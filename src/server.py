@@ -3202,12 +3202,16 @@ def api_canslim_scores():
     target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
     db = get_db()
 
-    # 如果没有指定日期的数据，取最近可用日期
-    check = db.execute("SELECT MAX(date) FROM cansim_scores").fetchone()
-    if not check or not check[0]:
+    # 如果没有指定日期的数据，取有足够数据的最新日期（至少1000条）
+    check = db.execute("""
+        SELECT date, COUNT(*) as cnt FROM cansim_scores 
+        GROUP BY date HAVING cnt >= 1000
+        ORDER BY date DESC LIMIT 1
+    """).fetchone()
+    if not check:
         return jsonify({'scores': [], 'date': target_date, 'count': 0})
 
-    latest = check[0]
+    latest = check['date']
     if target_date != latest:
         target_date = latest
 
@@ -3237,6 +3241,157 @@ def api_canslim_scores():
         })
 
     return jsonify({'scores': scores, 'date': target_date, 'count': len(scores)})
+
+# ═══════════════════════════════════════════════
+# 缠论每日精选
+# ═══════════════════════════════════════════════
+
+@app.route('/api/chanlun-daily-selection', methods=['GET'])
+def api_chanlun_daily_selection():
+    """返回最新观察池中当日有缠论买入信号的股票"""
+    target_date = request.args.get('date', '')
+    db = get_db()
+    
+    # 确定日期
+    if not target_date:
+        row = db.execute("SELECT MAX(date) FROM discipline_observation_pool").fetchone()
+        if not row or not row[0]:
+            return jsonify({'items': [], 'date': '', 'count': 0})
+        target_date = row[0]
+    
+    # 关联观察池 + 缠论扫描结果，筛选当日有买入信号的
+    pool_count = db.execute("SELECT COUNT(*) FROM discipline_observation_pool WHERE date = ?", (target_date,)).fetchone()[0]
+    scan_count = db.execute("SELECT COUNT(*) FROM chanlun_scan_daily WHERE scan_date = ? AND latest_trade_side = 'buy'", (target_date,)).fetchone()[0]
+    
+    rows = db.execute("""
+        SELECT o.stock_code, o.stock_name, o.industry_name, o.rs_category,
+               o.rps_20, o.rps_250, o.canslim_total, o.composite_score,
+               c.latest_trade_type, c.latest_trade_price, c.bi_count, c.zs_count,
+               c.latest_bi_dir, c.latest_bi_power
+        FROM discipline_observation_pool o
+        JOIN chanlun_scan_daily c ON o.stock_code = c.stock_code AND o.date = c.scan_date
+        WHERE o.date = ? AND c.latest_trade_side = 'buy'
+        ORDER BY o.composite_score DESC
+    """, (target_date,)).fetchall()
+    
+    items = []
+    for r in rows:
+        items.append({
+            'stock_code': r['stock_code'],
+            'stock_name': r['stock_name'],
+            'industry_name': r['industry_name'],
+            'rs_category': r['rs_category'],
+            'rps_20': r['rps_20'],
+            'rps_250': r['rps_250'],
+            'canslim_total': r['canslim_total'],
+            'composite_score': round(r['composite_score'],1) if r['composite_score'] else None,
+            'trade_type': r['latest_trade_type'],
+            'trade_price': r['latest_trade_price'],
+            'bi_count': r['bi_count'],
+            'zs_count': r['zs_count'],
+            'latest_bi_dir': r['latest_bi_dir'],
+            'latest_bi_power': round(r['latest_bi_power'],1) if r['latest_bi_power'] else None,
+        })
+    
+    return jsonify({'items': items, 'date': target_date, 'count': len(items), 'pool_count': pool_count, 'scan_count': scan_count})
+
+
+# ═══════════════════════════════════════════════
+# 突破形态结构识别
+# ═══════════════════════════════════════════════
+
+@app.route('/api/pattern/structure', methods=['GET', 'OPTIONS'])
+def api_pattern_structure():
+    if request.method == 'OPTIONS':
+        return '', 204
+    code = request.args.get('code', '').strip()
+    start = request.args.get('start', '').strip()
+    end = request.args.get('end', '').strip()
+    if not code or not start or not end:
+        return jsonify({'error': '缺少参数 code/start/end'}), 400
+    from scanners.pattern_structure import analyze_structure
+    result = analyze_structure(code, start, end)
+    if 'error' in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+# ═══════════════════════════════════════════════
+# MW 信号
+# ═══════════════════════════════════════════════
+
+@app.route('/api/mw/scan', methods=['POST', 'OPTIONS'])
+def api_mw_scan():
+    if request.method == 'OPTIONS':
+        return '', 204
+    data = request.get_json() or {}
+    start = data.get('start', '')
+    end = data.get('end', '')
+    if not start:
+        return jsonify({'error': '缺少 start 参数'}), 400
+    if not end:
+        end = start
+    
+    from datetime import datetime, timedelta
+    from scanners.mw_signal import run_scan
+    
+    s_dt = datetime.strptime(start, '%Y-%m-%d')
+    e_dt = datetime.strptime(end, '%Y-%m-%d')
+    results = []
+    dt = s_dt
+    while dt <= e_dt:
+        ds = dt.strftime('%Y-%m-%d')
+        print(f'[MW Scan] {ds}...', flush=True)
+        try:
+            run_scan(ds, fast=False)
+            results.append(ds)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'{ds}: {str(e)}'}), 500
+        dt += timedelta(days=1)
+    
+    return jsonify({'ok': True, 'scanned': results, 'count': len(results)})
+
+
+@app.route('/api/mw/signals', methods=['GET', 'OPTIONS'])
+def api_mw_signals():
+    if request.method == 'OPTIONS':
+        return '', 204
+    target_date = request.args.get('date', None)
+    start_date = request.args.get('start', None)
+    end_date = request.args.get('end', None)
+    db = get_db()
+    
+    if start_date and end_date:
+        rows = db.execute(
+            "SELECT * FROM mw_signal_daily WHERE b2_date >= ? AND b2_date <= ? ORDER BY b2_date DESC, score DESC",
+            (start_date, end_date)
+        ).fetchall()
+    elif target_date:
+        rows = db.execute(
+            "SELECT * FROM mw_signal_daily WHERE b2_date=? ORDER BY score DESC", (target_date,)
+        ).fetchall()
+    else:
+        row = db.execute("SELECT MAX(b2_date) FROM mw_signal_daily").fetchone()
+        if not row or not row[0]:
+            return jsonify({'date': None, 'signals': [], 'count': 0, 'dates': []})
+        target_date = row[0]
+        rows = db.execute(
+            "SELECT * FROM mw_signal_daily WHERE b2_date=? ORDER BY score DESC", (target_date,)
+        ).fetchall()
+    
+    signals = [dict(r) for r in rows]
+    
+    # 可用 B2 日期列表
+    avail = db.execute("SELECT DISTINCT b2_date FROM mw_signal_daily ORDER BY b2_date DESC").fetchall()
+    dates = [r[0] for r in avail]
+    
+    return jsonify({
+        'date': target_date, 'start': start_date, 'end': end_date,
+        'signals': signals, 'count': len(signals), 'dates': dates
+    })
+
 
 # ═══════════════════════════════════════════════
 # CORS

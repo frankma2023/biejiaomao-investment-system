@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>缠论每日精选</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<style>
+  .page-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+  .page-header h1{font-family:var(--font-display);font-size:1.2rem;font-weight:400;color:var(--text-primary)}
+  .page-header .meta{font-size:0.65rem;color:var(--muted)}
+  html[data-theme="light"] .page-header h1{color:#374151}
+
+  .info-row{font-size:10px;color:var(--muted);margin-bottom:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+  .tag{display:inline-block;padding:2px 6px;border-radius:5px;font-size:10px;font-weight:500;margin:1px}
+  .tag-leader{background:rgba(168,85,247,.12);color:#c084fc;border:1px solid rgba(168,85,247,.2)}
+  .tag-burst{background:rgba(6,182,212,.12);color:#22d3ee;border:1px solid rgba(6,182,212,.2)}
+  .tag-double{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.2)}
+  .tag-short{background:rgba(59,130,246,.12);color:#60a5fa;border:1px solid rgba(59,130,246,.2)}
+  .tag-steady{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.2)}
+  .tag-buy1{background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.2)}
+  .tag-buy2{background:rgba(245,158,11,.1);color:var(--accent);border:1px solid rgba(245,158,11,.2)}
+  .tag-buy3{background:rgba(168,85,247,.1);color:#a855f7;border:1px solid rgba(168,85,247,.2)}
+
+  .table-shell{background:var(--card);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow-card)}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  thead{position:sticky;top:0;z-index:5}
+  th{text-align:center;padding:8px 4px;border-bottom:1px solid var(--border);font-size:9px;font-weight:500;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap;background:var(--card);text-transform:uppercase;letter-spacing:.04em}
+  th:hover{color:var(--text-primary)}
+  td{padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.03);text-align:center;font-weight:300;font-variant-numeric:tabular-nums}
+  tbody tr:hover{background:rgba(255,255,255,.02)}
+  a{color:var(--accent);text-decoration:none;font-weight:500}
+  a:hover{text-decoration:underline}
+
+  .loading{text-align:center;padding:40px;color:var(--muted);font-family:var(--font-display)}
+  .ft-btn{padding:3px 10px;border:1px solid var(--border);border-radius:8px;background:rgba(26,26,31,.4);color:var(--muted);font-size:10px;cursor:pointer;font-family:var(--font-body);transition:all .15s}
+  .ft-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .ft-btn.active{background:var(--accent-subtle);color:var(--accent);border-color:var(--accent-border)}
+
+  html[data-theme="light"] .table-shell{background:rgba(255,255,255,.7);border-color:var(--divider)}
+  html[data-theme="light"] th{background:rgba(255,255,255,.9);color:var(--muted);border-bottom-color:var(--divider)}
+  html[data-theme="light"] td{border-bottom-color:rgba(0,0,0,.03)}
+  html[data-theme="light"] tbody tr:hover{background:rgba(0,0,0,.02)}
+  html[data-theme="light"] a{color:#d97706}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<script>(function(){var c=document.getElementById("bg-canvas"),w=c.width=window.innerWidth,h=c.height=window.innerHeight;var ctx=c.getContext("2d"),N=60;var p=[];for(var i=0;i<N;i++)p.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var P=p[i];P.x+=P.vx;P.y+=P.vy;if(P.x<0)P.x=w;if(P.x>w)P.x=0;if(P.y<0)P.y=h;if(P.y>h)P.y=0;ctx.beginPath();ctx.arc(P.x,P.y,P.r,0,Math.PI*2);ctx.fillStyle="rgba(245,158,11,"+P.o+")";ctx.fill()}for(var i=0;i<N;i++){for(var j=i+1;j<N;j++){var dx=p[i].x-p[j].x,dy=p[i].y-p[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){ctx.beginPath();ctx.moveTo(p[i].x,p[i].y);ctx.lineTo(p[j].x,p[j].y);ctx.strokeStyle="rgba(245,158,11,"+((100-dist)/100*.06)+")";ctx.stroke()}}}requestAnimationFrame(draw)}draw();window.addEventListener("resize",function(){w=c.width=window.innerWidth;h=c.height=window.innerHeight})})();</script>
+<div class="app-container">
+
+<nav id="top-nav"></nav>
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'🎋',brandText:'缠论每日精选',currentPage:'chanlun-daily'})</script>
+
+<div class="page-header">
+  <h1>🎋 缠论每日精选</h1>
+  <div class="meta" id="meta-info">加载中...</div>
+</div>
+
+<div class="info-row" id="info-bar"></div>
+<div class="table-shell" id="table-wrap">
+  <div class="loading">⏳ 扫描中...</div>
+</div>
+</div>
+
+<script>
+var API='http://localhost:8788';
+var allItems=[], sortCol='composite_score', sortDir='desc', currentFilter='all';
+
+function sortArrow(col){ return col===sortCol ? (sortDir==='asc'?' ▲':' ▼') : ''; }
+
+function thClick(col){
+  if(sortCol===col) sortDir=sortDir==='asc'?'desc':'asc';
+  else{sortCol=col;sortDir='desc';}
+  renderTable();
+}
+
+function loadData(){
+  fetch(API+'/api/chanlun-daily-selection')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      allItems=d.items||[];
+      document.getElementById('meta-info').textContent='数据日期: '+d.date+' · '+d.count+'只';
+      var tradeCounts={}; 
+      allItems.forEach(function(x){ tradeCounts[x.trade_type]=(tradeCounts[x.trade_type]||0)+1; });
+      var btnHtml='<span>📐 观察池 '+d.pool_count+'只 → 缠论买入信号 '+d.scan_count+'只 → 交集精选 <b>'+d.count+'只</b></span>';
+      btnHtml+='<span style="margin-left:12px;display:flex;gap:4px;align-items:center">';
+      btnHtml+='<button class="ft-btn active" onclick="setFilter("all",this)">全部('+d.count+')</button>';
+      ['一买','二买','三买','类一买'].forEach(function(t){
+        var n=tradeCounts[t]||0;
+        btnHtml+='<button class="ft-btn" onclick="setFilter(\''+t+'\',this)">'+t+'('+n+')</button>';
+      });
+      btnHtml+='</span>';
+      document.getElementById('info-bar').innerHTML=btnHtml;
+      renderTable();
+    })
+    .catch(function(e){
+      document.getElementById('table-wrap').innerHTML='<div class="loading">加载失败: '+e.message+'</div>';
+    });
+}
+
+function setFilter(type, btn){
+  currentFilter=type;
+  document.querySelectorAll('.ft-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  renderTable();
+}
+
+function renderTable(){
+  var items=allItems.slice();
+  if(currentFilter!=='all') items=items.filter(function(x){return x.trade_type===currentFilter;});
+  items.sort(function(a,b){
+    var va=a[sortCol]!=null?a[sortCol]:-Infinity;
+    var vb=b[sortCol]!=null?b[sortCol]:-Infinity;
+    return sortDir==='asc'?(va>vb?1:-1):(va<vb?1:-1);
+  });
+
+  if(!items.length){
+    document.getElementById('table-wrap').innerHTML='<div class="loading">今日暂无缠论买入信号</div>';
+    return;
+  }
+
+  var cols=[
+    {k:'stock_code',l:'代码',w:''},
+    {k:'stock_name',l:'名称',w:''},
+    {k:'industry_name',l:'行业',w:''},
+    {k:'rs_category',l:'RS分类',w:''},
+    {k:'rps_20',l:'RPS20',w:''},
+    {k:'rps_250',l:'RPS250',w:''},
+    {k:'canslim_total',l:'CANSLIM',w:''},
+    {k:'composite_score',l:'综合',w:''},
+    {k:'trade_type',l:'缠论信号',w:''},
+    {k:'bi_count',l:'笔数',w:''},
+    {k:'zs_count',l:'中枢',w:''},
+  ];
+
+  var h='<table><thead><tr>';
+  cols.forEach(function(c){
+    h+='<th onclick="thClick(\''+c.k+'\')">'+c.l+'<span style="font-size:8px;margin-left:2px">'+sortArrow(c.k)+'</span></th>';
+  });
+  h+='</tr></thead><tbody>';
+
+  items.forEach(function(item){
+    var cats=(item.rs_category||'').split(' / ');
+    var catTags=cats.map(function(c){
+      c=c.trim();
+      var cls='tag-steady';
+      if(c==='龙头')cls='tag-leader';
+      else if(c==='加速')cls='tag-burst';
+      else if(c==='双强')cls='tag-double';
+      else if(c==='短爆')cls='tag-short';
+      return '<span class="tag '+cls+'">'+c+'</span>';
+    }).join(' ');
+
+    var tradeCls='tag-buy1';
+    if(item.trade_type==='二买'||item.trade_type==='类一买')tradeCls='tag-buy2';
+    else if(item.trade_type==='三买')tradeCls='tag-buy3';
+
+    h+='<tr>';
+    h+='<td><a href="../chanlun-backtest/?code='+item.stock_code+'&mode=stock" target="_blank">'+item.stock_code+'</a></td>';
+    h+='<td>'+item.stock_name+'</td>';
+    h+='<td style="font-size:10px;color:var(--muted)">'+(item.industry_name||'')+'</td>';
+    h+='<td>'+catTags+'</td>';
+    h+='<td>'+(item.rps_20!=null?item.rps_20:'—')+'</td>';
+    h+='<td>'+(item.rps_250!=null?item.rps_250:'—')+'</td>';
+    h+='<td>'+(item.canslim_total!=null?item.canslim_total:'—')+'</td>';
+    h+='<td style="font-weight:500">'+(item.composite_score!=null?item.composite_score:'—')+'</td>';
+    h+='<td><span class="tag '+tradeCls+'">'+item.trade_type+'</span></td>';
+    h+='<td>'+(item.bi_count||0)+'</td>';
+    h+='<td>'+(item.zs_count||0)+'</td>';
+    h+='</tr>';
+  });
+  h+='</tbody></table>';
+  document.getElementById('table-wrap').innerHTML=h;
+}
+
+loadData();
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+</script>
+</body>
+</html>

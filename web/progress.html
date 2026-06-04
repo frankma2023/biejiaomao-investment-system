@@ -46,11 +46,11 @@
 
     <header class="panel-header">
       <h1>📋 欧奈尔投资系统 · 项目进展</h1>
-      <p>2026-05-30（阶段收尾）</p>
+      <p>2026-06-04（阶段收尾）</p>
     </header>
 
     <div class="pg-stats">
-      <div class="pg-stat"><div class="n" style="color:#4CAF50">89</div><div class="l">已完成</div></div>
+      <div class="pg-stat"><div class="n" style="color:#4CAF50">92</div><div class="l">已完成</div></div>
       <div class="pg-stat"><div class="n" style="color:#FF9800">0</div><div class="l">进行中</div></div>
       <div class="pg-stat"><div class="n">2</div><div class="l">待开发</div></div>
     </div>
@@ -203,6 +203,17 @@
         </table>
       </div>
 
+      <div class="pg-card">
+        <h3>🐺 MW 信号引擎 <span class="badge" style="background:#F3E5F5;color:#7B1FA2">3项</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>MW信号全市场扫描</td><td>src/scanners/mw_signal.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>特定形态结构识别</td><td>src/scanners/pattern_structure.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>MW信号数据回填</td><td>scripts/backfill_mw_data.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>MW信号前端看板</td><td>/mw-signals/</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>形态结构前端页面</td><td>/pattern-structure/</td></tr>
+        </table>
+      </div>
+
     </div>
 
     <div class="section-title" style="margin-top:28px">📋 本次开发经验教训</div>
@@ -268,7 +279,13 @@
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">52. Baostock 分钟数据按需拉取+缓存——首次慢，后续秒出</div><div class="ld">baostock 免费提供分钟 K 线（15/60 分钟），历史从 1999 年开始。封装 api_stock_minute.py 拉取模块（上下文管理器防连接泄漏），SQLite 缓存（INSERT OR IGNORE 增量），首次拉取约 3 秒，缓存后秒读。daily_update.py 步骤16 盘后预下载观察池+精选池分钟数据，次日区间套分析秒出。教训：免费数据源+本地缓存 > 实时请求——盘后预加载是用户体验的关键。</div></div>
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">53. 缩小扫描范围比全市场扫描更有价值——671 只 8 分钟完成</div><div class="ld">缠论批量扫描最初设计为全市场 5000 只（2-4 小时）。改为只扫描观察池+精选池（671 只）后，8 分钟即可完成，且扫描的都是用户实际关注的标的，信号更有决策价值。教训：技术可行 ≠ 产品有价值——聚焦用户真正需要的数据范围，性价比提升一个数量级。</div></div>
 
-    <div class="updated">❤️ 投资手账本 · 项目进展</div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">54. B1/B2 规则必须与 PRD 严格对齐，两套引擎不能各行其是</div><div class="ld">pattern_structure.py（形态页面）的 B1/B2 检测规则与 mw_signal.py（信号引擎/PRD）存在 5 处差异：B1 缺 MA5>MA10 条件、缺前10日最大下跌量、缺横盘区最高收盘价；B2 平台含 B1 盘中高点（PRD 说不含）、缺前10日下跌量、两轮宽松兜底。导致同一股票两引擎产出不同 B2 日期。统一为 PRD 的 8 条硬性门禁，删掉宽松兜底。</div></div>
+
+<div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">55. Popen+线程实时读取 stdout 是回填脚本的观测性底线</div><div class="ld">subprocess.run(capture_output=True) 把子进程输出全吞进内存，98天回填无任何输出。用户以为卡死只能杀进程。修复：Popen + threading 逐行读取 + flush=True + PYTHONUNBUFFERED=1，子进程输出实时透传。教训：长时间脚本的观测性优先级高于一切。</div></div>
+
+<div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">56. 形态扫描加市值过滤砍掉 25% 无效扫描</div><div class="ld">daily_pattern_scan.py --all 模式扫 4139 只候选，加入市值≥50亿过滤（stock_equity_change.capitalization × close）后降到 3120 只，砍掉 1019 只小票/垃圾股。单日扫描时间从 ~15min 降到 ~10min。教训：全量扫描前先砍无效样本，比优化扫描逻辑收益更大。</div></div>
+
+<div class="updated">❤️ 投资手账本 · 项目进展</div>
   </div>
 <script>
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}

@@ -102,6 +102,7 @@
 
 <div class="bottom-layout">
   <div class="bottom-left">
+    <div id="trend-banner"></div>
     <div class="xhs-card">
       <div class="xhs-card-header"><span class="xhs-card-label">笔列表</span><span style="font-size:10px;color:var(--muted);margin-left:6px" id="bi-count-label"></span></div>
       <div id="bi-table"></div>
@@ -123,6 +124,10 @@
     <div class="xhs-card" style="margin-top:12px">
       <div class="xhs-card-header"><span class="xhs-card-label">⚡ 背驰信号</span></div>
       <div id="divergence-panel"></div>
+    </div>
+    <div class="xhs-card" style="margin-top:12px">
+      <div class="xhs-card-header"><span class="xhs-card-label">📊 背驰后追踪</span></div>
+      <div id="outcome-panel"></div>
     </div>
   </div>
 </div>
@@ -428,6 +433,27 @@ function renderStats(data){
     return '<div class="stat-card"><div class="val"'+(c.c?' style=color:'+c.c:'')+'>'+c.v+'</div><div class="lbl">'+c.l+'</div></div>';
   }).join('');
   
+  // ── 走势类型卡片 ──
+  var tc=data.trend_classification;
+  if(tc){
+    var trendIcon={'上涨趋势':'📈','下跌趋势':'📉','盘整':'📦','无中枢':'🌫'}[tc.trend_type]||'📊';
+    var trendColor={'上涨趋势':'#ef4444','下跌趋势':'#10b981','盘整':'var(--accent)','无中枢':'var(--muted)'}[tc.trend_type]||'var(--muted)';
+    var confBg=tc.confidence==='高'?'rgba(245,158,11,.12)':tc.confidence==='中'?'rgba(255,255,255,.06)':'rgba(255,255,255,.03)';
+    var trendHtml='<div class="glass-card" style="margin-bottom:10px;padding:12px 16px">';
+    trendHtml+='<div style="display:flex;align-items:center;gap:10px">';
+    trendHtml+='<span style="font-size:20px">'+trendIcon+'</span>';
+    trendHtml+='<span style="font-family:var(--font-display);font-size:16px;font-weight:400;color:'+trendColor+'">'+tc.trend_type+'</span>';
+    trendHtml+='<span style="padding:2px 8px;border-radius:6px;font-size:10px;font-weight:500;background:'+confBg+';color:var(--accent)">置信度: '+tc.confidence+'</span>';
+    if(tc.direction&&tc.direction!=='不明')trendHtml+='<span style="font-size:10px;color:var(--muted)">方向: '+tc.direction+'</span>';
+    if(tc.latest_range)trendHtml+='<span style="font-size:10px;color:var(--muted)">最近中枢: '+tc.latest_range+'</span>';
+    trendHtml+='</div>';
+    trendHtml+='<div style="margin-top:4px;font-size:11px;color:var(--text-secondary)">'+tc.description+'</div>';
+    trendHtml+='</div>';
+    if(document.getElementById('trend-banner')){
+      document.getElementById('trend-banner').innerHTML=trendHtml;
+    }
+  }
+  
   // ── 笔列表 ──
   var tbl='<table class="mini-table"><thead><tr><th>#</th><th>方向</th><th>起点</th><th>终点</th><th>低</th><th>高</th><th>力度</th></tr></thead><tbody>';
   var bis=[].concat(data.bi_list||[]).reverse();
@@ -525,11 +551,50 @@ function renderStats(data){
     divHtml='<span style="color:var(--muted);font-size:11px;padding:8px;display:block">暂无背驰信号</span>';
   }
   document.getElementById('divergence-panel').innerHTML=divHtml;
+  
+  // ── 背驰后追踪面板 ──
+  var outcomeHtml='';
+  if(data.divergence_outcomes&&data.divergence_outcomes.length){
+    var stats={};
+    data.divergence_outcomes.forEach(function(o){
+      stats[o.outcome]=(stats[o.outcome]||0)+1;
+    });
+    var total=data.divergence_outcomes.length;
+    outcomeHtml+='<div style="display:flex;gap:10px;padding:8px 0;flex-wrap:wrap">';
+    ['反趋势','更大级别盘整','中枢扩展','数据不足'].forEach(function(k){
+      var cnt=stats[k]||0;
+      if(cnt>0){
+        var pct=(cnt/total*100).toFixed(0);
+        var clr=k==='反趋势'?'var(--rise)':k==='中枢扩展'?'var(--fall)':'var(--accent)';
+        outcomeHtml+='<div style="flex:1;min-width:70px;text-align:center;padding:8px 4px;background:var(--card);border-radius:10px;border:1px solid var(--border)">';
+        outcomeHtml+='<div style="font-size:16px;font-weight:600;color:'+clr+'">'+cnt+'</div>';
+        outcomeHtml+='<div style="font-size:9px;color:var(--muted);margin-top:2px">'+k+' ('+pct+'%)</div></div>';
+      }
+    });
+    outcomeHtml+='</div>';
+    // 明细列表
+    data.divergence_outcomes.forEach(function(o){
+      var bg={'反趋势':'rgba(16,185,129,.06)','更大级别盘整':'rgba(245,158,11,.06)','中枢扩展':'rgba(239,68,68,.04)'}[o.outcome]||'rgba(255,255,255,.03)';
+      var bd={'反趋势':'rgba(16,185,129,.2)','更大级别盘整':'rgba(245,158,11,.2)','中枢扩展':'rgba(239,68,68,.15)'}[o.outcome]||'rgba(255,255,255,.06)';
+      var clr={'反趋势':'#10b981','更大级别盘整':'var(--accent)','中枢扩展':'#ef4444'}[o.outcome]||'var(--muted)';
+      outcomeHtml+='<div style="padding:6px 10px;margin:3px 0;background:'+bg+';border:1px solid '+bd+';border-radius:8px;font-size:10px">';
+      outcomeHtml+='<span style="color:'+clr+';font-weight:600">'+o.div_type+'</span> ';
+      outcomeHtml+='<span style="color:var(--muted)">'+o.div_dt+'</span> → ';
+      outcomeHtml+='<span style="color:'+clr+';font-weight:500">'+o.outcome+'</span>';
+      outcomeHtml+='<div style="color:var(--muted);margin-top:2px">'+o.detail+'</div>';
+      outcomeHtml+='</div>';
+    });
+  }else{
+    outcomeHtml='<span style="color:var(--muted);font-size:11px;padding:8px;display:block">暂无背驰追踪数据</span>';
+  }
+  document.getElementById('outcome-panel').innerHTML=outcomeHtml;
 }
 
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);analyze()}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 analyze();
+// URL参数读取股票代码和模式
+(function(){var p=new URLSearchParams(window.location.search);var c=p.get('code');var m=p.get('mode');if(m){mode=m}else if(c){mode=c.length===6?'stock':'index'}if(mode){document.getElementById('btn-stock').className='mode-btn'+(mode==='stock'?' active':'');document.getElementById('btn-index').className='mode-btn'+(mode==='index'?' active':'')}if(c){document.getElementById('code').value=c;analyze()}})();
 </script>
 </body>
 </html>

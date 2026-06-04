@@ -48,8 +48,7 @@
     { href: '../daily-pattern-scan/',   label: '形态扫描',         page: 'daily-pattern-scan' },
     { href: '../canslim-scores/',       label: 'CAN SLIM',          page: 'canslim-scores' },
     { href: '../pattern-scan/',         label: '形态识别',         page: 'pattern-scan' },
-    { href: '../chanlun-backtest/',     label: '缠论分析',         page: 'chanlun' },
-    { href: '../chanlun-scan/',         label: '缠论扫描',         page: 'chanlun-scan' },
+    { href: '../chanlun/',              label: '缠论',             page: 'chanlun' },
   ];
 
   function render() {

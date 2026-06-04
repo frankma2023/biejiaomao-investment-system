@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>缠论</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<style>
+  body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)}
+  .hero{text-align:center;padding:40px 0 20px}
+  .hero h1{font-family:var(--font-display);font-size:1.8rem;font-weight:400;margin:0;color:var(--text-primary)}
+  .hero p{color:var(--muted);font-size:0.75rem;margin-top:6px}
+  html[data-theme="light"] .hero h1{color:#374151}
+
+  .stage-row{display:flex;gap:10px;margin:20px 0;flex-wrap:wrap}
+  .stage-card{flex:1 1 150px;background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:14px;padding:18px 14px;text-align:center;cursor:pointer;transition:all .2s;text-decoration:none;color:inherit;box-shadow:var(--shadow-card)}
+  .stage-card:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 6px 18px rgba(0,0,0,.15)}
+  .stage-card .icon{font-size:1.8rem;margin-bottom:6px}
+  .stage-card h3{font-family:var(--font-display);font-size:0.85rem;font-weight:600;margin:0 0 4px;color:var(--text-primary)}
+  .stage-card p{font-size:0.62rem;color:var(--muted);margin:0}
+
+  .section-title{font-family:var(--font-display);font-size:0.9rem;color:var(--muted);margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+
+  .quick-stats{display:flex;gap:10px;margin:16px 0;flex-wrap:wrap}
+  .qs{flex:1 1 130px;background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:14px;padding:14px 10px;text-align:center;box-shadow:var(--shadow-card);transition:all .2s}
+  .qs:hover{border-color:var(--accent)}
+  .qs .n{font-family:var(--font-display);font-size:1.4rem;font-weight:700;color:var(--text-primary)}
+  .qs .l{font-size:0.55rem;color:var(--muted);margin-top:2px}
+
+  html[data-theme="light"] .stage-card{background:rgba(255,255,255,.75);border-color:var(--divider)}
+  html[data-theme="light"] .stage-card h3{color:#374151}
+  html[data-theme="light"] .qs{background:rgba(255,255,255,.7);border-color:var(--divider)}
+  html[data-theme="light"] .section-title{color:var(--muted);border-bottom-color:var(--divider)}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<script>(function(){var c=document.getElementById("bg-canvas"),w=c.width=window.innerWidth,h=c.height=window.innerHeight;var ctx=c.getContext("2d"),N=60;var p=[];for(var i=0;i<N;i++)p.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var P=p[i];P.x+=P.vx;P.y+=P.vy;if(P.x<0)P.x=w;if(P.x>w)P.x=0;if(P.y<0)P.y=h;if(P.y>h)P.y=0;ctx.beginPath();ctx.arc(P.x,P.y,P.r,0,Math.PI*2);ctx.fillStyle="rgba(245,158,11,"+P.o+")";ctx.fill()}for(var i=0;i<N;i++){for(var j=i+1;j<N;j++){var dx=p[i].x-p[j].x,dy=p[i].y-p[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){ctx.beginPath();ctx.moveTo(p[i].x,p[i].y);ctx.lineTo(p[j].x,p[j].y);ctx.strokeStyle="rgba(245,158,11,"+((100-dist)/100*.06)+")";ctx.stroke()}}}requestAnimationFrame(draw)}draw();window.addEventListener("resize",function(){w=c.width=window.innerWidth;h=c.height=window.innerHeight})})();</script>
+<div class="app-container">
+
+<nav id="top-nav"></nav>
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'🎋',brandText:'缠论',currentPage:'chanlun'})</script>
+
+<div class="hero">
+  <h1>🎋 缠论</h1>
+  <p>形态学 · 动力学 · 结构定性 · 信号决策</p>
+</div>
+
+<div class="section-title">📊 分析工具</div>
+<div class="stage-row">
+  <a href="../chanlun-backtest/" class="stage-card"><div class="icon">🔬</div><h3>缠论分析</h3><p>单股K线+信号</p></a>
+  <a href="../chanlun-scan/" class="stage-card"><div class="icon">📡</div><h3>缠论扫描</h3><p>批量+筛选</p></a>
+  <a href="../discipline/chanlun-daily.html" class="stage-card"><div class="icon">✨</div><h3>每日精选</h3><p>观察池+信号</p></a>
+</div>
+
+<div class="section-title">📈 回测验证</div>
+<div class="stage-row">
+  <a href="../chanlun-backtest-compare/" class="stage-card"><div class="icon">⚔️</div><h3>缠论 vs 欧奈尔</h3><p>回测对比</p></a>
+</div>
+
+<div class="section-title">📐 今日概况</div>
+<div class="quick-stats" id="summary-stats">
+  <div class="qs"><div class="n" id="stat-obs">-</div><div class="l">观察池</div></div>
+  <div class="qs"><div class="n" id="stat-scan">-</div><div class="l">缠论信号</div></div>
+  <div class="qs"><div class="n" id="stat-pick">-</div><div class="l">每日精选</div></div>
+</div>
+</div>
+
+<script>
+var API='http://localhost:8788';
+fetch(API+'/api/chanlun-daily-selection')
+  .then(function(r){return r.json()})
+  .then(function(d){
+    document.getElementById('stat-obs').textContent=d.pool_count||'-';
+    document.getElementById('stat-scan').textContent=d.scan_count||'-';
+    document.getElementById('stat-pick').textContent=d.count||'-';
+  })
+  .catch(function(){});
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+</script>
+</body>
+</html>

@@ -7,7 +7,7 @@
   python src/scanners/chanlun_scan.py --date 2026-05-29 # 指定日期
 """
 
-import sqlite3, sys, os
+import sqlite3, sys, os, json
 from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -40,6 +40,7 @@ def _ensure_table(conn):
             latest_trade_side TEXT,
             latest_trade_price REAL,
             resonance_strength TEXT,
+            bi_json TEXT,
             created_at TEXT DEFAULT (datetime('now','localtime')),
             UNIQUE(scan_date, stock_code)
         )
@@ -48,18 +49,39 @@ def _ensure_table(conn):
         CREATE INDEX IF NOT EXISTS idx_chanlun_scan_date 
         ON chanlun_scan_daily(scan_date)
     """)
+    # 加 bi_json 列（如果旧表没有）
+    try: conn.execute("ALTER TABLE chanlun_scan_daily ADD COLUMN bi_json TEXT")
+    except: pass
     conn.commit()
 
 
-def get_target_stocks(conn):
-    """从观察池和精选池获取待扫描的股票代码
+def get_target_stocks(conn, all_market=False):
+    """获取待扫描的股票代码
     
-    Returns:
-        list[tuple]: [(code, name), ...]
+    两种模式：
+    - 默认模式（all_market=False）：观察池 + 精选池股票（~300-500只），用于缠论扫描看板
+    - 全市场模式（all_market=True）：全A股过滤后的股票（~4500只），用于MW信号引擎等下游模块
+      ─ 过滤规则：排除ST/*ST、近20日日均成交额 < 5000万元
     """
-    stocks = {}  # code → name
+    stocks = {}
     
-    # 观察池最新快照
+    if all_market:
+        # 全市场模式：所有正常上市 + 流动性过滤
+        rows = conn.execute("""
+            SELECT DISTINCT k.stock_code, b.name
+            FROM daily_kline k
+            INNER JOIN stock_basic b ON k.stock_code=b.stock_code
+            WHERE b.listing_status='normally_listed'
+            AND b.name NOT LIKE '%ST%'
+            AND k.date >= date('now','-20 days')
+            GROUP BY k.stock_code
+            HAVING AVG(k.amount) >= 50000000
+        """).fetchall()
+        for r in rows:
+            if r[0]: stocks[r[0]] = r[1] or r[0]
+        return [(code, name) for code, name in sorted(stocks.items())]
+    
+    # 默认模式：观察池 + 精选池
     try:
         rows = conn.execute(
             "SELECT DISTINCT stock_code, stock_name FROM discipline_observation_pool "
@@ -71,7 +93,6 @@ def get_target_stocks(conn):
     except Exception as e:
         print(f"  观察池读取异常: {e}")
     
-    # 最新精选股票
     try:
         rows = conn.execute(
             "SELECT DISTINCT stock_code FROM discipline_screening_daily "
@@ -79,7 +100,7 @@ def get_target_stocks(conn):
         ).fetchall()
         for r in rows:
             if r[0] and r[0] not in stocks:
-                stocks[r[0]] = r[0]  # 名称稍后补
+                stocks[r[0]] = r[0]
     except Exception as e:
         print(f"  精选池读取异常: {e}")
     
@@ -150,18 +171,20 @@ def scan_stock(code, scan_date):
             "latest_trade_type": latest_trade_type,
             "latest_trade_side": latest_trade_side,
             "latest_trade_price": latest_trade_price,
-            "resonance_strength": None
+            "resonance_strength": None,
+            "bi_json": json.dumps(r.get("bi_list", []), ensure_ascii=False)
         }
     except Exception as e:
         print(f"  {code} 扫描异常: {e}")
         return None
 
 
-def run_scan(scan_date=None):
+def run_scan(scan_date=None, all_market=False):
     """执行批量扫描
     
     Args:
         scan_date: 扫描日期，默认今天
+        all_market: True=全市场过滤后股票，False=观察池+精选池（默认）
     """
     if scan_date is None:
         scan_date = datetime.now().strftime("%Y-%m-%d")
@@ -169,13 +192,14 @@ def run_scan(scan_date=None):
     conn = _connect()
     _ensure_table(conn)
     
-    stocks = get_target_stocks(conn)
+    stocks = get_target_stocks(conn, all_market=all_market)
     if not stocks:
-        print("无待扫描股票（观察池和精选池均为空）")
+        print("无待扫描股票")
         conn.close()
         return
     
-    print(f"缠论批量扫描: {scan_date}, 共 {len(stocks)} 只股票")
+    mode = "全市场(已过滤)" if all_market else "观察池+精选池"
+    print(f"缠论批量扫描: {scan_date}, {mode}, 共 {len(stocks)} 只股票")
     
     scanned = 0
     has_signal = 0
@@ -189,8 +213,8 @@ def run_scan(scan_date=None):
                 (scan_date, stock_code, stock_name, bi_count, zs_count, segment_count,
                  latest_bi_dir, latest_bi_power, divergence_count, latest_div_type,
                  trade_signal_count, latest_trade_type, latest_trade_side, latest_trade_price,
-                 resonance_strength)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 resonance_strength, bi_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 result["scan_date"], result["stock_code"], result["stock_name"],
                 result["bi_count"], result["zs_count"], result["segment_count"],
@@ -198,7 +222,7 @@ def run_scan(scan_date=None):
                 result["divergence_count"], result["latest_div_type"],
                 result["trade_signal_count"], result["latest_trade_type"],
                 result["latest_trade_side"], result["latest_trade_price"],
-                result["resonance_strength"]
+                result["resonance_strength"], result["bi_json"]
             ))
             scanned += 1
             if result["trade_signal_count"] > 0 or result["divergence_count"] > 0:
@@ -434,5 +458,6 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--date", type=str, default=None, help="扫描日期")
+    parser.add_argument("--all", action="store_true", help="全市场模式（过滤ST+低量），默认仅观察池+精选池")
     args = parser.parse_args()
-    run_scan(args.date)
+    run_scan(args.date, all_market=args.all)

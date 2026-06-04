@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MW 信号</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<style>
+.page-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.page-header h1{font-family:var(--font-display);font-size:1.2rem;font-weight:400;color:var(--text-primary)}
+.page-header .meta{font-size:.65rem;color:var(--muted)}
+
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.toolbar input[type=date]{font-family:var(--font-body);padding:6px 10px;border:1px solid var(--border);border-radius:10px;font-size:11px;background:var(--card);color:var(--text-primary);outline:none;width:120px}
+.toolbar input[type=date]:focus{border-color:var(--accent)}
+.toolbar select{font-family:var(--font-body);padding:6px 12px;border:1px solid var(--border);border-radius:10px;font-size:11px;background:var(--card);color:var(--text-primary);outline:none;cursor:pointer}
+.toolbar select:hover,.toolbar select:focus{border-color:var(--accent)}
+.toolbar .btn-sm{font-size:10px;padding:5px 12px;border:1px solid var(--accent-border);border-radius:10px;background:var(--accent-subtle);color:var(--accent);cursor:pointer;font-family:var(--font-body);font-weight:500}
+.toolbar .btn-sm:hover{background:rgba(245,158,11,.18)}
+
+.signal-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:10px;box-shadow:var(--shadow-card);cursor:pointer;transition:border-color .2s}
+.signal-card:hover{border-color:rgba(245,158,11,.3)}
+.signal-card .top-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.signal-card .stock-info{font-family:var(--font-display);font-size:.95rem;color:var(--text-primary)}
+.signal-card .stock-info a{color:var(--accent);text-decoration:none}
+.signal-card .stock-info a:hover{text-decoration:underline}
+.signal-card .stock-info .code{font-size:.65rem;color:var(--muted);margin-left:6px;font-family:var(--font-mono)}
+.signal-card .badge{display:inline-block;padding:3px 10px;border-radius:8px;font-size:10px;font-weight:600}
+.badge-high{background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.2)}
+.badge-mid{background:rgba(245,158,11,.1);color:var(--accent);border:1px solid rgba(245,158,11,.2)}
+.badge-low{background:rgba(139,139,144,.1);color:var(--muted);border:1px solid rgba(139,139,144,.2)}
+
+.signal-card .node-line{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:10px;font-family:var(--font-mono)}
+.node-dot{display:inline-block;width:8px;height:8px;border-radius:50%}
+.nd-H{background:#ef4444}.nd-L{background:#10b981}.nd-C{background:var(--accent)}.nd-B1{background:#3b82f6}.nd-P{background:var(--muted)}.nd-B2{background:#a78bfa}
+
+.signal-card .expand{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.signal-card .expand table{width:100%;border-collapse:collapse;font-size:10px}
+.signal-card .expand td{padding:3px 8px;font-family:var(--font-mono)}
+.signal-card .expand .lbl{color:var(--muted);width:100px}
+.signal-card .expand .val{color:var(--text-primary)}
+.signal-card .expand .sc-ok{color:#10b981}
+.signal-card .expand .sc-no{color:var(--muted)}
+
+.empty-state{text-align:center;padding:40px;color:var(--muted);font-family:var(--font-display)}
+
+html[data-theme="light"] .signal-card{background:rgba(255,255,255,.75)}
+html[data-theme="light"] .toolbar select,html[data-theme="light"] .toolbar input{background:rgba(255,255,255,.7);border-color:var(--divider);color:var(--text-primary)}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<script>(function(){var c=document.getElementById("bg-canvas"),w=c.width=window.innerWidth,h=c.height=window.innerHeight;var ctx=c.getContext("2d"),N=60;var p=[];for(var i=0;i<N;i++)p.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var P=p[i];P.x+=P.vx;P.y+=P.vy;if(P.x<0)P.x=w;if(P.x>w)P.x=0;if(P.y<0)P.y=h;if(P.y>h)P.y=0;ctx.beginPath();ctx.arc(P.x,P.y,P.r,0,2*Math.PI);ctx.fillStyle="rgba(245,158,11,"+P.o+")";ctx.fill()}for(var i=0;i<N;i++){for(var j=i+1;j<N;j++){var dx=p[i].x-p[j].x,dy=p[i].y-p[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){ctx.beginPath();ctx.moveTo(p[i].x,p[i].y);ctx.lineTo(p[j].x,p[j].y);ctx.strokeStyle="rgba(245,158,11,"+((100-dist)/100*.06)+")";ctx.stroke()}}}requestAnimationFrame(draw)}draw();window.addEventListener("resize",function(){w=c.width=window.innerWidth;h=c.height=window.innerHeight})})();</script>
+<div class="app-container">
+<nav id="top-nav"></nav>
+
+<div class="page-header">
+  <h1>🔥 MW 信号</h1>
+  <span class="meta" id="meta-info">加载中...</span>
+</div>
+
+<div class="toolbar">
+  <span style="font-size:10px;color:var(--muted)">B2日期范围</span>
+  <input type="date" id="date-start">
+  <span style="font-size:10px;color:var(--muted)">~</span>
+  <input type="date" id="date-end">
+  <button class="btn-sm" onclick="loadRange()">🔍 查询</button>
+  <button class="btn-glass" onclick="loadLatest()" style="font-size:10px;padding:5px 10px">📅 最新</button>
+  <select id="conf-filter" onchange="render()" style="margin-left:8px">
+    <option value="">全部置信度</option>
+    <option value="高">⭐⭐⭐ 高</option>
+    <option value="中">⭐⭐ 中</option>
+    <option value="低">⭐ 低</option>
+  </select>
+  <select id="rs-filter" onchange="render()">
+    <option value="">全部RS</option>
+    <option value="80">RS250 ≥ 80 (强势股)</option>
+  </select>
+  <select id="amt-filter" onchange="render()">
+    <option value="">全部成交额</option>
+    <option value="5000">日均 ≥ 5000万</option>
+  </select>
+  <span style="font-size:10px;color:var(--muted);margin-left:auto">点击卡片展开详情</span>
+  <button class="btn-glass" onclick="toggleTheme()" style="font-size:10px;padding:4px 10px" title="切换深浅色">🌓</button>
+</div>
+
+<div id="filter-stats" style="font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.8"></div>
+
+<div id="signals"></div>
+</div>
+
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'🔥',brandText:'MW信号',currentPage:'mw-signals'})</script>
+
+<script>
+const API='http://localhost:8788';
+var allSignals=[], allDates=[];
+
+async function loadLatest(){
+  document.getElementById('date-start').value='';
+  document.getElementById('date-end').value='';
+  await loadData('');
+}
+
+async function loadRange(){
+  var s=document.getElementById('date-start').value;
+  var e=document.getElementById('date-end').value;
+  if(!s||!e) return;
+  
+  var el=document.getElementById('signals');
+  el.innerHTML='<div class="empty-state">⏳ 正在扫描 '+s+' ~ '+e+'，全市场5354只股票，请耐心等待...</div>';
+  
+  try{
+    // 触发扫描
+    var scanResp=await fetch(API+'/api/mw/scan',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({start:s,end:e})
+    });
+    var scanResult=await scanResp.json();
+    if(scanResult.error){ el.innerHTML='<div class="empty-state">扫描失败: '+scanResult.error+'</div>'; return; }
+    // 扫描完成，加载结果
+    await loadData('start='+s+'&end='+e);
+  }catch(err){
+    el.innerHTML='<div class="empty-state">扫描失败: '+err.message+'</div>';
+  }
+}
+
+async function loadData(params){
+  try{
+    var r=await fetch(API+'/api/mw/signals?'+(params||''));
+    var d=await r.json();
+    allSignals=d.signals||[];
+    allDates=d.dates||[];
+    var label=d.date||'';
+    if(d.start) label=d.start+' ~ '+d.end;
+    document.getElementById('meta-info').textContent='B2日期 '+label+' · '+d.count+'个信号 · '+allDates.length+'个B2日';
+    // 填充日期选择器默认值
+    if(allDates.length){
+      if(!document.getElementById('date-end').value) document.getElementById('date-end').value=allDates[0];
+      if(!document.getElementById('date-start').value) document.getElementById('date-start').value=allDates[allDates.length-1];
+    }
+    render();
+  }catch(e){
+    document.getElementById('signals').innerHTML='<div class="empty-state">加载失败: '+e.message+'</div>';
+  }
+}
+
+function render(){
+  var conf=document.getElementById('conf-filter').value;
+  var rs=document.getElementById('rs-filter').value;
+  var amt=document.getElementById('amt-filter').value;
+  
+  var total=allSignals.length;
+  var afterConf=conf?allSignals.filter(function(s){return s.confidence===conf}).length:total;
+  var afterRS=allSignals.filter(function(s){
+    if(conf && s.confidence!==conf) return false;
+    if(rs && (!s.h_rs250 || s.h_rs250 < parseInt(rs))) return false;
+    return true;
+  }).length;
+  var afterAmt=allSignals.filter(function(s){
+    if(conf && s.confidence!==conf) return false;
+    if(rs && (!s.h_rs250 || s.h_rs250 < parseInt(rs))) return false;
+    if(amt && (!s.c_amount_avg || s.c_amount_avg < parseInt(amt)*10000)) return false;
+    return true;
+  }).length;
+  
+  var stats=[];
+  if(total>0){
+    stats.push('<b>'+total+'</b>个信号');
+    if(conf) stats.push('→ 置信度'+(conf==='高'?'⭐⭐⭐':conf==='中'?'⭐⭐':'⭐')+conf+' <b>'+afterConf+'</b>个');
+    if(rs) stats.push('→ RS250≥'+rs+' <b>'+afterRS+'</b>个');
+    if(amt) stats.push('→ 日均≥'+(parseInt(amt)/10000).toFixed(0)+'亿 <b>'+afterAmt+'</b>个');
+    if(!conf&&!rs&&!amt) stats.push('（选择筛选条件缩小范围）');
+  }
+  document.getElementById('filter-stats').innerHTML=stats.join(' ');
+  
+  var filtered=allSignals.filter(function(s){
+    if(conf && s.confidence!==conf) return false;
+    if(rs && (!s.h_rs250 || s.h_rs250 < parseInt(rs))) return false;
+    if(amt && (!s.c_amount_avg || s.c_amount_avg < parseInt(amt)*10000)) return false;
+    return true;
+  });
+  var el=document.getElementById('signals');
+  if(!filtered.length){
+    el.innerHTML='<div class="empty-state">'+(allSignals.length?'无匹配信号':'所选范围暂无MW信号')+'</div>';
+    return;
+  }
+
+  el.innerHTML=filtered.map(function(s,i){
+    var badgeCls=s.confidence==='高'?'badge-high':s.confidence==='中'?'badge-mid':'badge-low';
+    var stars=s.confidence==='高'?'⭐⭐⭐':s.confidence==='中'?'⭐⭐':'⭐';
+    return '<div class="signal-card" onclick="toggleExpand('+i+')">'+
+      '<div class="top-row">'+
+        '<span class="stock-info"><a href="http://localhost:8772/pattern-scan/?code='+s.stock_code+'" target="_blank">'+(s.stock_name||s.stock_code)+'</a><span class="code">'+s.stock_code+'</span></span>'+
+        '<span style="font-size:10px;color:var(--muted)">B2 '+s.b2_date+'</span>'+
+        '<span style="font-size:10px;color:var(--muted)">RS'+(s.h_rs250||'—')+' | '+(s.c_amount_avg?(s.c_amount_avg/10000).toFixed(0)+'万':'—')+'</span>'+
+        '<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+' ('+s.score+'分)</span>'+
+      '</div>'+
+      '<div class="node-line">'+
+        '<span class="node-dot nd-H"></span> H '+s.h_date+' ¥'+(s.h_price||'—')+
+        ' <span style="color:var(--muted)">→</span> '+
+        '<span class="node-dot nd-L"></span> L '+s.l_date+
+        ' <span style="color:var(--muted)">→</span> '+
+        '<span class="node-dot nd-C"></span> C '+s.c_start+'~'+s.c_end+
+        ' <span style="color:var(--muted)">→</span> '+
+        '<span class="node-dot nd-B1"></span> <b>B1</b> '+s.b1_date+' +'+(s.b1_return_pct||0).toFixed(1)+'%'+
+        ' <span style="color:var(--muted)">→</span> '+
+        '<span class="node-dot nd-B2"></span> <b>B2</b> '+s.b2_date+' +'+(s.b2_return_pct||0).toFixed(1)+'%'+
+      '</div>'+
+      '<div class="expand" id="exp-'+i+'">'+
+        '<table>'+
+          '<tr><td class="lbl">B2 涨幅</td><td class="val">+'+(s.b2_return_pct||0).toFixed(1)+'%</td>'+
+            '<td class="lbl">B2 收盘位</td><td class="val">'+(s.b2_close_pos!=null?s.b2_close_pos+'%':'—')+'</td>'+
+            '<td class="lbl">B2 均线</td><td class="val">'+(s.b2_ma_count!=null?s.b2_ma_count+'条':'—')+'</td>'+
+            '<td class="lbl">B2 跳空</td><td class="val">'+(s.b2_is_gap?'是':'否')+'</td></tr>'+
+          '<tr><td class="lbl">B1 涨幅</td><td class="val">+'+(s.b1_return_pct||0).toFixed(1)+'%</td>'+
+            '<td class="lbl">B1 量比</td><td class="val">'+(s.b1_vol_ratio!=null?s.b1_vol_ratio:'—')+'</td>'+
+            '<td class="lbl">跌幅</td><td class="val">'+(s.decline_pct!=null?(s.decline_pct>0?'+':'')+s.decline_pct.toFixed(1)+'%':'—')+'</td>'+
+            '<td class="lbl">横盘振幅</td><td class="val">'+(s.c_amplitude_pct!=null?s.c_amplitude_pct.toFixed(1)+'%':'—')+'</td></tr>'+
+          '<tr><td class="lbl">评分 H</td><td class="val '+(s.score_h?'sc-ok':'sc-no')+'">'+(s.score_h?'✅ 10':'— 0')+'</td>'+
+            '<td class="lbl">评分 D</td><td class="val '+(s.score_d?'sc-ok':'sc-no')+'">'+(s.score_d?'✅ 10':'— 0')+'</td>'+
+            '<td class="lbl">评分 C</td><td class="val '+(s.score_c?'sc-ok':'sc-no')+'">'+(s.score_c?'✅ 10':'— 0')+'</td>'+
+            '<td class="lbl">评分 P</td><td class="val '+(s.score_p?'sc-ok':'sc-no')+'">'+(s.score_p?'✅ 10':'— 0')+'</td></tr>'+
+          '<tr style="border-top:1px solid var(--border)"><td class="lbl">行业 I-1</td><td class="val '+(s.score_i1?'sc-ok':'sc-no')+'">'+(s.score_i1?'✅ 10':'— 0')+'</td>'+
+            '<td class="lbl">行业 I-2</td><td class="val '+(s.score_i2?'sc-ok':'sc-no')+'">'+(s.score_i2?'✅ 10':'— 0')+'</td>'+
+            '<td class="lbl">欧奈尔 I</td><td class="val '+(s.score_o1?'sc-ok':'sc-no')+'">'+(s.score_o1?'✅ '+s.score_o1+'分':'— 0')+'</td>'+
+            '<td class="lbl">欧奈尔 L</td><td class="val '+(s.score_o2?'sc-ok':'sc-no')+'">'+(s.score_o2?'✅ '+s.score_o2+'分':'— 0')+'</td></tr>'+
+          '<tr><td class="lbl">MA排列</td><td class="val '+(s.score_ma?'sc-ok':'sc-no')+'">'+(s.score_ma?'✅ '+s.score_ma+'分':'— 0')+'</td>'+
+            '<td class="lbl">信号共振</td><td class="val '+(s.score_sig?'sc-ok':'sc-no')+'">'+(s.score_sig?'✅ '+s.score_sig+'分':'— 0')+'</td>'+
+            '<td class="lbl"></td><td class="val"></td></tr>'+
+          '<tr><td class="lbl" colspan="4" style="color:var(--accent);font-weight:600">总分: '+s.score+'/100 = 形态'+(s.score_h+s.score_d+s.score_c+s.score_p)+' + 行业'+(s.score_i1||0+s.score_i2||0)+' + 欧奈尔'+(s.score_o1||0+s.score_o2||0)+' + MA'+(s.score_ma||0)+' + 共振'+(s.score_sig||0)+'</td></tr>'+
+        '</table>'+
+        '<div style="margin-top:8px;display:flex;gap:12px">'+
+          '<a href="http://localhost:8772/pattern-scan/?code='+s.stock_code+'" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🔍 形态复核 →</a>'+
+          '<a href="http://localhost:8772/chanlun-backtest/?code='+s.stock_code+'&mode=stock" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🎋 缠论分析 →</a>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function toggleExpand(i){
+  var el=document.getElementById('exp-'+i);
+  el.style.display=el.style.display==='block'?'none':'block';
+}
+
+function toggleTheme(){
+  var h=document.documentElement;
+  h.setAttribute('data-theme-switching','');
+  var n=h.dataset.theme==='dark'?'light':'dark';
+  h.dataset.theme=n;localStorage.setItem('theme',n);
+  requestAnimationFrame(function(){requestAnimationFrame(function(){h.removeAttribute('data-theme-switching')})});
+}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+
+loadLatest();
+</script>
+</body>
+</html>

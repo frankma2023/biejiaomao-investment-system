@@ -4,116 +4,528 @@
 <meta charset="UTF-8">
 <link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>缠论 vs 欧奈尔回测对比</title>
+<title>缠论 vs 欧奈尔 回测对比</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/css/hanako-glass.css">
 <style>
-body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)}
+:root {--color-up:#ef4444;--color-dn:#10b981}
+
 .page-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .page-header h1{font-family:var(--font-display);font-size:1.2rem;font-weight:400;color:var(--text-primary)}
 .page-header .meta{font-size:0.65rem;color:var(--muted)}
-html[data-theme="light"] .page-header h1{color:#374151}
 
-.cmp-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px}
-.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;box-shadow:var(--shadow-card)}
-.cmp-card h3{font-family:var(--font-display);font-size:0.85rem;font-weight:600;margin:0 0 10px;color:var(--accent)}
-.cmp-table{width:100%;border-collapse:collapse;font-size:12px}
-.cmp-table th{text-align:center;padding:7px 6px;border-bottom:1px solid var(--border);font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-.cmp-table td{text-align:center;padding:7px 6px;border-bottom:1px solid rgba(255,255,255,.03);font-variant-numeric:tabular-nums}
-.cmp-table .hl{font-weight:700;color:var(--accent)}
-.cmp-table .up{color:#4CAF50;font-weight:700}
-.cmp-table .dn{color:#E53935;font-weight:700}
-.cmp-table .win{font-size:10px;color:var(--muted)}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.toolbar label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.toolbar select{font-family:var(--font-body);padding:6px 12px;border:1px solid var(--border);border-radius:10px;font-size:11px;background:var(--card);color:var(--text-primary);outline:none;cursor:pointer;transition:border-color .2s}
+.toolbar select:hover,.toolbar select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,158,11,.1)}
 
-.bias-note{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:10px 14px;font-size:11px;color:var(--accent);margin-top:8px;line-height:1.5}
+html[data-theme="light"] .toolbar select{background:rgba(255,255,255,.7);border-color:var(--divider)}
 
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:700px){.two-col{grid-template-columns:1fr}}
+.phase-badge{display:inline-block;padding:3px 10px;border-radius:8px;font-size:10px;font-weight:500}
+.phase-up{background:rgba(16,185,129,.08);color:#10b981;border:1px solid rgba(16,185,129,.15)}
+.phase-cor{background:rgba(245,158,11,.08);color:#f59e0b;border:1px solid rgba(245,158,11,.15)}
+.phase-down{background:rgba(239,68,68,.08);color:#ef4444;border:1px solid rgba(239,68,68,.15)}
+html[data-theme="light"] .phase-up{color:#059669}html[data-theme="light"] .phase-cor{color:#d97706}html[data-theme="light"] .phase-down{color:#dc2626}
 
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.summary-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;box-shadow:var(--shadow-card);text-align:center}
+.summary-card .label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.summary-card .value{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--accent)}
+.summary-card .sub{font-size:10px;color:var(--muted);margin-top:2px}
+@media(max-width:700px){.summary-grid{grid-template-columns:1fr}}
+
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+@media(max-width:800px){.cmp-grid{grid-template-columns:1fr}}
+.cmp-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.cmp-card h3{font-family:var(--font-display);font-size:0.8rem;font-weight:600;margin:0 0 8px;color:var(--accent)}
 html[data-theme="light"] .cmp-card{background:rgba(255,255,255,.75)}
+html[data-theme="light"] .summary-card{background:rgba(255,255,255,.75)}
+
+/* Table styles */
+.table-shell{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow-x:auto;box-shadow:var(--shadow-card);margin-bottom:12px}
+.cmp-table{width:100%;border-collapse:collapse;font-size:11px}
+.cmp-table th{text-align:center;padding:7px 5px;border-bottom:1px solid var(--border);font-size:9px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;cursor:pointer;user-select:none;background:rgba(26,26,31,.4)}
+.cmp-table th:hover{color:var(--text-primary)}
+.cmp-table td{text-align:center;padding:7px 5px;border-bottom:1px solid rgba(255,255,255,.03);font-variant-numeric:tabular-nums;font-family:var(--font-mono);font-size:10px}
+.cmp-table tbody tr:hover{background:rgba(255,255,255,.02)}
+.cmp-table .up{color:#ef4444;font-weight:600}
+.cmp-table .dn{color:#10b981;font-weight:600}
+.cmp-table .win{font-size:9px;color:var(--muted)}
+.cmp-table .code-link{color:var(--accent);text-decoration:none;cursor:pointer}
+.cmp-table .code-link:hover{text-decoration:underline}
+
+html[data-theme="light"] .cmp-table th{background:rgba(255,255,255,.9);border-bottom:1px solid rgba(0,0,0,.06)}
 html[data-theme="light"] .cmp-table td{border-bottom:1px solid rgba(0,0,0,.03)}
+html[data-theme="light"] .cmp-table tbody tr:hover{background:rgba(0,0,0,.02)}
+html[data-theme="light"] .code-link{color:#d97706}
+
+.method-note{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:10px;padding:10px 14px;font-size:11px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6}
+.method-note b{color:var(--accent)}
+html[data-theme="light"] .method-note{background:rgba(245,158,11,.04);border-color:rgba(245,158,11,.12)}
+
+.filter-rules{background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.15);border-radius:10px;padding:10px 14px;font-size:11px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6}
+.filter-rules b{color:#10b981}
+html[data-theme="light"] .filter-rules{background:rgba(16,185,129,.04);border-color:rgba(16,185,129,.12)}
+
+.empty-state{text-align:center;padding:32px;color:var(--muted);font-family:var(--font-display);font-size:.85rem}
+
+.sort-arrow{font-size:8px;margin-left:2px}
 </style>
 </head>
 <body>
+<canvas id="bg-canvas"></canvas>
+<script>
+(function(){
+  var c=document.getElementById('bg-canvas'),w=c.width=window.innerWidth,h=c.height=window.innerHeight;
+  var ctx=c.getContext('2d'),particles=[],N=60;
+  for(var i=0;i<N;i++)particles.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});
+  function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var p=particles[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=w;if(p.x>w)p.x=0;if(p.y<0)p.y=h;if(p.y>h)p.y=0;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(245,158,11,'+p.o+')';ctx.fill()}for(var i=0;i<N;i++){for(var j=i+1;j<N;j++){var dx=particles[i].x-particles[j].x,dy=particles[i].y-particles[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){ctx.beginPath();ctx.moveTo(particles[i].x,particles[i].y);ctx.lineTo(particles[j].x,particles[j].y);ctx.strokeStyle='rgba(245,158,11,'+((100-dist)/100*.06)+')';ctx.stroke()}}}requestAnimationFrame(draw)}draw();window.addEventListener('resize',function(){w=c.width=window.innerWidth;h=c.height=window.innerHeight});
+})();
+</script>
+
 <div class="app-container">
 <nav id="top-nav"></nav>
+
+<div class="page-header">
+  <h1>🎋 缠论 vs 欧奈尔 回测对比 <a href="guide.html" style="font-size:10px;color:var(--muted);text-decoration:none;margin-left:6px" title="查看解读指引">📖 解读指引</a></h1>
+  <span class="meta" id="meta-info">加载中...</span>
+</div>
+
+<div class="method-note">
+  <b>📐 回测方法论</b><br>
+  每日从欧奈尔观察池出发，三组对比：<b>全池基准</b>（买入全部）｜<b>缠论叠加</b>（同日缠论买入信号）｜<b>O'Neil进阶</b>（形态+行业共振精选）。
+  入场价统一为当日收盘价，追踪5/10/20个交易日。对照组包含全池基准与等额随机采样（50次取均值）。
+</div>
+
+<div class="toolbar">
+  <label>回测范围</label>
+  <select id="date-select" multiple size="1" onchange="onFilterChange()" style="min-width:160px">
+    <option value="">📅 加载中...</option>
+  </select>
+  <button class="btn-glass" onclick="selectAllDates()" style="font-size:9px;padding:2px 8px">全选</button>
+  <button class="btn-glass" onclick="deselectAllDates()" style="font-size:9px;padding:2px 8px">取消</button>
+  <label style="margin-left:8px">O'Neil状态</label>
+  <select id="phase-filter" onchange="onFilterChange()">
+    <option value="">全部</option>
+    <option value="上升趋势">上升趋势</option>
+    <option value="下降趋势">下降趋势</option>
+    <option value="尝试反弹">尝试反弹</option>
+    <option value="震荡盘整">震荡盘整</option>
+  </select>
+  <label>广度</label>
+  <select id="breadth-filter" onchange="onFilterChange()">
+    <option value="">全部</option>
+    <option value="广度健康">广度健康</option>
+    <option value="广度分化">广度分化</option>
+    <option value="广度恶化">广度恶化</option>
+  </select>
+  <label>趋势</label>
+  <select id="trend-filter" onchange="onFilterChange()">
+    <option value="">全部</option>
+    <option value="多头排列">多头排列</option>
+    <option value="震荡">震荡</option>
+    <option value="空头排列">空头排列</option>
+  </select>
+  <label>信号源</label>
+  <select id="source-filter" onchange="onFilterChange()">
+    <option value="raw">原始信号</option>
+    <option value="filtered">过滤后</option>
+  </select>
+  <button class="btn-glass" onclick="toggleTheme()" style="margin-left:auto;font-size:10px;padding:4px 10px" title="切换深浅色">🌓</button>
+</div>
+
+<div class="filter-rules" id="filter-rules" style="display:none">
+  <b>🔍 过滤后 · 三步规则链</b><br>
+  <b>Step 1 结构过滤</b>：走势类型为「上涨趋势」或「盘整」→ 通过<br>
+  <b>Step 2 信号匹配</b>：窗口内有至少一个买入信号 → 通过<br>
+  <b>Step 3 历史校验</b>：该股历史上背驰信号「反趋势」占比 ≥ 30% → 通过
+</div>
+
+<div class="summary-grid" id="summary-cards">
+  <div class="summary-card"><div class="label">缠论 vs 等额随机 · 胜率差</div><div class="value" id="sum-win-diff">—</div><div class="sub" id="sum-win-sub"></div></div>
+  <div class="summary-card"><div class="label">缠论 vs 全池基准 · 收益差</div><div class="value" id="sum-ret-diff">—</div><div class="sub" id="sum-ret-sub"></div></div>
+  <div class="summary-card"><div class="label">跑赢天数占比</div><div class="value" id="sum-beat-ratio">—</div><div class="sub" id="sum-beat-sub"></div></div>
+</div>
+
+<div class="cmp-grid" id="cmp-cards"></div>
+
+<div class="cmp-card" id="daily-detail-wrap" style="margin-bottom:12px">
+  <h3>📅 每日明细</h3>
+  <div class="table-shell"><table class="cmp-table" id="daily-table"><thead><tr></tr></thead><tbody></tbody></table></div>
+</div>
+
+<div class="cmp-card" id="signal-detail-wrap">
+  <h3>📋 信号明细（点击代码查看缠论分析）</h3>
+  <div class="table-shell"><table class="cmp-table" id="signal-table"><thead><tr></tr></thead><tbody></tbody></table></div>
+</div>
+</div>
+
 <script src="../shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:'🎋',brandText:'缠论vs欧奈尔',currentPage:'chanlun-backtest-compare'})</script>
 
-<div class="page-header">
-  <h1>🎋 缠论 vs 欧奈尔 回测对比</h1>
-  <div class="meta" id="meta-info">加载中...</div>
-</div>
-
-<div class="cmp-grid" id="main-grid"></div>
-
-<div class="bias-note">
-  ⚠️ CZSC 笔划分受完整历史数据（含未来K线）影响，回测信号质量高于实盘预期。本对比仅用于两套体系的相对差异分析，不构成实盘预测。
-</div>
-</div>
-
 <script>
-fetch('data.json').then(function(r){return r.json()}).then(function(d){
-  document.getElementById('meta-info').textContent = '观察池 671 只 | 回测 3 个月';
-  var h = '';
-
-  // A: 缠论 vs 随机
-  h += '<div class="cmp-card"><h3>A. 缠论买入 vs 随机买入</h3>';
-  h += '<table class="cmp-table"><thead><tr><th>持有期</th><th>缠论 均收益</th><th>缠论 胜率</th><th>随机 均收益</th><th>随机 胜率</th><th>优势</th></tr></thead><tbody>';
-  ['5d','10d','20d'].forEach(function(k){
-    var a = d['A_'+k]; if(!a) return;
-    var adv = (a.chanlun_avg - a.random_avg).toFixed(1);
-    var advCls = adv > 0 ? 'up' : 'dn';
-    h += '<tr><td><b>'+k+'</b></td>';
-    h += '<td class="hl">'+fmt(a.chanlun_avg)+'</td><td class="win">'+a.chanlun_win+'% ('+a.chanlun_n+')</td>';
-    h += '<td>'+fmt(a.random_avg)+'</td><td class="win">'+a.random_win+'% ('+a.random_n+')</td>';
-    h += '<td class="'+advCls+'">'+(adv>0?'+':'')+adv+'%</td></tr>';
-  });
-  h += '</tbody></table></div>';
-
-  // B + C 两列
-  h += '<div class="two-col">';
-
-  // B: 置信度
-  h += '<div class="cmp-card"><h3>B. 置信度对比</h3>';
-  h += '<table class="cmp-table"><thead><tr><th>持有期</th><th>高</th><th>中</th><th>低</th></tr></thead><tbody>';
-  ['5d','10d','20d'].forEach(function(k){
-    h += '<tr><td><b>'+k+'</b></td>';
-    ['高','中','低'].forEach(function(c){
-      var b = d['B_'+k+'_'+c]; if(!b) return;
-      h += '<td>'+(b.win>95?'<span class="hl">':'')+fmt(b.avg)+' <span class="win">'+b.win+'%</span>'+(b.win>95?'</span>':'')+'</td>';
-    });
-    h += '</tr>';
-  });
-  h += '<tr><td>样本</td>';
-  ['高','中','低'].forEach(function(c){ var b=d['B_5d_'+c]; h+='<td class="win">'+(b?b.n:0)+'</td>'; });
-  h += '</tr></tbody></table></div>';
-
-  // C: 信号类型
-  h += '<div class="cmp-card"><h3>C. 一买 vs 三买</h3>';
-  h += '<table class="cmp-table"><thead><tr><th>持有期</th><th>一买</th><th>三买</th></tr></thead><tbody>';
-  ['5d','10d','20d'].forEach(function(k){
-    h += '<tr><td><b>'+k+'</b></td>';
-    ['一买','三买'].forEach(function(t){
-      var c = d['C_'+k+'_'+t]; if(!c) return;
-      h += '<td>'+fmt(c.avg)+' <span class="win">'+c.win+'%</span></td>';
-    });
-    h += '</tr>';
-  });
-  h += '<tr><td>样本</td>';
-  ['一买','三买'].forEach(function(t){ var c=d['C_5d_'+t]; h+='<td class="win">'+(c?c.n:0)+'</td>'; });
-  h += '</tr></tbody></table></div>';
-
-  h += '</div>'; // two-col
-  document.getElementById('main-grid').innerHTML = h;
-});
-
-function fmt(v){ return (v>=0?'+':'')+v.toFixed(1)+'%'; }
-
-function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+function toggleTheme(){
+  var h=document.documentElement;
+  h.setAttribute('data-theme-switching','');
+  var n=h.dataset.theme==='dark'?'light':'dark';
+  h.dataset.theme=n;localStorage.setItem('theme',n);
+  requestAnimationFrame(function(){requestAnimationFrame(function(){h.removeAttribute('data-theme-switching')})});
+}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+
+var allData = [];
+var sourceType = 'raw';
+
+function onFilterChange(){
+  sourceType = document.getElementById('source-filter').value;
+  document.getElementById('filter-rules').style.display = sourceType==='filtered'?'block':'none';
+  render();
+}
+
+function fmt(v){ if(v==null||v===undefined) return '—'; var sign=v>=0?'+':''; return sign+v.toFixed(1)+'%'; }
+function fclr(v){ if(v==null||v===undefined) return ''; return v>=0?'up':'dn'; }
+
+function selectAllDates(){
+  var sel = document.getElementById('date-select');
+  for(var i=0;i<sel.options.length;i++) sel.options[i].selected=true;
+  onFilterChange();
+}
+function deselectAllDates(){
+  var sel = document.getElementById('date-select');
+  for(var i=0;i<sel.options.length;i++) sel.options[i].selected=false;
+  onFilterChange();
+}
+
+async function load(){
+  try{
+    var mResp = await fetch('manifest.json');
+    if(!mResp.ok){ document.getElementById('meta-info').textContent='无数据 · 请先运行回测脚本'; return; }
+    var manifest = await mResp.json();
+    if(!manifest.length){ document.getElementById('meta-info').textContent='Manifest为空'; return; }
+
+    // 填充日期选择器
+    var sel = document.getElementById('date-select');
+    sel.innerHTML = '';
+    manifest.forEach(function(m){
+      var opt = document.createElement('option');
+      opt.value = m.obs_date;
+      opt.selected = true; // 默认全选
+      var phase = m.market_phase||'—';
+      var filt = m.chanlun_filtered_n!=null ? ' F'+m.chanlun_filtered_n : '';
+      opt.textContent = m.obs_date + ' 池'+m.pool_size+' 缠'+m.chanlun_n+filt+' O'+m.oneil_advanced_n+' '+phase;
+      sel.appendChild(opt);
+    });
+
+    // 加载所有数据
+    allData = [];
+    var loadPromises = manifest.map(function(m){
+      var fname = sourceType==='filtered' ? m.obs_date+'_filtered.json' : m.obs_date+'.json';
+      return fetch('data/'+fname).then(function(r){return r.json()}).catch(function(){return null});
+    });
+    var results = await Promise.all(loadPromises);
+    results.forEach(function(d,i){
+      if(d){ d._meta = manifest[i]; allData.push(d); }
+    });
+
+    document.getElementById('meta-info').textContent = allData.length+'个交易日 · '+
+      allData.reduce(function(s,d){return s+(d.signals||[]).length},0)+'个缠论信号 · '+
+      allData.reduce(function(s,d){return s+(d.oneil_signals||[]).length},0)+'个O\'Neil精选';
+
+    render();
+  }catch(e){
+    document.getElementById('meta-info').textContent = '加载失败: '+e.message;
+    console.error(e);
+  }
+}
+
+function getFilteredData(){
+  var phase = document.getElementById('phase-filter').value;
+  var breadth = document.getElementById('breadth-filter').value;
+  var trend = document.getElementById('trend-filter').value;
+  // 读取日期多选
+  var sel = document.getElementById('date-select');
+  var selectedDates = Array.from(sel.selectedOptions).map(function(o){return o.value});
+  return allData.filter(function(d){
+    // 日期筛选
+    if(selectedDates.length > 0 && selectedDates.indexOf(d.obs_date) === -1) return false;
+    // 切片筛选
+    var ctx = d.market_context||{};
+    if(phase && ctx.oneil_phase!==phase) return false;
+    if(breadth && ctx.nh_nl_status!==breadth) return false;
+    if(trend && ctx.trend!==trend) return false;
+    return true;
+  });
+}
+
+function render(){
+  var data = getFilteredData();
+  if(!data.length){
+    document.getElementById('summary-cards').innerHTML='<div class="empty-state" style="grid-column:1/-1">无匹配数据</div>';
+    document.getElementById('cmp-cards').innerHTML='';
+    document.getElementById('daily-table').innerHTML='<thead><tr></tr></thead><tbody></tbody>';
+    document.getElementById('signal-table').innerHTML='<thead><tr></tr></thead><tbody></tbody>';
+    return;
+  }
+
+  // ═══ 汇总统计 ═══
+  renderSummary(data);
+
+  // ═══ 对比卡片 ═══
+  renderCards(data);
+
+  // ═══ 每日明细表 ═══
+  renderDailyTable(data);
+
+  // ═══ 信号明细 ═══
+  renderSignalTable(data);
+}
+
+function renderSummary(data){
+  var n = data.length;
+  var winDiffs=[], retDiffs=[], beatDays=0;
+
+  data.forEach(function(d){
+    var st = d.stats||{};
+    var cl = st.chanlun||{}, re = st.random_equal||{};
+    if(cl['20d'] && re['20d']){
+      var wd = cl['20d'].win - re['20d'].win;
+      var rd = cl['20d'].avg - re['20d'].avg;
+      winDiffs.push(wd);
+      retDiffs.push(rd);
+      if(rd>0) beatDays++;
+    }
+  });
+
+  var avgWinDiff = winDiffs.length ? (winDiffs.reduce(function(a,b){return a+b},0)/winDiffs.length).toFixed(1) : '—';
+  var avgRetDiff = retDiffs.length ? (retDiffs.reduce(function(a,b){return a+b},0)/retDiffs.length).toFixed(1) : '—';
+  var beatRatio = n>0 ? beatDays+'/'+n+' = '+(beatDays/n*100).toFixed(1)+'%' : '—';
+
+  document.getElementById('sum-win-diff').textContent = avgWinDiff!=='—' ? (avgWinDiff>=0?'+':'')+avgWinDiff+'pp' : '—';
+  document.getElementById('sum-win-sub').textContent = '缠论20日胜率 vs 等额随机';
+  document.getElementById('sum-ret-diff').textContent = avgRetDiff!=='—' ? fmt(parseFloat(avgRetDiff)) : '—';
+  document.getElementById('sum-ret-sub').textContent = '缠论20日均收益 vs 全池基准';
+  document.getElementById('sum-beat-ratio').textContent = beatRatio;
+  document.getElementById('sum-beat-sub').textContent = '缠论20日收益跑赢全池的天数占比';
+}
+
+function renderCards(data){
+  // Aggregate stats across all days
+  var agg = {chanlun:{'5d':[],'10d':[],'20d':[]},full_basket:{'5d':[],'10d':[],'20d':[]},
+              random_equal:{'5d':[],'10d':[],'20d':[]},oneil:{'5d':[],'10d':[],'20d':[]},
+              oneil_re:{'5d':[],'10d':[],'20d':[]}};
+  var byType = {}, byPhase = {};
+
+  data.forEach(function(d){
+    var st = d.stats||{};
+    ['5d','10d','20d'].forEach(function(h){
+      if(st.chanlun&&st.chanlun[h]) agg.chanlun[h].push(st.chanlun[h]);
+      if(st.full_basket&&st.full_basket[h]) agg.full_basket[h].push(st.full_basket[h]);
+      if(st.random_equal&&st.random_equal[h]) agg.random_equal[h].push(st.random_equal[h]);
+      if(st.oneil_advanced&&st.oneil_advanced[h]) agg.oneil[h].push(st.oneil_advanced[h]);
+      if(st.oneil_random_equal&&st.oneil_random_equal[h]) agg.oneil_re[h].push(st.oneil_random_equal[h]);
+    });
+
+    // By signal type
+    var bt = d.by_type||{};
+    Object.keys(bt).forEach(function(tp){
+      if(!byType[tp]) byType[tp]={'5d':[],'10d':[],'20d':[]};
+      ['5d','10d','20d'].forEach(function(h){
+        if(bt[tp][h]&&bt[tp][h].n>0) byType[tp][h].push(bt[tp][h]);
+      });
+    });
+
+    // By market phase
+    var ctx = d.market_context||{};
+    var phase = ctx.oneil_phase||'未知';
+    if(!byPhase[phase]) byPhase[phase]={'days':0,'chanlun_win':[],'chanlun_ret':[],'fc_win':[],'fc_ret':[]};
+    byPhase[phase].days++;
+    if(st.chanlun&&st.chanlun['20d']){byPhase[phase].chanlun_win.push(st.chanlun['20d'].win);byPhase[phase].chanlun_ret.push(st.chanlun['20d'].avg)}
+    if(st.full_basket&&st.full_basket['20d']){byPhase[phase].fc_win.push(st.full_basket['20d'].win);byPhase[phase].fc_ret.push(st.full_basket['20d'].avg)}
+  });
+
+  function avgAgg(arr){
+    if(!arr.length) return {avg:0,win:0,n:0};
+    var navg = arr.reduce(function(s,a){return s+a.n},0);
+    var wavg = arr.reduce(function(s,a){return s+a.win*a.n},0)/(navg||1);
+    var ravg = arr.reduce(function(s,a){return s+a.avg*a.n},0)/(navg||1);
+    return {avg:round2(ravg),win:round1(wavg),n:navg};
+  }
+  function round2(v){return Math.round(v*100)/100}
+  function round1(v){return Math.round(v*10)/10}
+
+  var cl20 = avgAgg(agg.chanlun['20d']), fb20 = avgAgg(agg.full_basket['20d']);
+  var re20 = avgAgg(agg.random_equal['20d']);
+  var oa20 = avgAgg(agg.oneil['20d']), or20 = avgAgg(agg.oneil_re['20d']);
+
+  var h = '<div class="cmp-card"><h3>📊 A: 三组对比 · 20日持有</h3>';
+  h += '<div class="table-shell"><table class="cmp-table"><thead><tr><th>组别</th><th>均收益</th><th>胜率</th><th>样本数</th></tr></thead><tbody>';
+  h += row('全池基准',fb20.avg,fb20.win,fb20.n+'只','');
+  h += row('等额随机',re20.avg,re20.win,re20.n+'次','');
+  h += row('缠论信号',cl20.avg,cl20.win,cl20.n+'只','★');
+  h += row('O\'Neil精选',oa20.avg,oa20.win,oa20.n+'只','');
+  h += '</tbody></table></div></div>';
+
+  h += '<div class="cmp-card"><h3>🔬 B: 按信号类型 · 20日</h3>';
+  h += '<div class="table-shell"><table class="cmp-table"><thead><tr><th>类型</th><th>均收益</th><th>胜率</th><th>信号数</th></tr></thead><tbody>';
+  ['一买','二买','三买','类一买'].forEach(function(tp){
+    var v = byType[tp] ? avgAgg(byType[tp]['20d']) : {avg:0,win:0,n:0};
+    h += row(tp,v.avg,v.win,v.n+'个','');
+  });
+  h += '</tbody></table></div></div>';
+
+  h += '<div class="cmp-card"><h3>🏷 C: 按市场阶段 · 20日</h3>';
+  h += '<div class="table-shell"><table class="cmp-table"><thead><tr><th>阶段</th><th>天数</th><th>缠论胜率</th><th>全池胜率</th><th>胜率差</th></tr></thead><tbody>';
+  var phases = ['上升趋势','下降趋势','尝试反弹','震荡盘整'];
+  phases.forEach(function(ph){
+    var v = byPhase[ph];
+    if(!v){ h += '<tr><td>'+ph+'</td><td>0</td><td>—</td><td>—</td><td>—</td></tr>'; return; }
+    var cw = v.chanlun_win.length ? round1(v.chanlun_win.reduce(function(a,b){return a+b},0)/v.chanlun_win.length) : 0;
+    var fw = v.fc_win.length ? round1(v.fc_win.reduce(function(a,b){return a+b},0)/v.fc_win.length) : 0;
+    var diff = cw-fw;
+    h += '<tr><td>'+ph+'</td><td>'+v.days+'</td><td>'+cw+'%</td><td>'+fw+'%</td><td class="'+(diff>=0?'up':'dn')+'">'+(diff>=0?'+':'')+round1(diff)+'pp</td></tr>';
+  });
+  h += '</tbody></table></div></div>';
+
+  h += '<div class="cmp-card"><h3>📈 D: 按持有期 · 全维度</h3>';
+  h += '<div class="table-shell"><table class="cmp-table"><thead><tr><th>组别</th><th>5日均收益</th><th>5日胜率</th><th>10日均收益</th><th>10日胜率</th><th>20日均收益</th><th>20日胜率</th></tr></thead><tbody>';
+  function hRow(label,ag){
+    var r='<tr><td>'+label+'</td>';
+    ['5d','10d','20d'].forEach(function(hh){
+      var v=avgAgg(ag[hh]);
+      r+='<td class="'+fclr(v.avg)+'">'+fmt(v.avg)+'</td><td>'+v.win+'%<span class="win">('+v.n+')</span></td>';
+    });
+    return r+'</tr>';
+  }
+  h += hRow('全池基准',agg.full_basket);
+  h += hRow('等额随机(缠论对照)',agg.random_equal);
+  h += hRow('缠论信号',agg.chanlun);
+  h += hRow('O\'Neil精选',agg.oneil);
+  h += '</tbody></table></div></div>';
+
+  document.getElementById('cmp-cards').innerHTML = h;
+}
+
+function row(label,avg,win,n,star){
+  return '<tr><td>'+(star||'')+label+'</td><td class="'+fclr(avg)+'">'+fmt(avg)+'</td><td>'+win+'%<span class="win">('+n+')</span></td></tr>';
+}
+
+function renderDailyTable(data){
+  var thead = '<tr><th onclick="sortDaily(\'obs_date\')">日期</th>'+
+    '<th onclick="sortDaily(\'pool_size\')">池</th>'+
+    '<th onclick="sortDaily(\'chanlun_n\')">缠论</th>'+
+    '<th onclick="sortDaily(\'oneil_n\')">O\'N</th>'+
+    '<th>全池5d</th><th>缠论5d</th><th>O\'N5d</th>'+
+    '<th>全池10d</th><th>缠论10d</th><th>O\'N10d</th>'+
+    '<th>全池20d</th><th>缠论20d</th><th>O\'N20d</th>'+
+    '<th>大盘状态</th></tr>';
+
+  var tbody = '';
+  data.forEach(function(d){
+    var st = d.stats||{}, ctx = d.market_context||{};
+    var cl_n = (d.signals||[]).length, oa_n = (d.oneil_signals||[]).length;
+    var fb5=st.full_basket&&st.full_basket['5d']?st.full_basket['5d']:null;
+    var fb10=st.full_basket&&st.full_basket['10d']?st.full_basket['10d']:null;
+    var fb20=st.full_basket&&st.full_basket['20d']?st.full_basket['20d']:null;
+    var cl5=st.chanlun&&st.chanlun['5d']?st.chanlun['5d']:null;
+    var cl10=st.chanlun&&st.chanlun['10d']?st.chanlun['10d']:null;
+    var cl20=st.chanlun&&st.chanlun['20d']?st.chanlun['20d']:null;
+    var oa5=st.oneil_advanced&&st.oneil_advanced['5d']?st.oneil_advanced['5d']:null;
+    var oa10=st.oneil_advanced&&st.oneil_advanced['10d']?st.oneil_advanced['10d']:null;
+    var oa20=st.oneil_advanced&&st.oneil_advanced['20d']?st.oneil_advanced['20d']:null;
+    var phase = ctx.oneil_phase||'—';
+    var pcls = '';
+    if(phase.includes('上升')) pcls='phase-up';
+    else if(phase.includes('反弹')||phase.includes('震荡')) pcls='phase-cor';
+    else if(phase.includes('下降')) pcls='phase-down';
+
+    tbody += '<tr data-date="'+d.obs_date+'">'+
+      '<td>'+d.obs_date+'</td><td>'+d.pool_size+'</td><td>'+cl_n+'</td><td>'+oa_n+'</td>'+
+      '<td class="'+fclr(fb5?fb5.avg:null)+'">'+fmt(fb5?fb5.avg:null)+'</td>'+
+      '<td class="'+fclr(cl5?cl5.avg:null)+'">'+fmt(cl5?cl5.avg:null)+'</td>'+
+      '<td class="'+fclr(oa5?oa5.avg:null)+'">'+fmt(oa5?oa5.avg:null)+'</td>'+
+      '<td class="'+fclr(fb10?fb10.avg:null)+'">'+fmt(fb10?fb10.avg:null)+'</td>'+
+      '<td class="'+fclr(cl10?cl10.avg:null)+'">'+fmt(cl10?cl10.avg:null)+'</td>'+
+      '<td class="'+fclr(oa10?oa10.avg:null)+'">'+fmt(oa10?oa10.avg:null)+'</td>'+
+      '<td class="'+fclr(fb20?fb20.avg:null)+'">'+fmt(fb20?fb20.avg:null)+'</td>'+
+      '<td class="'+fclr(cl20?cl20.avg:null)+'">'+fmt(cl20?cl20.avg:null)+'</td>'+
+      '<td class="'+fclr(oa20?oa20.avg:null)+'">'+fmt(oa20?oa20.avg:null)+'</td>'+
+      '<td><span class="phase-badge '+pcls+'">'+phase+'</span></td></tr>';
+  });
+
+  document.getElementById('daily-table').innerHTML = '<thead>'+thead+'</thead><tbody>'+tbody+'</tbody>';
+}
+
+var dailySortCol = 'obs_date', dailySortDir = 'desc';
+function sortDaily(col){
+  if(dailySortCol===col) dailySortDir=dailySortDir==='asc'?'desc':'asc';
+  else {dailySortCol=col;dailySortDir='desc';}
+  var tbody = document.querySelector('#daily-table tbody');
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort(function(a,b){
+    var va=a.querySelectorAll('td')[getColIdx(col)].textContent;
+    var vb=b.querySelectorAll('td')[getColIdx(col)].textContent;
+    var na=parseFloat(va),nb=parseFloat(vb);
+    if(!isNaN(na)&&!isNaN(nb)){
+      return dailySortDir==='asc'?na-nb:nb-na;
+    }
+    return dailySortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);
+  });
+  rows.forEach(function(r){tbody.appendChild(r)});
+}
+function getColIdx(col){
+  var map={'obs_date':0,'pool_size':1,'chanlun_n':2,'oneil_n':3};
+  return map[col]||0;
+}
+
+function renderSignalTable(data){
+  var thead = '<tr><th>日期</th><th>代码</th><th>名称</th><th>类型</th><th>置信度</th><th>5日</th><th>10日</th><th>20日</th></tr>';
+  var signals = [];
+  data.forEach(function(d){
+    (d.signals||[]).forEach(function(s){
+      signals.push(Object.assign({},s,{obs_date:d.obs_date}));
+    });
+  });
+
+  if(!signals.length){
+    document.getElementById('signal-table').innerHTML = thead+'<tbody><tr><td colspan="8" style="color:var(--muted);padding:20px">该筛选条件下无缠论信号</td></tr></tbody>';
+    return;
+  }
+
+  // Sort by 20d return desc, nulls at bottom
+  signals.sort(function(a,b){
+    var va=a.ret_20d!=null?a.ret_20d:-9999;
+    var vb=b.ret_20d!=null?b.ret_20d:-9999;
+    return vb-va;
+  });
+
+  var tbody = '';
+  signals.forEach(function(s){
+    var url = 'http://localhost:8772/chanlun-backtest/?code='+s.code+'&date='+s.obs_date+'&mode=stock';
+    var phase = '';
+    var d = data.find(function(dd){return dd.obs_date===s.obs_date});
+    if(d){
+      var ctx = d.market_context||{};
+      var ph = ctx.oneil_phase||'';
+      if(ph.includes('上升')) phase='<span class="phase-badge phase-up">'+ph+'</span>';
+      else if(ph.includes('反弹')||ph.includes('震荡')) phase='<span class="phase-badge phase-cor">'+ph+'</span>';
+      else if(ph) phase='<span class="phase-badge phase-down">'+ph+'</span>';
+    }
+    tbody += '<tr>'+
+      '<td>'+s.obs_date+' '+phase+'</td>'+
+      '<td><a class="code-link" href="'+url+'" target="_blank">'+s.code+'</a></td>'+
+      '<td>'+s.name+'</td><td>'+s.type+'</td><td>'+s.confidence+'</td>'+
+      '<td class="'+fclr(s.ret_5d)+'">'+fmt(s.ret_5d)+'</td>'+
+      '<td class="'+fclr(s.ret_10d)+'">'+fmt(s.ret_10d)+'</td>'+
+      '<td class="'+fclr(s.ret_20d)+'">'+fmt(s.ret_20d)+'</td>'+
+      '</tr>';
+  });
+
+  document.getElementById('signal-table').innerHTML = '<thead>'+thead+'</thead><tbody>'+tbody+'</tbody>';
+}
+
+load();
 </script>
 </body>
 </html>

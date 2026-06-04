@@ -74,6 +74,9 @@
   padding: 0;
 }
 
+/* ═══ 2.5 Dark scheme ═══ */
+html.dark { color-scheme: dark; }
+
 /* ═══ 3. Body ═══ */
 body {
   background: var(--bg);

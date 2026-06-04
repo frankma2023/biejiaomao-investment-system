@@ -170,43 +170,17 @@ TASKS.append(("📋 欧奈尔每日精选·股票", [PYTHON_EXE, "src/discipline
 TASKS.append(("📊 欧奈尔每日精选·指数", [PYTHON_EXE, "src/discipline/index_screener.py", "--date", today_str]))
 
 # 步骤16：缠论分钟数据预下载（每日执行，为区间套分析缓存关注股票的分钟K线）
-TASKS.append(("⏱️ 缠论分钟数据预下载", [PYTHON_EXE, "-c", """
-import sys; sys.path.insert(0, 'src')
-from data.lixr_api.api_stock_minute import sync_minute_kline
-import sqlite3
+# 优化后一次登录批量拉取，取代之前的逐只登录登出
+TASKS.append(("⏱️ 缠论分钟数据预下载", [PYTHON_EXE, "src/scripts/download_minute_kline.py"]))
 
-DB = r'data/lixinger.db'
-conn = sqlite3.connect(DB)
+# 步骤17：缠论批量扫描（每日执行，全市场过滤ST+低量后缓存bi数据，供MW信号等下游使用）
+TASKS.append(("🎋 缠论批量扫描", [PYTHON_EXE, "src/scanners/chanlun_scan.py", "--date", today_str, "--all"]))
 
-# 从观察池和每日精选股票获取关注列表
-codes = set()
-try:
-    rows = conn.execute('SELECT DISTINCT stock_code FROM discipline_observation_pool WHERE date=(SELECT MAX(date) FROM discipline_observation_pool)').fetchall()
-    codes.update(r[0] for r in rows)
-except: pass
-try:
-    rows = conn.execute('SELECT DISTINCT stock_code FROM discipline_screening_daily WHERE date=(SELECT MAX(date) FROM discipline_screening_daily)').fetchall()
-    codes.update(r[0] for r in rows)
-except: pass
-conn.close()
+# 步骤18：缠论 vs 欧奈尔回测对比（每日执行，对当天观察池做三组回测对比）
+TASKS.append(("⚖️ 缠论vs欧奈尔回测", [PYTHON_EXE, "src/scanners/chanlun_backtest_compare.py", "--date", today_str, "--filter"]))
 
-if not codes:
-    print('无关注股票，跳过分钟数据预下载')
-else:
-    print(f'预下载 {len(codes)} 只关注股票的分钟K线...')
-    for i, code in enumerate(sorted(codes)):
-        try:
-            c60 = sync_minute_kline(code, '60') or 0
-            c15 = sync_minute_kline(code, '15') or 0
-            if (i+1) % 20 == 0:
-                print(f'  进度: {i+1}/{len(codes)}')
-        except Exception as e:
-            print(f'  {code} 下载失败: {e}')
-    print(f'完成: {len(codes)} 只股票分钟数据已缓存')
-"""]))
-
-# 步骤17：缠论批量扫描（每日执行，对观察池+精选池股票做缠论分析）
-TASKS.append(("🎋 缠论批量扫描", [PYTHON_EXE, "src/scanners/chanlun_scan.py", "--date", today_str]))
+# 步骤19：MW信号扫描（每日执行，全市场扫描牛市回调后再启动形态）
+TASKS.append(("🔥 MW信号扫描", [PYTHON_EXE, "src/scanners/mw_signal.py", "--date", today_str]))
 
 for label, cmd in TASKS:
     lbl, ok, elapsed, _ = run_task(label, cmd)

@@ -28,7 +28,8 @@ ROBUST_RPS_250 = 90
 ROBUST_RPS_20 = 85
 BURST_RPS_250 = 80
 BURST_RPS_20 = 95
-MIN_AMOUNT = 50_000_000  # 5000万
+MIN_AMOUNT = 50_000_000    # 5000万成交额
+MIN_MCAP = 5_000_000_000   # 50亿市值（close × 总股本）
 
 
 def get_candidates(date_str, top_n=None, all_stocks=False):
@@ -55,19 +56,32 @@ def get_candidates(date_str, top_n=None, all_stocks=False):
                    {ds_case}
             FROM stock_rs_daily r
             JOIN stock_basic b ON r.stock_code = b.stock_code
+            LEFT JOIN (
+                SELECT e.stock_code, e.capitalization
+                FROM stock_equity_change e
+                JOIN (
+                    SELECT stock_code, MAX(date) as max_date
+                    FROM stock_equity_change
+                    WHERE date <= ?
+                    GROUP BY stock_code
+                ) latest ON e.stock_code = latest.stock_code AND e.date = latest.max_date
+            ) eq ON r.stock_code = eq.stock_code
             WHERE r.date = ?
               AND b.listing_status = 'normally_listed'
               AND b.name NOT LIKE '%ST%'
               AND b.name NOT LIKE '%*ST%'
               AND r.amount >= ?
+              AND (eq.capitalization IS NULL OR r.close * eq.capitalization >= ?)
             ORDER BY r.rps_250 DESC, r.rps_20 DESC
         """
         params = (
             ROBUST_RPS_250, ROBUST_RPS_20, BURST_RPS_250, BURST_RPS_20,
             ROBUST_RPS_250, ROBUST_RPS_20,
             BURST_RPS_250, BURST_RPS_20,
-            date_str,
-            MIN_AMOUNT
+            date_str,  # for stock_equity_change subquery date filter
+            date_str,  # for stock_rs_daily date filter
+            MIN_AMOUNT,
+            MIN_MCAP
         )
     else:
         query = f"""
@@ -571,12 +585,12 @@ def main():
         print("No data in stock_rs_daily")
         return
 
-    print(f"Scan date: {date_str}")
+    print(f"Scan date: {date_str}", flush=True)
     t0 = time.time()
 
     # Step 1: 获取候选
     candidates = get_candidates(date_str, args.top, all_stocks=args.all_stocks)
-    print(f"Candidates: {len(candidates)}")
+    print(f"Candidates: {len(candidates)}", flush=True)
 
     if not candidates:
         print("No candidates found")
@@ -596,10 +610,10 @@ def main():
 
         if (i + 1) % 20 == 0:
             elapsed = time.time() - t0
-            print(f"  Progress: {i+1}/{len(candidates)} ({elapsed:.1f}s)")
+            print(f"  Progress: {i+1}/{len(candidates)} ({elapsed:.1f}s)", flush=True)
 
     elapsed = time.time() - t0
-    print(f"Scan complete: {len(candidates)} stocks in {elapsed:.1f}s")
+    print(f"Scan complete: {len(candidates)} stocks in {elapsed:.1f}s", flush=True)
 
     # Step 3: 保存 JSON
     os.makedirs(os.path.dirname(OUT_JSON), exist_ok=True)
@@ -611,7 +625,7 @@ def main():
             'elapsed': round(elapsed, 1),
             'candidates': candidates
         }, f, ensure_ascii=False, indent=2)
-    print(f"JSON saved: {OUT_JSON}")
+    print(f"JSON saved: {OUT_JSON}", flush=True)
 
     # Step 3.5: 写入数据库（供知行系统消费）
     conn = sqlite3.connect(DB_PATH)
@@ -625,14 +639,14 @@ def main():
     conn.commit()
     conn.close()
     signal_count = sum(1 for c in candidates if c.get('signals'))
-    print(f"DB saved: {len(candidates)} stocks ({signal_count} with signals) to pattern_scan_signals")
+    print(f"DB saved: {len(candidates)} stocks ({signal_count} with signals) to pattern_scan_signals", flush=True)
 
     # Step 4: 生成 HTML
     html = generate_html(candidates, date_str, elapsed, all_stocks=args.all_stocks)
     with open(OUT_HTML, 'w', encoding='utf-8') as f:
         f.write(html)
-    print(f"HTML saved: {OUT_HTML}")
-    print("Done.")
+    print(f"HTML saved: {OUT_HTML}", flush=True)
+    print("Done.", flush=True)
 
 
 if __name__ == '__main__':

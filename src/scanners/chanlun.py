@@ -422,7 +422,7 @@ def generate_trade_signals(bi_list_raw, zs_list, divergence_signals):
     """
     trade_sigs = []
     
-    # 解析趋势背驰 → 一类买卖点
+    # 解析趋势背驰 → 一买/一卖
     for div in divergence_signals:
         if div["category"] != "趋势背驰":
             continue
@@ -444,7 +444,8 @@ def generate_trade_signals(bi_list_raw, zs_list, divergence_signals):
                 "price": round(float(curr_bi.low), 2),
                 "reason": f"下跌趋势底背驰（力度比{div['power_ratio']}），可能趋势反转",
                 "confidence": {"强": "高", "中": "中"}.get(div["severity"], "低"),
-                "div_signal": div["type"]
+                "div_signal": div["type"],
+                "bi_idx": bi_idx
             })
         
         # 顶背驰（向上笔力度衰减） → 一卖
@@ -456,10 +457,96 @@ def generate_trade_signals(bi_list_raw, zs_list, divergence_signals):
                 "price": round(float(curr_bi.high), 2),
                 "reason": f"上涨趋势顶背驰（力度比{div['power_ratio']}），可能趋势反转",
                 "confidence": {"强": "高", "中": "中"}.get(div["severity"], "低"),
-                "div_signal": div["type"]
+                "div_signal": div["type"],
+                "bi_idx": bi_idx
             })
     
-    # 二买/三买检测（基于中枢位置）
+    # ═══ 盘整背驰 → 类一买/类一卖 ═══
+    for div in divergence_signals:
+        if div["category"] != "盘整背驰":
+            continue
+        
+        bi_idx = div.get("bi_idx", 0)
+        if bi_idx >= len(bi_list_raw):
+            continue
+        
+        curr_bi = bi_list_raw[bi_idx]
+        
+        # 盘整底背驰 → 类一买（中枢内向下笔衰竭，可能向上离开中枢）
+        if div["type"] == "盘整底背驰":
+            trade_sigs.append({
+                "type": "类一买",
+                "side": "buy",
+                "dt": str(curr_bi.sdt)[:10],
+                "price": round(float(curr_bi.low), 2),
+                "reason": f"中枢盘整底背驰（力度比{div['power_ratio']}），中枢内向下衰竭，关注突破方向",
+                "confidence": {"强": "中", "中": "低"}.get(div["severity"], "低"),
+                "div_signal": div["type"],
+                "bi_idx": bi_idx
+            })
+        
+        # 盘整顶背驰 → 类一卖（中枢内向上笔衰竭，可能向下离开中枢）
+        if div["type"] == "盘整顶背驰":
+            trade_sigs.append({
+                "type": "类一卖",
+                "side": "sell",
+                "dt": str(curr_bi.sdt)[:10],
+                "price": round(float(curr_bi.high), 2),
+                "reason": f"中枢盘整顶背驰（力度比{div['power_ratio']}），中枢内向上衰竭，关注跌破方向",
+                "confidence": {"强": "中", "中": "低"}.get(div["severity"], "低"),
+                "div_signal": div["type"],
+                "bi_idx": bi_idx
+            })
+    
+    # ═══ 二买/二卖检测（基于一买/一卖位置） ═══
+    first_buy_sigs = [s for s in trade_sigs if s["type"] == "一买"]
+    first_sell_sigs = [s for s in trade_sigs if s["type"] == "一卖"]
+    
+    for fb in first_buy_sigs:
+        bi_idx = fb["bi_idx"]
+        if bi_idx + 2 >= len(bi_list_raw):
+            continue
+        bounce_bi = bi_list_raw[bi_idx + 1]
+        ret_bi = bi_list_raw[bi_idx + 2]
+        bounce_dir = str(bounce_bi.direction)
+        ret_dir = str(ret_bi.direction)
+        
+        # 一买后：反弹向上 → 回调向下 → 回调低点高于一买低点 → 二买
+        if bounce_dir in ("up", "向上") and ret_dir in ("down", "向下"):
+            if float(ret_bi.low) > fb["price"]:
+                trade_sigs.append({
+                    "type": "二买",
+                    "side": "buy",
+                    "dt": str(ret_bi.sdt)[:10],
+                    "price": round(float(ret_bi.low), 2),
+                    "reason": f"一买后回调不破前低（回调低点{ret_bi.low:.1f} > 一买低点{fb['price']:.1f}），确认反转",
+                    "confidence": "高",
+                    "bi_idx": bi_idx + 2
+                })
+    
+    for fs in first_sell_sigs:
+        bi_idx = fs["bi_idx"]
+        if bi_idx + 2 >= len(bi_list_raw):
+            continue
+        fall_bi = bi_list_raw[bi_idx + 1]
+        ret_bi = bi_list_raw[bi_idx + 2]
+        fall_dir = str(fall_bi.direction)
+        ret_dir = str(ret_bi.direction)
+        
+        # 一卖后：下跌 → 反弹向上 → 反弹高点低于一卖高点 → 二卖
+        if fall_dir in ("down", "向下") and ret_dir in ("up", "向上"):
+            if float(ret_bi.high) < fs["price"]:
+                trade_sigs.append({
+                    "type": "二卖",
+                    "side": "sell",
+                    "dt": str(ret_bi.sdt)[:10],
+                    "price": round(float(ret_bi.high), 2),
+                    "reason": f"一卖后反弹不破前高（反弹高点{ret_bi.high:.1f} < 一卖高点{fs['price']:.1f}），确认反转",
+                    "confidence": "高",
+                    "bi_idx": bi_idx + 2
+                })
+    
+    # 三买/三卖检测（基于中枢位置）
     for zs in zs_list:
         bi_indices = zs.get("bi_indices", [])
         if len(bi_indices) < 4:
@@ -505,6 +592,306 @@ def generate_trade_signals(bi_list_raw, zs_list, divergence_signals):
     trade_sigs.sort(key=lambda x: x["dt"], reverse=True)
     
     return trade_sigs
+
+
+# ═══════════════════════════════════════════════
+# 背驰后追踪
+# ═══════════════════════════════════════════════
+
+def track_divergence_outcomes(divergence_signals, bi_list, zs_list):
+    """追踪背驰信号后的实际走势结果
+    
+    对每条背驰信号，分析后续笔的走势，判断属于三种结果之一：
+    - 反趋势（最强）：离开原中枢后形成同向新中枢，且不重叠
+    - 更大级别盘整（较弱）：形成新中枢但与原中枢有重叠
+    - 中枢扩展（最弱）：未形成新中枢，在原中枢范围内震荡
+    
+    Returns:
+        list[dict]: 每条背驰信号附加 outcome 字段
+    """
+    results = []
+    
+    for div in divergence_signals:
+        bi_idx = div.get("bi_idx", 0)
+        n_after = len(bi_list) - bi_idx - 1
+        
+        outcome = {
+            "div_type": div["type"],
+            "div_dt": div["dt"],
+            "div_bi_idx": bi_idx,
+            "bis_after": n_after,
+            "outcome": "数据不足",
+            "detail": ""
+        }
+        
+        if n_after < 3:
+            outcome["outcome"] = "数据不足"
+            outcome["detail"] = f"信号后仅{n_after}笔，无法判断"
+            results.append(outcome)
+            continue
+        
+        # 取信号后的笔
+        after_bis = bi_list[bi_idx + 1:]
+        
+        # 在后续笔中重新检测中枢
+        # 用简化的3笔重叠法检测后续是否有新中枢
+        new_zs_list = _detect_zs_in_bis(after_bis)
+        
+        # 找到原中枢（背驰发生时所在的中枢）
+        ref_zs = None
+        for zs in zs_list:
+            indices = zs.get("bi_indices", [])
+            if indices and min(indices) <= bi_idx <= max(indices):
+                ref_zs = zs
+                break
+        # 如果没找到，取最后一个包含 bi_idx 之前笔的中枢
+        if ref_zs is None and zs_list:
+            for zs in reversed(zs_list):
+                if zs.get("bi_indices", []) and max(zs["bi_indices"]) <= bi_idx:
+                    ref_zs = zs
+                    break
+        
+        is_bottom = "底" in div["type"]  # 底背驰（买点）
+        
+        if not new_zs_list:
+            # 无新中枢 → 中枢扩展（最弱）
+            outcome["outcome"] = "中枢扩展"
+            outcome["detail"] = f"信号后{len(after_bis)}笔未形成新中枢，原中枢震荡延续"
+        elif ref_zs:
+            first_new_zs = new_zs_list[0]
+            if is_bottom:
+                # 底背驰后期望向上
+                if first_new_zs["zd"] > ref_zs["zg"]:
+                    # 新中枢完全在原中枢上方 → 反趋势
+                    outcome["outcome"] = "反趋势"
+                    outcome["detail"] = f"形成新中枢{first_new_zs['zd']:.1f}~{first_new_zs['zg']:.1f}，完全在原中枢({ref_zs['zd']:.1f}~{ref_zs['zg']:.1f})上方"
+                elif first_new_zs["zg"] >= ref_zs["zd"] and first_new_zs["zd"] <= ref_zs["zg"]:
+                    # 有重叠 → 更大级别盘整
+                    outcome["outcome"] = "更大级别盘整"
+                    outcome["detail"] = f"新中枢与原有重叠（新:{first_new_zs['zd']:.1f}~{first_new_zs['zg']:.1f} 原:{ref_zs['zd']:.1f}~{ref_zs['zg']:.1f}）"
+                else:
+                    outcome["outcome"] = "中枢扩展"
+                    outcome["detail"] = f"新中枢在原中枢下方，底背驰失效"
+            else:
+                # 顶背驰后期望向下
+                if first_new_zs["zg"] < ref_zs["zd"]:
+                    outcome["outcome"] = "反趋势"
+                    outcome["detail"] = f"形成新中枢{first_new_zs['zd']:.1f}~{first_new_zs['zg']:.1f}，完全在原中枢({ref_zs['zd']:.1f}~{ref_zs['zg']:.1f})下方"
+                elif first_new_zs["zg"] >= ref_zs["zd"] and first_new_zs["zd"] <= ref_zs["zg"]:
+                    outcome["outcome"] = "更大级别盘整"
+                    outcome["detail"] = f"新中枢与原有重叠（新:{first_new_zs['zd']:.1f}~{first_new_zs['zg']:.1f} 原:{ref_zs['zd']:.1f}~{ref_zs['zg']:.1f}）"
+                else:
+                    outcome["outcome"] = "中枢扩展"
+                    outcome["detail"] = f"新中枢在原中枢上方，顶背驰失效"
+        else:
+            # 有中枢但无参考中枢
+            outcome["outcome"] = "反趋势"
+            outcome["detail"] = f"形成新中枢（无原中枢参照）"
+        
+        results.append(outcome)
+    
+    return results
+
+
+def _detect_zs_in_bis(bi_list):
+    """在给定的笔列表中检测中枢（简化版，不合并延伸）"""
+    n = len(bi_list)
+    if n < 3:
+        return []
+    
+    zs_list = []
+    for i in range(n - 2):
+        b0, b1, b2 = bi_list[i], bi_list[i+1], bi_list[i+2]
+        h0 = float(b0.get("high", 0)) if isinstance(b0, dict) else float(b0.high)
+        l0 = float(b0.get("low", 0)) if isinstance(b0, dict) else float(b0.low)
+        h1 = float(b1.get("high", 0)) if isinstance(b1, dict) else float(b1.high)
+        l1 = float(b1.get("low", 0)) if isinstance(b1, dict) else float(b1.low)
+        h2 = float(b2.get("high", 0)) if isinstance(b2, dict) else float(b2.high)
+        l2 = float(b2.get("low", 0)) if isinstance(b2, dict) else float(b2.low)
+        
+        ZG = min(h0, h1, h2)
+        ZD = max(l0, l1, l2)
+        
+        if ZG > ZD and ZG > 0 and ZD > 0:
+            zs_list.append({
+                "zg": round(ZG, 2),
+                "zd": round(ZD, 2),
+                "bi_indices": [i, i+1, i+2]
+            })
+    
+    # 简单去重：相邻且重叠的合并
+    merged = []
+    for zs in zs_list:
+        if not merged:
+            merged.append(zs)
+            continue
+        last = merged[-1]
+        if max(zs["zd"], last["zd"]) < min(zs["zg"], last["zg"]):
+            # 重叠，合并
+            last["zg"] = min(last["zg"], zs["zg"])
+            last["zd"] = max(last["zd"], zs["zd"])
+        else:
+            merged.append(zs)
+    
+    return merged
+
+
+# ═══════════════════════════════════════════════
+# 走势类型判断
+# ═══════════════════════════════════════════════
+
+def classify_trend(zs_list, bi_list=None, ubi=None):
+    """基于中枢列表判断走势类型，结合当前价格位置修正
+    
+    缠论定义：
+    - 上涨趋势：至少两个中枢，后一个完全在前一个上方（ZG[i] < ZD[i+1]）
+    - 下跌趋势：至少两个中枢，后一个完全在前一个下方（ZD[i] > ZG[i+1]）
+    - 盘整：只有一个中枢，或多个中枢但有重叠
+    
+    修正规则（结合当前价格位置）：
+    - 盘整 + 价格在最新中枢下方 + 向下笔 → 盘整偏空（可能正在向下离开）
+    - 盘整 + 价格在最新中枢上方 + 向上笔 → 盘整偏多（可能正在向上离开）
+    
+    Args:
+        zs_list: compute_zhongshu() 的输出（已合并重叠中枢）
+        bi_list: 笔列表，用于判断历史笔方向
+        ubi: 未完成笔（CZSC.ubi），用于获取当前实时价格和方向
+    
+    Returns:
+        dict: {trend_type, direction, zs_count, description, confidence, ...}
+    """
+    n = len(zs_list)
+    
+    # 当前笔方向和价格：优先用未完成笔 ubi，其次用最后已完成笔
+    current_dir = None
+    current_price = None
+    
+    if ubi and isinstance(ubi, dict):
+        current_dir = str(ubi.get("direction", ""))
+        if current_dir in ("down", "向下"):
+            current_price = float(ubi.get("low", 0))
+        else:
+            current_price = float(ubi.get("high", 0))
+    
+    if current_price is None and bi_list and len(bi_list) > 0:
+        last_bi = bi_list[-1]
+        current_dir = str(last_bi.get("direction", "")) if isinstance(last_bi, dict) else str(last_bi.direction)
+        if current_dir in ("down", "向下"):
+            current_price = float(last_bi.get("low", 0)) if isinstance(last_bi, dict) else float(last_bi.low)
+        else:
+            current_price = float(last_bi.get("high", 0)) if isinstance(last_bi, dict) else float(last_bi.high)
+    
+    if n == 0:
+        return {
+            "trend_type": "无中枢",
+            "direction": "不明",
+            "zs_count": 0,
+            "description": "未检测到有效中枢，走势为单边或杂乱波动",
+            "confidence": "低"
+        }
+    
+    if n == 1:
+        zs = zs_list[0]
+        width_pct = zs.get("width_pct", 0)
+        return {
+            "trend_type": "盘整",
+            "direction": "不明",
+            "zs_count": 1,
+            "description": f"仅一个中枢（{zs['zd']:.1f}~{zs['zg']:.1f}，宽{width_pct}%），处于盘整中",
+            "zg": zs["zg"],
+            "zd": zs["zd"],
+            "confidence": "高"
+        }
+    
+    # 两两比较相邻中枢
+    up_pairs = 0
+    down_pairs = 0
+    overlap_pairs = 0
+    
+    for i in range(n - 1):
+        prev_zs = zs_list[i]
+        next_zs = zs_list[i + 1]
+        
+        if prev_zs["zg"] < next_zs["zd"]:
+            # 前一个中枢完全在下一个下方 → 上涨
+            up_pairs += 1
+        elif prev_zs["zd"] > next_zs["zg"]:
+            # 前一个中枢完全在下一个上方 → 下跌
+            down_pairs += 1
+        else:
+            # 有重叠 → 盘整
+            overlap_pairs += 1
+    
+    total_pairs = n - 1
+    
+    # 判定
+    if overlap_pairs > 0:
+        trend_type = "盘整"
+        direction = "不明"
+        desc = f"{n}个中枢中有重叠，处于盘整中"
+        confidence = "高" if overlap_pairs == total_pairs else "中"
+    elif up_pairs == total_pairs:
+        trend_type = "上涨趋势"
+        direction = "向上"
+        desc = f"{n}个中枢依次上移（无重叠），处于上涨趋势中"
+        confidence = "高" if n >= 3 else "中"
+    elif down_pairs == total_pairs:
+        trend_type = "下跌趋势"
+        direction = "向下"
+        desc = f"{n}个中枢依次下移（无重叠），处于下跌趋势中"
+        confidence = "高" if n >= 3 else "中"
+    else:
+        # 混合：有上有下
+        trend_type = "盘整"
+        direction = "不明"
+        desc = f"{n}个中枢方向不一致，整体处于盘整"
+        confidence = "低"
+    
+    # 最近中枢信息
+    last_zs = zs_list[-1]
+    first_zs = zs_list[0]
+    
+    # ── 结合当前价格修正 ──
+    position_vs_zs = "内部"
+    if current_price and last_zs:
+        if current_price > last_zs["zg"]:
+            position_vs_zs = "上方"
+        elif current_price < last_zs["zd"]:
+            position_vs_zs = "下方"
+    
+    bi_dir_label = "向上笔" if current_dir in ("up", "向上") else "向下笔" if current_dir in ("down", "向下") else ""
+    
+    # 修正：盘整但价格已离开中枢
+    if trend_type == "盘整" and position_vs_zs == "下方" and current_dir in ("down", "向下"):
+        direction = "向下"
+        desc += f"，但当前价格{current_price:.1f}已跌破中枢下沿{last_zs['zd']:.1f}（{bi_dir_label}），正在向下离开盘整区"
+    elif trend_type == "盘整" and position_vs_zs == "上方" and current_dir in ("up", "向上"):
+        direction = "向上"
+        desc += f"，当前价格{current_price:.1f}已突破中枢上沿{last_zs['zg']:.1f}（{bi_dir_label}），正在向上离开盘整区"
+    elif trend_type == "盘整" and position_vs_zs == "下方" and current_dir not in ("down", "向下"):
+        desc += f"，当前价格{current_price:.1f}低于中枢下沿{last_zs['zd']:.1f}，关注是否有效跌破"
+    elif trend_type == "盘整" and position_vs_zs == "上方" and current_dir not in ("up", "向上"):
+        desc += f"，当前价格{current_price:.1f}高于中枢上沿{last_zs['zg']:.1f}，关注是否有效突破"
+    elif trend_type == "盘整" and position_vs_zs == "内部":
+        desc += f"，当前价格{current_price:.1f}在中枢范围内"
+    elif trend_type == "上涨趋势" and position_vs_zs == "下方":
+        desc += f"，⚠️ 当前价格{current_price:.1f}已回落至最新中枢下沿{last_zs['zd']:.1f}下方，趋势可能转弱"
+    elif trend_type == "下跌趋势" and position_vs_zs == "上方":
+        desc += f"，⚠️ 当前价格{current_price:.1f}已反弹至最新中枢上沿{last_zs['zg']:.1f}上方，趋势可能转强"
+    
+    return {
+        "trend_type": trend_type,
+        "direction": direction,
+        "zs_count": n,
+        "description": desc,
+        "confidence": confidence,
+        "position_vs_zs": position_vs_zs,
+        "latest_zg": last_zs["zg"],
+        "latest_zd": last_zs["zd"],
+        "latest_range": f"{last_zs['zd']:.1f}~{last_zs['zg']:.1f}",
+        "first_zg": first_zs["zg"],
+        "first_zd": first_zs["zd"],
+    }
 
 
 # ═══════════════════════════════════════════════
@@ -625,6 +1012,12 @@ def analyze(code, freq="D", limit=500, data_mode="auto"):
             "low": float(czsc_obj.ubi.get("low", 0))
         }
     
+    # ── 走势类型判断 ──
+    trend_classification = classify_trend(zs_list, bi_list, ubi_info)
+    
+    # ── 背驰后追踪 ──
+    divergence_outcomes = track_divergence_outcomes(divergence_signals, bi_list, zs_list)
+    
     return {
         "code": code,
         "freq": freq,
@@ -643,7 +1036,9 @@ def analyze(code, freq="D", limit=500, data_mode="auto"):
         "segment_list": segment_list,
         "segment_zs_list": segment_zs_list,
         "divergence_signals": divergence_signals,
-        "trade_signals": trade_signals
+        "trade_signals": trade_signals,
+        "trend_classification": trend_classification,
+        "divergence_outcomes": divergence_outcomes
     }
 
 
@@ -1675,3 +2070,129 @@ if __name__ == "__main__":
         for ts in r["trade_signals"]:
             side_sym = "🟢" if ts["side"] == "buy" else "🔴"
             print(f"  {side_sym} {ts['type']} @{ts['dt']} 价格:{ts['price']} 置信度:{ts['confidence']}")
+
+
+# ═══════════════════════════════════════════════
+# 买入决策评估
+# ═══════════════════════════════════════════════
+
+def evaluate_buy_decision(code, freq="D", limit=500, data_mode="auto"):
+    """三步规则链评估是否买入
+    
+    流程：
+    1. 结构过滤：走势类型决定能不能买
+    2. 信号匹配：在允许的结构里，按信号类型分级
+    3. 历史校验：背驰后追踪结果评估信号质量
+    
+    Returns:
+        dict: {decision, grade, reason, signals, structure, quality}
+    """
+    result = analyze(code, freq, limit, data_mode)
+    if "error" in result:
+        return {"decision": "不买", "grade": "—", "reason": result["error"]}
+    
+    tc = result.get("trend_classification", {})
+    trade_sigs = result.get("trade_signals", [])
+    outcomes = result.get("divergence_outcomes", [])
+    
+    trend_type = tc.get("trend_type", "无中枢")
+    direction = tc.get("direction", "不明")
+    position = tc.get("position_vs_zs", "内部")
+    
+    # ═══ 第1步：结构过滤 ═══
+    structure_allow = {
+        "上涨趋势": "允许",
+        "下跌趋势": "禁止",
+        "盘整": "允许",  # 盘整允许，不要求偏多
+        "无中枢": "禁止"
+    }
+    trend_label = trend_type
+    
+    allow = structure_allow.get(trend_type, "禁止")
+    if allow == "禁止":
+        return {
+            "decision": "不买",
+            "grade": "—",
+            "trend": trend_label,
+            "reason": f"结构不满足：{trend_label}（方向:{direction} 价格在最新中枢{position}）",
+            "detail": tc.get("description", "")
+        }
+    
+    # ═══ 第2步：信号匹配 ═══
+    # 取最近3个月的买入信号
+    buy_signals = [s for s in trade_sigs if s["side"] == "buy"]
+    if not buy_signals:
+        return {
+            "decision": "观察",
+            "grade": "—",
+            "trend": trend_label,
+            "reason": f"结构允许（{trend_label}），但无买入信号",
+            "detail": tc.get("description", "")
+        }
+    
+    # 信号分级
+    signal_grades = {
+        "三买": 3,
+        "二买": 2,
+        "类一买": 2 if position == "上方" else 1,
+        "一买": 1  # 一买是左侧，所有结构下降一级
+    }
+    
+    best_signal = None
+    best_grade = 0
+    for sig in buy_signals:
+        g = signal_grades.get(sig["type"], 0)
+        if g > best_grade:
+            best_grade = g
+            best_signal = sig
+    
+    if best_signal is None:
+        return {"decision": "观察", "grade": "—", "trend": trend_label,
+                "reason": "无有效买入信号类型"}
+    
+    # ═══ 第3步：历史校验 ═══
+    quality_score = _evaluate_signal_quality(outcomes)
+    quality_label = "优" if quality_score >= 70 else "中" if quality_score >= 40 else "差"
+    
+    # 综合评级
+    if best_grade == 3 and quality_score >= 40:
+        grade = "⭐⭐⭐"
+        decision = "买入"
+    elif best_grade >= 2 and quality_score >= 40:
+        grade = "⭐⭐"
+        decision = "买入"
+    elif best_grade >= 1:
+        grade = "⭐"
+        decision = "观察"
+    else:
+        grade = "—"
+        decision = "不买"
+    
+    return {
+        "decision": decision,
+        "grade": grade,
+        "trend": trend_label,
+        "best_signal": best_signal,
+        "signal_count": len(buy_signals),
+        "quality_score": quality_score,
+        "quality_label": quality_label,
+        "reason": f"结构:{trend_label} + 最优信号:{best_signal['type']}(置信:{best_signal.get('confidence','?')}) + 历史质量:{quality_label}({quality_score}分)",
+        "detail": tc.get("description", "")
+    }
+
+
+def _evaluate_signal_quality(outcomes):
+    """根据背驰后追踪结果评估信号历史质量（0-100分）"""
+    if not outcomes:
+        return 50  # 无历史数据，中性
+    
+    total = len(outcomes)
+    strong = sum(1 for o in outcomes if o["outcome"] == "反趋势")
+    medium = sum(1 for o in outcomes if o["outcome"] == "更大级别盘整")
+    weak = sum(1 for o in outcomes if o["outcome"] == "中枢扩展")
+    
+    if total == 0:
+        return 50
+    
+    score = (strong * 100 + medium * 50 + weak * 0) / total
+    return round(score)

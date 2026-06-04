@@ -124,9 +124,10 @@ def main():
     parser.add_argument('--force', action='store_true')
     parser.add_argument('--limit', type=int, default=0)
     parser.add_argument('--workers', type=int, default=1)
+    parser.add_argument('--date', type=str, default=None)
     args = parser.parse_args()
 
-    target_date = date.today().strftime("%Y-%m-%d")
+    target_date = args.date or date.today().strftime("%Y-%m-%d")
     print(f"Date: {target_date}")
 
     stocks = get_stocks(args.limit or None)

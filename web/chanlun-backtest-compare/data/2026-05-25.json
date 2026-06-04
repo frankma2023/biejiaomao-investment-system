@@ -1,0 +1,186 @@
+{
+  "obs_date": "2026-05-25",
+  "pool_size": 679,
+  "run_date": "2026-06-03",
+  "signals": [],
+  "oneil_signals": [
+    {
+      "code": "600584",
+      "name": "长电科技",
+      "score": 89.0,
+      "ret_5d": -5.64,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "301377",
+      "name": "鼎泰高科",
+      "score": 86.0,
+      "ret_5d": 3.32,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "002916",
+      "name": "深南电路",
+      "score": 84.0,
+      "ret_5d": -5.0,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "001359",
+      "name": "平安电工",
+      "score": 79.0,
+      "ret_5d": -16.38,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "688401",
+      "name": "路维光电",
+      "score": 78.0,
+      "ret_5d": -12.63,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "000988",
+      "name": "华工科技",
+      "score": 77.0,
+      "ret_5d": -16.79,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "301323",
+      "name": "新莱福",
+      "score": 77.0,
+      "ret_5d": -15.41,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "002126",
+      "name": "银轮股份",
+      "score": 74.0,
+      "ret_5d": -13.8,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "688313",
+      "name": "仕佳光子",
+      "score": 72.0,
+      "ret_5d": -19.67,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "688668",
+      "name": "鼎通科技",
+      "score": 72.0,
+      "ret_5d": -5.1,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "300976",
+      "name": "达瑞电子",
+      "score": 71.0,
+      "ret_5d": -33.38,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "301603",
+      "name": "乔锋智能",
+      "score": 68.0,
+      "ret_5d": -6.93,
+      "ret_10d": null,
+      "ret_20d": null
+    }
+  ],
+  "stats": {
+    "chanlun": {
+      "5d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      }
+    },
+    "full_basket": {
+      "5d": {
+        "avg": -7.88,
+        "win": 21.0,
+        "n": 679
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "n": 679
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 679
+      }
+    },
+    "oneil_advanced": {
+      "5d": {
+        "avg": -12.28,
+        "win": 8.3,
+        "n": 12
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "n": 12
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 12
+      }
+    },
+    "oneil_random_equal": {
+      "5d": {
+        "avg": -8.18,
+        "win": 18.7,
+        "samples": 50,
+        "n_per_sample": 12
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "samples": 50,
+        "n_per_sample": 12
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "samples": 50,
+        "n_per_sample": 12
+      }
+    }
+  },
+  "by_type": {},
+  "by_confidence": {},
+  "market_context": {
+    "oneil_phase": null,
+    "nh_nl_status": null,
+    "trend": "震荡",
+    "strongest_index_rs": "动量强劲"
+  },
+  "filtered": false
+}

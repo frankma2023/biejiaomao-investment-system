@@ -1,0 +1,178 @@
+{
+  "obs_date": "2026-05-19",
+  "pool_size": 807,
+  "run_date": "2026-06-03",
+  "signals": [
+    {
+      "code": "000042",
+      "name": "中洲控股",
+      "type": "三买",
+      "confidence": "高",
+      "ret_5d": -3.68,
+      "ret_10d": -5.33,
+      "ret_20d": null,
+      "signal_types": "三买"
+    }
+  ],
+  "signals_raw": [
+    {
+      "code": "000042",
+      "name": "中洲控股",
+      "type": "三买",
+      "confidence": "高",
+      "ret_5d": -3.68,
+      "ret_10d": -5.33,
+      "ret_20d": null,
+      "signal_types": "三买"
+    },
+    {
+      "code": "300721",
+      "name": "怡达股份",
+      "type": "二买",
+      "confidence": "高",
+      "ret_5d": -17.01,
+      "ret_10d": -7.07,
+      "ret_20d": null,
+      "signal_types": "二买"
+    },
+    {
+      "code": "600769",
+      "name": "祥龙电业",
+      "type": "二买",
+      "confidence": "高",
+      "ret_5d": -30.6,
+      "ret_10d": -30.09,
+      "ret_20d": null,
+      "signal_types": "二买"
+    },
+    {
+      "code": "601991",
+      "name": "大唐发电",
+      "type": "二买",
+      "confidence": "高",
+      "ret_5d": -14.56,
+      "ret_10d": 9.55,
+      "ret_20d": null,
+      "signal_types": "二买"
+    }
+  ],
+  "oneil_signals": [],
+  "stats": {
+    "chanlun": {
+      "5d": {
+        "avg": -3.68,
+        "win": 0.0,
+        "n": 1
+      },
+      "10d": {
+        "avg": -5.33,
+        "win": 0.0,
+        "n": 1
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 1
+      }
+    },
+    "full_basket": {
+      "5d": {
+        "avg": -0.72,
+        "win": 39.9,
+        "n": 807
+      },
+      "10d": {
+        "avg": -5.82,
+        "win": 25.7,
+        "n": 805
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      }
+    },
+    "oneil_advanced": {
+      "5d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      }
+    },
+    "random_equal": {
+      "5d": {
+        "avg": 2.86,
+        "win": 54.0,
+        "samples": 50,
+        "n_per_sample": 1
+      },
+      "10d": {
+        "avg": -6.43,
+        "win": 24.0,
+        "samples": 50,
+        "n_per_sample": 1
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "samples": 50,
+        "n_per_sample": 1
+      }
+    }
+  },
+  "by_type": {
+    "三买": {
+      "5d": {
+        "avg": -3.68,
+        "win": 0.0,
+        "n": 1
+      },
+      "10d": {
+        "avg": -5.33,
+        "win": 0.0,
+        "n": 1
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 1
+      }
+    }
+  },
+  "by_confidence": {
+    "高": {
+      "5d": {
+        "avg": -3.68,
+        "win": 0.0,
+        "n": 1
+      },
+      "10d": {
+        "avg": -5.33,
+        "win": 0.0,
+        "n": 1
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 1
+      }
+    }
+  },
+  "market_context": {
+    "oneil_phase": null,
+    "nh_nl_status": null,
+    "trend": "震荡",
+    "strongest_index_rs": "动量强劲"
+  },
+  "filtered": true
+}

@@ -2,229 +2,247 @@
 <html lang="zh-CN" class="dark">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>个股RS回测</title>
+<title>个股RS强度回测</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/css/hanako-glass.css">
 <style>
-  .chart-wrap{height:520px;margin-bottom:4px}
-  .chart-legend{display:flex;gap:12px;flex-wrap:wrap;padding:6px 0;font-size:11px;color:var(--muted)}
-  .top-bar{display:flex;gap:12px;align-items:flex-end;padding:14px 18px;background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;box-shadow:var(--shadow-card);flex-wrap:wrap}
-  .top-bar .fld{flex:1;min-width:80px}
-  .top-bar label{display:block;font-size:10px;font-weight:500;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.03em}
-  .top-bar input,.top-bar select{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:10px;font-size:12px;background:rgba(26,26,31,.4);color:var(--text-primary);font-family:var(--font-body);outline:none;transition:all .2s}
-  .top-bar input:focus,.top-bar select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,158,11,.1)}
-  .bottom-layout{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}
-  .bottom-left{flex:1;min-width:0}
-  .bottom-right{width:380px;flex-shrink:0}
-  @media(max-width:900px){.bottom-layout{flex-direction:column}.bottom-right{width:100%}}
-  .param-card{background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:8px}
-  .param-card-hd{font-family:var(--font-display);font-size:14px;font-weight:400;color:#d4d4d8;cursor:pointer;display:flex;align-items:center;gap:8px}
-  .param-card-bd{padding:8px 0 0}.param-card-bd.collapsed{display:none}
-  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-  .sr{display:flex;align-items:center;gap:8px;padding:4px 0}
-  .sl{font-size:11px;color:var(--muted);min-width:60px}
-  .sv{font-size:11px;font-weight:500;color:var(--text-primary);min-width:36px;text-align:right}
-  input[type=range]{flex:1;height:4px;-webkit-appearance:none;appearance:none;background:var(--border);border-radius:2px;outline:none}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent)}
-  .btn-run{padding:8px 24px;background:var(--accent-subtle);color:var(--accent);border:1px solid var(--accent-border);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:all .2s;margin-top:8px}
-  .btn-run:hover{background:rgba(245,158,11,.18)}.btn-run:disabled{opacity:.4;cursor:not-allowed}
-  .btn-save{padding:8px 16px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;font-size:12px;cursor:pointer;font-family:var(--font-body);transition:all .2s;margin-top:8px;margin-left:6px}
-  .btn-save:hover{color:#d4d4d8;border-color:var(--border-hover)}.btn-save.saved{color:var(--rise)}
-  .table-wrapper{overflow-x:auto;font-size:11px}
-  .table-wrapper table{width:100%;border-collapse:collapse}
-  .table-wrapper th{text-align:left;padding:6px 8px;font-size:10px;font-weight:500;color:var(--muted);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.03em}
-  .table-wrapper td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.03);font-weight:300}
-  .s-conf{color:var(--fall);font-weight:500}.s-warn{color:var(--accent);font-weight:500}.s-clr{color:var(--rise);font-weight:500}
-  html[data-theme="light"] .top-bar{background:rgba(255,255,255,.75);border-color:var(--divider)}
-  html[data-theme="light"] .top-bar input,html[data-theme="light"] .top-bar select{background:rgba(255,255,255,.7);border-color:var(--divider);color:var(--text-primary)}
-  html[data-theme="light"] .param-card{background:rgba(255,255,255,.75);border-color:var(--divider)}
-  html[data-theme="light"] .param-card-hd{color:#374151}
-  html[data-theme="light"] .table-wrapper td{border-bottom-color:rgba(0,0,0,.03)}
-.bt-layout { display:flex; gap:16px; align-items:flex-start; }
+  /* ── 回测专用布局 ── */
+  .bt-layout { display:flex; gap:16px; align-items:flex-start; }
   .bt-left { width:330px; flex-shrink:0; display:flex; flex-direction:column; gap:12px; }
   .bt-right { flex:1; min-width:0; display:flex; flex-direction:column; gap:14px; }
-  /* 筛选按钮 */
-  .filter-btns { display:flex; gap:6px; flex-wrap:wrap; }
-  .filter-btn { padding:5px 14px; border:1px solid var(--border); border-radius:20px; background:var(--card); color:var(--text-secondary); cursor:pointer; font-family:var(--font-display); font-size:0.65rem; font-weight:600; transition:all 0.15s; }
-  .filter-btn:hover { border-color:var(--accent); color:var(--accent); }
-  .filter-btn.active { background:var(--accent); color:#FFF; border-color:var(--accent); }
-  /* 日期行 */
+
+  /* ── 日期卡片 ── */
+  .date-card { padding:14px 16px; }
   .date-row { display:flex; gap:8px; }
   .date-row > div { flex:1; }
-  /* 统计条 */
-  .stat-value { font-family:var(--font-display); font-size:1.15rem; font-weight:900; color:var(--text-primary); }
-  .stat-label { font-size:0.55rem; color:var(--muted); margin-top:2px; letter-spacing:0.04em; font-weight:600; }
-  .stat-red { color:var(--rise); } .stat-gold { color:var(--muted); }
-  /* 开关 */
+  .date-row label { display:block; font-size:10px; font-weight:500; color:var(--muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em; }
+
+  /* ── 参数卡片 ── */
+  .param-card { background:var(--card); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid var(--border); border-radius:14px; padding:0; margin-bottom:0; overflow:hidden; box-shadow:var(--shadow-card); }
+  .param-card-hd { display:flex; align-items:center; gap:8px; padding:10px 14px; cursor:pointer; border-bottom:1px solid transparent; font-family:var(--font-display); font-size:13px; font-weight:400; color:#d4d4d8; }
+  .param-card-bd { padding:10px 14px 12px; }
+  .param-card-bd.hidden { display:none; }
+  .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+  /* ── 滑块行 ── */
+  .sr { display:flex; align-items:center; gap:8px; padding:4px 0; }
+  .sl { font-size:11px; color:var(--muted); min-width:64px; }
+  .sv { font-size:11px; font-weight:500; color:var(--text-primary); min-width:44px; text-align:right; }
+  input[type=range] { flex:1; height:4px; -webkit-appearance:none; appearance:none; background:var(--border); border-radius:2px; outline:none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--accent); cursor:pointer; }
+
+  /* ── 开关 ── */
   .switch-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
-  .switch-row span { font-size:0.62rem; color:var(--text-secondary); font-family:var(--font-display); }
-  .switch { position:relative; width:40px; height:22px; border-radius:11px; border:none; cursor:pointer; transition:background 0.2s; }
+  .switch-row span { font-size:11px; color:var(--text-secondary); }
+  .switch { position:relative; width:22px; height:12px; border-radius:6px; border:none; cursor:pointer; transition:background .2s; }
   .switch.on { background:var(--accent); }
-  .switch.off { background:#CCC; }
-  .switch::after { content:''; position:absolute; top:2px; width:18px; height:18px; border-radius:50%; background:#FFF; transition:left 0.2s; }
-  .switch.on::after { left:20px; }
-  .switch.off::after { left:2px; }
-  /* 双强色块 */
-  .badge-robust { background:rgba(16,185,129,.08); color:var(--rise); border:1px solid rgba(16,185,129,.2); padding:2px 8px; border-radius:8px; font-size:0.58rem; font-weight:700; }
-  .badge-burst { background:var(--color-neutral-bg); color:var(--muted); border:1px solid var(--color-neutral-border); padding:2px 8px; border-radius:8px; font-size:0.58rem; font-weight:700; }
-  /* 表格 */
-  .result-table { min-width:auto; table-layout:auto; }
-  .result-table td { font-size:0.6rem; padding:5px 4px; white-space:nowrap; }
+  .switch.off { background:rgba(255,255,255,.15); }
+  .switch::after { content:''; position:absolute; top:1px; width:10px; height:10px; border-radius:50%; background:#FFF; transition:left .2s; box-shadow:0 1px 2px rgba(0,0,0,.15); }
+  .switch.on::after { left:11px; }
+  .switch.off::after { left:1px; }
+
+  /* ── 按钮 ── */
+  .btn-run { display:block; width:100%; padding:11px; background:var(--accent-subtle); color:var(--accent); border:1px solid var(--accent-border); border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; font-family:var(--font-body); transition:all .2s; }
+  .btn-run:hover { background:rgba(245,158,11,.18); }
+  .btn-run:disabled { opacity:.4; cursor:not-allowed; }
+  .btn-save { display:block; width:100%; padding:9px; background:transparent; color:var(--muted); border:1px solid var(--border); border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--font-body); transition:all .2s; }
+  .btn-save:hover { color:#d4d4d8; border-color:var(--border-hover); }
+  .btn-save.saved { color:var(--rise); }
+
+  /* ── 统计卡片 ── */
+  .stat-cards { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:0; }
+  .stat-card { background:var(--card); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid var(--border); border-radius:12px; padding:12px 10px; text-align:center; transition:all .25s ease; box-shadow:var(--shadow-card); }
+  .stat-card:hover { border-color:var(--border-hover); }
+  .stat-card .val { font-family:var(--font-display); font-size:1.3rem; font-weight:400; color:#f5f5f4; }
+  .stat-card .lbl { font-size:10px; color:var(--muted); margin-top:4px; letter-spacing:.02em; }
+  .stat-red .val { color:var(--rise) !important; }
+  .stat-gold .val { color:var(--accent) !important; }
+
+  /* ── 筛选按钮 ── */
+  .filter-btns { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .filter-btn { padding:5px 14px; border:1px solid var(--border); border-radius:20px; background:var(--card); color:var(--text-secondary); cursor:pointer; font-family:var(--font-body); font-size:11px; font-weight:500; transition:all .15s; }
+  .filter-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .filter-btn.active { background:var(--accent); color:#FFF; border-color:var(--accent); }
+
+  /* ── 搜索框 ── */
+  .search-input { width:160px; padding:5px 10px; border:1px solid var(--border); border-radius:10px; font-size:11px; background:var(--card); color:var(--text-primary); font-family:var(--font-body); outline:none; transition:all .2s; margin-left:8px; }
+  .search-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(245,158,11,.1); }
+
+  /* ── 玻璃输入框 ── */
+  .glass-input { width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:10px; font-size:12px; background:rgba(26,26,31,.4); color:var(--text-primary); font-family:var(--font-body); outline:none; transition:all .2s; }
+  .glass-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(245,158,11,.1); }
+
+  /* ── 表格容器 ── */
+  .table-wrapper { overflow-x:auto; font-size:11px; max-height:500px; overflow-y:auto; }
+  .table-wrapper table { width:100%; border-collapse:collapse; }
+  .table-wrapper th { text-align:left; padding:6px 8px; font-size:10px; font-weight:500; color:var(--muted); border-bottom:1px solid var(--border); text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; cursor:pointer; user-select:none; }
+  .table-wrapper th:hover { color:var(--text-primary); }
+  .table-wrapper td { padding:5px 8px; border-bottom:1px solid rgba(255,255,255,.03); font-weight:300; white-space:nowrap; }
+  .table-wrapper tbody tr:hover td { background:rgba(255,255,255,.02); }
+
+  /* ── 信号色 ── */
+  .s-conf { color:var(--fall); font-weight:500; }
+  .s-warn { color:var(--accent); font-weight:500; }
+  .s-clr { color:var(--rise); font-weight:500; }
   .rps-high { color:var(--rise); font-weight:700; }
-  .tr-ds { background:rgba(254,44,85,0.03); }
-  @media (max-width:900px) { .bt-layout{flex-direction:column} .bt-left{width:100%} .stat-cards{grid-template-columns:repeat(3,1fr)} }
-  /* ── 导航下拉菜单 ── */
-    display:none; position:absolute; top:100%; left:0;
-    background:var(--card-bg); border:1px solid var(--divider);
-    border-radius:14px; box-shadow:0 4px 20px rgba(0,0,0,0.08);
-    min-width:150px; padding:6px 0; z-index:200; white-space:nowrap;
+  .tr-ds { background:rgba(254,44,85,.03); }
+
+  /* ── 双强色块 ── */
+  .badge-robust { background:rgba(16,185,129,.08); color:var(--rise); border:1px solid rgba(16,185,129,.2); padding:2px 8px; border-radius:8px; font-size:10px; font-weight:700; }
+  .badge-burst { background:rgba(245,158,11,.08); color:var(--accent); border:1px solid rgba(245,158,11,.2); padding:2px 8px; border-radius:8px; font-size:10px; font-weight:700; }
+
+  /* ── 错误提示 ── */
+  .error-msg { display:none; padding:10px 14px; background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.2); border-radius:10px; color:var(--fall); font-size:11px; }
+  .error-msg.active { display:block; }
+
+  /* ── 响应式 ── */
+  @media(max-width:900px) {
+    .bt-layout { flex-direction:column; }
+    .bt-left { width:100%; }
+    .stat-cards { grid-template-columns:repeat(3,1fr); }
   }
-  .nav-dropdown:hover .nav-dropdown-menu { display:block; }
-    display:block; padding:7px 16px; font-size:0.72rem; color:var(--text-secondary);
-    text-decoration:none; transition:background 0.15s;
-    font-family:var(--font-display);
-  }
+
+  /* ═══ 浅色模式覆盖 ═══ */
+  html[data-theme="light"] .param-card-hd { color:#374151; }
+  html[data-theme="light"] .param-card { background:rgba(255,255,255,.75); }
+  html[data-theme="light"] .stat-card .val { color:#1a1a2e; }
+  html[data-theme="light"] .stat-card:hover { box-shadow:0 8px 24px rgba(0,0,0,.08); }
+  html[data-theme="light"] .glass-input { background:rgba(255,255,255,.7); border-color:var(--divider); }
+  html[data-theme="light"] .search-input { background:rgba(255,255,255,.7); }
+  html[data-theme="light"] .table-wrapper td { border-bottom-color:rgba(0,0,0,.03); }
+  html[data-theme="light"] .table-wrapper tbody tr:hover td { background:rgba(0,0,0,.02); }
+  html[data-theme="light"] .btn-save { color:var(--muted); }
+  html[data-theme="light"] .btn-save:hover { color:#374151; }
+  html[data-theme="light"] .switch.off { background:rgba(0,0,0,.1); }
+  html[data-theme="light"] .tr-ds { background:rgba(254,44,85,.02); }
+  html[data-theme="light"] .filter-btn { background:rgba(255,255,255,.75); }
+  html[data-theme="light"] input[type="date"] { color-scheme:light; }
 </style>
 </head>
 <body>
 <canvas id="bg-canvas"></canvas>
-<script>(function(){var c=document.getElementById("bg-canvas"),w=c.width=window.innerWidth,h=c.height=window.innerHeight;var ctx=c.getContext("2d"),N=60;var p=[];for(var i=0;i<N;i++)p.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var P=p[i];P.x+=P.vx;P.y+=P.vy;if(P.x<0)P.x=w;if(P.x>w)P.x=0;if(P.y<0)P.y=h;if(P.y>h)P.y=0;ctx.beginPath();ctx.arc(P.x,P.y,P.r,0,Math.PI*2);ctx.fillStyle="rgba(245,158,11,"+P.o+")";ctx.fill()}for(var i=0;i<N;i++){for(var j=i+1;j<N;j++){var dx=p[i].x-p[j].x,dy=p[i].y-p[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){ctx.beginPath();ctx.moveTo(p[i].x,p[i].y);ctx.lineTo(p[j].x,p[j].y);ctx.strokeStyle="rgba(245,158,11,"+((100-dist)/100*.06)+")";ctx.stroke()}}}requestAnimationFrame(draw)}draw();window.addEventListener("resize",function(){w=c.width=window.innerWidth;h=c.height=window.innerHeight})})();
-</script>
-
-TYPE html>
-<html lang="zh-CN" data-theme="light">
-<head>
-<meta charset="UTF-8">
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>个股RS强度回测 · 投资手账本</title>
-<link rel="stylesheet" href="../shared/themes/xhs-backtest.css">
-</head>
-<body class="xhs-body">
+<script>(function(){var c=document.getElementById("bg-canvas"),w=c.width=window.innerWidth,h=c.height=window.innerHeight;var ctx=c.getContext("2d"),N=60;var p=[];for(var i=0;i<N;i++)p.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var P=p[i];P.x+=P.vx;P.y+=P.vy;if(P.x<0)P.x=w;if(P.x>w)P.x=0;if(P.y<0)P.y=h;if(P.y>h)P.y=0;ctx.beginPath();ctx.arc(P.x,P.y,P.r,0,Math.PI*2);ctx.fillStyle="rgba(245,158,11,"+P.o+")";ctx.fill()}for(var i=0;i<N;i++){for(var j=i+1;j<N;j++){var dx=p[i].x-p[j].x,dy=p[i].y-p[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){ctx.beginPath();ctx.moveTo(p[i].x,p[i].y);ctx.lineTo(p[j].x,p[j].y);ctx.strokeStyle="rgba(245,158,11,"+((100-dist)/100*.06)+")";ctx.stroke()}}}requestAnimationFrame(draw)}draw();window.addEventListener("resize",function(){w=c.width=window.innerWidth;h=c.height=window.innerHeight})})();</script>
 
 <div class="app-container">
-<nav id="top-nav"></nav>
-
-
+  <nav id="top-nav"></nav>
 
   <div class="bt-layout">
-
     <!-- ═══ LEFT ═══ -->
     <div class="bt-left">
-
       <!-- 日期 -->
-      <div class="xhs-card">
-        <div class="xhs-card-header"><span class="xhs-card-label">📅 回测设置</span></div>
+      <div class="glass-card date-card">
+        <div class="chart-title" style="margin-bottom:8px;font-size:14px;">📅 回测设置</div>
         <div class="date-row">
-          <div><label class="xhs-label">日期</label><input type="date" class="xhs-input" id="target-date"></div>
+          <div><label>日期</label><input type="date" id="target-date" class="glass-input"></div>
         </div>
       </div>
 
       <!-- 卡片1: 稳健龙头 -->
-      <div class="xhs-param" id="card1">
-        <div class="xhs-param-header" onclick="toggleCard('card1')">
-          <span class="xhs-param-dot" style="background:var(--rise)"></span>
-          <span class="xhs-param-title">🔴 稳健龙头</span>
+      <div class="param-card" id="card1">
+        <div class="param-card-hd" onclick="toggleCard('card1')">
+          <span class="dot" style="background:var(--rise)"></span>
+          🔴 稳健龙头
         </div>
-        <div class="xhs-param-body" id="card1-body">
-          <div class="xhs-slider-row">
-            <span class="xhs-slider-label">RPS_250 ≥</span>
-            <input type="range" class="xhs-slider-input" id="robust-250" min="0" max="99" step="1" value="90" oninput="syncS('robust-250')">
-            <span class="xhs-slider-val" id="robust-250-v">90</span>
+        <div class="param-card-bd" id="card1-body">
+          <div class="sr">
+            <span class="sl">RPS_250 ≥</span>
+            <input type="range" id="robust-250" min="0" max="99" step="1" value="90" oninput="syncS('robust-250')">
+            <span class="sv" id="robust-250-v">90</span>
           </div>
-          <div class="xhs-slider-row">
-            <span class="xhs-slider-label">RPS_20 ≥</span>
-            <input type="range" class="xhs-slider-input" id="robust-20" min="0" max="99" step="1" value="85" oninput="syncS('robust-20')">
-            <span class="xhs-slider-val" id="robust-20-v">85</span>
+          <div class="sr">
+            <span class="sl">RPS_20 ≥</span>
+            <input type="range" id="robust-20" min="0" max="99" step="1" value="85" oninput="syncS('robust-20')">
+            <span class="sv" id="robust-20-v">85</span>
           </div>
         </div>
       </div>
 
       <!-- 卡片2: 加速爆发 -->
-      <div class="xhs-param" id="card2">
-        <div class="xhs-param-header" onclick="toggleCard('card2')">
-          <span class="xhs-param-dot" style="background:var(--muted)"></span>
-          <span class="xhs-param-title">🟡 加速爆发</span>
+      <div class="param-card" id="card2">
+        <div class="param-card-hd" onclick="toggleCard('card2')">
+          <span class="dot" style="background:var(--accent)"></span>
+          🟡 加速爆发
         </div>
-        <div class="xhs-param-body" id="card2-body">
-          <div class="xhs-slider-row">
-            <span class="xhs-slider-label">RPS_250 ≥</span>
-            <input type="range" class="xhs-slider-input" id="burst-250" min="0" max="99" step="1" value="80" oninput="syncS('burst-250')">
-            <span class="xhs-slider-val" id="burst-250-v">80</span>
+        <div class="param-card-bd" id="card2-body">
+          <div class="sr">
+            <span class="sl">RPS_250 ≥</span>
+            <input type="range" id="burst-250" min="0" max="99" step="1" value="80" oninput="syncS('burst-250')">
+            <span class="sv" id="burst-250-v">80</span>
           </div>
-          <div class="xhs-slider-row">
-            <span class="xhs-slider-label">RPS_20 ≥</span>
-            <input type="range" class="xhs-slider-input" id="burst-20" min="0" max="99" step="1" value="95" oninput="syncS('burst-20')">
-            <span class="xhs-slider-val" id="burst-20-v">95</span>
+          <div class="sr">
+            <span class="sl">RPS_20 ≥</span>
+            <input type="range" id="burst-20" min="0" max="99" step="1" value="95" oninput="syncS('burst-20')">
+            <span class="sv" id="burst-20-v">95</span>
           </div>
         </div>
       </div>
 
       <!-- 卡片3: 过滤 -->
-      <div class="xhs-param" id="card3">
-        <div class="xhs-param-header" onclick="toggleCard('card3')">
-          <span class="xhs-param-dot" style="background:var(--fall)"></span>
-          <span class="xhs-param-title">🟢 过滤条件</span>
+      <div class="param-card" id="card3">
+        <div class="param-card-hd" onclick="toggleCard('card3')">
+          <span class="dot" style="background:var(--fall)"></span>
+          🟢 过滤条件
         </div>
-        <div class="xhs-param-body" id="card3-body">
+        <div class="param-card-bd" id="card3-body">
           <div class="switch-row">
             <span>剔除 ST / 退市</span>
             <button class="switch on" id="switch-st" onclick="toggleSwitch('switch-st')"></button>
           </div>
-          <div class="xhs-slider-row">
-            <span class="xhs-slider-label">流动性阈值</span>
-            <input type="range" class="xhs-slider-input" id="filter-amount" min="0" max="20000" step="500" value="5000" oninput="syncSAmount('filter-amount')">
-            <span class="xhs-slider-val" id="filter-amount-v">5000万</span>
+          <div class="sr">
+            <span class="sl">流动性阈值</span>
+            <input type="range" id="filter-amount" min="0" max="20000" step="500" value="5000" oninput="syncSAmount('filter-amount')">
+            <span class="sv" id="filter-amount-v">5000万</span>
           </div>
         </div>
       </div>
 
       <!-- 卡片4: 展示 -->
-      <div class="xhs-param" id="card4">
-        <div class="xhs-param-header" onclick="toggleCard('card4')">
-          <span class="xhs-param-dot" style="background:var(--muted)"></span>
-          <span class="xhs-param-title">⚫ 展示配置</span>
+      <div class="param-card" id="card4">
+        <div class="param-card-hd" onclick="toggleCard('card4')">
+          <span class="dot" style="background:var(--muted)"></span>
+          ⚫ 展示配置
         </div>
-        <div class="xhs-param-body" id="card4-body">
-          <div class="xhs-slider-row">
-            <span class="xhs-slider-label">显示 TOP</span>
-            <input type="range" class="xhs-slider-input" id="display-top" min="10" max="500" step="10" value="100" oninput="syncSI('display-top')">
-            <span class="xhs-slider-val" id="display-top-v">100</span>
+        <div class="param-card-bd" id="card4-body">
+          <div class="sr">
+            <span class="sl">显示 TOP</span>
+            <input type="range" id="display-top" min="10" max="500" step="10" value="100" oninput="syncSI('display-top')">
+            <span class="sv" id="display-top-v">100</span>
           </div>
         </div>
       </div>
 
-      <button class="xhs-btn-run" id="btn-run" onclick="runBacktest()">🔍 运行回测</button>
-      <button class="xhs-btn-save" id="btn-save" onclick="saveConfig()">💾 保存配置</button>
-      <div class="xhs-error" id="error-msg"></div>
+      <button class="btn-run" id="btn-run" onclick="runBacktest()">🔍 运行回测</button>
+      <button class="btn-save" id="btn-save" onclick="saveConfig()">💾 保存配置</button>
+      <div class="error-msg" id="error-msg"></div>
     </div>
 
     <!-- ═══ RIGHT ═══ -->
     <div class="bt-right">
       <div class="stat-cards">
-        <div class="stat-card"><div class="stat-value" id="stat-total">—</div><div class="stat-label">有效股票</div></div>
-        <div class="stat-card"><div class="stat-value" id="stat-rps250">—</div><div class="stat-label">RPS_250有效</div></div>
-        <div class="stat-card"><div class="stat-value stat-red" id="stat-robust">—</div><div class="stat-label">稳健龙头</div></div>
-        <div class="stat-card"><div class="stat-value stat-gold" id="stat-burst">—</div><div class="stat-label">加速爆发</div></div>
-        <div class="stat-card"><div class="stat-value" id="stat-ds">—</div><div class="stat-label">双强总计</div></div>
-        <div class="stat-card"><div class="stat-value" id="stat-median">—</div><div class="stat-label">RPS_250中位</div></div>
+        <div class="stat-card" id="sc-total"><div class="val">—</div><div class="lbl">有效股票</div></div>
+        <div class="stat-card" id="sc-rps250"><div class="val">—</div><div class="lbl">RPS_250有效</div></div>
+        <div class="stat-card stat-red" id="sc-robust"><div class="val">—</div><div class="lbl">稳健龙头</div></div>
+        <div class="stat-card stat-gold" id="sc-burst"><div class="val">—</div><div class="lbl">加速爆发</div></div>
+        <div class="stat-card" id="sc-ds"><div class="val">—</div><div class="lbl">双强总计</div></div>
+        <div class="stat-card" id="sc-median"><div class="val">—</div><div class="lbl">RPS_250中位</div></div>
       </div>
 
-      <div class="xhs-card">
-        <div class="xhs-card-header">
-          <span class="xhs-card-label">📊 RPS 排名</span>
+      <div class="glass-card">
+        <div class="chart-title" style="margin-bottom:8px;font-size:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <span>📊 RPS 排名</span>
           <div class="filter-btns">
             <button class="filter-btn active" onclick="setFilter('all',this)">全部</button>
             <button class="filter-btn" onclick="setFilter('robust',this)">稳健龙头</button>
             <button class="filter-btn" onclick="setFilter('burst',this)">加速爆发</button>
             <button class="filter-btn" onclick="setFilter('ds',this)">双强股</button>
-            <input type="text" class="xhs-input" id="search-input" placeholder="搜索代码/名称..." style="width:160px;padding:5px 10px;font-size:0.65rem;margin-left:8px" oninput="applyFilter()">
+            <input type="text" class="search-input" id="search-input" placeholder="搜索代码/名称..." oninput="applyFilter()">
           </div>
         </div>
-        <div class="xhs-table-wrap" id="results-table"></div>
+        <div class="table-wrapper" id="results-table"></div>
       </div>
     </div>
   </div>
@@ -233,6 +251,8 @@ TYPE html>
 <script>
 var API='http://'+window.location.hostname+':8788';
 var lastResults=[], currentFilter='all';
+var currentPage=1, pageSize=100;
+var sortCol='rps_250', sortDir='desc';
 
 // ══════ THEME ══════
 function toggleTheme(){
@@ -250,53 +270,46 @@ function toggleTheme(){
 })();
 
 // ══════ UI ══════
-function toggleCard(id){document.getElementById(id+'-body').classList.toggle('hidden')}
-function syncS(id){document.getElementById(id+'-v').textContent=document.getElementById(id).value}
-function syncSI(id){document.getElementById(id+'-v').textContent=document.getElementById(id).value}
+function toggleCard(id){ document.getElementById(id+'-body').classList.toggle('hidden'); }
+function syncS(id){ document.getElementById(id+'-v').textContent=document.getElementById(id).value; }
+function syncSI(id){ document.getElementById(id+'-v').textContent=document.getElementById(id).value; }
 function syncSAmount(id){
   var v=parseInt(document.getElementById(id).value);
   document.getElementById(id+'-v').textContent=v===0?'不过滤':(v/10000).toFixed(1)+'亿';
 }
 function toggleSwitch(id){
   var b=document.getElementById(id);
-  b.classList.toggle('on');b.classList.toggle('off');
+  b.classList.toggle('on'); b.classList.toggle('off');
 }
 
 // ══════ INIT ══════
 (async function(){
   await loadConfig();
-  var d=new Date();d.setDate(d.getDate()-1);
+  var d=new Date(); d.setDate(d.getDate()-1);
   document.getElementById('target-date').value=d.toISOString().slice(0,10);
 })();
 
 // ══════ RUN ══════
-var currentPage=1,totalPages=1;
 async function runBacktest(){
   var btn=document.getElementById('btn-run'), err=document.getElementById('error-msg');
-  btn.disabled=true;btn.textContent='⏳ 计算中...';err.classList.remove('active');
+  btn.disabled=true; btn.textContent='⏳ 计算中...'; err.classList.remove('active');
 
   var date=document.getElementById('target-date').value;
   try{
-    // 加载第一页（含总数+总页数）
     var resp=await fetch(API+'/api/stock-rs?date='+date+'&page=1&page_size=200');
     if(!resp.ok)throw new Error('API ' + resp.status);
     var data=await resp.json();
-    currentPage=1;totalPages=data.stats.total_pages||1;
+    currentPage=1; var totalPages=data.stats.total_pages||1;
     lastResults=data.results||[];
 
-    // 缓存总分页信息
-    var dsCount=data.stats.double_strong_count||0;
-    var total=data.stats.total||0;
-    var valid250=data.stats.valid_rps250||0;
-
-    // 加载剩余页（缓存命中，秒出）
+    // 加载剩余页
     for(var p=2;p<=totalPages;p++){
       var pr=await fetch(API+'/api/stock-rs?date='+date+'&page='+p+'&page_size=200');
       var pd=await pr.json();
       lastResults=lastResults.concat(pd.results||[]);
     }
 
-    // 客户端双强筛选（允许用户调阈值后即时过滤）
+    // 客户端双强筛选
     var r250=parseInt(document.getElementById('robust-250').value);
     var r20=parseInt(document.getElementById('robust-20').value);
     var b250=parseInt(document.getElementById('burst-250').value);
@@ -312,25 +325,24 @@ async function runBacktest(){
     updateStats(data.stats||{}, lastResults);
     applyFilter();
   }catch(e){
-    err.textContent='回测失败: '+e.message;err.classList.add('active');
+    err.textContent='回测失败: '+e.message; err.classList.add('active');
   }finally{
-    btn.disabled=false;btn.textContent='🔍 运行回测';
+    btn.disabled=false; btn.textContent='🔍 运行回测';
   }
 }
 
 function updateStats(stats, results){
-  document.getElementById('stat-total').textContent=stats.total||results.length;
-  document.getElementById('stat-rps250').textContent=stats.valid_rps250||'-';
+  document.querySelector('#sc-total .val').textContent=stats.total||results.length;
+  document.querySelector('#sc-rps250 .val').textContent=stats.valid_rps250||'-';
   var robust=results.filter(function(r){return r._robust});
   var burst=results.filter(function(r){return r._burst});
   var ds=results.filter(function(r){return r._ds});
-  document.getElementById('stat-robust').textContent=robust.length;
-  document.getElementById('stat-burst').textContent=burst.length;
-  document.getElementById('stat-ds').textContent=ds.length;
-  // 中位数
+  document.querySelector('#sc-robust .val').textContent=robust.length;
+  document.querySelector('#sc-burst .val').textContent=burst.length;
+  document.querySelector('#sc-ds .val').textContent=ds.length;
   var rps250s=results.filter(function(r){return r.rps_250!=null}).map(function(r){return r.rps_250}).sort(function(a,b){return a-b});
   var mid=rps250s.length?rps250s[Math.floor(rps250s.length/2)]:'-';
-  document.getElementById('stat-median').textContent=mid;
+  document.querySelector('#sc-median .val').textContent=mid;
 }
 
 function setFilter(type, btn){
@@ -339,8 +351,6 @@ function setFilter(type, btn){
   btn.classList.add('active');
   applyFilter();
 }
-
-var currentPage=1,pageSize=100;
 
 function applyFilter(){
   var data=lastResults;
@@ -359,30 +369,30 @@ function applyFilter(){
   var start=(currentPage-1)*pageSize;
   data=data.slice(start, start+pageSize);
 
-  renderTable(data,currentPage,totalP,start+1,Math.min(start+pageSize,totalFiltered),totalFiltered);
+  renderTable(data, currentPage, totalP, start+1, Math.min(start+pageSize,totalFiltered), totalFiltered);
 }
 
-function renderTable(data,curPg,totalPg,itemStart,itemEnd,totalItems){
-  curPg=curPg||1;totalPg=totalPg||1;
+function renderTable(data, curPg, totalPg, itemStart, itemEnd, totalItems){
+  curPg=curPg||1; totalPg=totalPg||1;
   if(!data.length){
     document.getElementById('results-table').innerHTML='<div style="padding:32px;text-align:center;color:var(--muted)">暂无匹配结果</div>';
     return;
   }
   var cols=[
-    {k:'stock_code',l:'代码',t:'string'},
-    {k:'name',l:'名称',t:'string'},
-    {k:'close',l:'现价',t:'number'},
-    {k:'rps_250',l:'RPS_250',t:'number'},
-    {k:'rps_120',l:'RPS_120',t:'number'},
-    {k:'rps_60',l:'RPS_60',t:'number'},
-    {k:'rps_20',l:'RPS_20',t:'number'},
-    {k:'_ds_type',l:'双强类型',t:'string'},
-    {k:'rs_line',l:'RS线',t:'number'}
+    {k:'stock_code',l:'代码'},
+    {k:'name',l:'名称'},
+    {k:'close',l:'现价'},
+    {k:'rps_250',l:'RPS_250'},
+    {k:'rps_120',l:'RPS_120'},
+    {k:'rps_60',l:'RPS_60'},
+    {k:'rps_20',l:'RPS_20'},
+    {k:'_ds_type',l:'双强类型'},
+    {k:'rs_line',l:'RS线'}
   ];
 
   if(sortCol){
     data.sort(function(a,b){
-      var va=a[sortCol],vb=b[sortCol];
+      var va=a[sortCol], vb=b[sortCol];
       if(va==null)va=sortDir==='asc'?Infinity:-Infinity;
       if(vb==null)vb=sortDir==='asc'?Infinity:-Infinity;
       if(typeof va==='string')return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);
@@ -390,11 +400,11 @@ function renderTable(data,curPg,totalPg,itemStart,itemEnd,totalItems){
     });
   }
 
-  var h='<table class="xhs-table result-table"><thead><tr>';
+  var h='<table><thead><tr>';
   cols.forEach(function(c){
-    var cls=sortCol===c.k?' style="color:var(--accent);font-weight:700"':' style="color:var(--muted)"';
+    var cls=sortCol===c.k?' style="color:var(--accent);font-weight:700"':'';
     var arrow=sortCol===c.k?(sortDir==='asc'?' ▲':' ▼'):'';
-    h+='<th style="padding:3px 4px;font-size:0.55rem"'+cls+' onclick="sortBy(\''+c.k+'\')">'+c.l+arrow+'</th>';
+    h+='<th'+cls+' onclick="sortBy(\''+c.k+'\')">'+c.l+arrow+'</th>';
   });
   h+='</tr></thead><tbody>';
   data.forEach(function(r){
@@ -402,10 +412,10 @@ function renderTable(data,curPg,totalPg,itemStart,itemEnd,totalItems){
     var rps250=r.rps_250!=null?r.rps_250:'—';
     var rps250Cls=rps250>=90?'rps-high':'';
     h+='<tr class="'+dsCls+'">';
-    h+='<td style="color:var(--accent);font-weight:600;cursor:pointer;padding-right:6px">'+r.stock_code+'</td>';
-    h+='<td style="padding-right:6px">'+r.name+'</td>';
-    h+='<td style="padding-right:6px">'+(r.close?r.close.toFixed(2):'—')+'</td>';
-    h+='<td class="'+rps250Cls+'" style="font-weight:700;padding-right:6px">'+rps250+'</td>';
+    h+='<td style="color:var(--accent);font-weight:600;cursor:pointer">'+r.stock_code+'</td>';
+    h+='<td>'+r.name+'</td>';
+    h+='<td>'+(r.close?r.close.toFixed(2):'—')+'</td>';
+    h+='<td class="'+rps250Cls+'" style="font-weight:700">'+rps250+'</td>';
     h+='<td>'+(r.rps_120!=null?r.rps_120:'—')+'</td>';
     h+='<td>'+(r.rps_60!=null?r.rps_60:'—')+'</td>';
     h+='<td>'+(r.rps_20!=null?r.rps_20:'—')+'</td>';
@@ -414,27 +424,27 @@ function renderTable(data,curPg,totalPg,itemStart,itemEnd,totalItems){
     h+='</tr>';
   });
   h+='</tbody></table>';
-  // 分页导航（表格上方）
+
+  // 分页导航
   var pg='<div style="display:flex;gap:4px;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap">';
   pg+='<div style="display:flex;gap:4px;align-items:center">';
-  pg+='<button onclick="goPage(1)" style="padding:4px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card-bg);cursor:pointer;font-size:0.6rem;font-family:var(--font-display)">⏮</button>';
-  pg+='<button onclick="goPage('+Math.max(1,curPg-1)+')" style="padding:4px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card-bg);cursor:pointer;font-size:0.6rem;font-family:var(--font-display)">◀</button>';
-  var ps=Math.max(1,curPg-2),pe=Math.min(totalPg,curPg+2);
+  pg+='<button onclick="goPage(1)" style="padding:4px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card);cursor:pointer;font-size:10px;font-family:var(--font-body);color:var(--muted)">⏮</button>';
+  pg+='<button onclick="goPage('+Math.max(1,curPg-1)+')" style="padding:4px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card);cursor:pointer;font-size:10px;font-family:var(--font-body);color:var(--muted)">◀</button>';
+  var ps=Math.max(1,curPg-2), pe=Math.min(totalPg,curPg+2);
   for(var i=ps;i<=pe;i++){
-    pg+='<button onclick="goPage('+i+')" style="padding:4px 8px;border:1px solid '+(i===curPg?'var(--accent)':'var(--divider)')+';border-radius:8px;background:'+(i===curPg?'var(--accent)':'var(--card-bg)')+';color:'+(i===curPg?'#FFF':'var(--text-secondary)')+';cursor:pointer;font-size:0.6rem;font-family:var(--font-display);font-weight:700;min-width:26px">'+i+'</button>';
+    pg+='<button onclick="goPage('+i+')" style="padding:4px 8px;border:1px solid '+(i===curPg?'var(--accent)':'var(--divider)')+';border-radius:8px;background:'+(i===curPg?'var(--accent)':'var(--card)')+';color:'+(i===curPg?'#FFF':'var(--muted)')+';cursor:pointer;font-size:10px;font-family:var(--font-body);font-weight:700;min-width:26px">'+i+'</button>';
   }
-  pg+='<button onclick="goPage('+Math.min(totalPg,curPg+1)+')" style="padding:4px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card-bg);cursor:pointer;font-size:0.6rem;font-family:var(--font-display)">▶</button>';
-  pg+='<button onclick="goPage('+totalPg+')" style="padding:4px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card-bg);cursor:pointer;font-size:0.6rem;font-family:var(--font-display)">⏭</button>';
-  pg+='</div><span style="font-size:0.6rem;color:var(--muted)">'+itemStart+'-'+itemEnd+' / '+totalItems+'</span></div>';
+  pg+='<button onclick="goPage('+Math.min(totalPg,curPg+1)+')" style="padding:4px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card);cursor:pointer;font-size:10px;font-family:var(--font-body);color:var(--muted)">▶</button>';
+  pg+='<button onclick="goPage('+totalPg+')" style="padding:4px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card);cursor:pointer;font-size:10px;font-family:var(--font-body);color:var(--muted)">⏭</button>';
+  pg+='</div><span style="font-size:10px;color:var(--muted)">'+itemStart+'-'+itemEnd+' / '+totalItems+'</span></div>';
   document.getElementById('results-table').innerHTML=pg+h+pg;
 }
 
-function goPage(p){currentPage=p;applyFilter()}
+function goPage(p){ currentPage=p; applyFilter(); }
 
-var sortCol='rps_250',sortDir='desc';
 function sortBy(col){
   if(sortCol===col)sortDir=sortDir==='asc'?'desc':'asc';
-  else{sortCol=col;sortDir='desc'}
+  else{ sortCol=col; sortDir='desc'; }
   applyFilter();
 }
 
@@ -449,17 +459,16 @@ async function loadConfig(){
     if(cfg.burst_rps_20!=null)document.getElementById('burst-20').value=cfg.burst_rps_20;
     if(cfg.exclude_st!=null){
       var sw=document.getElementById('switch-st');
-      if(cfg.exclude_st){sw.classList.add('on');sw.classList.remove('off')}
-      else{sw.classList.add('off');sw.classList.remove('on')}
+      if(cfg.exclude_st){sw.classList.add('on');sw.classList.remove('off');}
+      else{sw.classList.add('off');sw.classList.remove('on');}
     }
     if(cfg.min_amount_20d!=null)document.getElementById('filter-amount').value=cfg.min_amount_20d;
     if(cfg.top_n!=null)document.getElementById('display-top').value=cfg.top_n;
-    syncS('robust-250');syncS('robust-20');syncS('burst-250');syncS('burst-20');
-    syncSAmount('filter-amount');syncSI('display-top');
-  }catch(e){console.error('Load config:',e)}
+    syncS('robust-250'); syncS('robust-20'); syncS('burst-250'); syncS('burst-20');
+    syncSAmount('filter-amount'); syncSI('display-top');
+  }catch(e){console.error('Load config:',e);}
 }
 
-// ══════ SAVE ══════
 async function saveConfig(){
   var yaml='robust_rps_250: '+document.getElementById('robust-250').value+'\n';
   yaml+='robust_rps_20: '+document.getElementById('robust-20').value+'\n';
@@ -471,11 +480,13 @@ async function saveConfig(){
   try{
     await fetch(API+'/api/config?signal_type=stock_rs',{method:'POST',body:yaml});
     var btn=document.getElementById('btn-save');
-    btn.textContent='✓ 已保存';setTimeout(function(){btn.textContent='💾 保存配置'},2000);
-  }catch(e){console.error(e)}
+    btn.textContent='✓ 已保存'; btn.classList.add('saved');
+    setTimeout(function(){btn.textContent='💾 保存配置'; btn.classList.remove('saved');},2000);
+  }catch(e){console.error('Save config:',e);}
 }
 </script>
-  <script src="../shared/js/nav.js"></script>
-  <script>Nav.init({brandIcon:"💪",brandText:"个股RS强度回测",currentPage:"stock-rs-backtest"})</script>
+
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:"💪",brandText:"个股RS强度回测",currentPage:"stock-rs-backtest"})</script>
 </body>
 </html>

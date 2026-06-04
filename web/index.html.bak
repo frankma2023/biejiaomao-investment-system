@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8">
+<link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>O'Neil 投资系统 · 导航</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared/css/hanako-glass.css">
+  <style>
+    .page-header{text-align:center;padding:32px 20px 16px}
+    .page-header h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--text-primary);letter-spacing:-.01em}
+    .page-header p{font-size:11px;color:var(--muted);margin-top:4px;font-weight:300}
+    .section-title{font-family:var(--font-display);font-size:0.9rem;font-weight:700;color:var(--text-primary);margin:20px 0 8px;display:flex;align-items:center;gap:8px}
+    .section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+    .nav-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-bottom:6px}
+    .nav-card{background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow-card);text-decoration:none;color:var(--text-primary);transition:all .2s ease;display:block}
+    .nav-card:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.15)}
+    .nav-card .icon{font-size:1.1rem;margin-bottom:2px}
+    .nav-card h2{font-family:var(--font-display);font-size:0.82rem;font-weight:400;margin:0 0 2px;color:var(--text-primary)}
+    .nav-card p{font-size:10px;color:var(--muted);margin:0;font-weight:300;line-height:1.3}
+
+    html[data-theme="light"] .page-header h1{color:#374151}
+    html[data-theme="light"] .section-title{color:#374151}
+    html[data-theme="light"] .nav-card h2{color:#374151}
+    html[data-theme="light"] .nav-card{background:rgba(255,255,255,.75)}
+  </style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<script>(function(){var c=document.getElementById("bg-canvas"),w=c.width=window.innerWidth,h=c.height=window.innerHeight;var ctx=c.getContext("2d"),N=60;var p=[];for(var i=0;i<N;i++)p.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var P=p[i];P.x+=P.vx;P.y+=P.vy;if(P.x<0)P.x=w;if(P.x>w)P.x=0;if(P.y<0)P.y=h;if(P.y>h)P.y=0;ctx.beginPath();ctx.arc(P.x,P.y,P.r,0,Math.PI*2);ctx.fillStyle="rgba(245,158,11,"+P.o+")";ctx.fill()}for(var i=0;i<N;i++){for(var j=i+1;j<N;j++){var dx=p[i].x-p[j].x,dy=p[i].y-p[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){ctx.beginPath();ctx.moveTo(p[i].x,p[i].y);ctx.lineTo(p[j].x,p[j].y);ctx.strokeStyle="rgba(245,158,11,"+((100-dist)/100*.06)+")";ctx.stroke()}}}requestAnimationFrame(draw)}draw();window.addEventListener("resize",function(){w=c.width=window.innerWidth;h=c.height=window.innerHeight})})();</script>
+<div class="app-container">
+  <div class="page-header">
+    <h1>O'Neil 投资系统</h1>
+    <p>CAN SLIM 量化 + 缠论技术分析 · A 股全流程决策辅助</p>
+  </div>
+
+  <div class="section-title">🔬 指数分析</div>
+  <div class="nav-grid">
+    <a href="index-scan/" class="nav-card"><div class="icon">🔬</div><h2>指数扫描看板</h2><p>RS/AD/拥挤度一览</p></a>
+    <a href="index-valuation/" class="nav-card"><div class="icon">📈</div><h2>指数估值分位</h2><p>PE/PB/股息率十年分位</p></a>
+    <a href="strongest-index/" class="nav-card"><div class="icon">⭐</div><h2>最强指数</h2><p>三级强势池筛选</p></a>
+  </div>
+
+  <div class="section-title">📊 大盘环境</div>
+  <div class="nav-grid">
+    <a href="market-scan/" class="nav-card"><div class="icon">📊</div><h2>大盘健康度看板</h2><p>主要指数+NHNL+成交额</p></a>
+  </div>
+
+  <div class="section-title">💎 个股分析</div>
+  <div class="nav-grid">
+    <a href="stock-valuation/" class="nav-card"><div class="icon">💎</div><h2>个股全维度扫描</h2><p>估值/盈利/健康/强度五维</p></a>
+  </div>
+
+  <div class="section-title">🎋 缠论分析</div>
+  <div class="nav-grid">
+    <a href="chanlun-backtest/" class="nav-card"><div class="icon">🎋</div><h2>缠论分析看板</h2><p>分型→中枢→背驰→买卖信号</p></a>
+  </div>
+
+  <div class="section-title">🧪 回测看板</div>
+  <div class="nav-grid">
+    <a href="distribution-day/" class="nav-card"><div class="icon">📉</div><h2>抛盘日</h2><p>V3规则回测</p></a>
+    <a href="follow-through-day/" class="nav-card"><div class="icon">📈</div><h2>追盘日</h2><p>三层FTD体系</p></a>
+    <a href="accumulation-day/" class="nav-card"><div class="icon">📦</div><h2>吸筹日</h2><p>机构吸筹检测</p></a>
+    <a href="index-rs-backtest/" class="nav-card"><div class="icon">🏆</div><h2>指数RS强度</h2><p>多周期RS排名</p></a>
+    <a href="index-crowdedness/" class="nav-card"><div class="icon">📊</div><h2>指数拥挤度</h2><p>五维度指标体系</p></a>
+    <a href="index-ad-backtest/" class="nav-card"><div class="icon">🔍</div><h2>机构吸筹出货</h2><p>A~E评级体系</p></a>
+    <a href="divergence-backtest/" class="nav-card"><div class="icon">⚠️</div><h2>指数背离</h2><p>量价/RSI/MACD</p></a>
+    <a href="base-breakout/" class="nav-card"><div class="icon">🏔️</div><h2>基部突破</h2><p>Layer1统一检测</p></a>
+    <a href="pocket-pivot/" class="nav-card"><div class="icon">🎯</div><h2>口袋支点</h2><p>量价突破信号</p></a>
+    <a href="double-bottom/" class="nav-card"><div class="icon">🅱</div><h2>双重底</h2><p>W底形态识别</p></a>
+    <a href="flat-base/" class="nav-card"><div class="icon">📏</div><h2>扁平基部</h2><p>窄幅盘整突破</p></a>
+    <a href="cup-handle-backtest/" class="nav-card"><div class="icon">☕</div><h2>杯柄形态</h2><p>杯柄结构识别</p></a>
+    <a href="saucer-base-backtest/" class="nav-card"><div class="icon">🥏</div><h2>碟形基部</h2><p>圆弧底形态</p></a>
+    <a href="breakout-failure/" class="nav-card"><div class="icon">⚠️</div><h2>突破失败</h2><p>7条独立规则</p></a>
+    <a href="climax-top/" class="nav-card"><div class="icon">🔴</div><h2>高潮见顶</h2><p>量价高潮信号</p></a>
+    <a href="railroad-tracks/" class="nav-card"><div class="icon">🚂</div><h2>铁轨线</h2><p>平行线形态</p></a>
+    <a href="top-pattern/" class="nav-card"><div class="icon">⛰️</div><h2>头部形态</h2><p>顶部反转信号</p></a>
+    <a href="volume-divergence/" class="nav-card"><div class="icon">📊</div><h2>量价背离</h2><p>价量关系异常</p></a>
+    <a href="stock-rs-backtest/" class="nav-card"><div class="icon">💪</div><h2>个股RS强度</h2><p>双强选股策略</p></a>
+    <a href="discipline/screening-backtest.html" class="nav-card"><div class="icon">📋</div><h2>股票精选回测</h2><p>精选快照历史验证</p></a>
+    <a href="discipline/screening-backtest-index.html" class="nav-card"><div class="icon">📈</div><h2>指数精选回测</h2><p>指数精选历史验证</p></a>
+  </div>
+
+  <div class="section-title">🔍 形态识别</div>
+  <div class="nav-grid">
+    <a href="pattern-scan/" class="nav-card"><div class="icon">🔍</div><h2>形态识别看板</h2><p>K线+TA+基部逐股诊断</p></a>
+    <a href="daily-pattern-scan/" class="nav-card"><div class="icon">📋</div><h2>全市场形态扫描</h2><p>4000+股票RS+信号摘要</p></a>
+  </div>
+
+  <div class="section-title">🎯 CAN SLIM 评分</div>
+  <div class="nav-grid">
+    <a href="canslim-scorecard/" class="nav-card"><div class="icon">🎯</div><h2>评分卡看板</h2><p>七维评分v3.0逐股拆解</p></a>
+    <a href="canslim-scores/" class="nav-card"><div class="icon">📊</div><h2>全市场评分查询</h2><p>5300+股票自动评分排序</p></a>
+  </div>
+
+  <div class="section-title">🧠 知行系统</div>
+  <div class="nav-grid">
+    <a href="discipline/screening.html" class="nav-card"><div class="icon">⭐</div><h2>每日精选</h2><p>六层筛选引擎</p></a>
+    <a href="discipline/observation.html" class="nav-card"><div class="icon">🔍</div><h2>观察池</h2><p>候选标的跟踪</p></a>
+    <a href="discipline/watchlist.html" class="nav-card"><div class="icon">⭐</div><h2>自选池</h2><p>重点关注列表</p></a>
+    <a href="discipline/trades.html" class="nav-card"><div class="icon">📝</div><h2>交易记录</h2><p>买卖历史管理</p></a>
+    <a href="discipline/monitor.html" class="nav-card"><div class="icon">📊</div><h2>持仓监控</h2><p>实时持仓跟踪</p></a>
+    <a href="discipline/review.html" class="nav-card"><div class="icon">🔬</div><h2>复核详情</h2><p>逐股技术复核</p></a>
+    <a href="discipline/" class="nav-card"><div class="icon">🧠</div><h2>知行首页</h2><p>系统总览入口</p></a>
+  </div>
+
+  <div class="section-title">📐 其它</div>
+  <div class="nav-grid">
+    <a href="progress.html" class="nav-card"><div class="icon">📋</div><h2>项目进展看板</h2><p>开发进度·经验教训</p></a>
+  </div>
+</div>
+<script>
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+</script>
+</body>
+</html>

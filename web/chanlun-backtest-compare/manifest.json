@@ -1,0 +1,101 @@
+[
+  {
+    "obs_date": "2026-04-01",
+    "pool_size": 195,
+    "chanlun_n": 4,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-06-03",
+    "market_phase": "下降趋势",
+    "chanlun_filtered_n": 2
+  },
+  {
+    "obs_date": "2026-04-30",
+    "pool_size": 1389,
+    "chanlun_n": 18,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-06-03",
+    "market_phase": null,
+    "chanlun_filtered_n": 4
+  },
+  {
+    "obs_date": "2026-05-19",
+    "pool_size": 807,
+    "chanlun_n": 4,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-06-03",
+    "market_phase": null,
+    "chanlun_filtered_n": 1
+  },
+  {
+    "obs_date": "2026-05-20",
+    "pool_size": 682,
+    "chanlun_n": 2,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-06-03",
+    "market_phase": null,
+    "chanlun_filtered_n": 2
+  },
+  {
+    "obs_date": "2026-05-21",
+    "pool_size": 420,
+    "chanlun_n": 3,
+    "oneil_advanced_n": 12,
+    "run_date": "2026-06-03",
+    "market_phase": null,
+    "chanlun_filtered_n": 2
+  },
+  {
+    "obs_date": "2026-05-25",
+    "pool_size": 679,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 12,
+    "run_date": "2026-06-03",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-05-26",
+    "pool_size": 474,
+    "chanlun_n": 2,
+    "oneil_advanced_n": 11,
+    "run_date": "2026-06-03",
+    "market_phase": null,
+    "chanlun_filtered_n": 1
+  },
+  {
+    "obs_date": "2026-05-27",
+    "pool_size": 670,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-06-03",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-05-28",
+    "pool_size": 665,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-06-03",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-05-29",
+    "pool_size": 490,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-06-03",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-06-03",
+    "pool_size": 472,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-06-03",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  }
+]

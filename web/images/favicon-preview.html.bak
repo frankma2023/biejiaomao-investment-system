@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title>Favicon 样本预览</title>
+<style>
+  body{background:#0f0f12;color:#e4e4e7;font-family:Inter,system-ui,sans-serif;padding:40px;text-align:center}
+  .grid{display:flex;gap:40px;justify-content:center;flex-wrap:wrap;margin-top:30px}
+  .item{text-align:center}
+  .item img{width:64px;height:64px;border-radius:16px}
+  .item .label{font-size:11px;color:#8b8b90;margin-top:8px}
+  h1{font-family:'Instrument Serif',Georgia,serif;font-weight:400;color:#d4d4d8}
+</style></head>
+<body>
+<h1>Favicon 样本 · 马武 MW</h1>
+<div class="grid">
+  <div class="item"><img src="favicon-samples/01-mountains.svg"><div class="label">01 · 山脉 M</div></div>
+  <div class="item"><img src="favicon-samples/02-monogram.svg"><div class="label">02 · MW 字母</div></div>
+  <div class="item"><img src="favicon-samples/03-peaks.svg"><div class="label">03 · 双峰 MW</div></div>
+  <div class="item"><img src="favicon-samples/04-char.svg"><div class="label">04 · 汉字「马」</div></div>
+</div>
+</body></html>

@@ -1,0 +1,267 @@
+{
+  "obs_date": "2026-05-26",
+  "pool_size": 474,
+  "run_date": "2026-06-03",
+  "signals": [
+    {
+      "code": "601168",
+      "name": "西部矿业",
+      "type": "二买",
+      "confidence": "高",
+      "ret_5d": -1.29,
+      "ret_10d": null,
+      "ret_20d": null,
+      "signal_types": "一买,二买"
+    }
+  ],
+  "signals_raw": [
+    {
+      "code": "002432",
+      "name": "九安医疗",
+      "type": "二买",
+      "confidence": "高",
+      "ret_5d": -15.06,
+      "ret_10d": null,
+      "ret_20d": null,
+      "signal_types": "二买"
+    },
+    {
+      "code": "601168",
+      "name": "西部矿业",
+      "type": "二买",
+      "confidence": "高",
+      "ret_5d": -1.29,
+      "ret_10d": null,
+      "ret_20d": null,
+      "signal_types": "一买,二买"
+    }
+  ],
+  "oneil_signals": [
+    {
+      "code": "600584",
+      "name": "长电科技",
+      "score": 90.0,
+      "ret_5d": -14.56,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "301377",
+      "name": "鼎泰高科",
+      "score": 88.0,
+      "ret_5d": 5.21,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "002916",
+      "name": "深南电路",
+      "score": 85.0,
+      "ret_5d": -4.93,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "002947",
+      "name": "恒铭达",
+      "score": 84.0,
+      "ret_5d": -11.26,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "001359",
+      "name": "平安电工",
+      "score": 79.0,
+      "ret_5d": -13.47,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "688401",
+      "name": "路维光电",
+      "score": 78.0,
+      "ret_5d": -4.62,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "000988",
+      "name": "华工科技",
+      "score": 77.0,
+      "ret_5d": -12.37,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "301323",
+      "name": "新莱福",
+      "score": 77.0,
+      "ret_5d": -12.04,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "300976",
+      "name": "达瑞电子",
+      "score": 72.0,
+      "ret_5d": -29.87,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "688313",
+      "name": "仕佳光子",
+      "score": 72.0,
+      "ret_5d": -9.69,
+      "ret_10d": null,
+      "ret_20d": null
+    },
+    {
+      "code": "688668",
+      "name": "鼎通科技",
+      "score": 72.0,
+      "ret_5d": 2.74,
+      "ret_10d": null,
+      "ret_20d": null
+    }
+  ],
+  "stats": {
+    "chanlun": {
+      "5d": {
+        "avg": -1.29,
+        "win": 0.0,
+        "n": 1
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "n": 1
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 1
+      }
+    },
+    "full_basket": {
+      "5d": {
+        "avg": -4.61,
+        "win": 27.5,
+        "n": 474
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "n": 474
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 474
+      }
+    },
+    "oneil_advanced": {
+      "5d": {
+        "avg": -9.53,
+        "win": 18.2,
+        "n": 11
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "n": 11
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 11
+      }
+    },
+    "random_equal": {
+      "5d": {
+        "avg": -4.1,
+        "win": 34.0,
+        "samples": 50,
+        "n_per_sample": 1
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "samples": 50,
+        "n_per_sample": 1
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "samples": 50,
+        "n_per_sample": 1
+      }
+    },
+    "oneil_random_equal": {
+      "5d": {
+        "avg": -4.38,
+        "win": 26.9,
+        "samples": 50,
+        "n_per_sample": 11
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "samples": 50,
+        "n_per_sample": 11
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "samples": 50,
+        "n_per_sample": 11
+      }
+    }
+  },
+  "by_type": {
+    "二买": {
+      "5d": {
+        "avg": -1.29,
+        "win": 0.0,
+        "n": 1
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "n": 1
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 1
+      }
+    }
+  },
+  "by_confidence": {
+    "高": {
+      "5d": {
+        "avg": -1.29,
+        "win": 0.0,
+        "n": 1
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "n": 1
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 1
+      }
+    }
+  },
+  "market_context": {
+    "oneil_phase": null,
+    "nh_nl_status": null,
+    "trend": "空头排列",
+    "strongest_index_rs": "动量强劲"
+  },
+  "filtered": true
+}

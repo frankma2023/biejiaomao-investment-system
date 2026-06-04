@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>回测看板解读指引</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<style>
+.guide-section{margin-bottom:32px}
+.guide-section h2{font-family:var(--font-display);font-size:1.1rem;font-weight:400;color:var(--accent);margin:0 0 6px;border-bottom:1px solid var(--border);padding-bottom:6px}
+.guide-section .subtitle{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px}
+.guide-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 24px;margin-bottom:14px;box-shadow:var(--shadow-card);line-height:1.8}
+.guide-card h3{font-family:var(--font-display);font-size:.9rem;color:var(--text-primary);margin:0 0 8px;font-weight:600}
+.guide-card .formula{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 14px;font-family:var(--font-mono);font-size:11px;color:var(--accent);margin:8px 0;display:inline-block}
+.guide-card .example{background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.15);border-radius:8px;padding:10px 14px;font-size:11px;margin:8px 0;line-height:1.7}
+.guide-card .note{background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:8px;padding:8px 14px;font-size:11px;margin:8px 0;color:var(--text-secondary)}
+.guide-card table{width:100%;border-collapse:collapse;margin:10px 0;font-size:11px}
+.guide-card th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase}
+.guide-card td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.03);font-variant-numeric:tabular-nums}
+.guide-card .up{color:#ef4444;font-weight:600}
+.guide-card .dn{color:#10b981;font-weight:600}
+.guide-card .key{display:inline-block;background:rgba(245,158,11,.12);color:var(--accent);padding:1px 6px;border-radius:4px;font-family:var(--font-mono);font-size:10px;margin:0 2px}
+.guide-card .arrow{color:var(--accent);margin:0 4px}
+.toc{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:24px;box-shadow:var(--shadow-card);line-height:2.2}
+.toc a{color:var(--accent);text-decoration:none;font-size:12px}
+.toc a:hover{text-decoration:underline}
+html[data-theme="light"] .guide-card{background:rgba(255,255,255,.75)}
+html[data-theme="light"] .guide-card td{border-bottom:1px solid rgba(0,0,0,.03)}
+html[data-theme="light"] .guide-card .formula{background:rgba(245,158,11,.04)}
+html[data-theme="light"] .guide-card .example{background:rgba(16,185,129,.04)}
+html[data-theme="light"] .guide-card .note{background:rgba(59,130,246,.04)}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<script>
+(function(){
+  var c=document.getElementById('bg-canvas'),w=c.width=window.innerWidth,h=c.height=window.innerHeight;
+  var ctx=c.getContext('2d'),ps=[],N=60;
+  for(var i=0;i<N;i++)ps.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});
+  function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var p=ps[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=w;if(p.x>w)p.x=0;if(p.y<0)p.y=h;if(p.y>h)p.y=0;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,2*Math.PI);ctx.fillStyle='rgba(245,158,11,'+p.o+')';ctx.fill()}for(var i=0;i<N;i++)for(var j=i+1;j<N;j++){var dx=ps[i].x-ps[j].x,dy=ps[i].y-ps[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){ctx.beginPath();ctx.moveTo(ps[i].x,ps[i].y);ctx.lineTo(ps[j].x,ps[j].y);ctx.strokeStyle='rgba(245,158,11,'+((100-dist)/100*.06)+')';ctx.stroke()}}requestAnimationFrame(draw)}draw();window.addEventListener('resize',function(){w=c.width=window.innerWidth;h=c.height=window.innerHeight});
+})();
+</script>
+<div class="app-container">
+<nav id="top-nav"></nav>
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'📖',brandText:'回测看板解读',currentPage:'chanlun-backtest-compare'})</script>
+
+<div class="page-header">
+  <h1>📖 缠论 vs 欧奈尔 回测看板 · 解读指引</h1>
+  <span class="meta">每张卡片的数据由来、字段含义、计算方法</span>
+</div>
+
+<div class="toc">
+  <b style="color:var(--accent);font-size:12px">目录</b><br>
+  <a href="#s0">0. 先理解：三组对比的逻辑</a><br>
+  <a href="#s1">1. 顶部三张汇总统计卡</a><br>
+  <a href="#s2">2. 卡片A：三组对比 · 20日持有</a><br>
+  <a href="#s3">3. 卡片B：按信号类型</a><br>
+  <a href="#s4">4. 卡片C：按市场阶段</a><br>
+  <a href="#s5">5. 卡片D：按持有期 · 全维度</a><br>
+  <a href="#s6">6. 每日明细表</a><br>
+  <a href="#s7">7. 信号明细表</a><br>
+  <a href="#s8">8. 筛选器说明</a><br>
+  <a href="#s9">9. 常见疑问</a>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<div class="guide-section" id="s0">
+<h2>0. 先理解：三组对比的逻辑</h2>
+<div class="subtitle">整个看板的底层设计</div>
+
+<div class="guide-card">
+<h3>为什么做这个对比？</h3>
+<p>欧奈尔的 CAN SLIM 系统每天从全市场 ~5300 只股票中，通过 RS 动量 + 基本面评分 + 形态信号，筛选出一个<span class="key">观察池</span>（通常 200~800 只）。这个池子本身已经比全市场强了。</p>
+<p>问题来了：<b>在这个已经不错的池子里，叠加缠论信号能不能进一步提效？</b>O'Neil 自己的进阶精选（形态+行业共振）又能提效多少？</p>
+
+<h3>三个组的含义</h3>
+<table>
+<tr><th style="width:120px">组别</th><th style="width:160px">选股逻辑</th><th>回答的问题</th></tr>
+<tr>
+  <td><b>全池基准</b></td>
+  <td>当天观察池全部股票，无差别买入</td>
+  <td>"不挑不拣，全买进去能赚多少？" 这是业绩底线</td>
+</tr>
+<tr>
+  <td><b>等额随机</b></td>
+  <td>从全池随机抽 N 只，抽 50 次取均值<br><span style="font-size:10px;color:var(--muted)">N = 当天缠论信号数量</span></td>
+  <td>"随便选 N 只，平均能赚多少？" 消除样本量差异</td>
+</tr>
+<tr>
+  <td><b>缠论信号</b></td>
+  <td>池内 + 同日缠论买入信号<br><span style="font-size:10px;color:var(--muted)">（一买/二买/三买/类一买）</span></td>
+  <td>"缠论挑出来的股票，跑赢随便选的吗？"</td>
+</tr>
+<tr>
+  <td><b>O'Neil 精选</b></td>
+  <td>池内 + O'Neil 进阶策略筛选<br><span style="font-size:10px;color:var(--muted)">（形态突破 + 行业共振 + 综合评分）</span></td>
+  <td>"O'Neil 系统自己再加一层筛选，效果如何？"</td>
+</tr>
+</table>
+
+<div class="note">
+<b>关键认知</b>：缠论组和 O'Neil 组不是互斥的。同一只股票可能同时出现在两组中。它们从不同维度（缠论用中枢背驰，O'Neil 用形态突破）对池子做二次筛选，你可以把它们理解为两种不同的"精选滤镜"。
+</div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<div class="guide-section" id="s1">
+<h2>1. 顶部三张汇总统计卡</h2>
+<div class="subtitle">跨所有选定交易日的总体结论</div>
+
+<div class="guide-card">
+<h3>卡片①：缠论 vs 等额随机 · 胜率差</h3>
+<div class="formula">胜率差 = 缠论组20日均胜率 − 等额随机组20日均胜率</div>
+<p><b>胜率</b>：持有 20 个交易日后，收盘价高于买入价的股票占比。比如 4 只缠论股中有 3 只涨了，胜率 = 75%。</p>
+<p><b>等额随机</b>：每天从全池随机抽「和缠论信号同样数量」的股票，重复抽 50 次取平均胜率。这样做是为了<b>剔除样本量影响</b>——你不能拿 4 只缠论股和 195 只全池股直接比胜率（大数定律会让大盘的胜率天然更稳），所以要同样数量比。</p>
+<div class="example">
+<b>举例</b>：04-01 缠论 4 只 20 日胜率 75%，等额随机 50 次平均胜率 62%。胜率差 = +13pp（百分点）。说明这天缠论挑的 4 只比随便挑 4 只好。<br>
+把所有交易日的胜率差求均值，就是这张卡显示的数值。
+</div>
+</div>
+
+<div class="guide-card">
+<h3>卡片②：缠论 vs 全池基准 · 收益差</h3>
+<div class="formula">收益差 = 缠论组20日均收益率 − 全池基准20日均收益率</div>
+<p><b>均收益率</b>：所有信号股的 20 日收益率的算术平均。比如 4 只缠论股的 20 日收益分别是 +35.6%、+16.4%、+17.3%、-4.5%，均值 = +16.2%。</p>
+<p><b>全池基准</b>：当天观察池全部股票 20 日收益率的均值。回答的是"全买进去平均每只得多少"。</p>
+<p>这张卡回答的是：<b>缠论选的股，平均每只比全池多赚/少赚多少。</b></p>
+<div class="example">
+<b>举例</b>：04-01 全池 195 只 20 日均收益 +21.0%，缠论 4 只均值 +16.2%。收益差 = -4.8pp。虽然缠论胜率更高（75% vs 79.5%），但全池被广合科技（+35.6%）拉高了均值。样本只有 4 只，波动大很正常。
+</div>
+</div>
+
+<div class="guide-card">
+<h3>卡片③：跑赢天数占比</h3>
+<div class="formula">跑赢天数占比 = 缠论组20日收益 > 全池20日收益 的天数 ÷ 总天数</div>
+<p>一张简单粗暴的卡：在所有回测交易日里，缠论跑赢全池的比例是多少。</p>
+<p>如果这个值 > 50%，说明缠论择时<b>在更多时候</b>帮你赚得更多。如果 < 50%，说明缠论信号并不稳定地优于闭眼全买。</p>
+<div class="note">
+<b>注意</b>：这个指标只看"方向"（赢没赢），不看"幅度"（赢了多少）。可能缠论赢的天数多但每次只小赢，输的天数少但每次大输。需要结合卡片①和②一起看。
+</div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<div class="guide-section" id="s2">
+<h2>2. 卡片A：三组对比 · 20日持有</h2>
+<div class="subtitle">四组数据并排，看谁的 20 日表现最好</div>
+
+<div class="guide-card">
+<table>
+<tr><th>列</th><th>含义</th><th>计算方式</th></tr>
+<tr>
+  <td>均收益</td>
+  <td>该组所有股票的 20 日收益率算术平均</td>
+  <td>Σ(每只股票 20 日收益率) ÷ 股票数。跨多日时按样本量加权</td>
+</tr>
+<tr>
+  <td>胜率</td>
+  <td>20 日后盈利的股票占比</td>
+  <td>盈利股票数 ÷ 总股票数 × 100%</td>
+</tr>
+<tr>
+  <td>样本数</td>
+  <td>纳入统计的股票/采样次数</td>
+  <td>缠论/O'Neil 组 = 信号总数；等额随机 = 采样次数（50次/天×天数）；全池 = 池内股票总数</td>
+</tr>
+</table>
+
+<div class="note">
+<b>怎么看</b>：重点比较「缠论信号」和「等额随机」两行的差异。如果缠论的均收益和胜率都高于等额随机，说明缠论信号有正向选股能力。如果缠论低于等额随机，说明缠论信号在当前市场阶段没有超额信息。
+</div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<div class="guide-section" id="s3">
+<h2>3. 卡片B：按信号类型 · 20日</h2>
+<div class="subtitle">缠论的四种买入信号，哪种最靠谱？</div>
+
+<div class="guide-card">
+<table>
+<tr><th>信号类型</th><th>含义</th><th>出现场景</th></tr>
+<tr>
+  <td><b>一买</b></td>
+  <td>第一类买点</td>
+  <td>下跌趋势末端，底背驰出现。抄底型，风险最高，潜在收益也最高</td>
+</tr>
+<tr>
+  <td><b>二买</b></td>
+  <td>第二类买点</td>
+  <td>一买后反弹再回调，不破前低。确认型，比一买更安全</td>
+</tr>
+<tr>
+  <td><b>三买</b></td>
+  <td>第三类买点</td>
+  <td>中枢突破后回踩不进中枢。趋势确认型，可靠性最高</td>
+</tr>
+<tr>
+  <td><b>类一买</b></td>
+  <td>盘整背驰买点</td>
+  <td>盘整中枢内出现背驰。类同一买但在盘整中，信号质量存疑</td>
+</tr>
+</table>
+
+<div class="note">
+<b>怎么看</b>：理论上三买可靠性最高（趋势已确认），一买潜在收益最大（抄在最低点）。实际数据可能和理论不同——这正是回测的价值。如果一买胜率系统性地低于三买，说明"抄底"策略在当前市场不work。
+</div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<div class="guide-section" id="s4">
+<h2>4. 卡片C：按市场阶段 · 20日</h2>
+<div class="subtitle">不同大盘环境下，缠论信号的表现如何？</div>
+
+<div class="guide-card">
+<table>
+<tr><th>市场阶段</th><th>判定标准</th><th>预期行为</th></tr>
+<tr>
+  <td><b>上升趋势</b></td>
+  <td>指数持续走高，追盘日已确认</td>
+  <td>三买/类一买应表现良好（顺势交易）</td>
+</tr>
+<tr>
+  <td><b>下降趋势</b></td>
+  <td>指数持续走低，抛盘日累积</td>
+  <td>所有信号表现差，缠论应帮你避开——如果信号数为 0，反而是好事</td>
+</tr>
+<tr>
+  <td><b>尝试反弹</b></td>
+  <td>新低后出现反弹，尚未确认</td>
+  <td>一买/二买（抄底型）可能出现，可靠性存疑</td>
+</tr>
+<tr>
+  <td><b>震荡盘整</b></td>
+  <td>指数在区间内波动</td>
+  <td>各类型信号都可能出现，但持续性差</td>
+</tr>
+</table>
+
+<div class="note">
+<b>怎么看</b>：核心看「胜率差」列。如果在上升趋势中缠论胜率明显高于全池，说明缠论在牛市里能挑出更强的股票。如果在下降趋势中缠论胜率和全池差不多（都很低），说明缠论在熊市里也没有超额避险能力。
+</div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<div class="guide-section" id="s5">
+<h2>5. 卡片D：按持有期 · 全维度</h2>
+<div class="subtitle">5日、10日、20日三个持有期，四组并排对比</div>
+
+<div class="guide-card">
+<p>这是卡片 A 的"展开版"，把 5 日、10 日、20 日三个持有期全部摊开。</p>
+<table>
+<tr><th>持有期</th><th>含义</th><th>对应现实</th></tr>
+<tr><td><b>5日</b></td><td>买入后持有 5 个交易日（约 1 周）</td><td>短线交易，对择时精度要求极高</td></tr>
+<tr><td><b>10日</b></td><td>买入后持有 10 个交易日（约 2 周）</td><td>短中线，容忍一定波动</td></tr>
+<tr><td><b>20日</b></td><td>买入后持有 20 个交易日（约 1 个月）</td><td>中线持仓，趋势跟踪</td></tr>
+</table>
+
+<div class="note">
+<b>怎么看</b>：如果缠论组在 5 日均收益为负但 20 日为强正，说明缠论信号需要时间发酵——短期噪声大，中期趋势有效。如果 5 日就为强正，说明缠论的高精度择时确实抓住了短期爆发点。
+</div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<div class="guide-section" id="s6">
+<h2>6. 每日明细表</h2>
+<div class="subtitle">每一天的独立回测结果，一行一天</div>
+
+<div class="guide-card">
+<table>
+<tr><th>列</th><th>含义</th></tr>
+<tr><td><b>日期</b></td><td>观察池日期（也是入场日期）</td></tr>
+<tr><td><b>池</b></td><td>当天观察池的股票总数</td></tr>
+<tr><td><b>缠论</b></td><td>当天有缠论买入信号的股票数</td></tr>
+<tr><td><b>O'N</b></td><td>当天有 O'Neil 精选的股票数</td></tr>
+<tr><td><b>全池/缠论/O'N × 5d/10d/20d</b></td><td>对应组别在对应持有期的均收益率</td></tr>
+<tr><td><b>大盘状态</b></td><td>当天的 O'Neil 大盘阶段（上升/下降/反弹/震荡）</td></tr>
+</table>
+
+<div class="note">
+<b>怎么看</b>：点击表头可以排序。比如点击「缠论20d」让它从高到低排列，一眼看出缠论在哪几天表现得最好。如果表现好的天都集中在「上升趋势」，表现差的天都在「下降趋势」，说明缠论信号对大盘环境敏感。
+</div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<div class="guide-section" id="s7">
+<h2>7. 信号明细表</h2>
+<div class="subtitle">每一只缠论信号股的单只表现，可点击跳转</div>
+
+<div class="guide-card">
+<table>
+<tr><th>列</th><th>含义</th></tr>
+<tr><td><b>日期</b></td><td>该信号出现的交易日 + 当日大盘状态标签</td></tr>
+<tr><td><b>代码</b></td><td>股票代码，点击可跳转到缠论分析页面，查看该股的中枢、背驰、买卖点详情</td></tr>
+<tr><td><b>名称</b></td><td>股票简称</td></tr>
+<tr><td><b>类型</b></td><td>缠论买入信号类型：一买 / 二买 / 三买 / 类一买</td></tr>
+<tr><td><b>置信度</b></td><td>信号质量：高 / 中 / 低。目前基于买点类型评级（三买=高置信度）× 中枢位置</td></tr>
+<tr><td><b>5日 / 10日 / 20日</b></td><td>该股买入后各持有期的实际收益率</td></tr>
+</table>
+
+<div class="note">
+<b>怎么看</b>：默认按 20 日收益从高到低排列。红色 = 盈利，绿色 = 亏损（A股红涨绿跌）。你可以点一只亏损的股票进去看缠论分析页，检查是不是中枢判断错了、背驰信号是假的。
+</div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<div class="guide-section" id="s8">
+<h2>8. 筛选器说明</h2>
+<div class="subtitle">如何切片观察数据</div>
+
+<div class="guide-card">
+<table>
+<tr><th>筛选器</th><th>作用</th></tr>
+<tr>
+  <td><b>回测范围</b></td>
+  <td>多选日期。默认全选，你可以反选某些日期来排除它们。Ctrl+点击切换单日，Ctrl+A 全选</td>
+</tr>
+<tr>
+  <td><b>O'Neil状态</b></td>
+  <td>只看特定大盘阶段的数据。选「上升趋势」只看牛市的回测表现</td>
+</tr>
+<tr>
+  <td><b>广度</b></td>
+  <td>按 NH-NL（新高新低比）筛选。广度健康 = 多数股票参与上涨</td>
+</tr>
+<tr>
+  <td><b>趋势</b></td>
+  <td>按指数均线排列筛选。多头排列 = 指数 > 20日线 > 50日线</td>
+</tr>
+<tr>
+  <td><b>信号源</b></td>
+  <td>「原始信号」= 所有当日有缠论买入信号的股票；「过滤后」= 经过三步规则链（结构→信号→历史质量）二次筛选后的股票。过滤后 ≤ 原始</td>
+</tr>
+</table>
+
+<div class="example">
+<b>典型用法</b>：选 O'Neil 状态 =「上升趋势」+ 信号源 =「过滤后」，看看在牛市环境下、经过严格筛选的缠论信号，到底能跑出什么水平。
+</div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<div class="guide-section" id="s9">
+<h2>9. 常见疑问</h2>
+<div class="subtitle">你可能会有的疑问</div>
+
+<div class="guide-card">
+<h3>Q: 为什么有些天缠论信号数为 0？</h3>
+<p>两种可能：(1) 当天池内没有股票在当天出现缠论买入信号——正常现象，缠论信号不是每天都有的；(2) 当天有信号但数据不足——比如最近几天的 forward 数据还没出来（5 日持有需要 5 个交易日之后才知道结果），这些天的数据实际上还在"孵化"中。</p>
+
+<h3>Q: 为什么 O'Neil 精选列大部分是空的？</h3>
+<p>O'Neil 每日精选功能从 2026-05-21 才开始运行。在此之前的数据中该列为空（标记为 0 或 "—"）。随着每日更新持续运行，O'Neil 列会逐渐有数据。</p>
+
+<h3>Q: "等额随机"和"全池基准"有什么区别？</h3>
+<p>全池基准 = 买入全部池内股票，样本量很大（比如 500 只），统计上很稳但和缠论组（比如只有 4 只）规模不对等。等额随机 = 同样选 4 只，重复抽 50 次取均值，消除了规模差异。前者回答"是否跑赢全仓买入"，后者回答"是否跑赢同样精度的随机选股"。</p>
+
+<h3>Q: 胜率差为正但收益差为负，说明什么？</h3>
+<p>说明缠论选股"赢的次数多但赢的幅度小，输的次数少但输的幅度大"。比如 4 只里有 3 只小赚 5%，1 只大亏 40%，胜率 75% 好看但均收益是负的。两种可能性：止损没做好（那 1 只大亏的该早点卖），或者样本太少被极端值支配。</p>
+
+<h3>Q: 目前的样本量够不够下结论？</h3>
+<p>不够。10 个交易日、总共 30+ 个缠论信号，在统计学上远远不够显著。建议至少积累 30~50 个交易日、100+ 个信号后再看。这也是为什么这个看板设计为"每日自动累积"——数据会越来越多，结论会越来越可靠。</p>
+
+<h3>Q: 为什么只有 04-01 有"下降趋势"标签，后面的日期都是 "—"？</h3>
+<p>大盘状态数据（market_direction_daily 表）在 2026-04-16 之后就停止更新了。后面日期的市场阶段显示为 "—"。后续如果恢复大盘状态引擎，数据会自动补上。</p>
+</div>
+</div>
+
+</div>
+
+<script>
+function toggleTheme(){
+  var h=document.documentElement;
+  h.setAttribute('data-theme-switching','');
+  var n=h.dataset.theme==='dark'?'light':'dark';
+  h.dataset.theme=n;localStorage.setItem('theme',n);
+  requestAnimationFrame(function(){requestAnimationFrame(function(){h.removeAttribute('data-theme-switching')})});
+}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+</script>
+</body>
+</html>

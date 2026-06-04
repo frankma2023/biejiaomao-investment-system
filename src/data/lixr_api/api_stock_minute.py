@@ -68,7 +68,7 @@ def _ensure_table(conn, table_name):
     conn.commit()
 
 
-def fetch_minute_kline(code: str, frequency: str, start_date: str, end_date: str) -> pd.DataFrame:
+def fetch_minute_kline(code: str, frequency: str, start_date: str, end_date: str, auto_session: bool = True) -> pd.DataFrame:
     """从 baostock 拉取分钟 K 线数据
     
     Args:
@@ -83,14 +83,25 @@ def fetch_minute_kline(code: str, frequency: str, start_date: str, end_date: str
     freq = FREQ_MAP.get(frequency, '15')
     bs_code = _to_bs_code(code)
     
-    with _session():
+    if auto_session:
+        with _session():
+            rs = bs.query_history_k_data_plus(
+                bs_code,
+                "date,time,code,open,high,low,close,volume,amount,adjustflag",
+                start_date=start_date,
+                end_date=end_date,
+                frequency=freq,
+                adjustflag="2"
+            )
+            df = rs.get_data()
+    else:
         rs = bs.query_history_k_data_plus(
             bs_code,
             "date,time,code,open,high,low,close,volume,amount,adjustflag",
             start_date=start_date,
             end_date=end_date,
             frequency=freq,
-            adjustflag="2"  # 前复权
+            adjustflag="2"
         )
         df = rs.get_data()
     

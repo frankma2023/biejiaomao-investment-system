@@ -54,31 +54,10 @@
   html[data-theme="light"] td{border-bottom-color:rgba(0,0,0,.03)}
   html[data-theme="light"] .table-wrap{background:rgba(255,255,255,.75);border-color:var(--divider)}
   html[data-theme="light"] .pager button{background:rgba(255,255,255,.6);border-color:var(--divider);color:var(--muted)}
-.top-bar { display:flex; gap:10px; align-items:flex-end; padding:14px 18px; background:var(--card-bg); border-radius:18px; margin-bottom:10px; box-shadow:0 1px 6px rgba(0,0,0,0.04); flex-wrap:wrap; }
-.top-bar .fld { min-width:90px; }
-.top-bar label { display:block; font-size:0.58rem; font-weight:600; color:var(--muted); margin-bottom:2px; }
-.top-bar input { padding:7px 8px; border:1px solid var(--divider); border-radius:10px; font-size:0.72rem; background:var(--card-bg); color:var(--text-primary); }
-.btn-run { padding:8px 22px; background:#FE2C55; color:#FFF; border:none; border-radius:12px; font-size:0.85rem; font-weight:800; cursor:pointer; }
-.table-wrap { background:var(--card-bg); border-radius:18px; padding:10px; box-shadow:0 1px 6px rgba(0,0,0,0.04); overflow-x:auto; }
-table { width:100%; border-collapse:collapse; font-size:0.7rem; }
-th { padding:8px 6px; font-weight:700; color:var(--text-secondary); font-size:0.6rem; border-bottom:2px solid var(--divider); cursor:pointer; white-space:nowrap; position:sticky; top:0; background:var(--card-bg); text-align:center; }
-th:hover { color:var(--accent); }
-td { padding:5px 6px; border-bottom:1px solid var(--divider); text-align:center; }
-tr:hover { background:var(--color-accent-subtle); }
-.code-link { color:var(--accent); font-weight:700; text-decoration:none; }
-.code-link:hover { text-decoration:underline; }
-.grade-S { color:#2E7D32; font-weight:900; } .grade-A { color:#1565C0; font-weight:700; }
-.grade-B { color:#F57F17; font-weight:700; } .grade-C { color:#E65100; font-weight:600; }
-.grade-D { color:#C62828; } .grade-E { color:#880E4F; }
-.num { text-align:center; font-variant-numeric:tabular-nums; }
-.pager { display:flex; gap:6px; align-items:center; padding:8px 0; font-size:0.62rem; color:var(--text-secondary); justify-content:center; }
-.pager button { padding:3px 10px; border:1px solid var(--divider); border-radius:6px; background:var(--card-bg); cursor:pointer; font-size:0.6rem; }
-.pager button:hover { border-color:var(--accent); color:var(--accent); }
-.pager button:disabled { opacity:0.3; }
-.pager select { padding:3px 6px; border:1px solid var(--divider); border-radius:6px; font-size:0.6rem; }
-.pager .info { color:var(--muted); }
-#stock-name { font-size:0.7rem; font-weight:700; color:var(--text-primary); padding-top:14px; flex-shrink:0; min-width:60px; }
 .nav-dropdown:hover .nav-dropdown-menu { display:block; }
+
+/* 浅色模式补充 */
+html[data-theme="light"] .btn-run{background:var(--accent-subtle);color:var(--accent);border-color:var(--accent-border)}
 </style>
 </head>
 <body>

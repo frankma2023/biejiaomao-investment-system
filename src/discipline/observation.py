@@ -75,6 +75,83 @@ def classify_rs(rps_20, rps_250):
 # 最小成交额过滤（避免仙股）
 MIN_AMOUNT_20D = 50_000_000  # 5000万
 
+# 综合评分阈值（低于此分不入池）
+COMPOSITE_THRESHOLD = 45
+
+# 信号评分权重（10天内，同类型可多次计分）
+# 单次贡献值 = 权重 × 30（信号满分30分）
+SIGNAL_WEIGHTS = {
+    'base_breakout': 9,        # 30% × 30 → 基部突破（统一替代各种基底形态）
+    'pocket_pivot': 9,          # 30% × 30 → 口袋支点
+    'talib_bullish': 4.5,       # 15% × 30 → TA-Lib技术指标看涨
+    'cdl_bullish': 3,           # 10% × 30 → K线看涨
+}
+
+# 信号评分窗口（天）
+SIGNAL_LOOKBACK_DAYS = 10
+
+
+def compute_signal_score(stock_code, target_date, db):
+    """根据过去10天的买入信号计算信号评分 (0-30)，含时间衰减"""
+    from datetime import datetime, timedelta
+    target_dt = datetime.strptime(target_date, '%Y-%m-%d')
+    start_dt = target_dt - timedelta(days=SIGNAL_LOOKBACK_DAYS)
+    start_str = start_dt.strftime('%Y-%m-%d')
+    
+    rows = db.execute("""
+        SELECT date, signals_json FROM pattern_scan_signals
+        WHERE stock_code = ? AND date >= ? AND date <= ?
+        ORDER BY date DESC
+    """, (stock_code, start_str, target_date)).fetchall()
+    
+    if not rows:
+        return 0
+    
+    score = 0.0
+    
+    for signal_date, signals_json in rows:
+        if not signals_json:
+            continue
+        try:
+            signals = json.loads(signals_json)
+        except Exception:
+            continue
+        
+        if not isinstance(signals, list):
+            signals = [signals]
+        
+        # 计算时间衰减系数
+        sig_dt = datetime.strptime(signal_date, '%Y-%m-%d')
+        days_ago = (target_dt - sig_dt).days
+        if days_ago <= 3:
+            decay = 1.0
+        elif days_ago <= 6:
+            decay = 0.7
+        else:
+            decay = 0.4
+        
+        for sig in signals:
+            source = sig.get('source', '')
+            sig_type = sig.get('signal_type', sig.get('type', sig.get('pattern', '')))
+            
+            # 基部突破
+            if source == 'base_breakout':
+                score += SIGNAL_WEIGHTS['base_breakout'] * decay
+            
+            # 口袋支点
+            elif source == 'pocket_pivot':
+                score += SIGNAL_WEIGHTS['pocket_pivot'] * decay
+            
+            # TA-Lib看涨
+            elif source == 'talib' and sig_type == 'bullish':
+                score += SIGNAL_WEIGHTS['talib_bullish'] * decay
+            
+            # K线看涨
+            elif source == 'cdl' and sig_type == 'bullish':
+                score += SIGNAL_WEIGHTS['cdl_bullish'] * decay
+    
+    return min(round(score, 1), 30)
+
 
 # ════════════════════════════════════════════════════════
 # 主流程
@@ -188,10 +265,23 @@ def run(target_date=None):
 
     # 7. 组装宽表数据 + 写入
     to_insert = []
+    below_threshold = 0
     for c in candidates:
         code = c['stock_code']
         cs = canslim_map.get(code, {})
         fin = fin_map.get(code, {})
+
+        # 先计算综合分，用于阈值过滤
+        composite = round(
+            0.2 * c['rps_250'] +
+            0.2 * c['rps_20'] +
+            0.3 * (cs.get('score') or 0) +
+            compute_signal_score(code, target_date, db),
+            1
+        )
+        if composite < COMPOSITE_THRESHOLD:
+            below_threshold += 1
+            continue
 
         row = (
             code,
@@ -210,25 +300,22 @@ def run(target_date=None):
             cs.get('score_s'),
             cs.get('score_l'),
             cs.get('score_i'),
-            None,  # canslim_m — cansim_scores 无此列
+            None,
             fin.get('roe'),
-            None,  # eps_yoy — 后续从季度表补充
+            None,
             fin.get('revenue_yoy'),
             fin.get('debt_ratio'),
             fin.get('gross_margin'),
-            None,  # pe_ttm — 后续补充
-            None,  # pb
-            None,  # pe_percentile
-            None,  # market_cap
-            None,  # buy_signals_json — 保留兼容
-            None,  # sell_signals_json — 保留兼容
-            signal_map.get(code),  # signals_json — V2 从 pattern_scan_signals 读取
-            # 综合评分：RPS250 权重 0.3 + RPS20 权重 0.3 + CANSLIM 权重 0.4
-            round(0.3 * (c['rps_250'] / 100) + 0.3 * (c['rps_20'] / 100) + 0.4 * ((cs.get('score') or 0) / 100), 4) * 100,
+            None, None, None, None,
+            None, None,
+            signal_map.get(code),
+            composite,
             None,  # grade
             None,  # suggestion
         )
         to_insert.append(row)
+
+    print(f"[observation] 综合评分 ≥ {COMPOSITE_THRESHOLD}: {len(to_insert)} 只（RS筛后{len(candidates)}只中过滤掉{below_threshold}只）")
 
     # 8. 替换写入（truncate + insert）
     db.execute("DELETE FROM discipline_observation_pool WHERE date = ?", (target_date,))
