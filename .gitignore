@@ -74,3 +74,6 @@ web/*/add_*.py
 # Handoff documents (session-only, not for repo)
 HANDOFF-*.md
 SESSION_HANDOFF_*.md
+
+# Product docs (local only)
+docs/product/
