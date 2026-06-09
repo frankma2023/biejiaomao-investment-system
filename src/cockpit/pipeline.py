@@ -130,15 +130,28 @@ def filter_observation_pool(db, target_date):
 def filter_market_cap(db, stock_codes, min_cap_yi=50):
     """
     筛选市值 ≥ min_cap_yi 亿的股票。
-    V1 策略：观察池的 RS 强度筛选已天然排除微盘股（无流动性的股票 RS 不会高）。
-    此处做轻量抽样验证，不阻塞管道。fundamental_indicator (274M行) 全量查询极慢。
+    使用 market_cap_snapshot 快照表（秒级查询）。
+    快照表为空时全部通过（兜底）。
     """
     if not stock_codes:
         return set()
 
-    # V1: 观察池已做质量过滤，市值维度暂做软标注而非硬过滤
-    # 后续版本可接入预计算的市值快照表
-    return set(stock_codes)
+    # 检查快照表是否存在
+    try:
+        cnt = db.execute("SELECT COUNT(*) as c FROM market_cap_snapshot").fetchone()
+        if not cnt or cnt['c'] == 0:
+            return set(stock_codes)  # 快照表为空，全部通过
+    except sqlite3.OperationalError:
+        return set(stock_codes)  # 表不存在，全部通过
+
+    placeholders = ','.join(['?'] * len(stock_codes))
+    rows = db.execute(f"""
+        SELECT stock_code FROM market_cap_snapshot
+        WHERE stock_code IN ({placeholders})
+          AND (market_cap >= ? OR market_cap IS NULL)
+    """, list(stock_codes) + [min_cap_yi]).fetchall()
+
+    return {r['stock_code'] for r in rows}
 
 
 # ════════════════════════════════════════════════════════

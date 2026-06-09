@@ -3611,7 +3611,9 @@ def api_cockpit_briefing():
         return jsonify({'error': 'No data for this stock'}), 404
 
     candidate = dict(row)
-    briefing = engine.generate(candidate)
+    # 获取市场数据
+    market = engine._module_market()
+    briefing = engine.generate(candidate, market_data=market)
 
     # 仓位计算
     from cockpit.position import calculate_position

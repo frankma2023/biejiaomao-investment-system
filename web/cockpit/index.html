@@ -344,7 +344,7 @@ function buildBriefingHTML(c) {
   // 欧奈尔分析
   if (c.oneil_analysis) {
     h += '<h4>📖 欧奈尔分析</h4>';
-    h += '<div style="font-size:.62rem;color:var(--text-secondary)">' + c.oneil_analysis + '</div>';
+    h += '<div style="font-size:.62rem;color:var(--text-secondary)">' + c.oneil_analysis.replace(/\\n/g,'<br>') + '</div>';
   }
 
   return h;

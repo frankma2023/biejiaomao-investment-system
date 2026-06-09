@@ -25,29 +25,73 @@ class BriefingEngine:
         self.db = db or sqlite3.connect(DB_PATH)
         self.db.row_factory = sqlite3.Row
 
-    def generate(self, candidate, pool_data=None):
+    def generate(self, candidate, pool_data=None, market_data=None):
         """
         生成完整简报。
 
         返回: dict with 9 modules
         """
         code = candidate['stock_code']
+
+        # 并行生成各模块
+        signal_mod = self._module_signal(candidate)
+        win_mod = self._module_win_rate(candidate)
+        fund_mod = self._module_fundamentals(candidate, pool_data)
+        ind_mod = self._module_industry(code, candidate)
+        mkt_mod = market_data if market_data else self._module_market()
+        sl_mod = self._module_stop_loss(candidate)
+
+        # 仓位计算
+        pos_mod = {}
+        try:
+            from .position import calculate_position
+            entry = sl_mod.get('entry_price_ref', 10)
+            stop = sl_mod.get('stop_loss_price', entry * 0.92)
+            # 简单凯利参数（使用 MW PLUS 回测数据兜底）
+            pos_mod = calculate_position(
+                entry, stop,
+                account_size=1000000,
+                max_loss_pct=0.02,
+                kelly_fraction=0.25,
+                win_rate=0.62,  # MW PLUS 10日胜率
+                avg_win=0.15,     # 估算平均盈利
+                avg_loss=0.08,    # 8%止损
+            )
+        except Exception:
+            pass
+
+        # 舆情
+        sent_mod = {}
+        try:
+            from .sentiment import SentimentEngine
+            engine = SentimentEngine()
+            sent_mod = engine.fetch(code, candidate.get('stock_name', ''))
+        except Exception:
+            sent_mod = {'summary': '', 'sources': []}
+
+        # 欧奈尔分析
+        oneil_mod = {}
+        try:
+            from .oneil_eval import ONeilEvaluator
+            evaluator = ONeilEvaluator(self.db)
+            oneil_mod = evaluator.evaluate(code, candidate, mkt_mod)
+        except Exception:
+            oneil_mod = {'summary': '分析暂不可用', 'verdict': '', 'score': 0}
+
         briefing = {
             'stock_code': code,
             'stock_name': candidate.get('stock_name', ''),
-            'signal_summary': self._module_signal(candidate),
-            'win_rate': self._module_win_rate(candidate),
-            'fundamentals': self._module_fundamentals(candidate, pool_data),
-            'industry': self._module_industry(code, candidate),
-            'market': self._module_market(),
-            'position': {},  # 由 position.py 填充
-            'sentiment': {},  # 由 sentiment.py 填充
-            'oneil': {},      # 由外部技能填充
-            'stop_loss': self._module_stop_loss(candidate),
+            'signal_summary': signal_mod,
+            'win_rate': win_mod,
+            'fundamentals': fund_mod,
+            'industry': ind_mod,
+            'market': mkt_mod,
+            'position': pos_mod,
+            'sentiment': sent_mod,
+            'oneil': oneil_mod,
+            'stop_loss': sl_mod,
         }
         return briefing
-
-    def _module_signal(self, c):
         """模块1：信号概要"""
         return {
             'signal_types': c.get('signals', []),

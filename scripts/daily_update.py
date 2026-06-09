@@ -194,6 +194,8 @@ TASKS.append(("⚖️ 缠论vs欧奈尔回测", [PYTHON_EXE, "src/scanners/chanl
 TASKS.append(("🔥 MW信号扫描", [PYTHON_EXE, "src/scanners/mw_signal.py", "--date", today_str]))
 
 # 步骤20：投资决策驾驶舱管道（每日执行，依赖前序所有步骤）
+# 先建市值快照，再跑管道
+TASKS.append(("💎 市值快照", [PYTHON_EXE, "src/cockpit/market_cap_snapshot.py"]))
 TASKS.append(("🚀 投资决策驾驶舱", [PYTHON_EXE, "src/cockpit/pipeline.py", "--date", today_str, "--save"]))
 
 for label, cmd in TASKS:
