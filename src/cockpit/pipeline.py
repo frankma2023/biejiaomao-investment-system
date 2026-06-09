@@ -486,16 +486,6 @@ def save_candidates(db, run_date, candidates, pool_data=None):
         try:
             oneil = oneil_evaluator.evaluate(code, c, market_data)
             oneil_analysis = oneil.get('summary', '')
-            # 对前5只候选生成深度分析（DeepSeek + trade-like-oneil）
-            if c.get('rank', 99) <= 5:
-                try:
-                    from cockpit.oneil_deep import ONeilDeepAnalyzer
-                    deep = ONeilDeepAnalyzer(db)
-                    report_path = deep.analyze(code, c, market_data, run_date)
-                    if report_path:
-                        c['oneil_report_path'] = report_path
-                except Exception as e:
-                    print(f"  [oneil_deep] {code} 深度分析失败: {e}")
         except Exception:
             pass
 

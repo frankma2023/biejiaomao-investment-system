@@ -3634,6 +3634,90 @@ def api_cockpit_briefing():
 
 
 
+@app.route('/api/cockpit/oneil-deep', methods=['GET', 'OPTIONS'])
+def api_cockpit_oneil_deep():
+    """欧奈尔深度分析 — 调用 DeepSeek CLI 实时生成"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    code = request.args.get('code', '')
+    if not code:
+        return jsonify({'error': 'code required'}), 400
+
+    db = get_db()
+    from cockpit.oneil_deep import ONeilDeepAnalyzer
+    from cockpit.briefing import BriefingEngine
+
+    analyzer = ONeilDeepAnalyzer(db)
+    engine = BriefingEngine(db)
+
+    # 收集股票数据
+    name_row = db.execute("SELECT name FROM stock_basic WHERE stock_code=?", (code,)).fetchone()
+    stock_name = name_row['name'] if name_row else code
+
+    # 获取候选数据（从 cockpit_daily 或构建基础候选）
+    candidate = {'stock_code': code, 'stock_name': stock_name}
+    row = db.execute(
+        "SELECT * FROM cockpit_daily WHERE stock_code=? ORDER BY run_date DESC LIMIT 1",
+        (code,)
+    ).fetchone()
+    if row:
+        candidate.update(dict(row))
+
+    # 收集股票全维度数据
+    stock_info = analyzer._build_stock_profile(code, candidate)
+    market_info = engine._module_market()
+    prompt = analyzer._build_prompt(code, stock_info, market_info)
+
+    # 构建完整 prompt（含技能框架）
+    skill = analyzer._load_skill()
+    full_prompt = f"""你是欧奈尔交易顾问，严格遵循《像欧奈尔信徒一样交易》的框架。
+请根据以下股票全维度数据，写一篇连贯的深度分析文章。
+叙事风格，像一位严师在跟你对话，引用欧奈尔名言。
+最后给出明确的综合结论（推荐买入/谨慎买入/观望/不建议）。
+
+{skill[:2000]}
+
+---
+
+{prompt}
+
+---
+请用HTML格式输出（h3标题、p段落、blockquote引用名言）。"""
+
+    # 调用 DeepSeek CLI
+    import subprocess, os
+    DEEPSEEK_EXE = r'D:\dstui\deepseek-tui-windows-x64.exe'
+
+    try:
+        result = subprocess.run(
+            [DEEPSEEK_EXE, '-p', full_prompt],
+            capture_output=True, text=True, timeout=180, encoding='utf-8', errors='replace',
+            cwd=r'D:\dstui', shell=False
+        )
+        output = result.stdout.strip() or result.stderr.strip()
+        if not output:
+            output = '<p>AI 未返回内容，请稍后重试。</p>'
+    except subprocess.TimeoutExpired:
+        output = '<p style="color:#F44336">AI 分析超时（180秒），请稍后重试。</p>'
+    except Exception as e:
+        output = f'<p style="color:#F44336">调用失败：{str(e)}</p>'
+
+    # 缓存到文件
+    run_date = datetime.now().strftime('%Y-%m-%d')
+    report_dir = os.path.join(PROJECT_DIR, 'data', 'cockpit', 'oneil', run_date)
+    os.makedirs(report_dir, exist_ok=True)
+    html_content = analyzer._text_to_html(code, stock_info, output, run_date)
+    with open(os.path.join(report_dir, f'{code}.html'), 'w', encoding='utf-8') as f:
+        f.write(html_content)
+
+    return jsonify({
+        'code': code,
+        'stock_name': stock_name,
+        'html': output,
+        'cached': f'data/cockpit/oneil/{run_date}/{code}.html'
+    })
+
+
 @app.route('/api/cockpit/oneil-report', methods=['GET', 'OPTIONS'])
 def api_cockpit_oneil_report():
     """获取欧奈尔深度分析 HTML 报告"""
