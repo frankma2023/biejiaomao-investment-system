@@ -3633,6 +3633,26 @@ def api_cockpit_briefing():
     return jsonify(briefing)
 
 
+
+@app.route('/api/cockpit/oneil-report', methods=['GET', 'OPTIONS'])
+def api_cockpit_oneil_report():
+    """获取欧奈尔深度分析 HTML 报告"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    code = request.args.get('code', '')
+    date = request.args.get('date', '')
+    if not code or not date:
+        return jsonify({'error': 'code and date required'}), 400
+
+    report_path = os.path.join(PROJECT_DIR, 'data', 'cockpit', 'oneil', date, f'{code}.html')
+    if not os.path.exists(report_path):
+        return jsonify({'error': 'not found'}), 404
+
+    with open(report_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    return content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+
 @app.route('/api/discipline/trade-stats', methods=['GET', 'OPTIONS'])
 def api_trade_stats():
     """交易记录统计（心理关数据源）"""

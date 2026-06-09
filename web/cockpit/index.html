@@ -343,8 +343,10 @@ function buildBriefingHTML(c) {
 
   // 欧奈尔分析
   if (c.oneil_analysis) {
-    h += '<h4>📖 欧奈尔分析</h4>';
+    h += '<h4>📖 欧奈尔分析（快速评估）</h4>';
     h += '<div style="font-size:.62rem;color:var(--text-secondary)">' + c.oneil_analysis.replace(/\\n/g,'<br>') + '</div>';
+    var reportUrl = '/api/cockpit/oneil-report?code=' + c.stock_code + '&date=' + (c.run_date||'');
+    h += '<a href="#" onclick="openOneilReport(\'' + c.stock_code + '\',\'' + (c.run_date||'') + '\');return false" style="display:inline-block;margin-top:6px;font-size:.6rem;color:var(--accent);text-decoration:none;border:1px solid var(--accent-border);padding:4px 12px;border-radius:8px">📖 查看 DeepSeek 深度分析 (1000+字)</a>';
   }
 
   return h;
@@ -437,6 +439,10 @@ async function runPipeline() {
 // ═══════════════════════════════════════════
 // THEME
 // ═══════════════════════════════════════════
+
+function openOneilReport(code, date) {
+  window.open('/api/cockpit/oneil-report?code=' + code + '&date=' + date, '_blank', 'width=900,height=700,scrollbars=yes');
+}
 
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
