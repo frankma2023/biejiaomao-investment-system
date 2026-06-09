@@ -236,10 +236,13 @@ class ONeilDeepAnalyzer:
         daily = []
         for i in range(min(10, len(rows) - 1)):
             r = rows[i]
+            raw_pct = r['change_pct']
+            # daily_kline.change_pct 是小数（0.0751=7.51%），需乘100
+            pct = round(raw_pct * 100, 2) if raw_pct is not None and abs(raw_pct) <= 1 else round(raw_pct, 2) if raw_pct else None
             daily.append({
                 'date': r['date'],
                 'close': r['close'],
-                'pct': round(r['change_pct'], 2) if r['change_pct'] else None,
+                'pct': pct,
                 'vol': r['volume'],
             })
         result['daily_10'] = daily
