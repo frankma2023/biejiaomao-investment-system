@@ -272,19 +272,15 @@ def analyze_structure(code, start_date, end_date):
             if ret < 0.03:
                 continue
 
-            # 成交量: > 前10日最大下跌量 AND > 20日均量×1.1
-            max_down_b2 = 0
+            # 成交额 > 前10日任意下跌日成交额（取消量比条件）
+            max_down_amt = 0
             for j in range(max(0, i - 10), i):
                 if j > 0 and klines[j]['close'] < klines[j-1]['close']:
-                    v = klines[j].get('volume') or 0
-                    if v > max_down_b2:
-                        max_down_b2 = v
+                    v = klines[j].get('amount') or 0
+                    if v > max_down_amt:
+                        max_down_amt = v
 
-            vol_20 = [klines[j]['volume'] for j in range(max(0, i - 20), i) if klines[j].get('volume') is not None]
-            avg_vol_20 = sum(vol_20) / len(vol_20) if vol_20 else 0
-            vol_ratio = k['volume'] / avg_vol_20 if avg_vol_20 > 0 else 0
-
-            if not (k['volume'] > max_down_b2 and vol_ratio >= 1.1):
+            if not ((k.get('amount') or 0) > max_down_amt):
                 continue
 
             # 收盘位置: 跳空≥40% / 非跳空≥80%
@@ -298,14 +294,19 @@ def analyze_structure(code, start_date, end_date):
             if not is_gap and close_pos < 0.80:
                 continue
 
-            # 均线突破 ≥ 4 条（MA5/10/20/30/60）
+            # 均线突破 ≥ 4 条（MA5/10/20/30/60），且必须站上 MA60
             ma_count = 0
+            ma60_val = None
             for period in [5, 10, 20, 30, 60]:
                 if i >= period - 1:
                     ma = sum(klines[j]['close'] for j in range(i - period + 1, i + 1)) / period
                     if k['close'] > ma:
                         ma_count += 1
+                    if period == 60:
+                        ma60_val = ma
             if ma_count < 4:
+                continue
+            if ma60_val is None or k['close'] <= ma60_val:
                 continue
 
             b2_idx = i

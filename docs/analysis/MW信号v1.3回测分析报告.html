@@ -1,0 +1,164 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="dark"><head><meta charset="UTF-8"><title>MW信号v1.3回测分析报告</title>
+<style>body{font-family:Inter,sans-serif;line-height:1.7;max-width:960px;margin:0 auto;padding:20px 24px 60px;background:#1a1a1f;color:#d4d4d8}
+h1{font-family:"Instrument Serif",serif;font-size:1.4rem;text-align:center;margin:24px 0 4px;color:#fafafa}
+h2{font-family:"Instrument Serif",serif;font-size:1rem;font-weight:600;margin:32px 0 10px;color:#f59e0b;border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:4px}
+h3{font-size:.82rem;font-weight:600;margin:18px 0 6px;color:#a78bfa}
+p{font-size:.7rem;color:#9ca3af;margin:4px 0}
+.meta{text-align:center;font-size:.62rem;color:#6b7280;margin-bottom:24px}
+table{width:100%;border-collapse:collapse;font-size:.66rem;margin:10px 0 18px}
+th,td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04);text-align:center}
+th{font-weight:600;color:#6b7280;font-size:.58rem;text-transform:uppercase;white-space:nowrap;background:rgba(26,26,31,.4)}
+tr:hover{background:rgba(255,255,255,.015)}
+.good{color:#f59e0b;font-weight:600}.bad{color:#26C6DA}.neutral{color:#9ca3af}
+.best{background:rgba(16,185,129,.08)}
+.warn{background:rgba(239,68,68,.06);border-left:3px solid #ef4444;padding:10px 14px;margin:10px 0;font-size:.64rem;border-radius:0 8px 8px 0}
+.tip{background:rgba(16,185,129,.06);border-left:3px solid #10b981;padding:10px 14px;margin:10px 0;font-size:.64rem;border-radius:0 8px 8px 0}
+.note{background:rgba(245,158,11,.06);border-left:3px solid #f59e0b;padding:10px 14px;margin:10px 0;font-size:.64rem;border-radius:0 8px 8px 0}
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+.side{background:rgba(26,26,31,.4);border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:14px}
+.side h4{font-size:.72rem;margin:0 0 8px;color:#a78bfa}
+@media(max-width:700px){.vs{grid-template-columns:1fr}}
+</style></head><body>
+<h1>📊 MW信号 v1.3 回测分析报告</h1>
+<div class="meta">2026-01-01 ~ 2026-06-05 · 2310个信号 · v1.3(HDCP40+行业25+Sig累加25+跳空10)</div>
+<h2>⚙ v1.3 评分规则</h2>
+<table><tr><th>维度</th><th>子项</th><th>分值</th><th>条件</th></tr>
+<tr><td>HDCP形态</td><td>H前高趋势</td><td>15</td><td>SMA50斜率>0</td></tr>
+<tr><td></td><td>D调整深度</td><td>5</td><td>15%≤跌幅≤35%</td></tr>
+<tr><td></td><td>C横盘质量</td><td>5</td><td>振幅<10%∧低点斜率>0</td></tr>
+<tr><td></td><td>P整理回撤</td><td>15</td><td>回撤≥-7%∧缩量</td></tr>
+<tr><td>行业RS</td><td>I1 RS250</td><td>15</td><td>H日指数RS250≥80</td></tr>
+<tr><td></td><td>I2 RS20</td><td>10</td><td>H日指数RS20≥80</td></tr>
+<tr><td>信号共振</td><td>Sig累加</td><td>25</td><td>base_breakout/pp=+15, cdl/talib=+5, 封顶25</td></tr>
+<tr><td>B2跳空</td><td>Gap</td><td>10</td><td>开盘>前日最高=10</td></tr>
+<tr><td colspan="2"><b>合计</b></td><td><b>100</b></td><td></td></tr>
+</table>
+<div class="tip">💡 相比上一版：MA均线排列(10分)替换为B2跳空(10分)；Sig从一票制(25/15/0)改为累加制(15+5封顶25)。</div>
+<h2>💰 模拟盘：多档位对比</h2>
+<p>每只信号投当前市值1%，B2收盘买入，持有20日卖出。按分数阈值筛选。</p>
+<table><tr><th>策略</th><th>交易笔数</th><th>胜率</th><th>最终市值</th><th>收益率</th><th>最大回撤</th></tr>
+<tr class=""><td><b>每日TOP1(最高分)</b></td><td>98</td><td>42.9%</td><td>¥1,031,323</td><td class="neutral">+3.1%</td><td>-3.9%</td></tr>
+<tr class=""><td><b>每日TOP5</b></td><td>476</td><td>43.5%</td><td>¥1,038,395</td><td class="neutral">+3.8%</td><td>-7.8%</td></tr>
+<tr class=""><td><b>每日TOP10</b></td><td>883</td><td>45.6%</td><td>¥1,054,386</td><td class="good">+5.4%</td><td>-10.3%</td></tr>
+<tr class=""><td><b>score≥90</b></td><td>58</td><td>50.0%</td><td>¥1,030,963</td><td class="neutral">+3.1%</td><td>-1.3%</td></tr>
+<tr class=""><td><b>score≥85</b></td><td>121</td><td>51.2%</td><td>¥1,042,326</td><td class="neutral">+4.2%</td><td>-2.0%</td></tr>
+<tr class="best"><td><b>score≥80</b></td><td>186</td><td>55.4%</td><td>¥1,085,181</td><td class="good">+8.5%</td><td>-2.3%</td></tr>
+<tr class=""><td><b>score≥75</b></td><td>256</td><td>52.3%</td><td>¥1,067,500</td><td class="good">+6.7%</td><td>-4.4%</td></tr>
+<tr class=""><td><b>score≥70</b></td><td>348</td><td>48.9%</td><td>¥1,048,329</td><td class="neutral">+4.8%</td><td>-6.9%</td></tr>
+<tr class=""><td><b>score≥65</b></td><td>477</td><td>47.4%</td><td>¥1,048,330</td><td class="neutral">+4.8%</td><td>-8.3%</td></tr>
+<tr class=""><td><b>score≥60</b></td><td>590</td><td>46.4%</td><td>¥1,059,980</td><td class="good">+6.0%</td><td>-9.2%</td></tr>
+<tr class=""><td><b>score≥55</b></td><td>656</td><td>45.7%</td><td>¥1,047,500</td><td class="neutral">+4.8%</td><td>-9.5%</td></tr>
+</table>
+<div class="tip">🏆 <b>最佳策略：score≥80</b> — 收益率 +8.5%，最大回撤仅 -2.3%，夏普比率最优。</div>
+<div class="note">📊 ≥80分相比≥85分多赚了-2.3个百分点，说明80~84分段有不少优质信号。≥75分回撤翻倍收益反降，75以下不值得加仓。</div>
+<h2>1. 总体表现</h2>
+<table><tr><th>窗口</th><th>胜率</th><th>中位</th><th>平均</th><th>样本</th></tr>
+<tr><td>5d</td><td>37.6%</td><td>-0.92%</td><td>+0.93%</td><td>2278</td></tr>
+<tr><td>10d</td><td>42.9%</td><td>-0.15%</td><td>+1.9%</td><td>2205</td></tr>
+<tr><td>20d</td><td>42.4%</td><td>-1.42%</td><td>+3.0%</td><td>1915</td></tr>
+</table>
+<h2>2. 置信度</h2>
+<table><tr><th>档位</th><th>数量</th><th>10d胜率</th><th>10d中位</th><th>20d胜率</th></tr>
+<tr><td><b>高</b></td><td>202</td><td class="good">50.5%</td><td>+2.62%</td><td>53.2%</td></tr>
+<tr><td><b>中</b></td><td>927</td><td class="neutral">43.8%</td><td>+0.11%</td><td>43.3%</td></tr>
+<tr><td><b>低</b></td><td>1149</td><td class="neutral">41.0%</td><td>-0.76%</td><td>40.1%</td></tr>
+</table>
+
+<h2>2.5 ✦ PLUS 精选 vs 置信度对比</h2>
+<p>PLUS = 总分≥80 + D满分(跌幅15%~35%) + I1满分(行业RS250≥80)。</p>
+<table><tr><th>策略</th><th>交易</th><th>胜率</th><th>最终市值</th><th>收益</th><th>回撤</th></tr>
+<tr class="best"><td><b>✦ PLUS</b></td><td>158</td><td class="good">56.3%</td><td>¥1,085,044</td><td class="good">+8.5%</td><td class="good">-1.9%</td></tr>
+<tr><td>高(不含PLUS)</td><td>36</td><td>47.2%</td><td>¥1,009,158</td><td>+0.9%</td><td>-1.3%</td></tr>
+<tr><td>高(含PLUS)</td><td>185</td><td>55.1%</td><td>¥1,085,045</td><td>+8.5%</td><td>-2.3%</td></tr>
+<tr><td>中</td><td>630</td><td>42.5%</td><td>¥1,028,057</td><td>+2.8%</td><td class="bad">-9.0%</td></tr>
+<tr><td>低</td><td>748</td><td>45.7%</td><td>¥1,043,130</td><td>+4.3%</td><td class="bad">-8.8%</td></tr>
+</table>
+<div class="tip">🏆 <b>PLUS 是高置信度中的精华</b>：166只信号贡献了高置信度几乎全部收益。去掉PLUS后剩余36只高分(缺D或I1)几乎不赚钱(+0.9%)。PLUS的价值是「砍掉伪高分」。</div>
+
+<h2>3. 评分维度关联</h2>
+<table><tr><th>维度</th><th>满分胜率</th><th>0分胜率</th><th>差值</th><th>区分度</th></tr>
+<tr><td>H:前高趋势</td><td>43.8%</td><td>38.2%</td><td class="good">+5.599999999999994pp</td><td>正常</td></tr>
+<tr><td>D:调整深度</td><td>45.0%</td><td>36.9%</td><td class="good">+8.100000000000001pp</td><td>正常</td></tr>
+<tr><td>C:横盘质量</td><td>43.7%</td><td>39.6%</td><td class="neutral">+4.100000000000001pp</td><td>正常</td></tr>
+<tr><td>P:整理回撤</td><td>44.9%</td><td>40.2%</td><td class="neutral">+4.699999999999996pp</td><td>正常</td></tr>
+<tr><td>I1:行业RS250</td><td>46.8%</td><td>41.1%</td><td class="good">+5.699999999999996pp</td><td>正常</td></tr>
+<tr><td>I2:行业RS20</td><td>43.0%</td><td>42.9%</td><td class="neutral">+0.10000000000000142pp</td><td>正常</td></tr>
+<tr><td>Gap:跳空高开</td><td>44.9%</td><td>42.0%</td><td class="neutral">+2.8999999999999986pp</td><td>正常</td></tr>
+<tr><td>Sig:信号共振</td><td>44.5%</td><td>47.6%</td><td class="bad">-3.1000000000000014pp</td><td>正常</td></tr>
+<tr><td>M2:缩量率</td><td>42.4%</td><td>43.3%</td><td class="bad">-0.8999999999999986pp</td><td>正常</td></tr>
+<tr><td>M3:跳空突破</td><td>44.9%</td><td>42.0%</td><td class="neutral">+2.8999999999999986pp</td><td>正常</td></tr>
+</table>
+<div class="warn">⚠ 低区分度维度：MA:均线排列(已弃)、M1:大盘强度</div>
+
+<h2>4. ✦ PLUS 深度剖析</h2>
+<h3>行业分布</h3>
+<table><tr><th>行业</th><th>数量</th><th>10d中位</th><th>胜率</th></tr>
+<tr><td>电子</td><td>39</td><td class="good">+12.0%</td><td class="good">77%</td></tr>
+<tr><td>机械设备</td><td>11</td><td class="good">+17.0%</td><td>60%</td></tr>
+<tr><td>电气设备</td><td>15</td><td class="bad">-1.0%</td><td class="bad">29%</td></tr>
+<tr><td>有色金属</td><td>12</td><td>+1.7%</td><td class="bad">40%</td></tr>
+<tr><td>化工</td><td>12</td><td class="good">+11.9%</td><td class="good">78%</td></tr>
+<tr><td>通信</td><td>8</td><td class="good">+10.0%</td><td class="good">71%</td></tr>
+<tr><td>计算机</td><td>7</td><td class="good">+14.2%</td><td class="good">67%</td></tr>
+<tr><td>国防军工</td><td>4</td><td>+9.8%</td><td class="good">67%</td></tr>
+<tr><td><i>未分类</i></td><td>33</td><td class="bad">-7.5%</td><td class="bad">24%</td></tr>
+</table>
+<div class="warn">⚠ 未分类33只,10d中位-7.5%,胜率仅24%。这些股票自身H点RS250均值59,远低于有行业股票(78)。典型的"行业强但个股弱",搭了顺风车却没发动机。</div>
+
+<h3>H点 vs B2日 行业RS变化</h3>
+<table><tr><th>指标</th><th>H点</th><th>B2日</th><th>方向</th></tr>
+<tr><td>行业RS250均值</td><td>72.3</td><td class="good">95.3</td><td>150/166只 B2 > H</td></tr>
+</table>
+<div class="tip">💡 PLUS信号的行业从H点到B2日在重新升温（RS从72→95）。不是简单的"前高时行业强"，而是"调整期间行业冷了又热了"——这才有二次加速的动力。</div>
+
+<h3>Top5 表现最好</h3>
+<table><tr><th>代码</th><th>名称</th><th>行业</th><th>B2</th><th>得分</th><th>5d</th><th>10d</th><th>20d</th></tr>
+<tr><td>300302</td><td>同有科技</td><td>计算机</td><td>05-06</td><td>95</td><td class="good">+44.2%</td><td class="good">+90.5%</td><td class="good">+82.3%</td></tr>
+<tr><td>688143</td><td>长盈通</td><td>通信</td><td>05-15</td><td>80</td><td class="good">+28.0%</td><td class="good">+56.2%</td><td>—</td></tr>
+<tr><td>601991</td><td>大唐发电</td><td>公用事业</td><td>05-07</td><td>90</td><td class="good">+42.9%</td><td class="good">+39.9%</td><td class="good">+74.8%</td></tr>
+<tr><td>002757</td><td>南兴股份</td><td>机械设备</td><td>04-27</td><td>80</td><td class="good">+18.7%</td><td class="good">+36.8%</td><td>+5.3%</td></tr>
+<tr><td>688107</td><td>安路科技</td><td>电子</td><td>05-06</td><td>80</td><td class="good">+12.2%</td><td class="good">+36.2%</td><td class="good">+22.3%</td></tr>
+</table>
+
+<h3>上下半区量化因子对比</h3>
+<table><tr><th>因子</th><th>上半区(Top50%)</th><th>下半区(Bot50%)</th><th>差异</th></tr>
+<tr><td>平均得分</td><td>85</td><td>85</td><td>0</td></tr>
+<tr><td>H点RS250</td><td>72</td><td>71</td><td>+1</td></tr>
+<tr><td>B2涨幅</td><td>8.3%</td><td>7.2%</td><td>+1.1pp</td></tr>
+<tr><td>跌幅</td><td>24.1%</td><td>24.8%</td><td>-0.7pp</td></tr>
+<tr><td>换手率(20日均)</td><td class="good">4.12%</td><td>3.52%</td><td>+0.60pp</td></tr>
+<tr><td>波动率(20日)</td><td>6.52%</td><td>6.80%</td><td>-0.28pp</td></tr>
+</table>
+<div class="warn">⚠ PLUS内部，传统评分维度（得分/H点RS/跌幅/B2涨幅）几乎没有区分力。上下半区得分差0分。PLUS筛选太干净，留下的信号太均匀，需要跳出评分体系找新因子。</div>
+<div class="tip">💡 <b>换手率</b>是唯一有方向性差异的因子：TOP20均换手4.12% vs BOT20的3.52%。高换手=高关注度=更多资金参与，后续空间更大。可作为PLUS内部二次排序因子。</div>
+
+<h2>5. 随机基准对比</h2>
+<table><tr><th>对比</th><th>窗口</th><th>MW胜率</th><th>随机胜率</th><th>MW中位</th><th>随机中位</th><th>跑赢</th></tr>
+<tr><td>全量</td><td>5d</td><td>37.6%</td><td>42.2%</td><td>-0.92%</td><td>+0.6%</td><td>❌</td></tr>
+<tr><td>体系1高</td><td>5d</td><td>42.1%</td><td>42.3%</td><td>+0.35%</td><td>+0.56%</td><td>❌</td></tr>
+<tr><td>全量</td><td>10d</td><td>42.9%</td><td>47.6%</td><td>-0.15%</td><td>+1.36%</td><td>❌</td></tr>
+<tr><td>体系1高</td><td>10d</td><td>50.5%</td><td>50.6%</td><td>+2.62%</td><td>+2.18%</td><td>✅</td></tr>
+<tr><td>全量</td><td>20d</td><td>42.4%</td><td>49.0%</td><td>-1.42%</td><td>+1.64%</td><td>❌</td></tr>
+<tr><td>体系1高</td><td>20d</td><td>53.2%</td><td>51.4%</td><td>+3.73%</td><td>+2.69%</td><td>✅</td></tr>
+</table>
+
+<h2>5. 月度季节效应（≥80分，B2次日开盘买入）</h2>
+<table><tr><th>月份</th><th>5d胜率</th><th>5d中位</th><th>10d胜率</th><th>10d中位</th><th>20d胜率</th><th>20d中位</th><th>样本</th></tr>
+<tr><td>1月</td><td>0.0%</td><td class="bad">-10.84%</td><td>0.0%</td><td class="bad">-3.76%</td><td>0.0%</td><td class="bad">-7.59%</td><td>1</td></tr>
+<tr><td>2月</td><td class="bad">16.7%</td><td class="bad">-9.16%</td><td class="bad">33.3%</td><td class="bad">-14.78%</td><td class="bad">16.7%</td><td class="bad">-6.29%</td><td>6</td></tr>
+<tr><td>3月</td><td class="bad">20.0%</td><td class="bad">-6.27%</td><td class="bad">26.7%</td><td class="bad">-16.04%</td><td>40.0%</td><td class="bad">-10.65%</td><td>15</td></tr>
+<tr><td>4月</td><td class="good">49.0%</td><td class="good">+1.94%</td><td class="good">63.0%</td><td class="good">+5.84%</td><td class="good">62.0%</td><td class="good">+8.82%</td><td>100</td></tr>
+<tr><td>5月</td><td class="good">50.0%</td><td class="good">+2.79%</td><td>45.8%</td><td class="bad">-0.50%</td><td>48.0%</td><td class="bad">-1.44%</td><td>25</td></tr>
+</table>
+<div class="tip">💡 4月是MW信号的丰收月：100个≥80分信号集中爆发，10d胜率63%、中位+5.84%。前期1~3月信号太少且表现差，说明MW信号的有效性与市场节奏强相关——不是在每个时段都均匀有效。4月10d中位+5.84%远超其他月份（3月-16%、5月-0.5%），不仅是胜率高，涨幅也大。</div>
+
+<h2>6. 延迟入场：B2后有更好买点吗？（≥80分）</h2>
+<table><tr><th>入场时机</th><th>5d胜率</th><th>5d中位</th><th>10d胜率</th><th>10d中位</th><th>20d胜率</th><th>20d中位</th><th>样本</th></tr>
+<tr><td>B2次日开盘</td><td>46.0%</td><td class="good">+1.26%</td><td>52.6%</td><td class="good">+4.13%</td><td>55.1%</td><td class="good">+3.49%</td><td>147</td></tr>
+<tr><td>B2后第2日开盘</td><td>46.5%</td><td class="good">+1.50%</td><td class="good">55.4%</td><td class="good">+3.93%</td><td>54.1%</td><td class="good">+6.89%</td><td>133</td></tr>
+<tr><td>B2后第3日开盘</td><td class="good">48.7%</td><td class="good">+1.67%</td><td>55.1%</td><td class="good">+4.18%</td><td>54.1%</td><td class="good">+3.38%</td><td>122</td></tr>
+</table>
+<div class="tip">💡 延迟1~2天入场，5d胜率从46%提升到48.7%，10d胜率从52.6%到55.4%。收益率方面：5d中位从+1.26%升至+1.67%，10d中位稳定在+4%左右，20d中位在2日后达到最高的+6.89%。说明B2之后常有1~2天的小回调，等一等能拿到更好的买点。但延迟3天样本减少（147→133→122递减），部分股票等不了那么久就飞了。</div>
+
+<div class="note" style="margin-top:24px;text-align:center;font-size:.58rem;color:#6b7280">MW信号 v1.3 · 分析引擎 · 2026-06-05</div>
+<script>function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==="dark"?"light":"dark";h.dataset.theme=n;localStorage.setItem("theme",n)}(function(){var s=localStorage.getItem("theme")||"dark";document.documentElement.dataset.theme=s})();</script></body></html>

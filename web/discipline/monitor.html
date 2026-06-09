@@ -149,6 +149,13 @@ function render() {
     html += '<div class="stat"><div class="val">' + h.buy_qty + '股</div><div class="lbl">数量</div></div>';
     html += '<div class="stat"><div class="val">¥' + (h.market_value || 0).toLocaleString() + '</div><div class="lbl">市值</div></div>';
     html += '<div class="stat"><div class="val">' + (h.position_pct || 0).toFixed(1) + '%</div><div class="lbl">仓位占比</div></div>';
+    if (h.entry_signal) {
+      html += '<div class="stat"><div class="val" style="font-size:0.65rem">' + h.entry_signal + '</div><div class="lbl">入场信号</div></div>';
+    }
+    if (h.stop_loss_price) {
+      var slClass = h.current_price <= h.stop_loss_price ? 'pnl-down' : '';
+      html += '<div class="stat"><div class="val ' + slClass + '">¥' + h.stop_loss_price.toFixed(2) + '</div><div class="lbl">止损价</div></div>';
+    }
     html += '</div>';
 
     if (h.alerts && h.alerts.length > 0) {

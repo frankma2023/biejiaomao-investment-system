@@ -2,7 +2,7 @@
 
 > 引擎：SQLite，WAL 模式，PRAGMA synchronous=NORMAL  
 > 数据库文件：`data/lixinger.db`  
-> 更新时间：2026-05-21
+> 更新时间：2026-06-09
 
 ---
 
@@ -1495,7 +1495,143 @@
 | K线数据 | daily_kline ~1794万 + weekly_kline ~222万 |
 | RS数据 | rs_daily ~527万 |
 | 指数K线 | index_daily_kline ~142万 |
+| MW信号 | mw_signal_daily ~2367条 |
+
+---
+
+## 50. mw_signal_daily — MW信号（牛市回调后再启动）
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| id | INTEGER | **PK**，自增 |
+| b2_date | TEXT | **UNIQUE(1)**，B2突破日 |
+| stock_code | TEXT | **UNIQUE(1)**，股票代码 |
+| stock_name | TEXT | 股票名称 |
+| confidence | TEXT | 体系1置信度：高/中/低 |
+| score | INTEGER | 体系1总分（0~100） |
+| confidence_v2 | TEXT | 体系2置信度 |
+| score_v2 | INTEGER | 体系2总分（0~115） |
+| h_date / h_price | TEXT/REAL | H点前高日期/价格 |
+| l_date / l_price | TEXT/REAL | L点最低日期/价格 |
+| c_start / c_end | TEXT/TEXT | C横盘区起止日期 |
+| b1_date | TEXT | B1突破日 |
+| b1_return_pct | REAL | B1涨幅% |
+| b1_vol_ratio | REAL | B1量比 |
+| b2_return_pct | REAL | B2涨幅% |
+| b2_close_pos | REAL | B2收盘位置% |
+| b2_is_gap | INTEGER | B2是否跳空 0/1 |
+| b2_ma_count | INTEGER | B2突破均线条数 |
+| decline_pct | REAL | D段跌幅% |
+| c_amplitude_pct | REAL | C段振幅% |
+| h_rs20 / h_rs250 | INTEGER | H点股票RS20/RS250 |
+| c_amount_avg | REAL | 横盘期日均成交额 |
+| h_pre_rise_pct | REAL | H点前60日涨幅% |
+| p_max_dd_pct | REAL | P段最大回撤% |
+| p_vol_ratio | REAL | P段缩量率（均量/B1量） |
+| score_h / score_d / score_c / score_p | INTEGER | HDCP形态评分（15/5/5/15） |
+| score_i1 / score_i2 | INTEGER | 行业RS评分（15/10） |
+| score_o1 / score_o2 | INTEGER | 已废弃（CANSLIM I/L），恒为0 |
+| score_ma | INTEGER | 已废弃（MA排列），恒为0 |
+| score_sig | INTEGER | 信号共振评分（累加制，封顶25） |
+| score_gap | INTEGER | B2跳空评分（10/0） |
+| score_m1 / score_m2 / score_m3 | INTEGER | 体系2新指标（大盘强度/缩量率/跳空） |
+| is_plus | INTEGER | PLUS标志（≥65=1） |
+| ind_rs20 / ind_rs250 | INTEGER | 行业指数RS20/RS250值 |
+| ind_code | TEXT | L2/L1行业指数代码 |
+| ind_name | TEXT | L2/L1行业指数名称 |
+| scan_date | TEXT | 扫描日期 |
+| created_at | TEXT | 创建时间 |
+
+**数据量**：~2367条  
+**写入脚本**：`src/scanners/mw_signal.py`  
+**读取场景**：MW信号看板、回测分析
+
+### 评分体系（v2.4）
+
+体系1满分100：HDCP形态40(H15/D5/C5/P15) + 行业RS25(I1=15,I2=10,L2优先L1兜底) + 信号共振25(累加制) + B2跳空10
+
+置信度：高≥80 中55~79 低<55
+
+PLUS：总分≥65
+
+---
+
+## 51. chanlun_scan_daily — 缠论批量扫描缓存
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| scan_date | TEXT | 扫描日期 |
+| stock_code | TEXT | 股票代码 |
+| stock_name | TEXT | 股票名称 |
+| bi_count | INTEGER | 笔数量 |
+| zs_count | INTEGER | 中枢数量 |
+| segment_count | INTEGER | 线段数量 |
+| latest_bi_dir | TEXT | 最新笔方向 |
+| latest_bi_power | REAL | 最新笔力度 |
+| divergence_count | INTEGER | 背驰信号数 |
+| latest_div_type | TEXT | 最新背驰类型 |
+| trade_signal_count | INTEGER | 交易信号数 |
+| latest_trade_type | TEXT | 最新交易信号类型 |
+| latest_trade_side | TEXT | 最新交易方向 buy/sell |
+| latest_trade_price | REAL | 最新交易价格 |
+| resonance_strength | REAL | 共振强度 |
+| bi_json | TEXT | 完整笔列表JSON（供MW信号H/L检测） |
+
+**数据量**：~4500条/日  
+**写入脚本**：`src/scanners/chanlun_scan.py`  
+**读取场景**：MW信号H/L检测加速、缠论每日精选
+
+---
+
+## 52. pattern_scan_signals — 形态扫描信号
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| stock_code | TEXT | **PK(1)** |
+| date | TEXT | **PK(2)** |
+| signals_json | TEXT | 信号JSON（source/type/details） |
+
+**数据量**：~3500条/日  
+**写入脚本**：`scripts/daily_pattern_scan.py`  
+**读取场景**：MW信号共振评分
 | 指数成分 | constituents ~62万 + weightings ~119万 |
 | 财务数据 | quarterly ~16万 + annual ~5.7万 + financial_statement ~2.8万 |
 | CANSLIM | quarterly_eps ~9.8万 + annual_eps ~1.8万 |
 | DB文件大小 | ~41GB |
+
+---
+
+## 53. cockpit_daily — 投资决策驾驶舱每日结果
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| id | INTEGER | **PK**，自增 |
+| run_date | TEXT | **UNIQUE(1)**，管道运行日期 |
+| stock_code | TEXT | **UNIQUE(2)**，股票代码 |
+| stock_name | TEXT | 股票名称 |
+| rank | INTEGER | 排序（1=最优） |
+| signal_types | TEXT | JSON数组，如 ["mw_b2","base_breakout"] |
+| signal_date | TEXT | 最近的买入信号日期 |
+| confidence | TEXT | 置信度 高/中/低 |
+| h_date | TEXT | 前高日期（MW结构） |
+| h_price | REAL | 前高价格 |
+| l_date | TEXT | 低点日期 |
+| l_price | REAL | 低点价格 |
+| decline_pct | REAL | H→L 调整深度% |
+| consolidation_days | INTEGER | 盘整天数 |
+| canslim_total | INTEGER | CAN SLIM 总分 |
+| canslim_c~canslim_m | INTEGER | CAN SLIM 各维度分 |
+| market_cap | REAL | 市值（亿） |
+| l1_industry | TEXT | 所属行业 |
+| l1_rs250 | INTEGER | 行业RS250 |
+| suggested_position_pct | REAL | 建议仓位% |
+| stop_loss_price | REAL | 止损参考价 |
+| target_price | REAL | 止盈参考价 |
+| sentiment_summary | TEXT | 舆情摘要 |
+| oneil_analysis | TEXT | 欧奈尔分析（trade-like-oneil输出） |
+| stop_loss_rule | TEXT | 止损规则描述 |
+| trailing_stop_rule | TEXT | 移动止损规则 |
+
+**数据量**：~5条/日
+**写入脚本**：`src/cockpit/pipeline.py --save`
+**读取场景**：投资决策驾驶舱前端 /cockpit/

@@ -262,6 +262,7 @@ def get_holdings_status(db):
             'buy_date': t['buy_date'],
             'buy_price': t['buy_price'],
             'buy_qty': t['buy_qty'],
+            'entry_signal': t['entry_signal'] if 'entry_signal' in t.keys() else '',
             'current_price': current_price,
             'market_value': market_value,
             'pnl_pct': pnl_pct,

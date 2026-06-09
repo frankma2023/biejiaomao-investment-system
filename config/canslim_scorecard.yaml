@@ -1,47 +1,77 @@
-# CAN SLIM 评分卡 v3.0 — 满分100分
-# 2026-05-24
-
 c_current_earnings:
-  eps_yoy_tiers: [25, 18, 10]
-  eps_yoy_scores: [11, 7, 4]       # v3: 12,8,5 → 11,7,4
+  eps_yoy_tiers:
+  - 25
+  - 18
+  - 10
+  eps_yoy_scores:
+  - 11
+  - 7
+  - 4
   eps_accel_threshold: 10
-  revenue_yoy_tiers: [25, 15]
-  revenue_yoy_scores: [4, 2]
+  revenue_yoy_tiers:
+  - 25
+  - 15
+  revenue_yoy_scores:
+  - 4
+  - 2
   nonrecurring_ratio: 90
-
 a_annual_earnings:
-  eps_cagr_3y_tiers: [25, 15, 5]
-  eps_cagr_scores: [8, 5, 2]        # v3: 9,6,3 → 8,5,2
+  eps_cagr_3y_tiers:
+  - 25
+  - 15
+  - 5
+  eps_cagr_scores:
+  - 8
+  - 5
+  - 2
   stability_cv_threshold: 30
-
 n_new:
-  high52_tiers: [-5, -15]
-  high52_scores: [6, 4]             # v3: 7,5 → 6,4
+  high52_tiers:
+  - -5
+  - -15
+  high52_scores:
+  - 6
+  - 4
   high_lookback_days: 5
-  upper_limit: 17                    # v3: 52周与形态突破 分离计算，上限17
-  engine_scores:
-    base_breakout: 5                  # 基部突破（替代原标准突破/双重底/扁平/碟形）
-    pocket_pivot: 5                   # 口袋支点
-    cdl_bullish: 2                    # K线形态·看涨
-    cdl_bullish_max: 4
-    talib_bullish: 1                  # TA-Lib·看涨
-    talib_bullish_max: 3
-
 s_supply_demand:
-  # v3: 去掉 market_cap 和 buyback，S 只有成交量放大
-  vol_ratio_tiers: [2.0, 1.5, 1.2]
-  vol_ratio_scores: [7, 5, 2]       # v3: 3,2 → 7,5,2
-
+  market_cap_tiers:
+  - 50
+  - 200
+  - 500
+  market_cap_scores:
+  - 4
+  - 2
+  - 1
+  vol_ratio_tiers:
+  - 2
+  - 1.5
+  - 1.2
+  vol_ratio_scores:
+  - 7
+  - 5
+  - 2
 l_leader:
-  rs250_tiers: [95, 90, 80, 70]
-  rs250_scores: [10, 8, 5, 2]       # v3: 11,9,6,3 → 10,8,5,2
-  rs20_bonus_tiers: [95, 90]         # v3: 新增 RS_20 短期爆发
-  rs20_bonus_scores: [2, 1]
+  rs250_tiers:
+  - 95
+  - 90
+  - 80
+  - 70
+  rs250_scores:
+  - 10
+  - 8
+  - 5
+  - 2
   excess_return_threshold: 5
-  excess_return_scores: [4, 2]      # v3: 3,1 → 4,2
-
 i_institutional:
-  inst_holding_tiers: [15, 5, 1]
-  inst_holding_scores: [5, 3, 1]
-  analyst_coverage_tiers: [3, 1]
+  inst_holding_tiers:
+  - 12
+  - 5
+  - 1
+  inst_holding_scores:
+  - 5
+  - 3
+  - 1
+  analyst_coverage_tiers:
+  - 3
+  - 1
   debt_ratio_warning: 60

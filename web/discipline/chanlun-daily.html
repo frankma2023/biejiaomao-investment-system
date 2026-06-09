@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN" class="dark">
 <head>
 <meta charset="UTF-8">
@@ -70,7 +70,7 @@
 </div>
 
 <script>
-var API='http://localhost:8788';
+var API='http://' + window.location.hostname + ':8788';
 var allItems=[], sortCol='composite_score', sortDir='desc', currentFilter='all';
 
 function sortArrow(col){ return col===sortCol ? (sortDir==='asc'?' ▲':' ▼') : ''; }

@@ -155,7 +155,7 @@ def scan_stock(klines, scan_date, code=None, conn=None):
         if k['high'] != k['low']: pos = (k['close']-k['low'])/(k['high']-k['low'])
         else: pos = 1.0
         # B1:涨幅 + 均线(MA5>MA10且收盘站上) + 量 + 空间
-        b1_vol_ok = k['volume'] > max_down_b1 and vol_r >= 1.5
+        b1_vol_ok = k['volume'] > max_down_b1 and vol_r >= 1.3
         # MA5/MA10 check
         ma5 = sum(klines[j]['close'] for j in range(i-4, i+1))/5 if i>=4 else 0
         ma10 = sum(klines[j]['close'] for j in range(i-9, i+1))/10 if i>=9 else 0
@@ -204,12 +204,9 @@ def scan_stock(klines, scan_date, code=None, conn=None):
         if not new_above and not new_cross and not price_break:
             continue
 
-        vol_20 = [klines[j]['volume'] for j in range(max(0,i-20), i) if klines[j].get('volume')]
-        avg20 = sum(vol_20)/len(vol_20) if vol_20 else 0
-        vol_r = k['volume']/avg20 if avg20 > 0 else 0
-        # 最近10日最大下跌量
-        max_down = max((klines[j]['volume'] for j in range(max(0,i-10), i) if j>0 and klines[j]['close']<klines[j-1]['close']), default=0)
-        b2_vol_ok = k['volume'] > max_down and vol_r >= 1.1
+        # 成交额 > 前10日任意下跌日成交额（取消量比条件）
+        max_down_amt = max((klines[j].get('amount') or 0 for j in range(max(0,i-10), i) if j>0 and klines[j]['close']<klines[j-1]['close']), default=0)
+        amount_ok = (k.get('amount') or 0) > max_down_amt
         ret = (k['close']/klines[i-1]['close']-1) if i>0 else 0
         if k['high'] != k['low']: pos = (k['close']-k['low'])/(k['high']-k['low'])
         else: pos = 1.0
@@ -217,16 +214,19 @@ def scan_stock(klines, scan_date, code=None, conn=None):
         is_gap = i > 0 and k['open'] > klines[i-1]['high']
         close_ok = (is_gap and pos >= 0.40) or (not is_gap and pos >= 0.80)
         if not close_ok: continue
-        if not b2_vol_ok: continue
+        if not amount_ok: continue
         if ret < 0.03: continue
 
-        # 均线突破 ≥ 4
+        # 均线突破 ≥ 4，且必须站上 MA60
         ma_count = 0
+        ma60_val = None
         for period in [5,10,20,30,60]:
             if i >= period-1:
                 ma = sum(klines[j]['close'] for j in range(i-period+1, i+1))/period
                 if k['close'] > ma: ma_count += 1
+                if period == 60: ma60_val = ma
         if ma_count < 4: continue
+        if ma60_val is None or k['close'] <= ma60_val: continue
 
         b2_idx = i; break
 
@@ -241,44 +241,43 @@ def scan_stock(klines, scan_date, code=None, conn=None):
     if (scan_dt - b2_dt).days > B2_RECENT_DAYS * 2:
         return False, None  # B2 太久了
 
-    # ── 6. 辅助评分(形态 H/D/C/P)──
+    # ── 6. 辅助评分(形态 H/D/C/P) ──
+    # 权重调整：H15 P15 D5 C5（基于回测数据：H+9.1pp, P+6.4pp >> D+4.6pp, C+4.3pp）
     score = {'H': 0, 'D': 0, 'C': 0, 'P': 0}
 
-    # H: SMA50 斜率 > 0
+    # H: SMA50 斜率 > 0（满分 15）
     if h_idx >= 60:
         sma50_now = sum(klines[j]['close'] for j in range(h_idx-50, h_idx))/50
         sma50_10d_ago = sum(klines[j]['close'] for j in range(h_idx-60, h_idx-10))/50 if h_idx >= 60 else sma50_now
         if sma50_now > sma50_10d_ago:
-            score['H'] = 10
+            score['H'] = 15
 
-    # D: 15% ≤ 跌幅 ≤ 35%
+    # D: 15% ≤ 跌幅 ≤ 35%（满分 15）
     decline = (h_price - l_price)/h_price*100 if h_price > 0 else 0
     if 15 <= decline <= 35:
-        score['D'] = 10
+        score['D'] = 15
 
-    # C: 振幅 < 10% AND 低点斜率 > 0
+    # C: 振幅 < 10% AND 低点斜率 > 0（满分 5）
     c_closes = [klines[j]['close'] for j in range(c_start, c_end+1)]
     c_min = min(c_closes); c_max = max(c_closes)
     c_amp = (c_max-c_min)/c_min*100 if c_min > 0 else 999
     c_slope = linear_slope(c_closes)
     if c_amp < 10 and c_slope > 0:
-        score['C'] = 10
+        score['C'] = 5
 
-    # P: 回撤 ≥ -7% AND 缩量
+    # P: 回撤 ≥ -7% AND 缩量（满分 15）
+    p_vol_avg = 0
     if b2_idx > b1_idx+1:
-        b1_close = klines[b1_idx]['close']
+        b1_close_val = klines[b1_idx]['close']
         p_dd = 0
         p_vols = []
         for i in range(b1_idx+1, b2_idx):
-            dd = (klines[i]['close']/b1_close-1)*100
+            dd = (klines[i]['close']/b1_close_val-1)*100
             if dd < p_dd: p_dd = dd
             p_vols.append(klines[i]['volume'])
         p_vol_avg = sum(p_vols)/len(p_vols) if p_vols else 0
         if p_dd >= -7 and p_vol_avg < klines[b1_idx]['volume']:
-            score['P'] = 10
-    else:
-        # 只有 1 天间隔,P 几乎不存在,给满分(宽容处理)
-        score['P'] = 0
+            score['P'] = 15
 
     # ── 6.5 前高时的 RS 强度 ──
     h_rs250 = h_rs20 = None
@@ -291,88 +290,70 @@ def scan_stock(klines, scan_date, code=None, conn=None):
             h_rs20 = row[0]
             h_rs250 = row[1]
 
-    # ── 7. 行业共振评分(20分)──
+    # ── 7. 行业共振 + 个股RS强度评分（25分：I1=15, I2=10）──
+    # I1: 行业RS250（L2→L1兜底，二进制）
+    # I2: 股票H点RS250（阶梯制）
     score_i1 = score_i2 = 0
     ind_rs20 = ind_rs250 = None
     if conn and code:
-        # 获取行业名称
-        ind_row = conn.execute(
-            "SELECT industry_name FROM discipline_observation_pool WHERE stock_code=? ORDER BY date DESC LIMIT 1",
-            (code,)
-        ).fetchone()
-        industry = ind_row[0] if ind_row else None
-        if industry:
-            # 匹配行业指数:在 index_rs_daily 中找名称包含行业名的指数
-            idx_row = conn.execute("""
-                SELECT r.stock_code, r.rs_20, r.rs_250
-                FROM index_rs_daily r
-                INNER JOIN index_daily_kline k ON r.stock_code=k.stock_code
-                WHERE r.date=? AND k.stock_code LIKE '00%'
-                GROUP BY r.stock_code
-                LIMIT 1
-            """, (scan_date,)).fetchone()
-            # 简化:直接按行业名找指数 RS
-            # 先查 index_constituents 看该股票属于哪些行业指数
-            idx_codes = conn.execute("""
-                SELECT DISTINCT ic.index_code FROM index_constituents ic
-                WHERE ic.stock_code=?
-            """, (code,)).fetchall()
-            idx_set = set(r[0] for r in idx_codes)
-            # 在这些指数中找有 RS 数据的,取 RS250 最高的(代表最相关的行业指数)
-            if idx_set:
-                placeholders = ','.join('?' * len(idx_set))
-                best = conn.execute(f"""
-                    SELECT stock_code, rs_20, rs_250 FROM index_rs_daily
-                    WHERE date=? AND stock_code IN ({placeholders})
-                    ORDER BY rs_250 DESC LIMIT 1
-                """, [scan_date] + list(idx_set)).fetchone()
-                if best:
-                    ind_rs20 = best[1]
-                    ind_rs250 = best[2]
-            if ind_rs250 is not None and ind_rs250 >= 80:
-                score_i1 = 10
-            if ind_rs20 is not None and ind_rs20 >= 80:
-                score_i2 = 10
-
-    # ── 8. 欧奈尔质量评分(20分)──
-    score_o1 = score_o2 = 0
-    if conn and code:
-        cs_row = conn.execute(
-            "SELECT canslim_i, canslim_l FROM discipline_observation_pool WHERE stock_code=? ORDER BY date DESC LIMIT 1",
-            (code,)
-        ).fetchone()
-        if cs_row:
-            ci = cs_row[0] or 0
-            cl = cs_row[1] or 0
-            if ci >= 12: score_o1 = 10
-            elif ci >= 8: score_o1 = 5
-            if cl >= 15: score_o2 = 10
-            elif cl >= 10: score_o2 = 5
-
-    # ── 8.5 MA 排列质量评分(10分)──
-    score_ma = 0
-    mas = {}
-    for p in [5,10,20,30,60]:
-        if b2_idx >= p-1:
-            mas[p] = sum(klines[j]['close'] for j in range(b2_idx-p+1, b2_idx+1))/p
+        # 加载L2/L1指数列表（缓存）
+        if not hasattr(scan_stock, '_l2_codes'):
+            import yaml, os as _os
+            cfg_path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))), 'config', 'index_style.yaml')
+            with open(cfg_path, 'r', encoding='utf-8') as _f:
+                _cfg = yaml.safe_load(_f)
+            scan_stock._l2_codes = set(i['code'] for i in _cfg['categories']['sector_l2'])
+            scan_stock._l2_names = {i['code']: i['name'] for i in _cfg['categories']['sector_l2']}
+            scan_stock._l1_codes = set(i['code'] for i in _cfg['categories']['sector_l1'])
+            scan_stock._l1_names = {i['code']: i['name'] for i in _cfg['categories']['sector_l1']}
+        l2_set = scan_stock._l2_codes
+        l2_names_map = scan_stock._l2_names
+        l1_names_map = scan_stock._l1_names
+        l1_set_cached = scan_stock._l1_codes
+        
+        idx_codes = conn.execute("""
+            SELECT DISTINCT ic.index_code FROM index_constituents ic WHERE ic.stock_code=?
+        """, (code,)).fetchall()
+        idx_set = set(r[0] for r in idx_codes)
+        l2_set_local = idx_set & l2_set
+        
+        if not l2_set_local:
+            l1_set_local = l1_set_cached & idx_set
+            use_set = l1_set_local if l1_set_local else set()
         else:
-            mas[p] = None
-    # MA 斜率(5日前比较)
-    ma_slopes = {}
-    for p in [5,10,20,30,60]:
-        if b2_idx >= p+4:
-            ma_now = sum(klines[j]['close'] for j in range(b2_idx-p+1, b2_idx+1))/p
-            ma_5ago = sum(klines[j]['close'] for j in range(b2_idx-p-4, b2_idx-4+1))/p if b2_idx >= p+4 else ma_now
-            ma_slopes[p] = ma_now > ma_5ago
-        else:
-            ma_slopes[p] = False
-    if all(mas[p] is not None for p in [5,10,20,30,60]):
-        if mas[5] > mas[10] > mas[20] > mas[30] > mas[60] and all(ma_slopes.values()):
-            score_ma = 10
-        elif mas[5] > mas[10] > mas[20]:
-            score_ma = 5
+            use_set = l2_set_local
+        
+        if use_set:
+            placeholders = ','.join('?' * len(use_set))
+            best = conn.execute(f"""
+                SELECT stock_code, rs_20, rs_250 FROM index_rs_daily
+                WHERE date=? AND stock_code IN ({placeholders})
+                ORDER BY rs_250 DESC LIMIT 1
+            """, [dates[h_idx]] + list(use_set)).fetchone()
+            if best:
+                ind_code = best[0]
+                ind_name = l2_names_map.get(ind_code) or l1_names_map.get(ind_code, '')
+                ind_rs20 = best[1]
+                ind_rs250 = best[2]
+        # I1: H点行业RS250，阶梯制
+        if ind_rs250 is not None and ind_rs250 >= 85:
+            score_i1 = 15
+        elif ind_rs250 is not None and ind_rs250 >= 80:
+            score_i1 = 10
+        elif ind_rs250 is not None and ind_rs250 >= 75:
+            score_i1 = 5
+        # I2: 股票H点RS250，阶梯制（满分15）
+        if h_rs250 is not None and h_rs250 >= 90:
+            score_i2 = 15
+        elif h_rs250 is not None and h_rs250 >= 85:
+            score_i2 = 10
+        elif h_rs250 is not None and h_rs250 >= 80:
+            score_i2 = 5
 
-    # ── 8.6 B2 日信号共振评分(10分)──
+    # ── 8. MA 排列质量评分 — 已移除，替换为 B2 跳空 ──
+    # （B2 硬闸已保证站上 MA60，均线排列冗余）
+
+    # ── 8.5 B2 日信号共振评分（10分，累加制）──
     score_sig = 0
     if conn and code:
         row = conn.execute(
@@ -382,20 +363,69 @@ def scan_stock(klines, scan_date, code=None, conn=None):
         if row and row[0]:
             try:
                 import json
-                sigs = json.loads(row[0])
-                sources = set(s.get('source','') for s in sigs) if isinstance(sigs, list) else set()
-                if 'base_breakout' in sources or 'pocket_pivot' in sources:
-                    score_sig = 10
-                elif 'cdl' in sources or 'talib' in sources:
-                    score_sig = 5
+                sigs = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                sources_seen = set()
+                for s in (sigs if isinstance(sigs, list) else []):
+                    src = s.get('source', '')
+                    if src in sources_seen:
+                        continue  # 同 source 去重
+                    sources_seen.add(src)
+                    if src in ('base_breakout', 'pocket_pivot'):
+                        score_sig += 6
+                    elif src in ('cdl', 'talib'):
+                        score_sig += 1
+                score_sig = min(score_sig, 10)  # 封顶 10
             except:
                 pass
 
+    # ── 8.6 B2 跳空高开（10分）──
+    score_gap = 10 if (b2_idx > 0 and klines[b2_idx]['open'] > klines[b2_idx-1]['high']) else 0
+
+    # ── 8.6 新指标 M1: B2日相对大盘强度（5分）──
+    score_m1 = 0
+    if conn and code:
+        row985 = conn.execute(
+            "SELECT change FROM index_daily_kline WHERE stock_code='000985' AND date=?",
+            (b2_date,)
+        ).fetchone()
+        if row985 and row985[0] is not None:
+            idx_chg = row985[0] * 100  # change 是小数，0.01=1%
+            b2_ret = (klines[b2_idx]['close']/klines[b2_idx-1]['close']-1)*100 if b2_idx>0 else 0
+            if b2_ret > idx_chg:
+                score_m1 = 5
+
+    # ── 8.7 新指标 M2: B1→B2 整理期缩量率（5分）──
+    score_m2 = 0
+    if b2_idx > b1_idx+1:
+        p_amounts = [klines[j].get('amount', 0) or 0 for j in range(b1_idx+1, b2_idx)]
+        p_amt_avg = sum(p_amounts)/len(p_amounts) if p_amounts else 0
+        b1_amount = klines[b1_idx].get('amount', 0) or 0
+        if b1_amount > 0:
+            ratio = p_amt_avg / b1_amount
+            if ratio < 0.5:
+                score_m2 = 5
+            elif ratio < 0.7:
+                score_m2 = 3
+
+    # ── 8.8 新指标 M3: B2 跳空突破（5分）──
+    score_m3 = 5 if (b2_idx > 0 and klines[b2_idx]['open'] > klines[b2_idx-1]['high']) else 0
+
     # ── 9. 综合评分 ──
-    total = sum(score.values()) + score_i1 + score_i2 + score_o1 + score_o2 + score_ma + score_sig
+    # 体系1（100分）= HDCP(40) + 行业(25) + Sig(25) + 跳空(10)
+    total = sum(score.values()) + score_i1 + score_i2 + score_sig + score_gap
     if total >= 80: conf = '高'
     elif total >= 55: conf = '中'
     else: conf = '低'
+
+    # 体系2（115分）
+    total_v2 = total + score_m1 + score_m2 + score_m3
+    if total_v2 >= 92: conf_v2 = '高'
+    elif total_v2 >= 63: conf_v2 = '中'
+    else: conf_v2 = '低'
+
+    # ── MW PLUS 标志 ──
+    # 同时满足: 总分≥80 + D满分(15%~35%跌幅) + I1满分(行业RS250≥80)
+    is_plus = (total >= 80 and score['D'] == 5 and score_i1 == 15)
 
     # ── 10. 组装结果 ──
     b1k = klines[b1_idx]; b2k = klines[b2_idx]
@@ -419,6 +449,26 @@ def scan_stock(klines, scan_date, code=None, conn=None):
     c_amounts = [klines[j].get('amount', 0) or 0 for j in range(c_start, c_end+1)]
     c_amount_avg = sum(c_amounts)/len(c_amounts) if c_amounts else 0
 
+    # H点前60日最低到H的涨幅
+    h_pre_start = max(0, h_idx-60)
+    h_pre_low = min(klines[j]['close'] for j in range(h_pre_start, h_idx)) if h_pre_start < h_idx else h_price
+    h_pre_rise = round((h_price - h_pre_low)/h_pre_low*100, 1) if h_pre_low > 0 else 0
+
+    # P段数据（整理回撤 + 缩量率）
+    p_dd_val = round(p_dd_val, 1) if 'p_dd_val' in dir() else None
+    # 重新计算P段回撤
+    p_max_dd = 0
+    p_vol_sum = 0
+    if b2_idx > b1_idx+1:
+        for ii in range(b1_idx+1, b2_idx):
+            dd = (klines[ii]['close']/klines[b1_idx]['close']-1)*100
+            if dd < p_max_dd: p_max_dd = dd
+            p_vol_sum += klines[ii].get('volume', 0) or 0
+        p_vol_ratio_val = round(p_vol_sum/(b2_idx-b1_idx-1)/klines[b1_idx]['volume'], 2) if klines[b1_idx]['volume'] > 0 else 0
+    else:
+        p_max_dd = 0
+        p_vol_ratio_val = 0
+
     result = {
         'h_date': dates[h_idx], 'h_price': round(h_price, 2),
         'l_date': dates[l_idx], 'l_price': round(l_price, 2),
@@ -433,13 +483,21 @@ def scan_stock(klines, scan_date, code=None, conn=None):
         'c_amplitude_pct': round(c_amp, 1),
         'h_rs20': h_rs20, 'h_rs250': h_rs250,
         'c_amount_avg': round(c_amount_avg, 0),
+        'h_pre_rise_pct': h_pre_rise,
+        'p_max_dd_pct': round(p_max_dd, 1),
+        'p_vol_ratio': p_vol_ratio_val,
         'score': total, 'confidence': conf,
+        'score_v2': total_v2, 'confidence_v2': conf_v2,
+        'is_plus': 1 if is_plus else 0,
         'score_h': score['H'], 'score_d': score['D'],
         'score_c': score['C'], 'score_p': score['P'],
         'score_i1': score_i1, 'score_i2': score_i2,
-        'score_o1': score_o1, 'score_o2': score_o2,
-        'score_ma': score_ma, 'score_sig': score_sig,
+        'score_o1': 0, 'score_o2': 0,
+        'score_ma': 0, 'score_sig': score_sig, 'score_gap': score_gap,
+        'score_m1': score_m1, 'score_m2': score_m2, 'score_m3': score_m3,
         'ind_rs20': ind_rs20, 'ind_rs250': ind_rs250,
+        'ind_code': ind_code if 'ind_code' in dir() else None,
+        'ind_name': ind_name if 'ind_name' in dir() else None,
     }
     return True, result
 
@@ -448,44 +506,46 @@ def save_signals(conn, scan_date, signals):
     """保存信号,以 b2_date 为主维度"""
     for s in signals:
         conn.execute("""INSERT OR REPLACE INTO mw_signal_daily
-            (b2_date,stock_code,stock_name,confidence,score,
+            (b2_date,stock_code,stock_name,confidence,score,confidence_v2,score_v2,
              h_date,h_price,l_date,l_price,c_start,c_end,
              b1_date,b1_return_pct,b1_vol_ratio,
              b2_return_pct,b2_close_pos,b2_is_gap,b2_ma_count,
              decline_pct,c_amplitude_pct,
              h_rs20,h_rs250,c_amount_avg,
+             h_pre_rise_pct,p_max_dd_pct,p_vol_ratio,
              score_h,score_d,score_c,score_p,
              score_i1,score_i2,score_o1,score_o2,
-             score_ma,score_sig,
-             ind_rs20,ind_rs250,scan_date)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             score_ma,score_sig,score_gap,score_m1,score_m2,score_m3,is_plus,
+             ind_rs20,ind_rs250,ind_code,ind_name,scan_date)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
-            s['b2_date'],s['code'],s.get('name',''),s['confidence'],s['score'],
+            s['b2_date'],s['code'],s.get('name',''),s['confidence'],s['score'],s.get('confidence_v2',''),s.get('score_v2',0),
             s['h_date'],s['h_price'],s['l_date'],s['l_price'],s['c_start'],s['c_end'],
             s['b1_date'],s['b1_return_pct'],s['b1_vol_ratio'],
             s['b2_return_pct'],s['b2_close_pos'],s['b2_is_gap'],s['b2_ma_count'],
             s['decline_pct'],s['c_amplitude_pct'],
             s.get('h_rs20'),s.get('h_rs250'),s.get('c_amount_avg',0),
+            s.get('h_pre_rise_pct'),s.get('p_max_dd_pct'),s.get('p_vol_ratio'),
             s['score_h'],s['score_d'],s['score_c'],s['score_p'],
             s.get('score_i1',0),s.get('score_i2',0),s.get('score_o1',0),s.get('score_o2',0),
-            s.get('score_ma',0),s.get('score_sig',0),
-            s.get('ind_rs20'),s.get('ind_rs250'),scan_date
+            s.get('score_ma',0),s.get('score_sig',0),s.get('score_gap',0),s.get('score_m1',0),s.get('score_m2',0),s.get('score_m3',0),s.get('is_plus',0),
+            s.get('ind_rs20'),s.get('ind_rs250'),s.get('ind_code'),s.get('ind_name'),scan_date
         ))
     conn.commit()
 
 
 def run_scan(scan_date, fast=False):
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.row_factory = sqlite3.Row
 
-    # 建表(v1.2: b2_date 为主维度)
-    conn.execute("DROP TABLE IF EXISTS mw_signal_daily_old")
-    # 先检查旧表是否存在且没有 b2_date 列
+    # 建表 — 若缺少新列则重建
     try:
-        conn.execute("SELECT b2_date FROM mw_signal_daily LIMIT 0")
+        conn.execute("SELECT confidence_v2 FROM mw_signal_daily LIMIT 0")
     except:
-        # 旧表,需要迁移
-        conn.execute("ALTER TABLE mw_signal_daily RENAME TO mw_signal_daily_old")
+        conn.execute("DROP TABLE IF EXISTS mw_signal_daily")
+        conn.execute("DROP TABLE IF EXISTS mw_signal_daily_old")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS mw_signal_daily (
@@ -495,6 +555,8 @@ def run_scan(scan_date, fast=False):
             stock_name TEXT,
             confidence TEXT,
             score INTEGER,
+            confidence_v2 TEXT,
+            score_v2 INTEGER,
             h_date TEXT, h_price REAL,
             l_date TEXT, l_price REAL,
             c_start TEXT, c_end TEXT,
@@ -503,10 +565,17 @@ def run_scan(scan_date, fast=False):
             decline_pct REAL, c_amplitude_pct REAL,
             h_rs20 INTEGER, h_rs250 INTEGER,
             c_amount_avg REAL,
+            h_pre_rise_pct REAL,
+            p_max_dd_pct REAL,
+            p_vol_ratio REAL,
             score_h INTEGER, score_d INTEGER, score_c INTEGER, score_p INTEGER,
             score_i1 INTEGER, score_i2 INTEGER,
             score_o1 INTEGER, score_o2 INTEGER,
+            score_ma INTEGER, score_sig INTEGER, score_gap INTEGER,
+            score_m1 INTEGER, score_m2 INTEGER, score_m3 INTEGER,
+            is_plus INTEGER DEFAULT 0,
             ind_rs20 INTEGER, ind_rs250 INTEGER,
+            ind_code TEXT, ind_name TEXT,
             scan_date TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(stock_code, b2_date)

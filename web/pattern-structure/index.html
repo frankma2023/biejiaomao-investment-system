@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN" class="dark">
 <head>
 <meta charset="UTF-8">
@@ -86,7 +86,7 @@ html[data-theme="light"] .feat-table td{border-bottom:1px solid rgba(0,0,0,.03)}
 <script>Nav.init({brandIcon:'🔬',brandText:'形态结构',currentPage:'pattern-structure'})</script>
 
 <script>
-const API = 'http://localhost:8788';
+const API = 'http://' + window.location.hostname + ':8788';
 var stockQueue = [];
 
 loadCases();

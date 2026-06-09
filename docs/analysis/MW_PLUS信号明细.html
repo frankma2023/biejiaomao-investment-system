@@ -1,0 +1,209 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="dark"><head><meta charset="UTF-8"><title>MW PLUS明细</title>
+<style>body{font-family:Inter;line-height:1.6;max-width:100%;margin:0 auto;padding:16px 20px;background:#1a1a1f;color:#d4d4d8}
+h1{font-family:"Instrument Serif",serif;font-size:1.3rem;text-align:center;margin:16px 0}
+.meta{text-align:center;font-size:.6rem;color:#6b7280;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:.62rem}
+th{font-weight:600;color:#6b7280;font-size:.54rem;text-transform:uppercase;white-space:nowrap;background:rgba(26,26,31,.4);position:sticky;top:0;z-index:2;padding:6px 5px;cursor:pointer}
+td{padding:5px 4px;border-bottom:1px solid rgba(255,255,255,.04);text-align:center;font-variant-numeric:tabular-nums}
+tr:hover{background:rgba(255,255,255,.015)}
+.up{color:#ef4444}.down{color:#26C6DA}
+</style></head><body>
+<h1>✦ MW PLUS 信号明细</h1>
+<div class="meta">35只 · 总分≥80 + D满分 + I1满分(L2行业RS250≥80) · 2026-01~06</div>
+<table><thead><tr>
+<th onclick="sortTable(0,0)">代码</th>
+<th onclick="sortTable(1,0)">名称</th>
+<th onclick="sortTable(2,0)">申万行业</th>
+<th onclick="sortTable(3,0)">B2日</th>
+<th onclick="sortTable(4,0)">得分</th>
+<th onclick="sortTable(5,0)">L2指数</th>
+<th onclick="sortTable(6,1)">H-L2 RS20</th>
+<th onclick="sortTable(7,1)">H-L2 RS250</th>
+<th onclick="sortTable(8,1)">B2-L2 RS20</th>
+<th onclick="sortTable(9,1)">B2-L2 RS250</th>
+<th onclick="sortTable(10,1)">H股票RS20</th>
+<th onclick="sortTable(11,1)">H股票RS250</th>
+<th onclick="sortTable(12,1)">B2股票RS20</th>
+<th onclick="sortTable(13,1)">B2股票RS250</th>
+<th onclick="sortTable(14,1)">换手率%</th>
+<th onclick="sortTable(15,1)">5d</th>
+<th onclick="sortTable(16,1)">10d</th>
+<th onclick="sortTable(17,1)">20d</th>
+</tr></thead><tbody id="tbody">
+<tr><td>301219</td><td>腾远钴业</td><td style="font-size:.55rem;color:#9ca3af">有色金属</td>
+<td>2026-02-27</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">000819 有色金属</td>
+<td>99</td><td>99</td><td>92</td><td>99</td>
+<td>82</td><td>78</td><td>78</td><td>79</td>
+<td>3.68%</td><td><span class="down">-12.4%</span></td><td><span class="down">-12.4%</span></td><td><span class="down">-21.9%</span></td></tr>
+<tr><td>600111</td><td>北方稀土</td><td style="font-size:.55rem;color:#9ca3af">有色金属</td>
+<td>2026-02-27</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">000819 有色金属</td>
+<td>99</td><td>99</td><td>92</td><td>99</td>
+<td>86</td><td>93</td><td>93</td><td>94</td>
+<td>2.62%</td><td><span class="down">-13.0%</span></td><td><span class="down">-18.6%</span></td><td><span class="down">-24.2%</span></td></tr>
+<tr><td>688072</td><td>拓荆科技</td><td style="font-size:.55rem;color:#9ca3af">机械设备</td>
+<td>2026-03-02</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">H30184 半导体</td>
+<td>88</td><td>86</td><td>29</td><td>83</td>
+<td>92</td><td>93</td><td>68</td><td>91</td>
+<td>3.24%</td><td><span class="down">-6.3%</span></td><td><span class="down">-9.7%</span></td><td><span class="up">+0.6%</span></td></tr>
+<tr><td>000933</td><td>神火股份</td><td style="font-size:.55rem;color:#9ca3af">有色金属</td>
+<td>2026-03-12</td><td>90</td><td style="font-size:.55rem;color:#a78bfa">000819 有色金属</td>
+<td>99</td><td>99</td><td>61</td><td>99</td>
+<td>91</td><td>83</td><td>89</td><td>89</td>
+<td>2.04%</td><td><span class="down">-16.5%</span></td><td><span class="down">-22.8%</span></td><td><span class="down">-11.4%</span></td></tr>
+<tr><td>000968</td><td>蓝焰控股</td><td style="font-size:.55rem;color:#9ca3af">采掘</td>
+<td>2026-03-27</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">H30198 油气产业</td>
+<td>99</td><td>90</td><td>79</td><td>90</td>
+<td>98</td><td>77</td><td>98</td><td>86</td>
+<td>1.90%</td><td><span class="down">-11.3%</span></td><td><span class="down">-12.0%</span></td><td><span class="down">-23.4%</span></td></tr>
+<tr><td>605589</td><td>圣泉集团</td><td style="font-size:.55rem;color:#9ca3af">化工</td>
+<td>2026-04-07</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">000929 800材料</td>
+<td>90</td><td>94</td><td>11</td><td>92</td>
+<td>89</td><td>51</td><td>91</td><td>67</td>
+<td>2.92%</td><td><span class="up">+4.2%</span></td><td><span class="up">+2.8%</span></td><td><span class="up">+11.2%</span></td></tr>
+<tr><td>688019</td><td>安集科技</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-04-08</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">H30184 半导体</td>
+<td>56</td><td>88</td><td>38</td><td>88</td>
+<td>28</td><td>83</td><td>90</td><td>81</td>
+<td>3.61%</td><td><span class="down">-6.1%</span></td><td><span class="down">-7.2%</span></td><td><span class="up">+0.8%</span></td></tr>
+<tr><td>688362</td><td>甬矽电子</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-04-08</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">H30184 半导体</td>
+<td>38</td><td>90</td><td>38</td><td>88</td>
+<td>14</td><td>76</td><td>81</td><td>73</td>
+<td>6.51%</td><td><span class="up">+10.8%</span></td><td><span class="up">+11.5%</span></td><td><span class="up">+19.5%</span></td></tr>
+<tr><td>300570</td><td>太辰光</td><td style="font-size:.55rem;color:#9ca3af">通信</td>
+<td>2026-04-13</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">000936 800通信</td>
+<td>63</td><td>92</td><td>99</td><td>99</td>
+<td>97</td><td>73</td><td>86</td><td>80</td>
+<td>6.47%</td><td><span class="up">+0.6%</span></td><td><span class="up">+9.7%</span></td><td><span class="up">+28.5%</span></td></tr>
+<tr><td>002203</td><td>海亮股份</td><td style="font-size:.55rem;color:#9ca3af">有色金属</td>
+<td>2026-04-17</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">000819 有色金属</td>
+<td>47</td><td>99</td><td>97</td><td>97</td>
+<td>39</td><td>70</td><td>95</td><td>84</td>
+<td>1.18%</td><td><span class="up">+1.7%</span></td><td><span class="up">+13.8%</span></td><td><span class="up">+19.0%</span></td></tr>
+<tr><td>688403</td><td>汇成股份</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-04-17</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">932087 集成电路</td>
+<td>52</td><td>83</td><td>81</td><td>86</td>
+<td>2</td><td>90</td><td>89</td><td>88</td>
+<td>4.41%</td><td><span class="down">-8.6%</span></td><td><span class="down">-1.8%</span></td><td><span class="up">+17.9%</span></td></tr>
+<tr><td>002384</td><td>东山精密</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-04-17</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">000858 500信息</td>
+<td>54</td><td>88</td><td>79</td><td>90</td>
+<td>99</td><td>98</td><td>97</td><td>98</td>
+<td>3.14%</td><td><span class="up">+15.9%</span></td><td><span class="up">+18.4%</span></td><td><span class="up">+37.6%</span></td></tr>
+<tr><td>688636</td><td>智明达</td><td style="font-size:.55rem;color:#9ca3af">国防军工</td>
+<td>2026-04-20</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">932088 全指航空</td>
+<td>61</td><td>86</td><td>79</td><td>74</td>
+<td>16</td><td>83</td><td>79</td><td>49</td>
+<td>3.45%</td><td><span class="down">-5.0%</span></td><td><span class="down">-3.6%</span></td><td><span class="down">-16.6%</span></td></tr>
+<tr><td>688508</td><td>芯朋微</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-04-22</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">932087 集成电路</td>
+<td>90</td><td>83</td><td>90</td><td>86</td>
+<td>84</td><td>80</td><td>88</td><td>71</td>
+<td>3.83%</td><td><span class="up">+8.0%</span></td><td><span class="up">+21.0%</span></td><td><span class="up">+30.5%</span></td></tr>
+<tr><td>300395</td><td>菲利华</td><td style="font-size:.55rem;color:#9ca3af">有色金属</td>
+<td>2026-04-22</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">000929 800材料</td>
+<td>54</td><td>92</td><td>83</td><td>92</td>
+<td>93</td><td>94</td><td>89</td><td>89</td>
+<td>2.73%</td><td><span class="down">-7.1%</span></td><td><span class="up">+9.4%</span></td><td><span class="up">+26.1%</span></td></tr>
+<tr><td>600584</td><td>长电科技</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-04-22</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">H30184 半导体</td>
+<td>38</td><td>90</td><td>88</td><td>88</td>
+<td>13</td><td>46</td><td>77</td><td>62</td>
+<td>3.33%</td><td><span class="down">-2.5%</span></td><td><span class="up">+22.7%</span></td><td><span class="up">+76.2%</span></td></tr>
+<tr><td>688041</td><td>海光信息</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-04-24</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">H30184 半导体</td>
+<td>90</td><td>86</td><td>90</td><td>88</td>
+<td>91</td><td>79</td><td>93</td><td>85</td>
+<td>3.94%</td><td><span class="up">+20.9%</span></td><td><span class="up">+22.2%</span></td><td><span class="up">+11.2%</span></td></tr>
+<tr><td>603125</td><td>常青科技</td><td style="font-size:.55rem;color:#9ca3af">化工</td>
+<td>2026-04-27</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">H30198 油气产业</td>
+<td>99</td><td>81</td><td>32</td><td>79</td>
+<td>74</td><td>19</td><td>85</td><td>37</td>
+<td>6.05%</td><td><span class="up">+8.4%</span></td><td><span class="up">+15.5%</span></td><td><span class="up">+17.4%</span></td></tr>
+<tr><td>600546</td><td>山煤国际</td><td style="font-size:.55rem;color:#9ca3af">未分类</td>
+<td>2026-04-28</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">000928 800能源</td>
+<td>94</td><td>88</td><td>54</td><td>74</td>
+<td>82</td><td>45</td><td>86</td><td>58</td>
+<td>2.32%</td><td><span class="down">-0.7%</span></td><td><span class="up">+0.8%</span></td><td><span class="up">+2.4%</span></td></tr>
+<tr><td>601168</td><td>西部矿业</td><td style="font-size:.55rem;color:#9ca3af">有色金属</td>
+<td>2026-04-29</td><td>90</td><td style="font-size:.55rem;color:#a78bfa">000819 有色金属</td>
+<td>88</td><td>99</td><td>83</td><td>97</td>
+<td>88</td><td>89</td><td>86</td><td>85</td>
+<td>1.93%</td><td><span class="up">+6.5%</span></td><td><span class="down">-0.1%</span></td><td><span class="up">+1.7%</span></td></tr>
+<tr><td>688173</td><td>希荻微</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-04-30</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">932087 集成电路</td>
+<td>11</td><td>86</td><td>99</td><td>86</td>
+<td>48</td><td>62</td><td>91</td><td>64</td>
+<td>3.70%</td><td><span class="up">+9.5%</span></td><td><span class="up">+13.8%</span></td><td><span class="down">-3.9%</span></td></tr>
+<tr><td>688387</td><td>信科移动</td><td style="font-size:.55rem;color:#9ca3af">通信</td>
+<td>2026-04-30</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">000936 800通信</td>
+<td>83</td><td>92</td><td>88</td><td>99</td>
+<td>1</td><td>95</td><td>93</td><td>96</td>
+<td>3.64%</td><td><span class="up">+11.9%</span></td><td><span class="down">-1.2%</span></td><td><span class="down">-19.7%</span></td></tr>
+<tr><td>688262</td><td>国芯科技</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-04-30</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">932087 集成电路</td>
+<td>54</td><td>83</td><td>99</td><td>86</td>
+<td>97</td><td>73</td><td>88</td><td>68</td>
+<td>4.43%</td><td><span class="up">+3.8%</span></td><td><span class="up">+1.1%</span></td><td><span class="down">-6.8%</span></td></tr>
+<tr><td>300223</td><td>北京君正</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-05-06</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">H30184 半导体</td>
+<td>32</td><td>79</td><td>97</td><td>94</td>
+<td>82</td><td>74</td><td>88</td><td>84</td>
+<td>5.08%</td><td><span class="up">+8.8%</span></td><td><span class="up">+3.8%</span></td><td><span class="up">+5.6%</span></td></tr>
+<tr><td>000983</td><td>山西焦煤</td><td style="font-size:.55rem;color:#9ca3af">未分类</td>
+<td>2026-05-06</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">000908 300能源</td>
+<td>94</td><td>79</td><td>32</td><td>63</td>
+<td>85</td><td>38</td><td>62</td><td>35</td>
+<td>1.68%</td><td><span class="down">-7.7%</span></td><td><span class="down">-9.7%</span></td><td><span class="up">+3.3%</span></td></tr>
+<tr><td>000060</td><td>中金岭南</td><td style="font-size:.55rem;color:#9ca3af">有色金属</td>
+<td>2026-05-07</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">000819 有色金属</td>
+<td>88</td><td>99</td><td>81</td><td>97</td>
+<td>80</td><td>81</td><td>89</td><td>76</td>
+<td>1.80%</td><td><span class="down">-2.2%</span></td><td><span class="down">-14.8%</span></td><td><span class="down">-3.5%</span></td></tr>
+<tr><td>300109</td><td>新开源</td><td style="font-size:.55rem;color:#9ca3af">未分类</td>
+<td>2026-05-08</td><td>90</td><td style="font-size:.55rem;color:#a78bfa">H30198 油气产业</td>
+<td>99</td><td>90</td><td>9</td><td>79</td>
+<td>58</td><td>63</td><td>68</td><td>57</td>
+<td>3.06%</td><td><span class="down">-5.5%</span></td><td><span class="down">-10.8%</span></td><td><span class="down">-18.7%</span></td></tr>
+<tr><td>000021</td><td>深科技</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-05-11</td><td>90</td><td style="font-size:.55rem;color:#a78bfa">000858 500信息</td>
+<td>54</td><td>83</td><td>90</td><td>92</td>
+<td>92</td><td>81</td><td>79</td><td>80</td>
+<td>2.02%</td><td><span class="up">+12.3%</span></td><td><span class="up">+24.8%</span></td><td>—</td></tr>
+<tr><td>600460</td><td>士兰微</td><td style="font-size:.55rem;color:#9ca3af">未分类</td>
+<td>2026-05-11</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">H30184 半导体</td>
+<td>38</td><td>90</td><td>97</td><td>94</td>
+<td>63</td><td>47</td><td>74</td><td>48</td>
+<td>2.68%</td><td><span class="up">+1.9%</span></td><td><span class="up">+12.2%</span></td><td>—</td></tr>
+<tr><td>688469</td><td>芯联集成</td><td style="font-size:.55rem;color:#9ca3af">未分类</td>
+<td>2026-05-11</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">H30184 半导体</td>
+<td>40</td><td>86</td><td>97</td><td>94</td>
+<td>83</td><td>74</td><td>59</td><td>70</td>
+<td>2.44%</td><td><span class="up">+6.4%</span></td><td><span class="up">+14.3%</span></td><td>—</td></tr>
+<tr><td>301308</td><td>江波龙</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-05-11</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">000858 500信息</td>
+<td>43</td><td>83</td><td>90</td><td>92</td>
+<td>95</td><td>97</td><td>98</td><td>99</td>
+<td>8.69%</td><td><span class="up">+6.4%</span></td><td><span class="up">+1.6%</span></td><td>—</td></tr>
+<tr><td>600111</td><td>北方稀土</td><td style="font-size:.55rem;color:#9ca3af">有色金属</td>
+<td>2026-05-11</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">000819 有色金属</td>
+<td>88</td><td>99</td><td>65</td><td>97</td>
+<td>94</td><td>94</td><td>68</td><td>89</td>
+<td>2.62%</td><td><span class="down">-10.6%</span></td><td><span class="down">-11.7%</span></td><td>—</td></tr>
+<tr><td>300782</td><td>卓胜微</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-05-14</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">H30184 半导体</td>
+<td>86</td><td>88</td><td>97</td><td>94</td>
+<td>92</td><td>68</td><td>93</td><td>81</td>
+<td>3.07%</td><td><span class="down">-14.1%</span></td><td><span class="down">-16.9%</span></td><td>—</td></tr>
+<tr><td>300811</td><td>铂科新材</td><td style="font-size:.55rem;color:#9ca3af">有色金属</td>
+<td>2026-05-22</td><td>85</td><td style="font-size:.55rem;color:#a78bfa">000819 有色金属</td>
+<td>81</td><td>99</td><td>11</td><td>92</td>
+<td>79</td><td>80</td><td>94</td><td>92</td>
+<td>3.52%</td><td><span class="down">-27.1%</span></td><td><span class="down">-21.8%</span></td><td>—</td></tr>
+<tr><td>601231</td><td>环旭电子</td><td style="font-size:.55rem;color:#9ca3af">电子</td>
+<td>2026-06-04</td><td>80</td><td style="font-size:.55rem;color:#a78bfa">000858 500信息</td>
+<td>90</td><td>92</td><td>79</td><td>88</td>
+<td>84</td><td>94</td><td>86</td><td>95</td>
+<td>2.05%</td><td>—</td><td>—</td><td>—</td></tr>
+</tbody></table>
+<script>var sortCol=-1,sortDir=1;function sortTable(col,isNum){var tbody=document.getElementById("tbody"),rows=Array.from(tbody.querySelectorAll("tr"));if(sortCol===col)sortDir=-sortDir;else{sortCol=col;sortDir=1}rows.sort(function(a,b){var va=a.cells[col].textContent.replace(/[%+\-]/g,"").trim();var vb=b.cells[col].textContent.replace(/[%+\-]/g,"").trim();if(isNum){va=parseFloat(va)||0;vb=parseFloat(vb)||0}return(va>vb?1:va<vb?-1:0)*sortDir});rows.forEach(function(r){tbody.appendChild(r)});document.querySelectorAll("th").forEach(function(th,i){th.textContent=th.textContent.replace(/ [▲▼]/g,"");if(i===col)th.textContent+=(sortDir>0?" ▲":" ▼")})}</script></body></html>

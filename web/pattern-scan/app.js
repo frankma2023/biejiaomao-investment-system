@@ -1,9 +1,9 @@
-/**
+﻿/**
  * 形态识别看板 - 前端逻辑 v2
  * 单 ECharts 三格（K线+MA / 布林带 / 成交量）+ 分析建议 + 信号时间线
  */
 
-const API = 'http://localhost:8788/api/pattern-scan';
+const API = 'http://' + window.location.hostname + ':8788/api/pattern-scan';
 
 // ── 调色板（按 category 动态分配）──
 const PALETTE = [
@@ -91,7 +91,7 @@ async function scan() {
   // 查询股票名称
   var code = document.getElementById('code').value.trim();
   try {
-    var nr = await fetch('http://localhost:8788/api/stock-name?code=' + code + '&mode=' + state.mode);
+    var nr = await fetch('http://' + window.location.hostname + ':8788/api/stock-name?code=' + code + '&mode=' + state.mode);
     if (nr.ok) {
       var nd = await nr.json();
       document.getElementById('stock-name').textContent = nd.name || '';
@@ -108,6 +108,47 @@ async function scan() {
       return;
     }
     state.data = data;
+    
+    // 加载口袋支点V3信号并合并到 engines
+    try {
+      var ppV3Resp = await fetch('http://' + window.location.hostname + ':8788/api/pocket-pivot-v3?code=' + code + '&start=' + document.getElementById('date-start').value + '&end=' + document.getElementById('date-end').value);
+      if (ppV3Resp.ok) {
+        var ppV3Data = await ppV3Resp.json();
+        if (ppV3Data.signals && ppV3Data.signals.length > 0) {
+          // 转换为统一信号格式
+          var ppV3Signals = ppV3Data.signals.map(function(s) {
+            return {
+              date: s.date,
+              source: 'pocket_pivot_v3',
+              type: 'bullish',
+              details: {
+                signal_type: 'pocket_pivot_v3',
+                pivot_type: s.pivot_type,
+                gain_pct: s.gain_pct,
+                vol_ratio: s.vol_ratio,
+                rps_20: s.rps_20,
+                rps_250: s.rps_250,
+                c_days: s.c_days,
+                b1_overlap: s.b1_overlap,
+                description: (s.pivot_type === 'base' ? '基部' : s.pivot_type === 'continuation' ? '延续' : '10日反弹') +
+                  (s.b1_overlap ? '★B1重合' : '') + ' | 涨' + s.gain_pct.toFixed(1) + '% | 盘整' + s.c_days + '天'
+              }
+            };
+          });
+          // 合并到 data.signals
+          data.signals = (data.signals || []).concat(ppV3Signals);
+          // 添加 engine
+          if (!data.engines) data.engines = [];
+          data.engines.push({
+            name: 'pocket_pivot_v3',
+            display_name: '口袋支点V3',
+            category: 'breakout',
+            signals: ppV3Signals
+          });
+        }
+      }
+    } catch(e) { console.log('口袋支点V3加载失败:', e); }
+    
     buildMaps(data.engines);
     renderAll();
   } catch (e) {
@@ -127,6 +168,10 @@ function buildMaps(engines) {
     state.displayNameMap[eng.name] = eng.display_name || eng.name;
     if (eng.name === 'pocket_pivot') {
       state.colorMap[eng.name] = { color: '#FD03E7', symbol: 'pin', size: 15 };
+    } else if (eng.name === 'pocket_pivot_v3') {
+      state.colorMap[eng.name] = { color: '#FF9800', symbol: 'pin', size: 15 };
+    } else if (eng.name === 'mw_signal') {
+      state.colorMap[eng.name] = { color: '#a78bfa', symbol: 'diamond', size: 16 };
     } else if (eng.category === 'candlestick') {
       state.colorMap[eng.name + '_bullish'] = { color: '#9C27B0', symbol: 'emptyCircle', size: 10 };
       state.colorMap[eng.name + '_bearish'] = { color: '#333333', symbol: 'emptyCircle', size: 10 };
@@ -169,6 +214,7 @@ function toggleOverlay(mode) {
         'MA5': mode === 'ma',
         'MA10': mode === 'ma',
         'MA20': mode === 'ma',
+        'MA30': mode === 'ma',
         'MA60': mode === 'ma',
         'MA120': mode === 'ma',
         'MA250': mode === 'ma',
@@ -236,12 +282,13 @@ function renderChart() {
   var ma5 = calcMA(5);
   var ma10 = calcMA(10);
   var ma20 = calcMA(20);
+  var ma30 = calcMA(30);
   var ma60 = calcMA(60);
   var ma120 = calcMA(120);
   var ma250 = calcMA(250);
 
-  // MA 颜色（开发标准）
-  var mc = ['#FF9800', '#2196F3', '#4CAF50', '#9C27B0', '#00BCD4', '#795548'];
+  // MA 颜色
+  var mc = ['#FF9800', '#2196F3', '#4CAF50', '#E91E63', '#9C27B0', '#00BCD4', '#795548'];
 
   // ── 信号标注 ──
   var dateIndex = {};
@@ -330,13 +377,27 @@ function renderChart() {
     type: 'candlestick',
     xAxisIndex: 0,
     yAxisIndex: 0,
-    data: ck.map(function (k) { return [k.open, k.close, k.low, k.high]; }),
-    itemStyle: {
-      color: '#E53935',
-      color0: '#26C6DA',
-      borderColor: '#E53935',
-      borderColor0: '#26C6DA'
-    }
+    data: ck.map(function (k, i) {
+      // 判断真实涨跌（相对前日收盘），优先用数据库 change_pct
+      var isUp;
+      if (k.change_pct != null) {
+        var raw = k.change_pct;
+        isUp = (Math.abs(raw) > 1 ? raw : raw * 100) >= 0;
+      } else if (i > 0 && ck[i-1].close != null) {
+        isUp = k.close >= ck[i-1].close;
+      } else {
+        isUp = k.close >= k.open;
+      }
+      return {
+        value: [k.open, k.close, k.low, k.high],
+        itemStyle: {
+          color: isUp ? '#E53935' : '#26C6DA',
+          color0: isUp ? '#E53935' : '#26C6DA',
+          borderColor: isUp ? '#E53935' : '#26C6DA',
+          borderColor0: isUp ? '#E53935' : '#26C6DA'
+        }
+      };
+    })
   });
 
   // Grid 0 — 均线
@@ -344,9 +405,10 @@ function renderChart() {
     { data: ma5, name: 'MA5', color: mc[0] },
     { data: ma10, name: 'MA10', color: mc[1] },
     { data: ma20, name: 'MA20', color: mc[2] },
-    { data: ma60, name: 'MA60', color: mc[3] },
-    { data: ma120, name: 'MA120', color: mc[4] },
-    { data: ma250, name: 'MA250', color: mc[5] }
+    { data: ma30, name: 'MA30', color: mc[3] },
+    { data: ma60, name: 'MA60', color: mc[4] },
+    { data: ma120, name: 'MA120', color: mc[5] },
+    { data: ma250, name: 'MA250', color: mc[6] }
   ];
   maConfig.forEach(function (m) {
     series.push({
@@ -415,10 +477,19 @@ function renderChart() {
     xAxisIndex: 1,
     yAxisIndex: 1,
     data: vols.map(function (v, i) {
-      var up = ck[i].close >= ck[i].open;
+      // 成交量柱颜色跟随真实涨跌
+      var isUp;
+      if (ck[i].change_pct != null) {
+        var raw = ck[i].change_pct;
+        isUp = (Math.abs(raw) > 1 ? raw : raw * 100) >= 0;
+      } else if (i > 0 && ck[i-1].close != null) {
+        isUp = ck[i].close >= ck[i-1].close;
+      } else {
+        isUp = ck[i].close >= ck[i].open;
+      }
       return {
         value: v,
-        itemStyle: { color: up ? '#E53935' : '#26C6DA' }
+        itemStyle: { color: isUp ? '#E53935' : '#26C6DA' }
       };
     })
   });
@@ -441,6 +512,7 @@ function renderChart() {
         'MA5': state.overlayMode === 'ma',
         'MA10': state.overlayMode === 'ma',
         'MA20': state.overlayMode === 'ma',
+        'MA30': state.overlayMode === 'ma',
         'MA60': state.overlayMode === 'ma',
         'MA120': state.overlayMode === 'ma',
         'MA250': state.overlayMode === 'ma',
@@ -464,7 +536,7 @@ function renderChart() {
         var k = ck[params[0].dataIndex];
         if (!k) return '';
         var chg = k.close - k.open;
-        // 优先用理杏仁涨跌幅(昨日vs前日)，兼容数据库小数和API百分比两种格式
+        // 优先用理杏仁涨跌幅(相对前日收盘)，兼容数据库小数和API百分比两种格式
         var chgPct;
         if (k.change_pct != null) {
           var raw = k.change_pct;
@@ -472,13 +544,14 @@ function renderChart() {
         } else {
           chgPct = k.open > 0 ? (chg / k.open * 100).toFixed(2) : '0.00';
         }
-        var col = chg >= 0 ? '#E53935' : '#26C6DA';
+        var col = parseFloat(chgPct) >= 0 ? '#E53935' : '#26C6DA';
         var html = '<span style="font-size:12px;font-weight:700">' + k.date + '</span><br/>';
         html += '开盘：<b>' + (k.open != null ? k.open.toFixed(2) : '—') + '</b><br/>';
         html += '最高：<b>' + (k.high != null ? k.high.toFixed(2) : '—') + '</b><br/>';
         html += '最低：<b>' + (k.low != null ? k.low.toFixed(2) : '—') + '</b><br/>';
         html += '收盘：<b style="color:' + col + '">' + (k.close != null ? k.close.toFixed(2) : '—') + '</b><br/>';
-        html += '涨跌：<b style="color:' + col + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(2) + ' (' + (chg >= 0 ? '+' : '') + chgPct + '%)</b><br/>';
+        var priceChg = k.change_pct != null ? (k.close * parseFloat(chgPct) / 100) : chg;
+        html += '涨跌：<b style="color:' + col + '">' + (parseFloat(chgPct) >= 0 ? '+' : '') + priceChg.toFixed(2) + ' (' + (parseFloat(chgPct) >= 0 ? '+' : '') + chgPct + '%)</b><br/>';
         html += '成交量：<b>' + fmtVol(k.volume) + '</b>';
         if (k.amount != null || k.turnover != null) {
           html += '<br/>成交额：<b>' + fmtAmount(k.amount || k.turnover) + '</b>';
@@ -492,9 +565,10 @@ function renderChart() {
           { v: ma5[di], name: 'MA5', color: mc[0] },
           { v: ma10[di], name: 'MA10', color: mc[1] },
           { v: ma20[di], name: 'MA20', color: mc[2] },
-          { v: ma60[di], name: 'MA60', color: mc[3] },
-          { v: ma120[di], name: 'MA120', color: mc[4] },
-          { v: ma250[di], name: 'MA250', color: mc[5] }
+          { v: ma30[di], name: 'MA30', color: mc[3] },
+          { v: ma60[di], name: 'MA60', color: mc[4] },
+          { v: ma120[di], name: 'MA120', color: mc[5] },
+          { v: ma250[di], name: 'MA250', color: mc[6] }
         ];
         html += '<br/>';
         maLines.forEach(function (m) {

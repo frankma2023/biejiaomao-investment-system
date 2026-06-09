@@ -97,5 +97,23 @@
     "run_date": "2026-06-03",
     "market_phase": null,
     "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-06-04",
+    "pool_size": 476,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-06-04",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-06-08",
+    "pool_size": 414,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-06-08",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
   }
 ]

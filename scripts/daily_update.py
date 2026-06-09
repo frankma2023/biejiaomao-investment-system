@@ -15,16 +15,24 @@
   5. 指数拥挤度         (index_crowding)
   6. 融资融券           (fetch_margin_daily)
   7. 大盘健康度         (market_health)
-  8. 大盘扫描快照       (compute_market_snapshot)
-  9. 个股RS+指数RS      (stock_rs + index_rs)
-  10. 全A股形态扫描     (daily_pattern_scan — 每日)
-  11. 机构持股拉取      (fetch_institutional_holdings — 周一)
-  12. 研报拉取          (fetch_stock_reports — 周一)
-  13. 回购数据          (fetch_buyback — 周一)
-  14. CAN SLIM评分      (batch_canslim_score — 周一)
-  15. 观察池日更        (observation — 每日)
-  16. 持仓监控扫描      (monitoring — 每日)
-  17. 欧奈尔每日精选    (screener — 每日)
+  8. 大盘卖出评分       (market_sell_score)
+  9. 大盘扫描快照       (compute_market_snapshot)
+  10. 个股RS+指数RS     (stock_rs + index_rs)
+  11. 全A股形态扫描     (daily_pattern_scan — 每日)
+  11.5 口袋支点V3扫描    (pocket_pivot_v2 — 每日)
+  12. 机构持股拉取      (fetch_institutional_holdings — 周一)
+  13. 研报拉取          (fetch_stock_reports — 周一)
+  14. 回购数据          (fetch_buyback — 周一)
+  15. CAN SLIM评分      (batch_canslim_score — 每日)
+  16. 观察池日更        (observation — 每日)
+  17. 持仓监控扫描      (monitoring — 每日)
+  18. 欧奈尔每日精选·股票 (screener — 每日)
+  19. 欧奈尔每日精选·指数 (index_screener — 每日)
+  20. 缠论分钟数据预下载 (download_minute_kline — 每日)
+  21. 缠论批量扫描      (chanlun_scan — 每日)
+  22. 缠论vs欧奈尔回测  (chanlun_backtest_compare — 每日)
+  23. MW信号扫描        (mw_signal — 每日，依赖RS/CANSLIM/观察池/缠论缓存)
+  24. 投资决策驾驶舱    (cockpit — 每日，依赖前序全部步骤)
 
 步骤 1~3 可并行，但为简单起见串行执行，出错时终止。
 """
@@ -136,6 +144,9 @@ if not SKIP_RS:
 # 步骤7：全A股形态扫描（依赖个股RS完成，每日执行）
 TASKS.append(("🔎 全A股形态扫描", [PYTHON_EXE, "scripts/daily_pattern_scan.py", "--date", today_str, "--all"]))
 
+# 步骤7.5：口袋支点V3扫描（依赖MW结构的H/L/C，每日执行）
+TASKS.append(("🟠 口袋支点V3", [PYTHON_EXE, "src/scanners/pocket_pivot_v2.py", "--date", today_str, "--save"]))
+
 # 步骤8：机构持股拉取（每周一执行，增量模式）
 if date.today().weekday() == 0:
     TASKS.append(("🏦 机构持股拉取", [PYTHON_EXE, "scripts/fetch_institutional_holdings.py"]))
@@ -181,6 +192,9 @@ TASKS.append(("⚖️ 缠论vs欧奈尔回测", [PYTHON_EXE, "src/scanners/chanl
 
 # 步骤19：MW信号扫描（每日执行，全市场扫描牛市回调后再启动形态）
 TASKS.append(("🔥 MW信号扫描", [PYTHON_EXE, "src/scanners/mw_signal.py", "--date", today_str]))
+
+# 步骤20：投资决策驾驶舱管道（每日执行，依赖前序所有步骤）
+TASKS.append(("🚀 投资决策驾驶舱", [PYTHON_EXE, "src/cockpit/pipeline.py", "--date", today_str, "--save"]))
 
 for label, cmd in TASKS:
     lbl, ok, elapsed, _ = run_task(label, cmd)

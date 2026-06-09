@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN" class="dark">
 <head>
 <meta charset="UTF-8">
@@ -136,7 +136,7 @@
 <script src="../shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:"⬤",brandText:"缠论分析",currentPage:"chanlun"})</script>
 <script>
-const API='http://localhost:8788';let mode='index',freq='D',chartInst,viewMode='single';
+const API='http://' + window.location.hostname + ':8788';let mode='index',freq='D',chartInst,viewMode='single';
 let chartInstD,chartInstW,chartInstM;
 
 function switchMode(m){mode=m;document.getElementById('btn-stock').className='mode-btn'+(m==='stock'?' active':'');document.getElementById('btn-index').className='mode-btn'+(m==='index'?' active':'');document.getElementById('code').value=m==='stock'?'600519':'000985';analyze()}

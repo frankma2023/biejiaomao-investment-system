@@ -1,5 +1,5 @@
-var API = 'http://localhost:8788/api/canslim-score';
-var API_CFG = 'http://localhost:8788/api/config?signal_type=canslim_scorecard';
+﻿var API = 'http://' + window.location.hostname + ':8788/api/canslim-score';
+var API_CFG = 'http://' + window.location.hostname + ':8788/api/config?signal_type=canslim_scorecard';
 var chart = null;
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function fetchName() {
   var code = document.getElementById('code').value.trim();
-  fetch('http://localhost:8788/api/stock-name?code=' + code + '&mode=stock')
+  fetch('http://' + window.location.hostname + ':8788/api/stock-name?code=' + code + '&mode=stock')
     .then(function(r) { return r.json(); })
     .then(function(d) {
       document.getElementById('stock-name').textContent = d.name || '';

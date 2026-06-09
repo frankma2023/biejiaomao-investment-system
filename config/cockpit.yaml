@@ -1,0 +1,26 @@
+# 投资决策驾驶舱 · 管道配置
+# 遵循全站回测看板铁律：保存→POST到YAML，加载→GET填充控件
+
+pipeline:
+  market_cap_min: 50              # 亿（市值门槛）
+  industry_rs250_min: 75          # 行业RS250最低分
+  stock_rs250_h_min: 80           # H点时点RS250最低分
+  signal_lookback_days: 5         # 信号回溯天数（自然日）
+  max_candidates: 5               # 最终候选数量
+
+position:
+  max_loss_pct: 0.02              # 单笔最大亏损占账户%
+  kelly_fraction: 0.25            # 凯利分数（1/4凯利）
+  account_size: 1000000           # 账户总资产（用户可改）
+
+sentiment:
+  enabled: true                   # 是否启用舆情模块
+  timeout_seconds: 60             # 单只股票舆情超时
+  sources:                        # 数据源优先级
+    - pysnowball
+    - snowball_mcp
+    - autoglm_browser
+
+oneil:
+  auto_analyze_count: 5           # 自动分析前N只
+  timeout_seconds: 120            # 单只分析超时

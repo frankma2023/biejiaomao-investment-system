@@ -49,6 +49,7 @@
     { href: '../canslim-scores/',       label: 'CAN SLIM',          page: 'canslim-scores' },
     { href: '../pattern-scan/',         label: '形态识别',         page: 'pattern-scan' },
     { href: '../chanlun/',              label: '缠论',             page: 'chanlun' },
+    { href: '../cockpit/',             label: '驾驶舱',           page: 'cockpit' },
   ];
 
   function render() {

@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MW信号综合分析报告 v2.5</title>
+<style>
+  :root {
+    --bg: #1a1a1f;
+    --card: rgba(26,26,31,0.6);
+    --text: #d4d4d8;
+    --text-muted: #9ca3af;
+    --text-dim: #6b7280;
+    --accent: #f59e0b;
+    --purple: #a78bfa;
+    --green: #10b981;
+    --red: #ef4444;
+    --blue: #38bdf8;
+    --divider: rgba(255,255,255,0.06);
+    --border: rgba(255,255,255,0.08);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.72;
+    background: var(--bg);
+    color: var(--text);
+    padding: 40px 24px 80px;
+  }
+  .container { max-width: 1024px; margin: 0 auto; }
+
+  /* Header */
+  .report-header {
+    text-align: center;
+    padding: 40px 20px 32px;
+    border-bottom: 1px solid var(--divider);
+    margin-bottom: 40px;
+  }
+  .report-header h1 {
+    font-family: 'Instrument Serif', 'Georgia', serif;
+    font-size: 1.6rem;
+    font-weight: 400;
+    color: #fafafa;
+    letter-spacing: 0.02em;
+    margin-bottom: 6px;
+  }
+  .report-header .subtitle {
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .report-header .meta {
+    font-size: 0.64rem;
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
+
+  /* Sections */
+  h2 {
+    font-family: 'Instrument Serif', 'Georgia', serif;
+    font-size: 1.08rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 44px 0 16px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--divider);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h2 .num {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-weight: 400;
+    font-family: 'Inter', sans-serif;
+  }
+  h3 {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--purple);
+    margin: 24px 0 10px;
+  }
+
+  /* Cards */
+  .insight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin: 16px 0 24px;
+  }
+  .insight-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 16px;
+  }
+  .insight-card .label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .insight-card .value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    font-family: 'Instrument Serif', serif;
+  }
+  .insight-card .detail {
+    font-size: 0.64rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .val-good { color: var(--accent); }
+  .val-great { color: var(--green); }
+  .val-bad { color: var(--red); }
+  .val-neutral { color: var(--blue); }
+
+  /* Tables */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 12px 0 24px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.68rem;
+  }
+  th {
+    font-weight: 600;
+    color: var(--text-dim);
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    background: rgba(26,26,31,0.5);
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--divider);
+    text-align: center;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--divider);
+    text-align: center;
+    white-space: nowrap;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: rgba(255,255,255,0.012); }
+  tr.row-highlight { background: rgba(245,158,11,0.06); }
+  tr.row-best { background: rgba(16,185,129,0.06); }
+  tr.row-worst { background: rgba(239,68,68,0.04); }
+
+  .c-good { color: var(--accent); font-weight: 600; }
+  .c-great { color: var(--green); font-weight: 600; }
+  .c-bad { color: var(--red); }
+  .c-muted { color: var(--text-muted); }
+
+  /* Callouts */
+  .callout {
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-radius: 0 10px 10px 0;
+    font-size: 0.66rem;
+    line-height: 1.65;
+  }
+  .callout-warn {
+    background: rgba(239,68,68,0.05);
+    border-left: 3px solid var(--red);
+  }
+  .callout-tip {
+    background: rgba(16,185,129,0.05);
+    border-left: 3px solid var(--green);
+  }
+  .callout-note {
+    background: rgba(245,158,11,0.05);
+    border-left: 3px solid var(--accent);
+  }
+  .callout-info {
+    background: rgba(56,189,248,0.05);
+    border-left: 3px solid var(--blue);
+  }
+  .callout strong { color: #fafafa; }
+
+  /* VS grid */
+  .vs-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0 24px;
+  }
+  @media (max-width: 700px) { .vs-grid { grid-template-columns: 1fr; } }
+  .vs-side {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .vs-side h4 {
+    font-size: 0.74rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  /* Bars */
+  .bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 3px 0;
+    font-size: 0.64rem;
+  }
+  .bar-label {
+    width: 80px;
+    text-align: right;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .bar-track {
+    flex: 1;
+    height: 18px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s;
+  }
+  .bar-fill.good { background: linear-gradient(90deg, rgba(245,158,11,0.5), rgba(245,158,11,0.8)); }
+  .bar-fill.great { background: linear-gradient(90deg, rgba(16,185,129,0.5), rgba(16,185,129,0.8)); }
+  .bar-fill.bad { background: linear-gradient(90deg, rgba(239,68,68,0.5), rgba(239,68,68,0.8)); }
+  .bar-fill.neutral { background: linear-gradient(90deg, rgba(56,189,248,0.5), rgba(56,189,248,0.8)); }
+  .bar-val {
+    width: 52px;
+    font-weight: 600;
+    font-size: 0.62rem;
+    flex-shrink: 0;
+    text-align: left;
+  }
+
+  /* Conclusion */
+  .conclusion-list {
+    list-style: none;
+    counter-reset: conc;
+  }
+  .conclusion-list li {
+    counter-increment: conc;
+    padding: 12px 16px 12px 48px;
+    margin: 8px 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.68rem;
+    position: relative;
+    line-height: 1.6;
+  }
+  .conclusion-list li::before {
+    content: counter(conc);
+    position: absolute;
+    left: 14px;
+    top: 12px;
+    width: 22px;
+    height: 22px;
+    background: rgba(245,158,11,0.15);
+    color: var(--accent);
+    border-radius: 6px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Footer */
+  .report-footer {
+    text-align: center;
+    font-size: 0.58rem;
+    color: var(--text-dim);
+    margin-top: 52px;
+    padding-top: 24px;
+    border-top: 1px solid var(--divider);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ====== HEADER ====== -->
+<header class="report-header">
+  <h1>MW 信号综合分析报告</h1>
+  <div class="subtitle">v1.3 ⇢ v2.4 全维度对比 · 评分逻辑迭代效果评估</div>
+  <div class="meta">回测区间 2026-01-01 ~ 2026-06-05 · 信号总量 ~2320 · 基于 B1=1.3 重跑数据</div>
+</header>
+
+<!-- ====== KEY INSIGHTS ====== -->
+<h2><span class="num">01</span> 核心发现</h2>
+
+<div class="insight-grid">
+  <div class="insight-card">
+    <div class="label">全量 10d 胜率</div>
+    <div class="value val-neutral">43.0%</div>
+    <div class="detail">跑输随机基准 (47.2%)</div>
+  </div>
+  <div class="insight-card">
+    <div class="label">PLUS 最佳策略 (v1.3)</div>
+    <div class="value val-great">+8.5%</div>
+    <div class="detail">≥80 + D满分 + I1满分 · 回撤 -1.9%</div>
+  </div>
+  <div class="insight-card">
+    <div class="label">D 维度预测力</div>
+    <div class="value val-good">+8.1pp</div>
+    <div class="detail">唯一两版复现的强预测维度</div>
+  </div>
+  <div class="insight-card">
+    <div class="label">L2 限定代价</div>
+    <div class="value val-bad">-79%</div>
+    <div class="detail">高分信号 202 → 43，梯度崩塌</div>
+  </div>
+  <div class="insight-card">
+    <div class="label">最佳入场</div>
+    <div class="value val-great">B2+2日</div>
+    <div class="detail">20d 中位 +6.89% vs 次日 +3.49%</div>
+  </div>
+  <div class="insight-card">
+    <div class="label">丰收月</div>
+    <div class="value val-good">4月</div>
+    <div class="detail">100信号 · 10d胜率63% · 中位+5.84%</div>
+  </div>
+</div>
+
+<!-- ====== VERSION COMPARISON ====== -->
+<h2><span class="num">02</span> v1.3 vs v2.4 评分规则对比</h2>
+
+<div class="vs-grid">
+  <div class="vs-side">
+    <h4 style="color:#f59e0b;">v1.3 — 全行业 RS</h4>
+    <table style="font-size:0.62rem;">
+      <tr><th>维度</th><th>分值</th><th>数据源</th></tr>
+      <tr><td>H 前高趋势</td><td>15</td><td>SMA50 斜率>0</td></tr>
+      <tr><td>D 调整深度</td><td>5</td><td>15%~35%</td></tr>
+      <tr><td>C 横盘质量</td><td>5</td><td>振幅<10% ∧ 低点斜率>0</td></tr>
+      <tr><td>P 整理回撤</td><td>15</td><td>回撤≥-7% ∧ 缩量</td></tr>
+      <tr><td>I1 行业RS250</td><td>15</td><td>全行业指数</td></tr>
+      <tr><td>I2 行业RS20</td><td>10</td><td>全行业指数</td></tr>
+      <tr><td>Sig 信号共振</td><td>25</td><td>累加制</td></tr>
+      <tr><td>Gap 跳空</td><td>10</td><td>B2开盘>前日最高</td></tr>
+      <tr style="font-weight:600;"><td>合计</td><td>100</td><td></td></tr>
+    </table>
+    <p style="font-size:0.58rem;color:var(--text-dim);margin-top:8px;">高分202只 · 置信度梯度清晰 · 行业覆盖100%</p>
+  </div>
+  <div class="vs-side">
+    <h4 style="color:#a78bfa;">v2.4 — L2 行业 RS</h4>
+    <table style="font-size:0.62rem;">
+      <tr><th>维度</th><th>分值</th><th>数据源</th></tr>
+      <tr><td>H 前高趋势</td><td>15</td><td>SMA50 斜率>0</td></tr>
+      <tr><td>D 调整深度</td><td>5</td><td>15%~35%</td></tr>
+      <tr><td>C 横盘质量</td><td>5</td><td>振幅<10% ∧ 低点斜率>0</td></tr>
+      <tr><td>P 整理回撤</td><td>15</td><td>回撤≥-7% ∧ 缩量</td></tr>
+      <tr><td>I1 行业RS250</td><td>15</td><td><b>L2限定</b> (56指数)</td></tr>
+      <tr><td>I2 行业RS20</td><td>10</td><td><b>L2限定</b> (56指数)</td></tr>
+      <tr><td>Sig 信号共振</td><td>25</td><td>累加制</td></tr>
+      <tr><td>Gap 跳空</td><td>10</td><td>B2开盘>前日最高</td></tr>
+      <tr style="font-weight:600;"><td>合计</td><td>100</td><td></td></tr>
+    </table>
+    <p style="font-size:0.58rem;color:var(--text-dim);margin-top:8px;">高分仅43只 · 置信度梯度消失 · 行业覆盖38%</p>
+  </div>
+</div>
+
+<div class="callout callout-warn">
+  <strong>⚠ L2 限定是一把双刃剑。</strong>理论上提高行业RS含金量，实际上把高分信号从202只砍到43只（-79%），中置信度（44.9%）反而超过高置信度（44.2%），评分体系的置信度梯度完全崩塌。I1/I2两个维度合计占25分，当62%的股票拿不到行业RS分时，总分分布被严重扭曲。
+</div>
+
+<!-- ====== OVERALL PERFORMANCE ====== -->
+<h2><span class="num">03</span> 总体表现</h2>
+
+<h3>全量信号 — 无超额收益</h3>
+<div class="table-wrap">
+<table>
+  <tr><th>窗口</th><th>胜率 (&gt;2%)</th><th>中位收益率</th><th>平均收益率</th><th>样本</th><th>特征</th></tr>
+  <tr>
+    <td>5d</td><td>37.6%</td><td class="c-bad">-0.92%</td><td>+0.93%</td><td>2285</td>
+    <td class="c-muted">长尾拉偏均值</td>
+  </tr>
+  <tr>
+    <td>10d</td><td>43.0%</td><td class="c-bad">-0.15%</td><td>+1.93%</td><td>2225</td>
+    <td class="c-muted">中位仍为负</td>
+  </tr>
+  <tr>
+    <td>20d</td><td>42.1%</td><td class="c-bad">-1.56%</td><td>+2.82%</td><td>1952</td>
+    <td class="c-muted">时间拉长不改善</td>
+  </tr>
+</table>
+</div>
+
+<div class="callout callout-note">
+  <strong>全量信号不产生超额收益。</strong>三个窗口的中位收益率全部为负，平均收益靠少数大牛股强撑（典型长尾分布）。MW 信号必须经过严格筛选才能使用——全量买入等于给市场送钱。
+</div>
+
+<!-- ====== SCORE BANDS ====== -->
+<h2><span class="num">04</span> 分数段表现 (v2.4)</h2>
+
+<div class="table-wrap">
+<table>
+  <tr><th>分数段</th><th>数量</th><th>占比</th><th>10d 胜率</th><th>10d 中位</th><th>20d 胜率</th><th>评级</th></tr>
+  <tr class="row-worst">
+    <td><b>90~100</b></td><td>6</td><td>0.3%</td><td class="c-bad">16.7%</td><td class="c-bad">-0.13%</td><td>0.0%</td>
+    <td class="c-muted">样本过少·无统计意义</td>
+  </tr>
+  <tr class="row-best">
+    <td><b>85~90</b></td><td>21</td><td>0.9%</td><td class="c-great">57.1%</td><td class="c-great">+3.27%</td><td class="c-great">55.6%</td>
+    <td class="c-great">★★★</td>
+  </tr>
+  <tr>
+    <td>80~85</td><td>16</td><td>0.7%</td><td class="c-muted">37.5%</td><td>+1.08%</td><td class="c-great">58.3%</td>
+    <td class="c-muted">波动大</td>
+  </tr>
+  <tr>
+    <td>75~80</td><td>50</td><td>2.2%</td><td>46.9%</td><td>+0.84%</td><td>41.9%</td>
+    <td>中规中矩</td>
+  </tr>
+  <tr class="row-best">
+    <td><b>70~75</b></td><td>90</td><td>3.9%</td><td class="c-great">57.5%</td><td class="c-great">+4.13%</td><td>43.8%</td>
+    <td class="c-great">★★★</td>
+  </tr>
+  <tr>
+    <td>65~70</td><td>172</td><td>7.5%</td><td>47.6%</td><td class="c-good">+1.14%</td><td>43.4%</td>
+    <td class="c-good">稳</td>
+  </tr>
+  <tr>
+    <td>60~65</td><td>216</td><td>9.5%</td><td>42.3%</td><td class="c-bad">-0.37%</td><td>43.9%</td>
+    <td class="c-muted">平庸线</td>
+  </tr>
+  <tr>
+    <td>55~60</td><td>271</td><td>11.9%</td><td>40.8%</td><td class="c-bad">-0.57%</td><td>44.3%</td>
+    <td class="c-muted">不可用</td>
+  </tr>
+  <tr>
+    <td>50~55</td><td>223</td><td>9.8%</td><td>43.3%</td><td class="c-bad">-0.40%</td><td>40.9%</td>
+    <td class="c-muted">不可用</td>
+  </tr>
+  <tr>
+    <td>0~50</td><td>1220</td><td>53.5%</td><td>41.6%</td><td class="c-bad">-0.69%</td><td>40.9%</td>
+    <td class="c-muted">≈随机</td>
+  </tr>
+</table>
+</div>
+
+<div class="callout callout-tip">
+  <strong>分数与胜率并非单调递增。</strong>两个峰值在 <b>85~90</b> (57.1%) 和 <b>70~75</b> (57.5%)，呈 U 型反转。90~100 分的 6 个信号几乎全灭，暗示极度完美的形态往往已是强弩之末。≥65 合计 358 只 (15.6%)，是当前最合理的 PLUS 切割点。
+</div>
+
+<!-- ====== PREDICTIVE POWER ====== -->
+<h2><span class="num">05</span> 评分维度预测力 — D 为王，Sig 反向</h2>
+
+<div class="vs-grid">
+  <div class="vs-side">
+    <h4 style="color:#f59e0b;">v1.3 预测力排序</h4>
+    <div class="bar-wrap"><span class="bar-label">D 调整深度</span><div class="bar-track"><div class="bar-fill great" style="width:100%"></div></div><span class="bar-val c-great">+8.1pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">I1 行业RS250</span><div class="bar-track"><div class="bar-fill good" style="width:70%"></div></div><span class="bar-val c-good">+5.7pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">H 前高趋势</span><div class="bar-track"><div class="bar-fill good" style="width:69%"></div></div><span class="bar-val c-good">+5.6pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">P 整理回撤</span><div class="bar-track"><div class="bar-fill neutral" style="width:58%"></div></div><span class="bar-val" style="color:var(--blue);">+4.7pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">C 横盘质量</span><div class="bar-track"><div class="bar-fill neutral" style="width:50%"></div></div><span class="bar-val" style="color:var(--blue);">+4.1pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">Gap 跳空</span><div class="bar-track"><div class="bar-fill neutral" style="width:36%"></div></div><span class="bar-val" style="color:var(--blue);">+2.9pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">I2 行业RS20</span><div class="bar-track"><div class="bar-fill bad" style="width:2%"></div></div><span class="bar-val c-bad">+0.1pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">Sig 信号共振</span><div class="bar-track"><div class="bar-fill bad" style="width:0%; background:rgba(239,68,68,0.4)!important"></div></div><span class="bar-val c-bad">-3.1pp</span></div>
+  </div>
+  <div class="vs-side">
+    <h4 style="color:#a78bfa;">v2.4 预测力排序</h4>
+    <div class="bar-wrap"><span class="bar-label">D 调整深度</span><div class="bar-track"><div class="bar-fill great" style="width:96%"></div></div><span class="bar-val c-great">+7.8pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">H 前高趋势</span><div class="bar-track"><div class="bar-fill good" style="width:71%"></div></div><span class="bar-val c-good">+5.8pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">P 整理回撤</span><div class="bar-track"><div class="bar-fill neutral" style="width:58%"></div></div><span class="bar-val" style="color:var(--blue);">+4.7pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">C 横盘质量</span><div class="bar-track"><div class="bar-fill neutral" style="width:47%"></div></div><span class="bar-val" style="color:var(--blue);">+3.8pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">Gap 跳空</span><div class="bar-track"><div class="bar-fill neutral" style="width:36%"></div></div><span class="bar-val" style="color:var(--blue);">+2.9pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">M2 缩量率</span><div class="bar-track"><div class="bar-fill bad" style="width:0%; background:rgba(239,68,68,0.4)!important"></div></div><span class="bar-val c-bad">-0.6pp</span></div>
+    <div class="bar-wrap"><span class="bar-label">Sig 信号共振</span><div class="bar-track"><div class="bar-fill bad" style="width:0%; background:rgba(239,68,68,0.4)!important"></div></div><span class="bar-val c-bad">-3.6pp</span></div>
+  </div>
+</div>
+
+<div class="callout callout-warn">
+  <strong>Sig（信号共振）是稳定的反向预测指标。</strong>两版报告中满分 Sig 的胜率始终低于 0 分 Sig（v1.3: 44.5% vs 47.6%, v2.4: 43.9% vs 47.5%）。信号越多越杂，真正的爆发力反而被噪声淹没。I2（行业RS20）在 v1.3 中区分度仅 +0.1pp，基本无预测力。
+</div>
+
+<div class="callout callout-tip">
+  <strong>D 是唯一贯穿两版均贡献 +8pp 的王者维度。</strong>调整深度在 15%~35% 区间是 MW 信号的命门——跌得不够深（&lt;15%）说明调整不充分，跌太深（&gt;35%）则形态可能已经走坏。这个区间的精确定位是 MW 策略的核心。
+</div>
+
+<!-- ====== RANDOM BENCHMARK ====== -->
+<h2><span class="num">06</span> 随机基准对比 — L2 限定后退步</h2>
+
+<div class="table-wrap">
+<table>
+  <tr><th>版本</th><th>分组</th><th>窗口</th><th>MW 胜率</th><th>随机胜率</th><th>MW 中位</th><th>随机中位</th><th>跑赢</th></tr>
+  <tr>
+    <td rowspan="3">v1.3</td>
+    <td>全量</td><td>5d</td><td>37.6%</td><td>42.2%</td><td class="c-bad">-0.92%</td><td>+0.60%</td><td class="c-bad">❌</td>
+  </tr>
+  <tr>
+    <td>全量</td><td>10d</td><td>42.9%</td><td>47.6%</td><td class="c-bad">-0.15%</td><td>+1.36%</td><td class="c-bad">❌</td>
+  </tr>
+  <tr class="row-best">
+    <td><b>高置信度</b></td><td><b>10d</b></td><td class="c-good"><b>50.5%</b></td><td>50.6%</td><td class="c-good"><b>+2.62%</b></td><td>+2.18%</td><td class="c-great"><b>✅</b></td>
+  </tr>
+  <tr>
+    <td rowspan="3">v2.4</td>
+    <td>全量</td><td>5d</td><td>37.6%</td><td>41.9%</td><td class="c-bad">-0.92%</td><td>+0.56%</td><td class="c-bad">❌</td>
+  </tr>
+  <tr>
+    <td>全量</td><td>10d</td><td>43.0%</td><td>47.2%</td><td class="c-bad">-0.15%</td><td>+1.25%</td><td class="c-bad">❌</td>
+  </tr>
+  <tr>
+    <td>高置信度</td><td>10d</td><td>44.2%</td><td>47.9%</td><td>+0.81%</td><td>+1.41%</td><td class="c-bad">❌</td>
+  </tr>
+</table>
+</div>
+
+<div class="callout callout-note">
+  <strong>高置信度 vs 随机是 MW 体系含金量的试金石。</strong>v1.3 高分组 10d 能打平随机（50.5% vs 50.6%，中位反而跑赢），20d 则全面领先；v2.4 高分组 10d 全面落后（44.2% vs 47.9%）。L2 限定让评分体系失去了筛选力——这是本次迭代最大的教训。
+</div>
+
+<!-- ====== MARKET & CAP ====== -->
+<h2><span class="num">07</span> 市场状态 &amp; 市值效应</h2>
+
+<div class="vs-grid">
+  <div class="vs-side">
+    <h4 style="color:#38bdf8;">市场状态 (v2.4)</h4>
+    <div class="bar-wrap"><span class="bar-label">多头</span><div class="bar-track"><div class="bar-fill bad" style="width:68%"></div></div><span class="bar-val c-bad">36.4%</span></div>
+    <div class="bar-wrap"><span class="bar-label">震荡</span><div class="bar-track"><div class="bar-fill neutral" style="width:80%"></div></div><span class="bar-val" style="color:var(--blue);">43.1%</span></div>
+    <div class="bar-wrap"><span class="bar-label">空头</span><div class="bar-track"><div class="bar-fill great" style="width:100%"></div></div><span class="bar-val c-great">53.5%</span></div>
+    <p style="font-size:0.58rem;color:var(--text-dim);margin-top:10px;">MW 信号在空头市场最赚钱（中位 +3.72%），本质抓超跌反弹。</p>
+  </div>
+  <div class="vs-side">
+    <h4 style="color:#38bdf8;">市值分组 (v2.4)</h4>
+    <div class="bar-wrap"><span class="bar-label">小盘 &lt;50亿</span><div class="bar-track"><div class="bar-fill neutral" style="width:83%"></div></div><span class="bar-val" style="color:var(--blue);">44.4%</span></div>
+    <div class="bar-wrap"><span class="bar-label">中盘 50~200亿</span><div class="bar-track"><div class="bar-fill bad" style="width:77%"></div></div><span class="bar-val c-bad">41.3%</span></div>
+    <div class="bar-wrap"><span class="bar-label">大盘 200~1000亿</span><div class="bar-track"><div class="bar-fill good" style="width:83%"></div></div><span class="bar-val c-good">44.7%</span></div>
+    <div class="bar-wrap"><span class="bar-label">超大盘 ≥1000亿</span><div class="bar-track"><div class="bar-fill great" style="width:96%"></div></div><span class="bar-val c-great">51.3%</span></div>
+    <p style="font-size:0.58rem;color:var(--text-dim);margin-top:10px;">大市值的 MW 信号更稳定，中盘是表现最差的区间。</p>
+  </div>
+</div>
+
+<div class="callout callout-info">
+  <strong>MW 信号的空头偏好是个重要特征。</strong>它和追盘日、口袋支点等牛市策略形成互补。在多头市场 MW 胜率仅 36.4%（中位 -1.93%），因为牛市里强势股不需要"二次突破"——它们一直在涨。MW 的独特价值在于熊市/震荡中抓反转。
+</div>
+
+<!-- ====== CONFIDENCE GRADIENT ====== -->
+<h2><span class="num">08</span> 置信度梯度 — v1.3 清晰，v2.4 崩塌</h2>
+
+<h3>v1.3 置信度 · 层次分明</h3>
+<div class="table-wrap">
+<table>
+  <tr><th>档位</th><th>数量</th><th>10d 胜率</th><th>10d 中位</th><th>20d 胜率</th><th>模拟盘收益</th><th>最大回撤</th></tr>
+  <tr class="row-best">
+    <td><b>高 (≥80)</b></td><td>202</td><td class="c-great">50.5%</td><td class="c-good">+2.62%</td><td class="c-great">53.2%</td><td class="c-great">+8.5%</td><td class="c-great">-2.3%</td>
+  </tr>
+  <tr>
+    <td>中</td><td>927</td><td>43.8%</td><td>+0.11%</td><td>43.3%</td><td>+2.8%</td><td class="c-bad">-9.0%</td>
+  </tr>
+  <tr>
+    <td>低</td><td>1149</td><td class="c-bad">41.0%</td><td class="c-bad">-0.76%</td><td>40.1%</td><td>+4.3%</td><td class="c-bad">-8.8%</td>
+  </tr>
+</table>
+</div>
+
+<h3>v2.4 置信度 · 梯度消失</h3>
+<div class="table-wrap">
+<table>
+  <tr><th>档位</th><th>数量</th><th>10d 胜率</th><th>10d 中位</th><th>20d 胜率</th><th>特征</th></tr>
+  <tr>
+    <td><b>高 (≥80)</b></td><td>43</td><td class="c-muted">44.2%</td><td>+0.81%</td><td>50.0%</td><td class="c-muted">样本不足·被中档反超</td>
+  </tr>
+  <tr class="row-best">
+    <td><b>中</b></td><td>799</td><td class="c-good">44.9%</td><td>+0.63%</td><td>43.8%</td><td class="c-muted">10d胜率反而最高</td>
+  </tr>
+  <tr>
+    <td>低</td><td>1443</td><td>41.8%</td><td class="c-bad">-0.68%</td><td>40.9%</td><td class="c-muted">和随机差不多</td>
+  </tr>
+</table>
+</div>
+
+<div class="callout callout-warn">
+  <strong>v2.4 的高→中梯度仅 -0.7pp（中反超高），而 v1.3 的梯度是 +6.7pp。</strong>根源是 I1 + I2 合计占 25 分，L2 限定后 62% 的股票拿不到行业 RS 分数，总分被人为压低。那些本应拿到高分的信号被错误地打入中低档，而侥幸拿到 L2 行业分的信号又不一定真的好——筛选变成了运气游戏。根本修复方案是通过申万行业桥接提升覆盖率，目前 38% → 目标 80%+。
+</div>
+
+<!-- ====== MONTHLY ====== -->
+<h2><span class="num">09</span> 月度季节效应 (v1.3, ≥80分)</h2>
+
+<div class="table-wrap">
+<table>
+  <tr><th>月份</th><th>样本</th><th>5d 胜率</th><th>10d 胜率</th><th>10d 中位</th><th>20d 胜率</th><th>20d 中位</th><th>定性</th></tr>
+  <tr class="row-worst">
+    <td><b>1月</b></td><td>1</td><td class="c-bad">0%</td><td class="c-bad">0%</td><td class="c-bad">-3.76%</td><td class="c-bad">0%</td><td class="c-bad">-7.59%</td><td class="c-muted">无样本</td>
+  </tr>
+  <tr class="row-worst">
+    <td><b>2月</b></td><td>6</td><td class="c-bad">16.7%</td><td class="c-bad">33.3%</td><td class="c-bad">-14.78%</td><td class="c-bad">16.7%</td><td class="c-bad">-6.29%</td><td class="c-muted">灾难</td>
+  </tr>
+  <tr class="row-worst">
+    <td><b>3月</b></td><td>15</td><td class="c-bad">20.0%</td><td class="c-bad">26.7%</td><td class="c-bad">-16.04%</td><td>40.0%</td><td class="c-bad">-10.65%</td><td class="c-muted">灾难</td>
+  </tr>
+  <tr class="row-best">
+    <td><b>4月</b></td><td><b>100</b></td><td class="c-great"><b>49.0%</b></td><td class="c-great"><b>63.0%</b></td><td class="c-great"><b>+5.84%</b></td><td class="c-great"><b>62.0%</b></td><td class="c-great"><b>+8.82%</b></td><td class="c-great"><b>★★★★★</b></td>
+  </tr>
+  <tr>
+    <td><b>5月</b></td><td>25</td><td class="c-good">50.0%</td><td>45.8%</td><td class="c-bad">-0.50%</td><td>48.0%</td><td class="c-bad">-1.44%</td><td>分化</td>
+  </tr>
+</table>
+</div>
+
+<div class="callout callout-tip">
+  <strong>4 月是 MW 信号的黄金窗口，2026 年表现堪称完美。</strong>100 个 ≥80 分信号集中爆发（占总量 68%），10d 胜率 63%、中位 +5.84%，20d 胜率 62%、中位 +8.82%。这个时间窗口对应年报和一季报密集披露期，业绩催化剂与 MW 抓的"强势股二次突破"形成共振。1~3 月（数据真空期）MW 信号几乎全面失灵——<b>这不是一个全年无差别可用的策略</b>。
+</div>
+
+<h3>月度信号分布</h3>
+<div class="bar-wrap"><span class="bar-label">1月</span><div class="bar-track"><div class="bar-fill bad" style="width:1%"></div></div><span class="bar-val c-muted">1只</span></div>
+<div class="bar-wrap"><span class="bar-label">2月</span><div class="bar-track"><div class="bar-fill bad" style="width:6%"></div></div><span class="bar-val c-muted">6只</span></div>
+<div class="bar-wrap"><span class="bar-label">3月</span><div class="bar-track"><div class="bar-fill neutral" style="width:15%"></div></div><span class="bar-val c-muted">15只</span></div>
+<div class="bar-wrap"><span class="bar-label">4月</span><div class="bar-track"><div class="bar-fill great" style="width:100%"></div></div><span class="bar-val c-great">100只</span></div>
+<div class="bar-wrap"><span class="bar-label">5月</span><div class="bar-track"><div class="bar-fill good" style="width:25%"></div></div><span class="bar-val c-muted">25只</span></div>
+
+<!-- ====== DELAYED ENTRY ====== -->
+<h2><span class="num">10</span> 延迟入场效果 (v1.3, ≥80分)</h2>
+
+<div class="table-wrap">
+<table>
+  <tr><th>入场时机</th><th>样本</th><th>5d 胜率</th><th>5d 中位</th><th>10d 胜率</th><th>10d 中位</th><th>20d 胜率</th><th>20d 中位</th></tr>
+  <tr>
+    <td>B2 次日开盘</td><td>147</td><td>46.0%</td><td>+1.26%</td><td>52.6%</td><td class="c-good">+4.13%</td><td>55.1%</td><td>+3.49%</td>
+  </tr>
+  <tr>
+    <td>B2 后第 2 日</td><td>133</td><td>46.5%</td><td>+1.50%</td><td class="c-good">55.4%</td><td class="c-good">+3.93%</td><td>54.1%</td><td class="c-great"><b>+6.89%</b></td>
+  </tr>
+  <tr class="row-best">
+    <td><b>B2 后第 3 日</b></td><td>122</td><td class="c-good"><b>48.7%</b></td><td class="c-good"><b>+1.67%</b></td><td class="c-good"><b>55.1%</b></td><td class="c-good"><b>+4.18%</b></td><td>54.1%</td><td>+3.38%</td>
+  </tr>
+</table>
+</div>
+
+<div class="callout callout-tip">
+  <strong>延迟 1~2 天入场全面优于 B2 次日抢入。</strong>原理直白：B2 当天放量突破，短线获利盘次日有抛压。等 1~2 天让抛压消化，拿到更好的买点。20d 中位从 +3.49% 跳升到 +6.89%（几乎翻倍）。但延迟 3 天样本递减（147→133→122），有些票等不及就飞了。
+</div>
+
+<div class="callout callout-note">
+  <strong>实操建议：</strong>B2 信号触发后，次日不急于追。观察 1~2 天找回调买点——如果 B2 后第 2 天缩量回踩 B2 收盘价附近且未破 MA10，是最佳入场窗口。
+</div>
+
+<!-- ====== PLUS DEEP DIVE ====== -->
+<h2><span class="num">11</span> PLUS 信号深度剖析 (v1.3)</h2>
+
+<h3>PLUS 精选 vs 全量高置信度</h3>
+<div class="table-wrap">
+<table>
+  <tr><th>策略</th><th>交易</th><th>胜率</th><th>模拟盘收益</th><th>最大回撤</th><th>评价</th></tr>
+  <tr class="row-best">
+    <td><b>✦ PLUS (≥80 + D满分 + I1满分)</b></td><td>158</td><td class="c-great">56.3%</td><td class="c-great">+8.5%</td><td class="c-great">-1.9%</td><td class="c-great">🏆 最优</td>
+  </tr>
+  <tr class="row-worst">
+    <td>高 (不含 PLUS)</td><td>36</td><td>47.2%</td><td class="c-bad">+0.9%</td><td>-1.3%</td><td class="c-muted">伪高分</td>
+  </tr>
+  <tr>
+    <td>高 (含 PLUS)</td><td>185</td><td>55.1%</td><td class="c-good">+8.5%</td><td>-2.3%</td><td class="c-good">好</td>
+  </tr>
+</table>
+</div>
+
+<div class="callout callout-tip">
+  <strong>PLUS 的价值是"砍掉伪高分"。</strong>去掉 PLUS 后的 36 只高分残渣（有分但缺 D 或 I1）几乎不赚钱（+0.9%）。高置信度的全部收益来自 PLUS 子集。PLUS 的三个条件（≥80 + D满分 + I1满分）形成了最小必要充分条件集。
+</div>
+
+<h3>PLUS 行业分布</h3>
+<div class="table-wrap">
+<table>
+  <tr><th>行业</th><th>数量</th><th>占比</th><th>10d 中位</th><th>胜率</th><th>评级</th></tr>
+  <tr class="row-best">
+    <td><b>电子</b></td><td>39</td><td>23.5%</td><td class="c-great">+12.0%</td><td class="c-great">77%</td><td class="c-great">🏆 王牌</td>
+  </tr>
+  <tr class="row-best">
+    <td><b>化工</b></td><td>12</td><td>7.2%</td><td class="c-great">+11.9%</td><td class="c-great">78%</td><td class="c-great">🏆 王牌</td>
+  </tr>
+  <tr>
+    <td><b>通信</b></td><td>8</td><td>4.8%</td><td class="c-good">+10.0%</td><td class="c-good">71%</td><td class="c-good">优秀</td>
+  </tr>
+  <tr>
+    <td><b>计算机</b></td><td>7</td><td>4.2%</td><td class="c-good">+14.2%</td><td class="c-good">67%</td><td class="c-good">优秀</td>
+  </tr>
+  <tr>
+    <td><b>国防军工</b></td><td>4</td><td>2.4%</td><td class="c-good">+9.8%</td><td class="c-good">67%</td><td>少量</td>
+  </tr>
+  <tr>
+    <td><b>机械设备</b></td><td>11</td><td>6.6%</td><td class="c-good">+17.0%</td><td>60%</td><td>尚可</td>
+  </tr>
+  <tr>
+    <td><b>有色金属</b></td><td>12</td><td>7.2%</td><td>+1.7%</td><td class="c-bad">40%</td><td>一般</td>
+  </tr>
+  <tr class="row-worst">
+    <td><b>电气设备</b></td><td>15</td><td>9.0%</td><td class="c-bad">-1.0%</td><td class="c-bad">29%</td><td class="c-bad">避雷</td>
+  </tr>
+  <tr class="row-worst">
+    <td><b>未分类</b></td><td>33</td><td>19.9%</td><td class="c-bad">-7.5%</td><td class="c-bad">24%</td><td class="c-bad">避雷</td>
+  </tr>
+</table>
+</div>
+
+<div class="callout callout-info">
+  <strong>电子和化工是 MW 信号的两大主战场。</strong>合计占 PLUS 的 30.7%，胜率分别 77%、78%，中位收益率 +12%。电气设备的 15 只同属"行业 RS 强"，但正股表现极差（胜率仅 29%），说明行业 RS 不是充分条件——电子/化工的 MW 信号可能叠加了产业链景气度和资金偏好。未分类的 33 只（个股 RS 均值仅 59，远低于有行业股票的 78）是"搭了顺风车却没发动机"的典型。
+</div>
+
+<h3>PLUS 内部因子 — 传统评分已耗尽区分力</h3>
+<div class="table-wrap">
+<table>
+  <tr><th>因子</th><th>上半区 (Top50%)</th><th>下半区 (Bot50%)</th><th>差异</th><th>区分力</th></tr>
+  <tr><td>平均得分</td><td>85</td><td>85</td><td class="c-muted">0</td><td class="c-muted">无</td></tr>
+  <tr><td>H 点 RS250</td><td>72</td><td>71</td><td class="c-muted">+1</td><td class="c-muted">无</td></tr>
+  <tr><td>B2 涨幅</td><td>8.3%</td><td>7.2%</td><td>+1.1pp</td><td>极弱</td></tr>
+  <tr><td>跌幅</td><td>24.1%</td><td>24.8%</td><td class="c-muted">-0.7pp</td><td class="c-muted">无</td></tr>
+  <tr class="row-highlight">
+    <td><b>换手率 (20日均)</b></td><td class="c-good"><b>4.12%</b></td><td>3.52%</td><td class="c-good"><b>+0.60pp</b></td><td class="c-good"><b>唯一有效</b></td>
+  </tr>
+  <tr><td>波动率 (20日)</td><td>6.52%</td><td>6.80%</td><td class="c-muted">-0.28pp</td><td class="c-muted">无</td></tr>
+</table>
+</div>
+
+<div class="callout callout-note">
+  <strong>PLUS 筛选太干净了，留下的信号太均匀。</strong>传统评分维度（得分/H点RS/跌幅/B2涨幅）在 PLUS 内部几乎没有区分力——上下半区得分完全一致（85 vs 85）。<b>换手率是唯一有方向性差异的因子</b>，高换手 = 高关注度 = 更多资金参与。建议将换手率作为 PLUS 内部二次排序因子。
+</div>
+
+<h3>PLUS Top5 个例</h3>
+<div class="table-wrap">
+<table>
+  <tr><th>代码</th><th>名称</th><th>行业</th><th>B2 日</th><th>得分</th><th>5d</th><th>10d</th><th>20d</th></tr>
+  <tr>
+    <td>300302</td><td>同有科技</td><td>计算机</td><td>05-06</td><td>95</td><td class="c-great">+44.2%</td><td class="c-great">+90.5%</td><td class="c-great">+82.3%</td>
+  </tr>
+  <tr>
+    <td>688143</td><td>长盈通</td><td>通信</td><td>05-15</td><td>80</td><td class="c-great">+28.0%</td><td class="c-great">+56.2%</td><td class="c-muted">—</td>
+  </tr>
+  <tr>
+    <td>601991</td><td>大唐发电</td><td>公用事业</td><td>05-07</td><td>90</td><td class="c-great">+42.9%</td><td class="c-great">+39.9%</td><td class="c-great">+74.8%</td>
+  </tr>
+  <tr>
+    <td>002757</td><td>南兴股份</td><td>机械设备</td><td>04-27</td><td>80</td><td class="c-great">+18.7%</td><td class="c-great">+36.8%</td><td>+5.3%</td>
+  </tr>
+  <tr>
+    <td>688107</td><td>安路科技</td><td>电子</td><td>05-06</td><td>80</td><td class="c-great">+12.2%</td><td class="c-great">+36.2%</td><td class="c-great">+22.3%</td>
+  </tr>
+</table>
+</div>
+
+<!-- ====== INDUSTRY RS MIGRATION ====== -->
+<h2><span class="num">12</span> 行业 RS 迁移效应 — H 点 → B2 日的升温</h2>
+
+<div class="table-wrap">
+<table>
+  <tr><th>指标</th><th>H 点 (前高)</th><th>B2 日 (突破)</th><th>方向</th></tr>
+  <tr>
+    <td>行业 RS250 均值</td><td>72.3</td><td class="c-good">95.3</td><td class="c-good">150/166 只 B2 &gt; H</td>
+  </tr>
+</table>
+</div>
+
+<div class="callout callout-tip">
+  <strong>PLUS 信号不是"前高时行业强"，而是"调整期间行业冷了又热了"。</strong>从 H 点到 B2 日，行业 RS 从 72 跳升到 95，90% 的信号呈现行业重新升温特征。这与 MW 的核心逻辑一致：强势股在行业退潮期调整，行业重新起势时二次突破。这不仅是选股信号，更是<b>行业择时的间接指标</b>。
+</div>
+
+<!-- ====== SIMULATED TRADING ====== -->
+<h2><span class="num">13</span> 模拟盘多档位对比 (v1.3)</h2>
+
+<div class="table-wrap">
+<table>
+  <tr><th>策略</th><th>交易笔数</th><th>胜率</th><th>最终市值</th><th>收益率</th><th>最大回撤</th><th>夏普印象</th></tr>
+  <tr>
+    <td>每日 TOP1</td><td>98</td><td>42.9%</td><td>¥1,031,323</td><td>+3.1%</td><td class="c-bad">-3.9%</td><td>一般</td>
+  </tr>
+  <tr>
+    <td>每日 TOP5</td><td>476</td><td>43.5%</td><td>¥1,038,395</td><td>+3.8%</td><td class="c-bad">-7.8%</td><td>一般</td>
+  </tr>
+  <tr>
+    <td>每日 TOP10</td><td>883</td><td>45.6%</td><td>¥1,054,386</td><td>+5.4%</td><td class="c-bad">-10.3%</td><td>一般</td>
+  </tr>
+  <tr>
+    <td>≥90</td><td>58</td><td>50.0%</td><td>¥1,030,963</td><td>+3.1%</td><td class="c-great">-1.3%</td><td class="c-great">优秀</td>
+  </tr>
+  <tr>
+    <td>≥85</td><td>121</td><td>51.2%</td><td>¥1,042,326</td><td>+4.2%</td><td class="c-great">-2.0%</td><td class="c-great">优秀</td>
+  </tr>
+  <tr class="row-best">
+    <td><b>≥80 🏆</b></td><td><b>186</b></td><td class="c-great"><b>55.4%</b></td><td><b>¥1,085,181</b></td><td class="c-great"><b>+8.5%</b></td><td class="c-great"><b>-2.3%</b></td><td class="c-great"><b>最优</b></td>
+  </tr>
+  <tr>
+    <td>≥75</td><td>256</td><td>52.3%</td><td>¥1,067,500</td><td>+6.7%</td><td class="c-bad">-4.4%</td><td>好</td>
+  </tr>
+  <tr>
+    <td>≥70</td><td>348</td><td>48.9%</td><td>¥1,048,329</td><td>+4.8%</td><td class="c-bad">-6.9%</td><td>尚可</td>
+  </tr>
+  <tr>
+    <td>≥65</td><td>477</td><td>47.4%</td><td>¥1,048,330</td><td>+4.8%</td><td class="c-bad">-8.3%</td><td>一般</td>
+  </tr>
+  <tr>
+    <td>≥60</td><td>590</td><td>46.4%</td><td>¥1,059,980</td><td>+6.0%</td><td class="c-bad">-9.2%</td><td>一般</td>
+  </tr>
+</table>
+</div>
+
+<div class="callout callout-tip">
+  <strong>≥80 是模拟盘的最优切割点。</strong>收益率 +8.5% 配合最大回撤仅 -2.3%，收益回撤比 3.7:1，在所有阈值中遥遥领先。放宽到 ≥75 收益反而下降到 +6.7%，且回撤翻倍（-4.4%），说明 75~79 分段里混入了不少假信号。每次下探阈值都让回撤显著增加——<b>MW 策略的核心价值在于精选，不在于广撒网。</b>
+</div>
+
+<!-- ====== HIGH RETURNS COMMONALITY ====== -->
+<h2><span class="num">14</span> 高收益信号共性 (v2.4 Top10% vs 全量)</h2>
+
+<div class="table-wrap">
+<table>
+  <tr><th>特征</th><th>全量均值</th><th>Top10% 均值</th><th>差异</th></tr>
+  <tr>
+    <td>10d 收益率</td><td>+1.93%</td><td class="c-great">+35.5%</td><td class="c-great">+33.57pp</td>
+  </tr>
+  <tr>
+    <td>H 点 RS250</td><td>63.54</td><td class="c-good">67.57</td><td class="c-good">+4.03</td>
+  </tr>
+  <tr>
+    <td>总分</td><td>46.62</td><td class="c-good">48.0</td><td class="c-good">+1.38</td>
+  </tr>
+  <tr>
+    <td>B2 涨幅</td><td>7.98%</td><td class="c-good">8.66%</td><td class="c-good">+0.68pp</td>
+  </tr>
+</table>
+</div>
+
+<div class="callout callout-info">
+  <strong>Top10% 的大牛股在总分上只比全量高 1.38 分。</strong>再次验证评分体系在顶部区域的区分力不足。H 点 RS250 (+4.03) 和 B2 涨幅 (+0.68pp) 有微弱正相关性，但远不足以预测谁会爆涨。找出那 10% 的爆款仍然需要评分体系之外的因子。
+</div>
+
+<!-- ====== CONCLUSIONS ====== -->
+<h2><span class="num">15</span> 综合结论与行动建议</h2>
+
+<ol class="conclusion-list">
+  <li>
+    <strong>全量 MW 信号不产生超额收益，必须精选。</strong>v1.3 的 PLUS 标准（≥80 + D满分 + I1满分）是最佳切割：56.3% 胜率、+8.5% 模拟盘收益、-1.9% 回撤。v2.4 的 ≥65 切割（358只）牺牲了胜率换取样本量，不划算。
+  </li>
+  <li>
+    <strong>L2 限定过度收紧，急需提升行业覆盖率。</strong>目前仅 38% 的股票能拿到行业 RS 分，导致评分梯度崩塌。申万行业桥接到 L2/L1 是优先级最高的工程任务，目标覆盖率 ≥80%。在覆盖率达到之前，建议回退到全行业 RS 或混合策略（有 L2 用 L2，没有兜底到全指数）。
+  </li>
+  <li>
+    <strong>D（调整深度 15%~35%）是唯一稳定强预测维度。</strong>两版报告均贡献 +8pp 胜率差。这个区间是 MW 信号的命门，不应轻易修改。而 Sig 信号共振在两版中都显示负区分度，需要重新设计：要么只保留 base_breakout 和 pp 两个核心，砍掉 cdl/talib 噪声；要么将 Sig 权重从 25 降至 10。
+  </li>
+  <li>
+    <strong>MW 信号是季节性的，不是全年可用。</strong>4 月是黄金窗口（100信号/63%胜率），1~3 月几近失灵。策略的设计应该内置月度权重或市场状态过滤，冬天不强行开仓。
+  </li>
+  <li>
+    <strong>B2 后延迟 1~2 天入场是最优执行方案。</strong>20d 中位从 +3.49% 提升到 +6.89%。但需注意不是所有信号都会回调，可以设条件单（缩量回踩 B2 收盘价 ±2% 且未破 MA10）。
+  </li>
+  <li>
+    <strong>电子和化工是 MW 信号的最优狩猎场。</strong>胜率 77%~78%，远高于其他行业。电气设备、有色金属、未分类信号需要回避或降低仓位权重。
+  </li>
+  <li>
+    <strong>大市值（≥200 亿）MW 信号优于中小盘。</strong>超大盘胜率 51.3% vs 中盘 41.3%。MW 在龙头股上更有效，因为龙头的"二次突破"更受机构资金关注。
+  </li>
+  <li>
+    <strong>PLUS 内部，换手率是唯一有区分力的二筛因子。</strong>建议在 PLUS 信号看板中将 20 日均换手率作为默认排序维度，或在模拟盘中用换手率加权仓位。
+  </li>
+  <li>
+    <strong>I2（行业 RS20）在两版中均无预测力。</strong>v1.3 区分度仅 +0.1pp。10 分的权重可并入其他维度，或直接拿掉。
+  </li>
+  <li>
+    <strong>MW 信号在空头市场优于多头市场。</strong>这与追盘日/口袋支点等牛市策略形成互补。MW 的定位应是熊市/震荡中的反转策略，而非牛市追涨工具。
+  </li>
+</ol>
+
+<!-- ====== FOOTER ====== -->
+<footer class="report-footer">
+  MW 信号综合分析报告 v2.5 · 数据区间 2026-01-01 ~ 2026-06-05 · 基于 B1=1.3 回填数据<br>
+  基于 v1.3 和 v2.4 两份回测分析报告的交叉对比 · 生成于 2026-06-08
+</footer>
+
+</div>
+</body>
+</html>

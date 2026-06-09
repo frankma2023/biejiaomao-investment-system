@@ -1,4 +1,4 @@
-var API = 'http://localhost:8788/api/canslim-scores';
+﻿var API = 'http://' + window.location.hostname + ':8788/api/canslim-scores';
 var allData = [];
 var filteredData = [];
 var currentPage = 1;
@@ -41,7 +41,7 @@ function loadData() {
 function fetchName() {
   var code = document.getElementById('code').value.trim();
   if (!code) { document.getElementById('stock-name').textContent = ''; return; }
-  fetch('http://localhost:8788/api/stock-name?code=' + code + '&mode=stock')
+  fetch('http://' + window.location.hostname + ':8788/api/stock-name?code=' + code + '&mode=stock')
     .then(function(r) { return r.json(); })
     .then(function(d) { document.getElementById('stock-name').textContent = d.name || ''; });
 }

@@ -810,6 +810,54 @@ def api_pocket_pivot_rs():
     return jsonify(rs or {'rs_20': None, 'rs_250': None})
 
 # ═══════════════════════════════════════════════
+# API: GET /api/pocket-pivot-v3 — 口袋支点V3信号查询
+# ═══════════════════════════════════════════════
+
+@app.route('/api/pocket-pivot-v3')
+def api_pocket_pivot_v3():
+    code = request.args.get('code', '')
+    start = request.args.get('start', '2026-01-01')
+    end = request.args.get('end', datetime.now().strftime('%Y-%m-%d'))
+    
+    db = get_db()
+    rows = db.execute("""
+        SELECT date, stock_code, stock_name, pivot_type, b1_overlap,
+               gain_pct, vol_ratio, close_position, rps_20, rps_250,
+               sma10, sma60, pct_from_ma10, base_depth, close, volume,
+               h_date, l_date, c_days
+        FROM pocket_pivot_daily
+        WHERE stock_code = ? AND date >= ? AND date <= ?
+        ORDER BY date
+    """, (code, start, end)).fetchall()
+    
+    signals = []
+    for r in rows:
+        signals.append({
+            'date': r['date'],
+            'stock_code': r['stock_code'],
+            'stock_name': r['stock_name'],
+            'pivot_type': r['pivot_type'],
+            'b1_overlap': bool(r['b1_overlap']),
+            'gain_pct': r['gain_pct'],
+            'vol_ratio': r['vol_ratio'],
+            'close_position': r['close_position'],
+            'rps_20': r['rps_20'],
+            'rps_250': r['rps_250'],
+            'sma10': r['sma10'],
+            'sma60': r['sma60'],
+            'pct_from_ma10': r['pct_from_ma10'],
+            'base_depth': r['base_depth'],
+            'close': r['close'],
+            'volume': r['volume'],
+            'h_date': r['h_date'],
+            'l_date': r['l_date'],
+            'c_days': r['c_days'],
+            'signal_type': 'pocket_pivot_v3'
+        })
+    
+    return jsonify({'signals': signals, 'count': len(signals)})
+
+# ═══════════════════════════════════════════════
 # API: GET /api/saucer-base?stock=XXX&date=YYYY-MM-DD
 # ═══════════════════════════════════════════════
 
@@ -3045,6 +3093,10 @@ def api_pattern_scan():
     # ── 计算 TA-Lib 指标（供前端和引擎使用） ──
     indicators = _compute_indicators(klines_full)
 
+    # ── 注入 stock_code 到每条 K 线（供引擎获取缠论数据）──
+    for k in klines_full:
+        k['stock_code'] = code
+
     # ── 运行全部引擎 ──
     signals = run_all_engines(klines=klines_full, indicators=indicators)
 
@@ -3383,6 +3435,24 @@ def api_mw_signals():
     
     signals = [dict(r) for r in rows]
     
+    # 附加信号共振详情
+    for s in signals:
+        code = s['stock_code']; b2 = s['b2_date']
+        row = db.execute("SELECT signals_json FROM pattern_scan_signals WHERE stock_code=? AND date=?", (code, b2)).fetchone()
+        s['sig_details'] = []
+        if row and row[0]:
+            try:
+                import json as _json
+                sigs = _json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                for sig in (sigs if isinstance(sigs, list) else []):
+                    src = sig.get('source','')
+                    tp = sig.get('type','')
+                    det = sig.get('details',{})
+                    desc = det.get('cdl_name') or det.get('description') or det.get('signal_type') or ''
+                    s['sig_details'].append({'source': src, 'type': tp, 'desc': desc})
+            except:
+                pass
+    
     # 可用 B2 日期列表
     avail = db.execute("SELECT DISTINCT b2_date FROM mw_signal_daily ORDER BY b2_date DESC").fetchall()
     dates = [r[0] for r in avail]
@@ -3391,6 +3461,217 @@ def api_mw_signals():
         'date': target_date, 'start': start_date, 'end': end_date,
         'signals': signals, 'count': len(signals), 'dates': dates
     })
+
+
+# ═══════════════════════════════════════════════
+# MW 信号回测分析
+# ═══════════════════════════════════════════════
+
+@app.route('/api/mw/backtest', methods=['GET', 'OPTIONS'])
+def api_mw_backtest():
+    if request.method == 'OPTIONS':
+        return '', 204
+    start = request.args.get('start', '2026-01-01')
+    end = request.args.get('end', datetime.now().strftime('%Y-%m-%d'))
+    from analytics.mw_backtest import run
+    result = run(start, end)
+    return jsonify(result)
+
+
+# ═══════════════════════════════════════════════
+# 投资决策驾驶舱 API
+# ═══════════════════════════════════════════════
+
+@app.route('/api/cockpit/latest', methods=['GET', 'OPTIONS'])
+def api_cockpit_latest():
+    """获取最近一次管道运行结果"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    db = get_db()
+    latest = db.execute("SELECT MAX(run_date) FROM cockpit_daily").fetchone()
+    if not latest or not latest[0]:
+        return jsonify({'candidates': [], 'run_date': None, 'market': {}, 'pipeline_stats': {}})
+    run_date = latest[0]
+    rows = db.execute(
+        "SELECT * FROM cockpit_daily WHERE run_date=? ORDER BY rank",
+        (run_date,)
+    ).fetchall()
+    candidates = [dict(r) for r in rows]
+    # 解析 JSON 字段
+    for c in candidates:
+        for field in ['signal_types', 'theme_indices']:
+            if c.get(field) and isinstance(c[field], str):
+                try:
+                    c[field] = json.loads(c[field])
+                except json.JSONDecodeError:
+                    c[field] = []
+
+    # 获取大盘环境
+    from cockpit.briefing import BriefingEngine
+    engine = BriefingEngine(db)
+    market = engine._module_market()
+    engine.close()
+
+    return jsonify({
+        'candidates': candidates,
+        'run_date': run_date,
+        'market': market,
+        'pipeline_stats': {'total_candidates': len(candidates)}
+    })
+
+
+@app.route('/api/cockpit/run', methods=['POST', 'OPTIONS'])
+def api_cockpit_run():
+    """手动触发管道运行"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    from cockpit.pipeline import run_pipeline, load_config as cockpit_load_config
+    config = cockpit_load_config()
+    db = get_db()
+    try:
+        candidates, stats = run_pipeline(
+            target_date=datetime.now().strftime('%Y-%m-%d'),
+            config=config, db=db, save=True
+        )
+        return jsonify({'success': True, 'candidates': candidates, 'stats': stats})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/cockpit/status', methods=['GET', 'OPTIONS'])
+def api_cockpit_status():
+    """管道运行状态"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    db = get_db()
+    row = db.execute("SELECT MAX(run_date) as last_run, COUNT(*) as count FROM cockpit_daily").fetchone()
+    # 检查是否在运行中
+    import os
+    lock_file = os.path.join(PROJECT_DIR, 'data', '.cockpit_running')
+    running = os.path.exists(lock_file)
+    return jsonify({
+        'last_run': row['last_run'] if row else None,
+        'total_records': row['count'] if row else 0,
+        'running': running
+    })
+
+
+@app.route('/api/cockpit/config', methods=['GET', 'OPTIONS'])
+def api_cockpit_config_get():
+    """获取管道配置"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    from cockpit.pipeline import load_config as cockpit_load_config
+    config = cockpit_load_config()
+    return jsonify(config)
+
+
+@app.route('/api/cockpit/config', methods=['POST'])
+def api_cockpit_config_post():
+    """保存管道配置 → config/cockpit.yaml"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data'}), 400
+    import yaml
+    config_path = os.path.join(PROJECT_DIR, 'config', 'cockpit.yaml')
+    with open(config_path, 'w', encoding='utf-8') as f:
+        yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+    return jsonify({'success': True, 'message': '配置已保存'})
+
+
+@app.route('/api/cockpit/briefing', methods=['GET', 'OPTIONS'])
+def api_cockpit_briefing():
+    """单只股票完整简报"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    code = request.args.get('code', '')
+    date = request.args.get('date', '')
+    if not code:
+        return jsonify({'error': 'stock_code required'}), 400
+
+    db = get_db()
+    from cockpit.briefing import BriefingEngine
+    from cockpit.pipeline import load_config as _load_config
+    engine = BriefingEngine(db)
+
+    # 从数据库取候选数据
+    if date:
+        row = db.execute(
+            "SELECT * FROM cockpit_daily WHERE stock_code=? AND run_date=?",
+            (code, date)
+        ).fetchone()
+    else:
+        row = db.execute(
+            "SELECT * FROM cockpit_daily WHERE stock_code=? ORDER BY run_date DESC LIMIT 1",
+            (code,)
+        ).fetchone()
+
+    if not row:
+        engine.close()
+        return jsonify({'error': 'No data for this stock'}), 404
+
+    candidate = dict(row)
+    briefing = engine.generate(candidate)
+
+    # 仓位计算
+    from cockpit.position import calculate_position
+    sl = briefing.get('stop_loss', {})
+    entry = sl.get('entry_price_ref', 10)
+    stop = sl.get('stop_loss_price', entry * 0.92)
+    pos_cfg = _load_config().get('position', {})
+    pos = calculate_position(
+        entry, stop,
+        account_size=pos_cfg.get('account_size', 1000000),
+        max_loss_pct=pos_cfg.get('max_loss_pct', 0.02),
+        kelly_fraction=pos_cfg.get('kelly_fraction', 0.25)
+    )
+    briefing['position'] = pos
+
+    engine.close()
+    return jsonify(briefing)
+
+
+@app.route('/api/discipline/trade-stats', methods=['GET', 'OPTIONS'])
+def api_trade_stats():
+    """交易记录统计（心理关数据源）"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT * FROM discipline_trades ORDER BY buy_date DESC LIMIT 20"
+        ).fetchall()
+        trades = [dict(r) for r in rows]
+
+        # 计算胜率
+        closed = [t for t in trades if t.get('sell_price') is not None]
+        wins = [t for t in closed if (t.get('sell_price', 0) - t.get('buy_price', 0)) > 0]
+        recent_5 = closed[:5]
+        recent_wins = [t for t in recent_5 if (t.get('sell_price', 0) - t.get('buy_price', 0)) > 0]
+
+        # 连续亏损检测
+        streak = 0
+        for t in closed:
+            if (t.get('sell_price', 0) - t.get('buy_price', 0)) < 0:
+                streak += 1
+            else:
+                break
+
+        return jsonify({
+            'total_trades': len(trades),
+            'closed_trades': len(closed),
+            'win_rate_all': round(len(wins) / len(closed) * 100, 1) if closed else None,
+            'win_rate_5': round(len(recent_wins) / len(recent_5) * 100, 1) if recent_5 else None,
+            'consecutive_losses': streak,
+            'last_trade_date': trades[0]['buy_date'] if trades else None,
+        })
+    except sqlite3.OperationalError as e:
+        return jsonify({
+            'total_trades': 0, 'closed_trades': 0,
+            'win_rate_all': None, 'win_rate_5': None,
+            'consecutive_losses': 0, 'last_trade_date': None,
+            'note': '暂无交易记录'
+        })
 
 
 # ═══════════════════════════════════════════════

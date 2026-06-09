@@ -145,13 +145,14 @@
       </div>
 
       <div class="pg-card">
-        <h3>🧠 知行系统 <span class="badge" style="background:#E8EAF6;color:#1A237E">7项</span></h3>
+        <h3>🧠 知行系统 <span class="badge" style="background:#E8EAF6;color:#1A237E">8项</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span>⭐ 每日精选</td><td>/discipline/screening</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>🔍 观察池</td><td>/discipline/observation</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>⭐ 自选池</td><td>/discipline/watchlist</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>📝 交易记录</td><td>/discipline/trades</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>📊 持仓监控</td><td>/discipline/monitor</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>🚀 投资决策驾驶舱</td><td>/cockpit/</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>🔬 复核详情</td><td>/discipline/review</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>✅ 买入前检查</td><td>precheck API</td></tr>
         </table>
@@ -283,7 +284,10 @@
 
 <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">55. Popen+线程实时读取 stdout 是回填脚本的观测性底线</div><div class="ld">subprocess.run(capture_output=True) 把子进程输出全吞进内存，98天回填无任何输出。用户以为卡死只能杀进程。修复：Popen + threading 逐行读取 + flush=True + PYTHONUNBUFFERED=1，子进程输出实时透传。教训：长时间脚本的观测性优先级高于一切。</div></div>
 
-<div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">56. 形态扫描加市值过滤砍掉 25% 无效扫描</div><div class="ld">daily_pattern_scan.py --all 模式扫 4139 只候选，加入市值≥50亿过滤（stock_equity_change.capitalization × close）后降到 3120 只，砍掉 1019 只小票/垃圾股。单日扫描时间从 ~15min 降到 ~10min。教训：全量扫描前先砍无效样本，比优化扫描逻辑收益更大。</div></div>
+<div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">57. 工具集群需要编排层——驾驶舱不是新引擎，是决策漏斗</div><div class="ld">用户拥有 13+ 个工具（MW信号/口袋支点/基部突破/CANSLIM/RS强度/指数扫描/缠论等），但缺少统一的决策逻辑。驾驶舱通过五级硬过滤管道（观察池→市值→行业RS→个股RS→形态信号）把工作串联起来，5000+缩到 3~5。不是造新工具，是编排旧工具。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">58. RS强度与形态信号是时序错位关系，不能做同点AND</div><div class="ld">RS高时股价在涨，信号不出现（MW/口袋支点/基部突破都是回调信号）。信号出现时RS已回落。硬过滤取H点时点RS250而非当前RS，让「过去强势」和「现在出信号」可以共存。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">59. 引擎包装器让独立扫描器融入 pattern-scan 生态</div><div class="ld">MW信号引擎是独立扫描器（mw_signal.py），不走 engine_registry 接口。创建 mw_signal_engine.py 包装器（detect()+ENGINE_META），自动注册到 pattern-scan 的 K 线图。注意前端读 sig.details.signal_type 而非 sig.details.signal。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">60. 274M行表的市值查询不能硬来</div><div class="ld">fundamental_indicator 有 2.74 亿行，按 stock_code IN + metric_code + date 子查询极慢（超时）。V1 降级为「观察池RS筛选已天然排除微盘股」，市值做软标注不阻塞管道。后续方案：预计算市值快照表。</div></div>
 
 <div class="updated">❤️ 投资手账本 · 项目进展</div>
   </div>

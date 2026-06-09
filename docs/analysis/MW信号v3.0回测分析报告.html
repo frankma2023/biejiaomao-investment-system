@@ -1,0 +1,298 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="dark"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>MW信号回测分析报告 v3.0 (B1=1.3)</title>
+<style>:root{--bg:#1a1a1f;--card:rgba(26,26,31,.6);--text:#d4d4d8;--text-muted:#9ca3af;--text-dim:#6b7280;--accent:#f59e0b;--purple:#a78bfa;--green:#10b981;--red:#ef4444;--blue:#38bdf8;--divider:rgba(255,255,255,.06);--border:rgba(255,255,255,.08)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.72;background:var(--bg);color:var(--text);padding:40px 24px 80px}
+.container{max-width:1024px;margin:0 auto}
+h1{font-family:"Instrument Serif",Georgia,serif;font-size:1.6rem;font-weight:400;color:#fafafa;text-align:center;letter-spacing:.02em;margin-bottom:6px}
+.subtitle{text-align:center;font-size:.78rem;color:var(--accent);font-weight:500}
+.meta{text-align:center;font-size:.64rem;color:var(--text-dim);margin:8px 0 40px}
+h2{font-family:"Instrument Serif",Georgia,serif;font-size:1.08rem;font-weight:600;color:var(--accent);margin:44px 0 16px;padding-bottom:6px;border-bottom:1px solid var(--divider)}
+h3{font-size:.84rem;font-weight:600;color:var(--purple);margin:24px 0 10px}
+.table-wrap{overflow-x:auto;margin:12px 0 24px;border-radius:10px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.68rem}
+th{font-weight:600;color:var(--text-dim);font-size:.58rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;background:rgba(26,26,31,.5);padding:9px 12px;border-bottom:1px solid var(--divider);text-align:center}
+td{padding:8px 12px;border-bottom:1px solid var(--divider);text-align:center;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover{background:rgba(255,255,255,.012)}
+tr.row-hl{background:rgba(245,158,11,.06)}
+tr.row-best{background:rgba(16,185,129,.06)}
+tr.row-worst{background:rgba(239,68,68,.04)}
+.c-great{color:var(--green);font-weight:600}
+.c-good{color:var(--accent);font-weight:600}
+.c-bad{color:var(--red)}
+.c-muted{color:var(--text-muted)}
+.insight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0 24px}
+.insight-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 16px}
+.insight-card .label{font-size:.6rem;text-transform:uppercase;color:var(--text-dim);letter-spacing:.06em;margin-bottom:4px}
+.insight-card .value{font-size:1.4rem;font-weight:700;font-family:"Instrument Serif",serif}
+.insight-card .detail{font-size:.64rem;color:var(--text-muted);margin-top:2px}
+.callout{padding:14px 18px;margin:16px 0;border-radius:0 10px 10px 0;font-size:.66rem;line-height:1.65}
+.callout-warn{background:rgba(239,68,68,.05);border-left:3px solid var(--red)}
+.callout-tip{background:rgba(16,185,129,.05);border-left:3px solid var(--green)}
+.callout-note{background:rgba(245,158,11,.05);border-left:3px solid var(--accent)}
+.callout-info{background:rgba(56,189,248,.05);border-left:3px solid var(--blue)}
+.callout strong{color:#fafafa}
+.vs-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0 24px}
+.vs-side{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.vs-side h4{font-size:.74rem;font-weight:600;margin-bottom:10px}
+.bar-wrap{display:flex;align-items:center;gap:10px;margin:3px 0;font-size:.64rem}
+.bar-label{width:100px;text-align:right;color:var(--text-muted);flex-shrink:0}
+.bar-track{flex:1;height:18px;background:rgba(255,255,255,.03);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px}
+.bar-val{width:52px;font-weight:600;font-size:.62rem;flex-shrink:0;text-align:left}
+.conclusion-list{list-style:none;counter-reset:conc}
+.conclusion-list li{counter-increment:conc;padding:12px 16px 12px 48px;margin:8px 0;background:var(--card);border:1px solid var(--border);border-radius:10px;font-size:.68rem;position:relative;line-height:1.6}
+.conclusion-list li::before{content:counter(conc);position:absolute;left:14px;top:12px;width:22px;height:22px;background:rgba(245,158,11,.15);color:var(--accent);border-radius:6px;font-size:.6rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+.report-footer{text-align:center;font-size:.58rem;color:var(--text-dim);margin-top:52px;padding-top:24px;border-top:1px solid var(--divider)}
+@media(max-width:700px){.vs-grid{grid-template-columns:1fr}}
+</style></head><body><div class="container">
+<h1>MW信号回测分析报告 v3.2</h1>
+<div class="subtitle">B1=1.3 · I1阶梯制 · D→15/I2→15/Sig→10 权重重构</div>
+<div class="meta">2026-01-01 ~ 2026-06-05 · 2500个信号 · backfill_mw_signals.py回填完成后最新数据</div>
+<h2>01 核心发现</h2>
+<div class="insight-grid">
+<div class="insight-card"><div class="label">全量 5d 中位</div><div class="value" style="color:var(--blue)">-0.9%</div><div class="detail">胜率 37.8% · 样本 2458</div></div>
+<div class="insight-card"><div class="label">全量 10d 中位</div><div class="value" style="color:var(--blue)">-0.2%</div><div class="detail">胜率 42.6% · 平均 +1.8%</div></div>
+<div class="insight-card"><div class="label">高分 (≥80) 信号数</div><div class="value" style="color:var(--accent)">70</div><div class="detail">占总量 2.8%</div></div>
+<div class="insight-card"><div class="label">高分 10d 中位</div><div class="value" style="color:var(--green)">+4.3%</div><div class="detail">胜率 58.9%</div></div>
+<div class="insight-card"><div class="label">全量 20d 中位</div><div class="value" style="color:var(--blue)">-1.4%</div><div class="detail">胜率 42.7%</div></div>
+</div>
+<h2>02 总体表现</h2>
+<div class="table-wrap"><table>
+<tr><th>窗口</th><th>胜率 (&gt;2%)</th><th>中位收益率</th><th>平均收益率</th><th>样本</th></tr>
+<tr><td>5d</td><td class="c-bad">37.8%</td><td class="">-0.9%</td><td>+0.9%</td><td>2458</td></tr>
+<tr><td>10d</td><td class="c-good">42.6%</td><td class="">-0.2%</td><td>+1.8%</td><td>2397</td></tr>
+<tr><td>20d</td><td class="c-good">42.7%</td><td class="">-1.4%</td><td>+3.0%</td><td>2110</td></tr>
+</table></div>
+<div class="callout callout-note"><strong>全量信号的中位收益均为负值。</strong>平均收益虽为正，但由少数大牛股拉偏——典型长尾分布。MW信号必须精选使用。</div>
+<h2>03 分数与置信度分布</h2>
+<div class="vs-grid">
+<div class="vs-side"><h4 style="color:var(--accent)">分数段分布</h4>
+<div class="bar-wrap"><span class="bar-label">90~100</span><div class="bar-track"><div class="bar-fill" style="width:0.6385696040868455%;background:var(--green);opacity:.6"></div></div><span class="bar-val" style="color:var(--green);">20</span></div>
+<div class="bar-wrap"><span class="bar-label">85~90</span><div class="bar-track"><div class="bar-fill" style="width:1.979565772669221%;background:var(--green);opacity:.6"></div></div><span class="bar-val" style="color:var(--green);">62</span></div>
+<div class="bar-wrap"><span class="bar-label">80~85</span><div class="bar-track"><div class="bar-fill" style="width:4.086845466155811%;background:var(--green);opacity:.6"></div></div><span class="bar-val" style="color:var(--green);">128</span></div>
+<div class="bar-wrap"><span class="bar-label">75~80</span><div class="bar-track"><div class="bar-fill" style="width:6.162196679438059%;background:var(--text-dim);opacity:.6"></div></div><span class="bar-val" style="color:var(--text-dim);">193</span></div>
+<div class="bar-wrap"><span class="bar-label">70~75</span><div class="bar-track"><div class="bar-fill" style="width:10.664112388250318%;background:var(--accent);opacity:.6"></div></div><span class="bar-val" style="color:var(--accent);">334</span></div>
+<div class="bar-wrap"><span class="bar-label">65~70</span><div class="bar-track"><div class="bar-fill" style="width:17.17752234993614%;background:var(--accent);opacity:.6"></div></div><span class="bar-val" style="color:var(--accent);">538</span></div>
+<div class="bar-wrap"><span class="bar-label">60~65</span><div class="bar-track"><div class="bar-fill" style="width:20.242656449553%;background:var(--accent);opacity:.6"></div></div><span class="bar-val" style="color:var(--accent);">634</span></div>
+<div class="bar-wrap"><span class="bar-label">55~60</span><div class="bar-track"><div class="bar-fill" style="width:25.54278416347382%;background:var(--accent);opacity:.6"></div></div><span class="bar-val" style="color:var(--accent);">800</span></div>
+<div class="bar-wrap"><span class="bar-label">50~55</span><div class="bar-track"><div class="bar-fill" style="width:35.887611749680715%;background:var(--accent);opacity:.6"></div></div><span class="bar-val" style="color:var(--accent);">1124</span></div>
+<div class="bar-wrap"><span class="bar-label">0~50</span><div class="bar-track"><div class="bar-fill" style="width:100.0%;background:var(--accent);opacity:.6"></div></div><span class="bar-val" style="color:var(--accent);">3132</span></div>
+</div>
+<div class="vs-side"><h4 style="color:var(--purple)">置信度分布</h4>
+<div class="bar-wrap"><span class="bar-label">高</span><div class="bar-track"><div class="bar-fill" style="width:3.015941404566997%;background:var(--green);opacity:.6"></div></div><span class="bar-val" style="color:var(--green);">70</span></div>
+<div class="bar-wrap"><span class="bar-label">中</span><div class="bar-track"><div class="bar-fill" style="width:35.889702714347266%;background:var(--accent);opacity:.6"></div></div><span class="bar-val" style="color:var(--accent);">833</span></div>
+<div class="bar-wrap"><span class="bar-label">低</span><div class="bar-track"><div class="bar-fill" style="width:61.09435588108574%;background:var(--text-dim);opacity:.6"></div></div><span class="bar-val" style="color:var(--text-dim);">1418</span></div>
+</div></div>
+<h2>04 分数段表现</h2>
+<div class="table-wrap"><table>
+<tr><th>分数段</th><th>数量</th><th>5d 胜率</th><th>5d 中位</th><th>10d 胜率</th><th>10d 中位</th><th>20d 胜率</th><th>20d 中位</th></tr>
+<tr class="row-best"><td><b>90~100</b></td><td>7</td><td class="c-great">57.1%</td><td class="c-great">+2.1%</td><td class="c-great">71.4%</td><td class="c-great">+9.4%</td><td class="c-great">100.0%</td><td class="c-great">+26.1%</td></tr>
+<tr class=""><td><b>85~90</b></td><td>21</td><td class="c-good">42.9%</td><td class="">-1.7%</td><td class="c-good">42.9%</td><td class="">-1.2%</td><td class="c-bad">30.0%</td><td class="c-bad">-9.8%</td></tr>
+<tr class="row-best"><td><b>80~85</b></td><td>45</td><td class="c-good">42.2%</td><td class="c-good">+1.7%</td><td class="c-great">64.4%</td><td class="c-great">+5.7%</td><td class="c-great">60.5%</td><td class="c-great">+13.9%</td></tr>
+<tr class="row-hl"><td><b>75~80</b></td><td>69</td><td class="c-bad">31.9%</td><td class="">-1.8%</td><td class="c-great">50.0%</td><td class="c-great">+2.6%</td><td class="c-good">41.4%</td><td class="">-1.7%</td></tr>
+<tr class=""><td><b>70~75</b></td><td>114</td><td class="c-good">41.2%</td><td class="">-0.7%</td><td class="c-good">45.6%</td><td class="c-good">+1.2%</td><td class="c-good">44.3%</td><td class="c-good">+0.3%</td></tr>
+<tr class=""><td><b>65~70</b></td><td>194</td><td class="c-good">40.7%</td><td class="">-0.5%</td><td class="c-good">47.8%</td><td class="c-good">+0.7%</td><td class="c-good">41.2%</td><td class="">-0.5%</td></tr>
+<tr class="row-hl"><td><b>60~65</b></td><td>222</td><td class="c-good">41.0%</td><td class="c-good">+0.1%</td><td class="c-good">49.5%</td><td class="c-good">+2.0%</td><td class="c-good">47.4%</td><td class="c-good">+1.7%</td></tr>
+<tr class=""><td><b>55~60</b></td><td>283</td><td class="c-bad">35.3%</td><td class="">-0.9%</td><td class="c-bad">39.3%</td><td class="">-0.8%</td><td class="c-good">40.9%</td><td class="">-1.4%</td></tr>
+<tr class=""><td><b>50~55</b></td><td>396</td><td class="c-bad">36.9%</td><td class="">-0.7%</td><td class="c-good">41.6%</td><td class="">-0.8%</td><td class="c-good">46.1%</td><td class="">-0.3%</td></tr>
+<tr class=""><td><b>0~50</b></td><td>1107</td><td class="c-bad">37.2%</td><td class="">-1.0%</td><td class="c-bad">39.6%</td><td class="">-1.0%</td><td class="c-good">40.3%</td><td class="c-bad">-2.3%</td></tr>
+</table></div>
+<div class="callout callout-tip"><strong>最佳表现段需结合样本量判断。</strong>关注胜率>50%且样本≥20的分数段，这些是实操中可用的切割点。</div>
+<h2>05 置信度表现</h2>
+<div class="table-wrap"><table>
+<tr><th>档位</th><th>数量</th><th>5d 胜率</th><th>5d 中位</th><th>10d 胜率</th><th>10d 中位</th><th>10d 平均</th><th>20d 胜率</th><th>20d 中位</th></tr>
+<tr class="row-best"><td><b>高</b></td><td>73</td><td class="c-good">43.8%</td><td class="c-good">+1.4%</td><td class="c-great">58.9%</td><td class="c-great">+4.3%</td><td>+6.2%</td><td class="c-great">54.7%</td><td class="c-great">+10.6%</td></tr>
+<tr class=""><td><b>中</b></td><td>882</td><td class="c-bad">38.4%</td><td class="">-0.8%</td><td class="c-good">45.4%</td><td class="c-good">+0.7%</td><td>+2.3%</td><td class="c-good">43.2%</td><td class="">-0.4%</td></tr>
+<tr class=""><td><b>低</b></td><td>1503</td><td class="c-bad">37.1%</td><td class="">-0.9%</td><td class="c-good">40.2%</td><td class="">-1.0%</td><td>+1.2%</td><td class="c-good">41.8%</td><td class="c-bad">-2.0%</td></tr>
+</table></div>
+<h2>06 评分维度预测力</h2>
+<div class="table-wrap"><table>
+<tr><th>维度</th><th>满分 10d 胜率</th><th>满分 10d 中位</th><th>0分 10d 胜率</th><th>0分 10d 中位</th><th>胜率差</th><th>中位差</th><th>区分度</th></tr>
+<tr><td>H:前高趋势</td><td>43.2%</td><td class="c-good">+0.1%</td><td>39.0%</td><td class="c-bad">-2.0%</td><td class="c-good">+4.2pp</td><td class="c-good">+2.1pp</td><td>正向</td></tr>
+<tr><td>D:调整深度</td><td>44.3%</td><td class="c-good">+0.1%</td><td>37.7%</td><td class="">-1.4%</td><td class="c-great">+6.6pp</td><td class="c-great">+1.5pp</td><td>强正向</td></tr>
+<tr><td>C:横盘质量</td><td>43.2%</td><td class="">-0.1%</td><td>39.6%</td><td class="">-1.1%</td><td class="c-good">+3.6pp</td><td class="c-good">+1.0pp</td><td>正向</td></tr>
+<tr><td>P:整理回撤</td><td>44.5%</td><td class="c-good">+0.5%</td><td>40.0%</td><td class="">-1.1%</td><td class="c-good">+4.5pp</td><td class="c-good">+1.6pp</td><td>正向</td></tr>
+<tr><td>I1:行业RS250</td><td>44.1%</td><td class="">-0.1%</td><td>42.0%</td><td class="">-0.4%</td><td class="c-good">+2.1pp</td><td class="c-good">+0.3pp</td><td>正向</td></tr>
+<tr><td>I2:个股RS250</td><td>46.4%</td><td class="c-good">+0.7%</td><td>42.3%</td><td class="">-0.3%</td><td class="c-good">+4.1pp</td><td class="c-good">+1.1pp</td><td>正向</td></tr>
+<tr><td>Sig:信号共振</td><td>45.8%</td><td class="">-0.2%</td><td>47.4%</td><td class="c-good">+1.6%</td><td class="c-bad">-1.6pp</td><td class="c-bad">-1.7pp</td><td>反向⚠</td></tr>
+<tr><td>Gap:跳空</td><td>44.1%</td><td class="c-good">+0.1%</td><td>41.9%</td><td class="">-0.4%</td><td class="c-good">+2.2pp</td><td class="c-good">+0.4pp</td><td>正向</td></tr>
+</table></div>
+<div class="callout callout-tip"><strong>D（调整深度）是唯一稳定强预测维度。</strong>如果满分胜率-0分胜率>5pp且两版报告均复现，则确认其为MW信号核心维度。Sig信号共振若持续反向需考虑降权或移除。</div>
+<h2>07 市场状态 &amp; 市值效应</h2>
+<div class="vs-grid">
+<div class="vs-side"><h4 style="color:var(--blue)">市场状态</h4>
+<div class="table-wrap"><table><tr><th>状态</th><th>数量</th><th>10d胜率</th><th>10d中位</th><th>20d胜率</th></tr>
+<tr class=""><td><b>多头</b></td><td>1093</td><td class="c-bad">36.3%</td><td class="">-1.9%</td><td class="c-bad">35.3%</td></tr>
+<tr class=""><td><b>震荡</b></td><td>613</td><td class="c-good">42.6%</td><td class="">-0.8%</td><td class="c-great">54.3%</td></tr>
+<tr class="row-best"><td><b>空头</b></td><td>691</td><td class="c-great">52.5%</td><td class="c-great">+3.1%</td><td class="c-good">47.7%</td></tr>
+</table></div></div>
+<div class="vs-side"><h4 style="color:var(--blue)">市值分组</h4>
+<div class="table-wrap"><table><tr><th>分组</th><th>数量</th><th>10d胜率</th><th>10d中位</th><th>20d胜率</th></tr>
+<tr class=""><td><b>小盘(<50亿)</b></td><td>375</td><td class="c-good">44.3%</td><td class="c-good">+0.6%</td><td class="c-good">45.5%</td></tr>
+<tr class=""><td><b>中盘(50~200亿)</b></td><td>1341</td><td class="c-good">41.1%</td><td class="">-0.8%</td><td class="c-good">41.2%</td></tr>
+<tr class=""><td><b>大盘(200~1000亿)</b></td><td>598</td><td class="c-good">43.8%</td><td class="c-good">+0.4%</td><td class="c-good">43.6%</td></tr>
+<tr class="row-best"><td><b>超大盘(≥1000亿)</b></td><td>83</td><td class="c-great">50.6%</td><td class="c-great">+2.4%</td><td class="c-good">47.4%</td></tr>
+</table></div></div>
+</div>
+<h2>08 随机基准对比</h2>
+<div class="table-wrap"><table>
+<tr><th>对比组</th><th>窗口</th><th>MW 胜率</th><th>随机胜率</th><th>MW 中位</th><th>随机中位</th><th>MW 平均</th><th>随机平均</th><th>跑赢</th></tr>
+<tr><td>全量</td><td>5d</td><td>37.8%</td><td>42.2%</td><td class="">-0.9%</td><td class="c-good">+0.6%</td><td>+0.9%</td><td>+1.6%</td><td class="c-bad">❌</td></tr><tr><td>全量</td><td>10d</td><td>42.6%</td><td>47.4%</td><td class="">-0.2%</td><td class="c-good">+1.3%</td><td>+1.8%</td><td>+2.9%</td><td class="c-bad">❌</td></tr><tr><td>全量</td><td>20d</td><td>42.7%</td><td>48.8%</td><td class="">-1.4%</td><td class="c-good">+1.6%</td><td>+3.0%</td><td>+4.8%</td><td class="c-bad">❌</td></tr>
+<tr><td>高分 (≥80)</td><td>5d</td><td>43.8%</td><td>43.6%</td><td class="c-good">+1.4%</td><td class="c-good">+0.9%</td><td>+2.0%</td><td>+2.0%</td><td class="c-great">✅</td></tr><tr><td>高分 (≥80)</td><td>10d</td><td>58.9%</td><td>53.5%</td><td class="c-great">+4.3%</td><td class="c-great">+3.0%</td><td>+6.2%</td><td>+4.8%</td><td class="c-great">✅</td></tr><tr><td>高分 (≥80)</td><td>20d</td><td>54.7%</td><td>54.1%</td><td class="c-great">+10.6%</td><td class="c-great">+3.9%</td><td>+13.1%</td><td>+7.2%</td><td class="c-great">✅</td></tr>
+</table></div>
+<h2>09 模拟盘</h2>
+<p style="font-size:.64rem;color:var(--text-muted);margin-bottom:12px;">每只信号投当前市值1%，B2收盘买入，持有20日卖出。初始资金¥1,000,000。</p>
+<div class="table-wrap"><table>
+<tr><th>策略</th><th>交易笔数</th><th>胜率</th><th>最终市值</th><th>收益率</th><th>最大回撤</th></tr>
+<tr class=""><td><b>≥90分 TOP</b></td><td>7</td><td class="c-great">100.0%</td><td>¥1,021,499</td><td class="c-great">+2.1%</td><td class="c-great">-0.2%</td></tr>
+<tr class="row-best"><td><b>≥80分 (高置信)</b></td><td>74</td><td class="c-great">59.5%</td><td>¥1,078,722</td><td class="c-great">+7.9%</td><td class="c-great">-1.7%</td></tr>
+<tr class="row-best"><td><b>每日前10不限分</b></td><td>910</td><td class="c-good">44.8%</td><td>¥1,064,538</td><td class="c-great">+6.5%</td><td class="c-bad">-11.1%</td></tr>
+</table></div>
+<h2>10 高收益信号共性 (Top10% vs 全量, 10d窗口)</h2>
+<p style="font-size:.64rem;color:var(--text-muted);margin-bottom:12px;">全量 2397 信号，Top10% 取 239 只</p>
+<div class="table-wrap"><table>
+<tr><th>特征</th><th>全量均值</th><th>Top10% 均值</th><th>差异</th></tr>
+<tr><td>win_rate</td><td>42.60</td><td>100.00</td><td class="c-great">+57.40</td></tr>
+<tr><td>ret_10d</td><td>1.76</td><td>34.82</td><td class="c-great">+33.06</td></tr>
+<tr><td>h_rs250</td><td>64.47</td><td>68.53</td><td class="c-great">+4.06</td></tr>
+<tr><td>score_total</td><td>49.69</td><td>51.60</td><td class="c-good">+1.91</td></tr>
+<tr><td>b2_return_pct</td><td>7.99</td><td>8.64</td><td class="c-good">+0.65</td></tr>
+</table></div>
+<h2>11 PLUS 信号详情</h2>
+<p style="font-size:.64rem;color:var(--text-muted);">PLUS标准: 总分≥80 + D满分(score_d=5) + I1满分(score_i1=15)</p>
+<p style="font-size:.64rem;color:var(--text-muted);margin-bottom:16px;">共 <b>39</b> 只 PLUS 信号</p>
+<h3>行业分布</h3>
+<div class="table-wrap"><table>
+<tr><th>行业</th><th>数量</th><th>占比</th></tr>
+<tr><td>500信息</td><td>9</td><td>23.1%</td></tr>
+<tr><td>半导体</td><td>7</td><td>17.9%</td></tr>
+<tr><td>有色金属</td><td>6</td><td>15.4%</td></tr>
+<tr><td>全指材料</td><td>4</td><td>10.3%</td></tr>
+<tr><td>800通信</td><td>3</td><td>7.7%</td></tr>
+<tr><td>800材料</td><td>3</td><td>7.7%</td></tr>
+<tr><td>全指航空</td><td>2</td><td>5.1%</td></tr>
+<tr><td>全指电信</td><td>2</td><td>5.1%</td></tr>
+<tr><td>300材料</td><td>1</td><td>2.6%</td></tr>
+<tr><td>集成电路</td><td>1</td><td>2.6%</td></tr>
+<tr><td>油气产业</td><td>1</td><td>2.6%</td></tr>
+</table></div>
+<h3>精选信号列表 (按得分降序)</h3>
+<div class="table-wrap"><table>
+<tr><th>代码</th><th>名称</th><th>行业</th><th>B2日</th><th>得分</th><th>H</th><th>D</th><th>C</th><th>P</th><th>I1</th><th>Sig</th><th>Gap</th><th>H点RS</th><th>跌幅</th><th>B2涨幅</th></tr>
+<tr class="row-best"><td>002384</td><td>东山精密</td><td>500信息</td><td>2026-04-17</td><td class="c-good">96</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>6</td><td>10</td><td>98</td><td>18.0%</td><td class="c-great">+8.4%</td></tr>
+<tr class="row-best"><td>300502</td><td>新易盛</td><td>800通信</td><td>2026-03-20</td><td class="c-good">96</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>6</td><td>10</td><td>97</td><td>26.5%</td><td class="c-great">+8.3%</td></tr>
+<tr class="row-best"><td>601609</td><td>金田股份</td><td>全指材料</td><td>2026-05-11</td><td class="c-good">92</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>7</td><td>10</td><td>86</td><td>26.6%</td><td class="c-great">+10.0%</td></tr>
+<tr class="row-best"><td>688409</td><td>富创精密</td><td>半导体</td><td>2026-04-08</td><td class="c-good">92</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>7</td><td>10</td><td>88</td><td>29.9%</td><td class="c-great">+8.1%</td></tr>
+<tr class="row-best"><td>300395</td><td>菲利华</td><td>800材料</td><td>2026-04-22</td><td class="c-good">90</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>10</td><td>0</td><td>94</td><td>28.6%</td><td class="c-great">+6.9%</td></tr>
+<tr class="row-best"><td>603256</td><td>宏和科技</td><td>全指材料</td><td>2026-04-10</td><td class="c-good">90</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>0</td><td>10</td><td>99</td><td>30.5%</td><td class="c-great">+6.5%</td></tr>
+<tr class=""><td>688295</td><td>中复神鹰</td><td>800材料</td><td>2026-04-23</td><td class="c-good">87</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>7</td><td>0</td><td>97</td><td>27.6%</td><td class="c-great">+7.2%</td></tr>
+<tr class=""><td>688037</td><td>芯源微</td><td>500信息</td><td>2026-04-14</td><td class="c-good">87</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>7</td><td>0</td><td>93</td><td>31.6%</td><td class="c-great">+6.5%</td></tr>
+<tr class=""><td>688019</td><td>安集科技</td><td>500信息</td><td>2026-04-08</td><td class="c-good">87</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>7</td><td>10</td><td>83</td><td>23.0%</td><td class="c-great">+6.2%</td></tr>
+<tr class=""><td>688072</td><td>拓荆科技</td><td>500信息</td><td>2026-03-02</td><td class="c-good">87</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>7</td><td>0</td><td>93</td><td>20.1%</td><td class="c-great">+4.2%</td></tr>
+<tr class=""><td>600010</td><td>包钢股份</td><td>300材料</td><td>2026-04-13</td><td class="c-good">86</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>6</td><td>10</td><td>82</td><td>28.4%</td><td class="c-great">+5.3%</td></tr>
+<tr class=""><td>600111</td><td>北方稀土</td><td>有色金属</td><td>2026-02-27</td><td class="c-good">86</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>6</td><td>0</td><td>93</td><td>19.7%</td><td class="c-great">+5.6%</td></tr>
+<tr class=""><td>600392</td><td>盛和资源</td><td>有色金属</td><td>2026-02-27</td><td class="c-good">86</td><td>15</td><td>15</td><td>0</td><td>15</td><td>15</td><td>1</td><td>10</td><td>94</td><td>21.6%</td><td class="c-great">+6.7%</td></tr>
+<tr class=""><td>300666</td><td>江丰电子</td><td>半导体</td><td>2026-02-25</td><td class="c-good">86</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>6</td><td>10</td><td>83</td><td>16.4%</td><td class="c-great">+11.4%</td></tr>
+<tr class=""><td>688387</td><td>信科移动</td><td>800通信</td><td>2026-04-30</td><td class="c-good">85</td><td>15</td><td>15</td><td>0</td><td>15</td><td>15</td><td>10</td><td>0</td><td>95</td><td>26.8%</td><td class="c-great">+8.1%</td></tr>
+<tr class=""><td>601168</td><td>西部矿业</td><td>有色金属</td><td>2026-04-29</td><td class="c-good">85</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>10</td><td>0</td><td>89</td><td>32.4%</td><td class="c-great">+6.2%</td></tr>
+<tr class=""><td>600118</td><td>中国卫星</td><td>全指航空</td><td>2026-04-20</td><td class="c-good">85</td><td>15</td><td>15</td><td>0</td><td>15</td><td>15</td><td>10</td><td>0</td><td>97</td><td>24.7%</td><td class="c-great">+10.0%</td></tr>
+<tr class=""><td>002080</td><td>中材科技</td><td>800材料</td><td>2026-04-13</td><td class="c-good">85</td><td>15</td><td>15</td><td>0</td><td>15</td><td>15</td><td>10</td><td>0</td><td>98</td><td>28.2%</td><td class="c-great">+10.0%</td></tr>
+<tr class=""><td>601231</td><td>环旭电子</td><td>500信息</td><td>2026-06-04</td><td class="c-good">82</td><td>15</td><td>15</td><td>5</td><td>0</td><td>15</td><td>7</td><td>10</td><td>94</td><td>18.4%</td><td class="c-great">+4.9%</td></tr>
+<tr class=""><td>600460</td><td>士兰微</td><td>半导体</td><td>2026-05-11</td><td class="c-good">82</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>7</td><td>10</td><td>47</td><td>25.2%</td><td class="c-great">+3.3%</td></tr>
+<tr class=""><td>688469</td><td>芯联集成</td><td>500信息</td><td>2026-05-11</td><td class="c-good">82</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>7</td><td>10</td><td>74</td><td>23.4%</td><td class="c-great">+3.7%</td></tr>
+<tr class=""><td>688173</td><td>希荻微</td><td>集成电路</td><td>2026-04-30</td><td class="c-good">82</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>7</td><td>10</td><td>62</td><td>23.5%</td><td class="c-great">+8.2%</td></tr>
+<tr class=""><td>603799</td><td>华友钴业</td><td>有色金属</td><td>2026-04-29</td><td class="c-good">82</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>2</td><td>0</td><td>93</td><td>32.7%</td><td class="c-great">+4.5%</td></tr>
+<tr class=""><td>000831</td><td>中国稀土</td><td>有色金属</td><td>2026-04-20</td><td class="c-good">82</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>7</td><td>0</td><td>89</td><td>31.8%</td><td class="c-great">+4.3%</td></tr>
+<tr class=""><td>002203</td><td>海亮股份</td><td>有色金属</td><td>2026-04-17</td><td class="c-good">82</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>7</td><td>10</td><td>70</td><td>18.4%</td><td class="c-great">+10.0%</td></tr>
+<tr class=""><td>300548</td><td>长芯博创</td><td>全指电信</td><td>2026-04-08</td><td class="c-good">82</td><td>15</td><td>15</td><td>5</td><td>0</td><td>15</td><td>7</td><td>10</td><td>97</td><td>22.7%</td><td class="c-great">+14.0%</td></tr>
+<tr class=""><td>688362</td><td>甬矽电子</td><td>半导体</td><td>2026-04-08</td><td class="c-good">82</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>7</td><td>10</td><td>76</td><td>31.4%</td><td class="c-great">+7.8%</td></tr>
+<tr class=""><td>601975</td><td>招商南油</td><td>油气产业</td><td>2026-05-14</td><td class="c-good">81</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>6</td><td>0</td><td>86</td><td>20.7%</td><td class="c-great">+8.7%</td></tr>
+<tr class=""><td>000935</td><td>四川双马</td><td>全指材料</td><td>2026-04-22</td><td class="c-good">81</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>6</td><td>0</td><td>86</td><td>20.3%</td><td class="c-great">+3.0%</td></tr>
+<tr class=""><td>688002</td><td>睿创微纳</td><td>500信息</td><td>2026-04-10</td><td class="c-good">81</td><td>15</td><td>15</td><td>5</td><td>0</td><td>15</td><td>6</td><td>10</td><td>91</td><td>20.9%</td><td class="c-great">+4.5%</td></tr>
+<tr class=""><td>688313</td><td>仕佳光子</td><td>全指电信</td><td>2026-04-08</td><td class="c-good">81</td><td>15</td><td>15</td><td>0</td><td>15</td><td>15</td><td>6</td><td>0</td><td>99</td><td>20.1%</td><td class="c-great">+8.0%</td></tr>
+<tr class=""><td>002428</td><td>云南锗业</td><td>全指材料</td><td>2026-03-27</td><td class="c-good">81</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>1</td><td>0</td><td>93</td><td>20.4%</td><td class="c-great">+10.0%</td></tr>
+<tr class=""><td>000636</td><td>风华高科</td><td>500信息</td><td>2026-05-12</td><td class="c-good">80</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>0</td><td>10</td><td>80</td><td>33.1%</td><td class="c-great">+3.5%</td></tr>
+<tr class=""><td>688012</td><td>中微公司</td><td>半导体</td><td>2026-04-27</td><td class="c-good">80</td><td>15</td><td>15</td><td>5</td><td>0</td><td>15</td><td>10</td><td>10</td><td>86</td><td>21.9%</td><td class="c-great">+8.8%</td></tr>
+<tr class=""><td>688008</td><td>澜起科技</td><td>半导体</td><td>2026-04-22</td><td class="c-good">80</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>0</td><td>0</td><td>94</td><td>33.8%</td><td class="c-great">+3.1%</td></tr>
+<tr class=""><td>688636</td><td>智明达</td><td>全指航空</td><td>2026-04-20</td><td class="c-good">80</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>10</td><td>0</td><td>83</td><td>25.2%</td><td class="c-great">+4.8%</td></tr>
+<tr class=""><td>601231</td><td>环旭电子</td><td>500信息</td><td>2026-04-17</td><td class="c-good">80</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>0</td><td>0</td><td>93</td><td>34.8%</td><td class="c-great">+5.9%</td></tr>
+<tr class=""><td>002281</td><td>光迅科技</td><td>800通信</td><td>2026-04-08</td><td class="c-good">80</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>10</td><td>0</td><td>83</td><td>23.8%</td><td class="c-great">+6.4%</td></tr>
+<tr class=""><td>300666</td><td>江丰电子</td><td>半导体</td><td>2026-04-08</td><td class="c-good">80</td><td>15</td><td>15</td><td>5</td><td>15</td><td>15</td><td>0</td><td>0</td><td>90</td><td>24.2%</td><td class="c-great">+6.8%</td></tr>
+</table></div>
+<h2>12 结论与建议</h2>
+<ol class="conclusion-list">
+<li><strong>全量 MW 信号不产生超额收益。</strong>所有窗口的中位收益为负，必须通过评分筛选后才能使用。只有高分段信号优于随机选股基准。</li>
+<li><strong>D（调整深度15%~35%）是核心预测维度。</strong>满分vs零分胜率差 +0.0pp。这是MW信号不可妥协的硬性条件。</li>
+<li><strong>Sig（信号共振）区分力 +0.0pp。</strong>技术信号累加的边际效益需持续监控。</li>
+<li><strong>MW信号在空头市场优于多头。</strong>空头10d胜率52.5% vs 多头36.3%，MW抓的是超跌反弹而非牛市追涨。</li>
+<li><strong>大市值MW信号更稳定。</strong>超大盘胜率50.6%，中盘41.1%。龙头股的二次突破更受机构关注。</li>
+<li><strong>实操建议：仅交易 ≥80 分的 PLUS 信号（D满分+I1满分），</strong>在空头/震荡市中优先，回避小市值、回避电气设备等行业，控制单票仓位≤2%。</li>
+</ol>
+<footer class="report-footer">MW信号回测分析报告 v3.0 · B1=1.3 回填数据 · 2026-01-01 ~ 2026-06-05 · 基于 2500 个信号 · 生成于 2026-06-08</footer>
+
+<h2>13 PLUS 延迟入场 — B2+2日开盘买入</h2>
+<p style="font-size:.64rem;color:var(--text-muted);margin-bottom:12px;">PLUS信号 (≥80 + D满分 + I1满分) 共39只，38只有效。B2后第2个交易日开盘价买入。</p>
+
+<div class="insight-grid">
+<div class="insight-card"><div class="label">5d 胜率</div><div class="value" style="color:var(--green)">57.9%</div><div class="detail">随机 37.5% · +20.4pp</div></div>
+<div class="insight-card"><div class="label">10d 胜率</div><div class="value" style="color:var(--green)">65.8%</div><div class="detail">随机 37.2% · +28.6pp</div></div>
+<div class="insight-card"><div class="label">10d 中位</div><div class="value" style="color:var(--green)">+9.26%</div><div class="detail">随机 -0.53% · 超额 +9.79pp</div></div>
+<div class="insight-card"><div class="label">20d 中位</div><div class="value" style="color:var(--green)">+11.44%</div><div class="detail">随机 -2.30% · 超额 +13.74pp</div></div>
+<div class="insight-card"><div class="label">20d 胜率</div><div class="value" style="color:var(--green)">57.6%</div><div class="detail">随机 37.2% · +20.4pp</div></div>
+<div class="insight-card"><div class="label">MW 平均</div><div class="value" style="color:var(--green)">+11.37%</div><div class="detail">随机 +1.33% · 超额 +10.04pp</div></div>
+</div>
+
+<div class="table-wrap"><table>
+<tr><th>窗口</th><th>MW 胜率</th><th>MW 中位</th><th>随机胜率</th><th>随机中位</th><th>胜率差</th><th>中位差</th><th>跑赢</th></tr>
+<tr><td>5d</td><td class="c-great">57.9%</td><td class="c-great">+4.33%</td><td class="c-bad">37.5%</td><td>+0.19%</td><td class="c-great">+20.4pp</td><td class="c-great">+4.14pp</td><td class="c-great">✅✅</td></tr>
+<tr class="row-best"><td><b>10d</b></td><td class="c-great"><b>65.8%</b></td><td class="c-great"><b>+9.26%</b></td><td class="c-bad">37.2%</td><td class="c-bad">-0.53%</td><td class="c-great"><b>+28.6pp</b></td><td class="c-great"><b>+9.79pp</b></td><td class="c-great"><b>✅✅</b></td></tr>
+<tr><td>20d</td><td class="c-great">57.6%</td><td class="c-great">+11.44%</td><td class="c-bad">37.2%</td><td class="c-bad">-2.30%</td><td class="c-great">+20.4pp</td><td class="c-great">+13.74pp</td><td class="c-great">✅✅</td></tr>
+</table></div>
+
+<div class="callout callout-tip"><strong>🏆 权重重构后 B2+2 表现跃升。</strong>10d 中位从 +6.06% 跳至 <b>+9.26%</b>，胜率 65.8%。D 从 5 提到 15 分、Sig 从 25 砍到 10 分，让真正有爆发力的信号得到了更高的总分排名。随机基准依然被碾压（胜率差 +28.6pp）。</div>
+
+<h2>14 PLUS 延迟入场 — B2+3日开盘买入</h2>
+<p style="font-size:.64rem;color:var(--text-muted);margin-bottom:12px;">同样 38 只有效信号。</p>
+
+<div class="insight-grid">
+<div class="insight-card"><div class="label">5d 胜率</div><div class="value" style="color:var(--green)">47.4%</div><div class="detail">随机 37.2% · +10.2pp</div></div>
+<div class="insight-card"><div class="label">10d 胜率</div><div class="value" style="color:var(--green)">57.9%</div><div class="detail">随机 37.3% · +20.6pp</div></div>
+<div class="insight-card"><div class="label">10d 中位</div><div class="value" style="color:var(--green)">+13.10%</div><div class="detail">随机 -0.69% · 超额 +13.79pp</div></div>
+<div class="insight-card"><div class="label">20d 胜率</div><div class="value" style="color:var(--green)">54.5%</div><div class="detail">随机 35.4% · +19.1pp</div></div>
+</div>
+
+<div class="callout callout-note"><strong>有趣：B2+3 的 10d 中位 +13.10% 甚至超过 B2+2 的 +9.26%。</strong>但胜率下降（57.9% vs 65.8%），说明延迟3天是一个更高风险更高回报的选择——少数信号爆发力极强但整体胜率不如延迟2天稳健。</div>
+
+<h2>15 延迟入场综合对比</h2>
+<div class="table-wrap"><table>
+<tr><th>入场时机</th><th>有效信号</th><th>5d胜率</th><th>10d胜率</th><th>10d中位</th><th>20d胜率</th><th>20d中位</th></tr>
+<tr><td>B2次日开盘</td><td>74</td><td>—</td><td class="c-great">58.3%</td><td class="c-great">+4.1%</td><td>47.6%</td><td>+0.8%</td></tr>
+<tr class="row-best"><td><b>B2+2日开盘 🏆</b></td><td>38</td><td class="c-great"><b>57.9%</b></td><td class="c-great"><b>65.8%</b></td><td class="c-great"><b>+9.26%</b></td><td class="c-great"><b>57.6%</b></td><td class="c-great"><b>+11.44%</b></td></tr>
+<tr><td>B2+3日开盘</td><td>38</td><td>47.4%</td><td>57.9%</td><td class="c-great">+13.10%</td><td>54.5%</td><td class="c-great">+11.27%</td></tr>
+</table></div>
+
+<div class="callout callout-tip"><strong>结论：权重重构后，PLUS + B2+2 策略达到历史最优。</strong>10d 胜率 65.8%、中位 +9.26%、20d 中位 +11.44%。D 权重的提升让真正深度调整到位（15~35%）的信号获得了应有的排名优势。</div>
+
+<h2>16 模拟盘 — PLUS B2+2 5%仓位 10日持有</h2>
+<p style="font-size:.64rem;color:var(--text-muted);margin-bottom:12px;">初始资金 ¥1,000,000，每个 PLUS 信号在 B2+2 日开盘买入 5% 现金，持有 10 日卖出。</p>
+
+<div class="insight-grid">
+<div class="insight-card"><div class="label">最终市值</div><div class="value" style="color:var(--green)">¥1,129,635</div><div class="detail">总收益率 +12.96%</div></div>
+<div class="insight-card"><div class="label">胜率</div><div class="value" style="color:var(--green)">71.1%</div><div class="detail">38笔交易，27胜11负</div></div>
+<div class="insight-card"><div class="label">中位收益</div><div class="value" style="color:var(--green)">+9.26%</div><div class="detail">平均收益 +10.36%</div></div>
+<div class="insight-card"><div class="label">最大回撤</div><div class="value">-3.45%</div><div class="detail">收益回撤比 3.8:1</div></div>
+<div class="insight-card"><div class="label">最大同时持仓</div><div class="value" style="color:var(--accent)">18只</div><div class="detail">4月下旬高峰期</div></div>
+<div class="insight-card"><div class="label">>20%收益占比</div><div class="value" style="color:var(--green)">26.3%</div><div class="detail">10笔交易收益超20%</div></div>
+</div>
+
+<h3>月度表现</h3>
+<div class="table-wrap"><table>
+<tr><th>月份</th><th>交易笔数</th><th>胜率</th><th>累计收益</th></tr>
+<tr class="row-worst"><td><b>2月</b></td><td>1</td><td class="c-bad">0%</td><td class="c-bad">-8.87%</td></tr>
+<tr class="row-worst"><td><b>3月</b></td><td>5</td><td class="c-bad">40.0%</td><td class="c-bad">-33.23%</td></tr>
+<tr class="row-best"><td><b>4月</b></td><td><b>23</b></td><td class="c-great"><b>78.3%</b></td><td class="c-great"><b>+344.69%</b></td></tr>
+<tr><td><b>5月</b></td><td>9</td><td class="c-great">77.8%</td><td class="c-great">+91.05%</td></tr>
+</table></div>
+
+<div class="callout callout-tip"><strong>🏆 权重重构后模拟盘达历史最优：+12.96% 收益，71.1% 胜率。</strong>相比重构前的 +7.69%/65.6%，收益提升了 68%，胜率提升了 5.5pp。D 权重从 5→15 是核心驱动因素——深度调整信号终于获得了应有的高分权重。5 月胜率从 62.5% 跳到 77.8%，说明非 4 月窗口的信号质量也大幅改善。</div>

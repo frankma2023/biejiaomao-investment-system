@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MW信号回测分析</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<script src="../shared/js/echarts.min.js"></script>
+<style>
+.page-header{text-align:center;padding:16px 0}
+.page-header h1{font-family:var(--font-display);font-size:1.2rem;font-weight:400;margin:0}
+.page-header .meta{font-size:0.65rem;color:var(--muted);margin-top:4px}
+.card{background:var(--card);border-radius:14px;padding:16px;margin-bottom:10px;border:1px solid var(--border);box-shadow:var(--shadow-card)}
+.stat-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.stat-card{flex:1;min-width:100px;background:var(--card);border-radius:12px;padding:14px 12px;text-align:center;border:1px solid var(--border);box-shadow:var(--shadow-card)}
+.stat-card .val{font-family:var(--font-display);font-size:1.4rem;font-weight:600;color:var(--accent)}
+.stat-card .val.down{color:#26C6DA}
+.stat-card .lbl{font-size:0.58rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.04em}
+.tabs{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap}
+.tab-btn{padding:6px 14px;border:1px solid var(--border);border-radius:8px;background:rgba(26,26,31,.4);color:var(--muted);font-size:0.65rem;cursor:pointer;transition:all .15s}
+.tab-btn:hover{border-color:var(--accent);color:var(--text-primary)}
+.tab-btn.active{background:var(--accent-subtle);color:var(--accent);border-color:var(--accent-border)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+table{width:100%;border-collapse:collapse;font-size:0.65rem}
+th,td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:center}
+th{font-weight:600;color:var(--muted);font-size:0.58rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+tr:hover{background:rgba(255,255,255,.02)}
+.chart-wrap{width:100%;height:340px;margin:8px 0}
+.filter-bar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.filter-bar input,.filter-bar button{padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:rgba(26,26,31,.4);color:var(--text-primary);font-size:0.65rem}
+.filter-bar button{cursor:pointer;background:var(--accent-subtle);color:var(--accent);border-color:var(--accent-border)}
+.filter-bar button:hover{opacity:.8}
+.note{font-size:0.58rem;color:var(--muted);padding:8px;border-left:2px solid var(--accent);margin:8px 0}
+html[data-theme="light"] .tab-btn{background:rgba(255,255,255,.6);border-color:var(--divider)}
+html[data-theme="light"] tr:hover{background:rgba(0,0,0,.02)}
+html[data-theme="light"] .stat-card{background:rgba(255,255,255,.75);border-color:var(--divider)}
+</style>
+</head>
+<body>
+<div class="app-container">
+<nav id="top-nav"></nav>
+
+<div class="page-header">
+  <h1>📊 MW信号回测分析</h1>
+  <div class="meta" id="meta-info">加载中...</div>
+</div>
+
+<div class="filter-bar">
+  <span style="font-size:0.62rem;color:var(--muted)">B2日期范围:</span>
+  <input type="date" id="d-start" value="2026-01-01">
+  <span style="font-size:0.62rem;color:var(--muted)">~</span>
+  <input type="date" id="d-end" value="2026-06-04">
+  <button onclick="loadAnalysis()">🔍 分析</button>
+  <select id="score-sys" onchange="rerender()" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:rgba(26,26,31,.4);color:var(--text-primary);font-size:0.65rem">
+    <option value="v1">体系1 (100分)</option>
+    <option value="v2">体系2 (115分)</option>
+  </select>
+</div>
+
+<div id="stat-cards" class="stat-row"></div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('confidence')">🎯 置信度</button>
+  <button class="tab-btn" onclick="switchTab('dimensions')">📐 评分维度</button>
+  <button class="tab-btn" onclick="switchTab('market')">📈 市场背景</button>
+  <button class="tab-btn" onclick="switchTab('cap')">💰 市值</button>
+  <button class="tab-btn" onclick="switchTab('traits')">🔬 共性</button>
+  <button class="tab-btn" onclick="switchTab('baseline')">🎲 基准</button>
+</div>
+
+<div id="tab-confidence" class="tab-content active"><div class="card"><div class="chart-wrap" id="chart-conf"></div></div></div>
+<div id="tab-dimensions" class="tab-content"><div class="card"><div id="dim-note"></div><div class="chart-wrap" id="chart-dim"></div></div></div>
+<div id="tab-market" class="tab-content"><div class="card"><div class="chart-wrap" id="chart-market"></div></div></div>
+<div id="tab-cap" class="tab-content"><div class="card"><div class="chart-wrap" id="chart-cap"></div></div></div>
+<div id="tab-traits" class="tab-content"><div class="card"><div id="traits-content"></div></div></div>
+<div id="tab-baseline" class="tab-content"><div class="card"><div class="chart-wrap" id="chart-base"></div></div></div>
+
+</div>
+
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'📊',brandText:'MW回测分析',currentPage:'mw-backtest'})</script>
+<script>
+var API='http://localhost:8788';
+var DATA=null;
+var HORIZONS=['5d','10d','20d'];
+var CHARTS={};
+
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});
+  document.querySelectorAll('.tab-content').forEach(function(c){c.classList.remove('active')});
+  document.querySelector('.tab-btn[onclick*="'+name+'"]').classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  setTimeout(function(){
+    Object.values(CHARTS).forEach(function(c){try{c.resize()}catch(e){}});
+  },100);
+}
+
+function fmtPct(v){return (v>=0?'+':'')+v.toFixed(2)+'%';}
+function fmtWin(v){return v.toFixed(1)+'%';}
+
+function buildChart(id, option){
+  var dom=document.getElementById(id);
+  if(!dom) return null;
+  var c=echarts.init(dom);
+  c.setOption(option);
+  CHARTS[id]=c;
+  return c;
+}
+
+function barOption(categories, series, title){
+  return {
+    backgroundColor:'transparent',
+    tooltip:{trigger:'axis'},
+    legend:{bottom:0,textStyle:{fontSize:10,color:'#9ca3af'}},
+    grid:{left:60,right:20,top:20,bottom:40},
+    xAxis:{type:'category',data:categories,axisLabel:{fontSize:9,color:'#9ca3af',rotate:30}},
+    yAxis:[
+      {type:'value',name:'胜率%',axisLabel:{fontSize:9,color:'#9ca3af'}},
+      {type:'value',name:'收益率%',axisLabel:{fontSize:9,color:'#9ca3af'}}
+    ],
+    series:series
+  };
+}
+
+var SYS='v1';
+
+function rerender(){
+  SYS=document.getElementById('score-sys').value;
+  if(DATA) renderAll(DATA);
+}
+
+function renderAll(d){
+  renderStats(d);
+  renderConfidence(d);
+  renderDimensions(d);
+  renderMarket(d);
+  renderCap(d);
+  renderTraits(d);
+  renderBaseline(d);
+}
+
+function loadAnalysis(){
+
+function confKey(){ return SYS==='v2'?'confidence_v2':'confidence'; }
+function scoreKey(){ return SYS==='v2'?'score_v2':'score'; }
+function byConf(){ return SYS==='v2'?(DATA.by_confidence_v2||{}):(DATA.by_confidence||{}); }
+  var s=document.getElementById('d-start').value;
+  var e=document.getElementById('d-end').value;
+  document.getElementById('meta-info').textContent='加载中...';
+  fetch(API+'/api/mw/backtest?start='+s+'&end='+e)
+    .then(function(r){return r.json()})
+    .then(function(d){
+      DATA=d;
+      document.getElementById('meta-info').textContent='B2日期 '+d.start+' ~ '+d.end+' · '+d.total_signals+'个信号';
+      renderAll(d);
+    })
+    .catch(function(e){
+      document.getElementById('meta-info').textContent='加载失败: '+e.message;
+    });
+}
+
+function renderStats(d){
+  var h='';
+  HORIZONS.forEach(function(hz){
+    var o=d.overall[hz];
+    if(!o) return;
+    h+='<div class="stat-card"><div class="val">'+fmtWin(o.win_rate)+'</div><div class="lbl">'+hz+'胜率(>2%)</div></div>';
+    h+='<div class="stat-card"><div class="val'+(o.median_return<0?' down':'')+'">'+fmtPct(o.median_return)+'</div><div class="lbl">'+hz+'中位收益率</div></div>';
+    h+='<div class="stat-card"><div class="val">'+o.n+'</div><div class="lbl">'+hz+'有效样本</div></div>';
+  });
+  document.getElementById('stat-cards').innerHTML=h;
+}
+
+function renderConfidence(d){
+  var conf=byConf();
+  var cats=[], wins=[], mrets=[];
+  var order=['高','中','低'];
+  order.forEach(function(k){
+    if(!conf[k]) return;
+    cats.push(k+'('+conf[k]['10d'].n+')');
+    wins.push(conf[k]['10d'].win_rate);
+    mrets.push(conf[k]['10d'].median_return);
+  });
+  buildChart('chart-conf', barOption(cats, [
+    {name:'10d胜率',type:'bar',data:wins,itemStyle:{color:'#f59e0b'}},
+    {name:'10d中位收益',type:'bar',yAxisIndex:1,data:mrets,itemStyle:{color:'#8b5cf6'}}
+  ]));
+
+  // 细粒度表格
+  var tbl='<table><thead><tr><th>分数档</th><th>信号数</th><th>5d胜率</th><th>5d中位收益</th><th>10d胜率</th><th>10d中位收益</th><th>20d胜率</th><th>20d中位收益</th></tr></thead><tbody>';
+  var tiers=['90~100','85~90','80~85','75~80','70~75','65~70','60~65','55~60','50~55','0~50'];
+  tiers.reverse();
+  tiers.forEach(function(t){
+    var v=d.by_score_tier[t];
+    if(!v) return;
+    tbl+='<tr><td><b>'+t+'</b></td><td>'+v['5d'].n+'</td>';
+    HORIZONS.forEach(function(hz){tbl+='<td>'+fmtWin(v[hz].win_rate)+'</td><td>'+fmtPct(v[hz].median_return)+'</td>';});
+    tbl+='</tr>';
+  });
+  tbl+='</tbody></table>';
+  document.getElementById('tab-confidence').innerHTML+='<div class="card" style="margin-top:8px">'+tbl+'</div>';
+}
+
+function renderDimensions(d){
+  var dist=d.score_distribution||{};
+  var dims=d.score_dimension||{};
+
+  // 层一：标注低区分度
+  var notes=[];
+  Object.keys(dist).forEach(function(k){
+    if(dist[k].differentiation==='低'){
+      notes.push('<b>'+dist[k].name+'</b>：≥'+dist[k].dominant_pct+'%信号得分相同，缺乏区分度');
+    }
+  });
+  document.getElementById('dim-note').innerHTML=notes.length?'<div class="note">⚠ 低区分度维度：'+notes.join('；')+'</div>':'';
+
+  // 层二：有区分度维度的图表
+  var cats=[], wins=[], mrets=[];
+  Object.keys(dims).forEach(function(k){
+    if(dims[k].differentiation==='低'||!dims[k].detail) return;
+    cats.push(dims[k].name);
+    // 取10分档的数据
+    var d10=dims[k].detail['10']||dims[k].detail[Object.keys(dims[k].detail)[0]];
+    if(d10){
+      wins.push(d10['10d'].win_rate);
+      mrets.push(d10['10d'].median_return);
+    }else{
+      wins.push(0);mrets.push(0);
+    }
+  });
+  if(cats.length){
+    buildChart('chart-dim', barOption(cats, [
+      {name:'得10分-10d胜率',type:'bar',data:wins,itemStyle:{color:'#f59e0b'}},
+      {name:'得10分-10d中位收益',type:'bar',yAxisIndex:1,data:mrets,itemStyle:{color:'#8b5cf6'}}
+    ]));
+  }
+
+  // 详细表格
+  var tbl='<table><thead><tr><th>维度</th><th>分值</th><th>信号数</th><th>5d胜率</th><th>5d中位</th><th>10d胜率</th><th>10d中位</th><th>20d胜率</th><th>20d中位</th></tr></thead><tbody>';
+  Object.keys(dims).forEach(function(k){
+    var v=dims[k];
+    if(!v.detail) return;
+    Object.keys(v.detail).forEach(function(val){
+      var s=v.detail[val];
+      tbl+='<tr><td>'+v.name+'</td><td>'+val+'分</td><td>'+s['5d'].n+'</td>';
+      HORIZONS.forEach(function(hz){tbl+='<td>'+fmtWin(s[hz].win_rate)+'</td><td>'+fmtPct(s[hz].median_return)+'</td>';});
+      tbl+='</tr>';
+    });
+  });
+  tbl+='</tbody></table>';
+  document.getElementById('tab-dimensions').innerHTML+='<div class="card" style="margin-top:8px">'+tbl+'</div>';
+}
+
+function renderMarket(d){
+  var cats=[], wins=[], mrets=[];
+  ['多头','震荡','空头','未知'].forEach(function(k){
+    if(!d.by_market[k]||d.by_market[k]['10d'].n===0) return;
+    cats.push(k+'('+d.by_market[k]['10d'].n+')');
+    wins.push(d.by_market[k]['10d'].win_rate);
+    mrets.push(d.by_market[k]['10d'].median_return);
+  });
+  if(cats.length){
+    buildChart('chart-market', barOption(cats, [
+      {name:'10d胜率',type:'bar',data:wins,itemStyle:{color:'#10b981'}},
+      {name:'10d中位收益',type:'bar',yAxisIndex:1,data:mrets,itemStyle:{color:'#f59e0b'}}
+    ]));
+  }
+}
+
+function renderCap(d){
+  var cats=[], wins=[], mrets=[];
+  ['小盘(<50亿)','中盘(50~200亿)','大盘(200~1000亿)','超大盘(≥1000亿)'].forEach(function(k){
+    if(!d.by_market_cap[k]||d.by_market_cap[k]['10d'].n===0) return;
+    cats.push(k+'('+d.by_market_cap[k]['10d'].n+')');
+    wins.push(d.by_market_cap[k]['10d'].win_rate);
+    mrets.push(d.by_market_cap[k]['10d'].median_return);
+  });
+  if(cats.length){
+    buildChart('chart-cap', barOption(cats, [
+      {name:'10d胜率',type:'bar',data:wins,itemStyle:{color:'#8b5cf6'}},
+      {name:'10d中位收益',type:'bar',yAxisIndex:1,data:mrets,itemStyle:{color:'#ec4899'}}
+    ]));
+  }
+}
+
+function renderTraits(d){
+  var t=d.common_traits||{};
+  var h='<p style="font-size:0.7rem;margin:0 0 8px">🔬 10日收益 Top10% 信号 ('+t.top10_n+'只) vs 全量 ('+(t.all_signals_n||0)+'只) 共性差异</p>';
+  if(t.top_features&&t.top_features.length){
+    h+='<table><thead><tr><th>特征</th><th>全量均值</th><th>Top10%均值</th><th>差异</th></tr></thead><tbody>';
+    t.top_features.forEach(function(f){
+      h+='<tr><td>'+f.feature+'</td><td>'+f.all+'</td><td>'+f.top10+'</td><td style="color:'+(f.diff>0?'#f59e0b':'#26C6DA')+'">'+fmtPct(f.diff)+'</td></tr>';
+    });
+    h+='</tbody></table>';
+  }
+  h+='<div class="note">差异最大的特征即高收益信号与普通信号的区别所在。正值=Top10%更高，负值=Top10%更低。</div>';
+  document.getElementById('traits-content').innerHTML=h;
+}
+
+function renderBaseline(d){
+  var b=d.random_baseline||{};
+  var cats=[], mwWins=[], blWins=[], mwMrets=[], blMrets=[];
+  HORIZONS.forEach(function(hz){
+    var mw=d.overall[hz];
+    var bl=b[hz];
+    if(!mw||!bl) return;
+    cats.push(hz);
+    mwWins.push(mw.win_rate);
+    blWins.push(bl.win_rate);
+    mwMrets.push(mw.median_return);
+    blMrets.push(bl.median_return);
+  });
+  if(cats.length){
+    buildChart('chart-base', barOption(cats, [
+      {name:'MW胜率',type:'bar',data:mwWins,itemStyle:{color:'#f59e0b'}},
+      {name:'随机胜率',type:'bar',data:blWins,itemStyle:{color:'#6b7280'}},
+    ]));
+  }
+}
+
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+
+// 首次加载
+loadAnalysis();
+</script>
+</body>
+</html>

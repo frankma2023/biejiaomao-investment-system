@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN" class="dark">
 <head>
 <meta charset="UTF-8">
@@ -68,8 +68,9 @@ html[data-theme="light"] .toolbar select,html[data-theme="light"] .toolbar input
   <input type="date" id="date-start">
   <span style="font-size:10px;color:var(--muted)">~</span>
   <input type="date" id="date-end">
-  <button class="btn-sm" onclick="loadRange()">🔍 查询</button>
+  <button class="btn-sm" onclick="queryRange()">🔍 查询</button>
   <button class="btn-glass" onclick="loadLatest()" style="font-size:10px;padding:5px 10px">📅 最新</button>
+  <button class="btn-glass" onclick="scanRange()" style="font-size:10px;padding:5px 10px" title="重新扫描全市场，约15分钟">🔄 重新扫描</button>
   <select id="conf-filter" onchange="render()" style="margin-left:8px">
     <option value="">全部置信度</option>
     <option value="高">⭐⭐⭐ 高</option>
@@ -97,25 +98,40 @@ html[data-theme="light"] .toolbar select,html[data-theme="light"] .toolbar input
 <script>Nav.init({brandIcon:'🔥',brandText:'MW信号',currentPage:'mw-signals'})</script>
 
 <script>
-const API='http://localhost:8788';
+const API='http://' + window.location.hostname + ':8788';
 var allSignals=[], allDates=[];
 
 async function loadLatest(){
-  document.getElementById('date-start').value='';
-  document.getElementById('date-end').value='';
-  await loadData('');
+  // 先静默获取全量数据拿日期列表
+  var r=await fetch(API+'/api/mw/signals');
+  var d=await r.json();
+  if(d.dates&&d.dates.length){
+    var latest=d.dates[0];
+    document.getElementById('date-start').value=latest;
+    document.getElementById('date-end').value=latest;
+    // 只加载最近一天
+    await loadData('start='+latest+'&end='+latest);
+  }else{
+    document.getElementById('signals').innerHTML='<div class="empty-state">暂无MW信号数据</div>';
+  }
 }
 
-async function loadRange(){
+async function queryRange(){
   var s=document.getElementById('date-start').value;
   var e=document.getElementById('date-end').value;
   if(!s||!e) return;
-  
+  await loadData('start='+s+'&end='+e);
+}
+
+async function scanRange(){
+  var s=document.getElementById('date-start').value;
+  var e=document.getElementById('date-end').value;
+  if(!s||!e) return;
+
   var el=document.getElementById('signals');
   el.innerHTML='<div class="empty-state">⏳ 正在扫描 '+s+' ~ '+e+'，全市场5354只股票，请耐心等待...</div>';
-  
+
   try{
-    // 触发扫描
     var scanResp=await fetch(API+'/api/mw/scan',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -123,7 +139,6 @@ async function loadRange(){
     });
     var scanResult=await scanResp.json();
     if(scanResult.error){ el.innerHTML='<div class="empty-state">扫描失败: '+scanResult.error+'</div>'; return; }
-    // 扫描完成，加载结果
     await loadData('start='+s+'&end='+e);
   }catch(err){
     el.innerHTML='<div class="empty-state">扫描失败: '+err.message+'</div>';
@@ -138,12 +153,7 @@ async function loadData(params){
     allDates=d.dates||[];
     var label=d.date||'';
     if(d.start) label=d.start+' ~ '+d.end;
-    document.getElementById('meta-info').textContent='B2日期 '+label+' · '+d.count+'个信号 · '+allDates.length+'个B2日';
-    // 填充日期选择器默认值
-    if(allDates.length){
-      if(!document.getElementById('date-end').value) document.getElementById('date-end').value=allDates[0];
-      if(!document.getElementById('date-start').value) document.getElementById('date-start').value=allDates[allDates.length-1];
-    }
+    document.getElementById('meta-info').textContent='B2日期 '+label+' · '+d.count+'个信号 · 全库共'+allDates.length+'个B2日';
     render();
   }catch(e){
     document.getElementById('signals').innerHTML='<div class="empty-state">加载失败: '+e.message+'</div>';
@@ -200,6 +210,7 @@ function render(){
         '<span style="font-size:10px;color:var(--muted)">B2 '+s.b2_date+'</span>'+
         '<span style="font-size:10px;color:var(--muted)">RS'+(s.h_rs250||'—')+' | '+(s.c_amount_avg?(s.c_amount_avg/10000).toFixed(0)+'万':'—')+'</span>'+
         '<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+' ('+s.score+'分)</span>'+
+        (s.is_plus ? '<span class="badge" style="background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.2);margin-left:4px">✦ PLUS</span>' : '') +
       '</div>'+
       '<div class="node-line">'+
         '<span class="node-dot nd-H"></span> H '+s.h_date+' ¥'+(s.h_price||'—')+
@@ -222,18 +233,19 @@ function render(){
             '<td class="lbl">B1 量比</td><td class="val">'+(s.b1_vol_ratio!=null?s.b1_vol_ratio:'—')+'</td>'+
             '<td class="lbl">跌幅</td><td class="val">'+(s.decline_pct!=null?(s.decline_pct>0?'+':'')+s.decline_pct.toFixed(1)+'%':'—')+'</td>'+
             '<td class="lbl">横盘振幅</td><td class="val">'+(s.c_amplitude_pct!=null?s.c_amplitude_pct.toFixed(1)+'%':'—')+'</td></tr>'+
-          '<tr><td class="lbl">评分 H</td><td class="val '+(s.score_h?'sc-ok':'sc-no')+'">'+(s.score_h?'✅ 10':'— 0')+'</td>'+
-            '<td class="lbl">评分 D</td><td class="val '+(s.score_d?'sc-ok':'sc-no')+'">'+(s.score_d?'✅ 10':'— 0')+'</td>'+
-            '<td class="lbl">评分 C</td><td class="val '+(s.score_c?'sc-ok':'sc-no')+'">'+(s.score_c?'✅ 10':'— 0')+'</td>'+
-            '<td class="lbl">评分 P</td><td class="val '+(s.score_p?'sc-ok':'sc-no')+'">'+(s.score_p?'✅ 10':'— 0')+'</td></tr>'+
-          '<tr style="border-top:1px solid var(--border)"><td class="lbl">行业 I-1</td><td class="val '+(s.score_i1?'sc-ok':'sc-no')+'">'+(s.score_i1?'✅ 10':'— 0')+'</td>'+
-            '<td class="lbl">行业 I-2</td><td class="val '+(s.score_i2?'sc-ok':'sc-no')+'">'+(s.score_i2?'✅ 10':'— 0')+'</td>'+
-            '<td class="lbl">欧奈尔 I</td><td class="val '+(s.score_o1?'sc-ok':'sc-no')+'">'+(s.score_o1?'✅ '+s.score_o1+'分':'— 0')+'</td>'+
-            '<td class="lbl">欧奈尔 L</td><td class="val '+(s.score_o2?'sc-ok':'sc-no')+'">'+(s.score_o2?'✅ '+s.score_o2+'分':'— 0')+'</td></tr>'+
-          '<tr><td class="lbl">MA排列</td><td class="val '+(s.score_ma?'sc-ok':'sc-no')+'">'+(s.score_ma?'✅ '+s.score_ma+'分':'— 0')+'</td>'+
-            '<td class="lbl">信号共振</td><td class="val '+(s.score_sig?'sc-ok':'sc-no')+'">'+(s.score_sig?'✅ '+s.score_sig+'分':'— 0')+'</td>'+
-            '<td class="lbl"></td><td class="val"></td></tr>'+
-          '<tr><td class="lbl" colspan="4" style="color:var(--accent);font-weight:600">总分: '+s.score+'/100 = 形态'+(s.score_h+s.score_d+s.score_c+s.score_p)+' + 行业'+(s.score_i1||0+s.score_i2||0)+' + 欧奈尔'+(s.score_o1||0+s.score_o2||0)+' + MA'+(s.score_ma||0)+' + 共振'+(s.score_sig||0)+'</td></tr>'+
+          // 评分明细 (v2.4)
+          '<tr><td class="lbl">H 前高趋势</td><td class="val '+(s.score_h?'sc-ok':'sc-no')+'">'+(s.score_h?'✅ '+s.score_h+'/15 (高点¥'+(s.h_price||0).toFixed(0)+')':'— 0/15 (未在上升趋势)')+'</td>'+
+            '<td class="lbl">D 调整深度</td><td class="val '+(s.score_d?'sc-ok':'sc-no')+'">'+(s.score_d?'✅ '+s.score_d+'/15 (跌幅'+(s.decline_pct||0).toFixed(1)+'%)':'— 0/15 (跌幅'+(s.decline_pct||0).toFixed(1)+'%，需15%~35%)')+'</td></tr>'+
+          '<tr><td class="lbl">C 横盘质量</td><td class="val '+(s.score_c?'sc-ok':'sc-no')+'">'+(s.score_c?'✅ '+s.score_c+'/5 (振幅'+(s.c_amplitude_pct||0).toFixed(1)+'%)':'— 0/5 (振幅'+(s.c_amplitude_pct||0).toFixed(1)+'%，需<10%∧低点抬高)')+'</td>'+
+            '<td class="lbl">P 整理回撤</td><td class="val '+(s.score_p?'sc-ok':'sc-no')+'">'+(s.score_p?'✅ '+s.score_p+'/15 (回撤≥-7%∧缩量)':'— 0/15 (未达标)')+'</td></tr>'+
+          '<tr style="border-top:1px solid var(--border)"><td class="lbl" colspan="2">'+(s.ind_name?'L2: '+s.ind_code+' '+s.ind_name:'L2指数: '+(s.ind_code||'无L2行业归属'))+'</td>'+
+            '<td class="lbl">I-1 行业RS250</td><td class="val '+(s.score_i1?'sc-ok':'sc-no')+'">'+(s.score_i1?'✅ '+s.score_i1+'/15':'— 0/15')+' (RS='+(s.ind_rs250!=null?s.ind_rs250:'—')+')</td></tr>'+
+          '<tr><td class="lbl"></td><td class="val"></td>'+
+            '<td class="lbl">I-2 个股RS250</td><td class="val '+(s.score_i2?'sc-ok':'sc-no')+'">'+(s.score_i2?'✅ '+s.score_i2+'/15':'— 0/15')+' (RS='+(s.h_rs250!=null?s.h_rs250:'—')+')</td></tr>'+
+          '<tr><td class="lbl">Sig 信号共振</td><td class="val '+(s.score_sig?'sc-ok':'sc-no')+'">'+(s.score_sig?'✅ '+s.score_sig+'/10':'— 0/10')+'</td>'+
+            '<td class="lbl">Gap 跳空</td><td class="val '+(s.score_gap?'sc-ok':'sc-no')+'">'+(s.score_gap?'✅ '+s.score_gap+'/10 (开盘>前高)':'— 0/10 ('+(s.b2_is_gap?'是':'否')+')')+'</td></tr>'+
+          (s.sig_details&&s.sig_details.length?'<tr><td class="lbl" style="font-size:.55rem;color:var(--muted)">共振信号</td><td class="val" colspan="3" style="font-size:.55rem;text-align:left">'+s.sig_details.map(function(d){return '<span style="display:inline-block;background:rgba(245,158,11,.1);padding:1px 6px;border-radius:4px;margin:1px">'+d.source+' '+(d.desc||d.type||'')+'</span>'}).join('')+'</td></tr>':'')+
+          '<tr style="border-top:1px solid var(--border)"><td class="lbl" colspan="4" style="color:var(--accent);font-weight:600">总分: '+s.score+'/100 = 形态'+(s.score_h+s.score_d+s.score_c+s.score_p)+' + 行业'+(s.score_i1||0+s.score_i2||0)+' + 共振'+(s.score_sig||0)+' + 跳空'+(s.score_gap||0)+'</td></tr>'+
         '</table>'+
         '<div style="margin-top:8px;display:flex;gap:12px">'+
           '<a href="http://localhost:8772/pattern-scan/?code='+s.stock_code+'" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🔍 形态复核 →</a>'+

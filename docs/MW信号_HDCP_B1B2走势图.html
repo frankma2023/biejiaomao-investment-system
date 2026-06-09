@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title>MW信号 HDCP-B1-B2 走势图</title>
+<style>body{background:#1a1a1f;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;font-family:Inter,sans-serif}svg{max-width:900px}</style></head><body>
+<svg viewBox="0 0 900 480" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a1a1f"/><stop offset="100%" stop-color="#111"/></linearGradient>
+    <marker id="arrowH" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill="#ef4444"/></marker>
+    <marker id="arrowL" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill="#10b981"/></marker>
+    <marker id="arrowB1" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill="#3b82f6"/></marker>
+    <marker id="arrowB2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill="#a78bfa"/></marker>
+  </defs>
+  <rect width="900" height="480" fill="url(#bg)"/>
+
+  <!-- 价格曲线 -->
+  <polyline points="40,300 110,220 150,150 190,120 220,160 250,190 280,210 320,310 360,250 400,230 440,235 460,225 480,240 500,170 530,190" fill="none" stroke="#d4d4d8" stroke-width="2"/>
+
+  <!-- H 前高 -->
+  <circle cx="190" cy="120" r="6" fill="#ef4444"/>
+  <line x1="190" y1="120" x2="190" y2="45" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowH)"/>
+  <text x="190" y="35" text-anchor="middle" fill="#ef4444" font-size="13" font-weight="700">H 前高</text>
+  <text x="190" y="52" text-anchor="middle" fill="#9ca3af" font-size="10">SMA50斜率>0</text>
+
+  <!-- D 调整段 -->
+  <path d="M200,125 Q260,280 320,310" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.5"/>
+  <text x="260" y="210" text-anchor="middle" fill="#ef4444" font-size="10" opacity="0.7">D 调整段</text>
+  <text x="260" y="224" text-anchor="middle" fill="#9ca3af" font-size="9">跌幅 15%~35%</text>
+
+  <!-- L 最低 -->
+  <circle cx="320" cy="310" r="6" fill="#10b981"/>
+  <line x1="320" y1="310" x2="320" y2="380" stroke="#10b981" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowL)"/>
+  <text x="320" y="370" text-anchor="middle" fill="#10b981" font-size="13" font-weight="700">L 最低</text>
+
+  <!-- C 横盘区 -->
+  <rect x="310" y="225" width="140" height="90" rx="6" fill="rgba(245,158,11,.08)" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="380" y="218" text-anchor="middle" fill="#f59e0b" font-size="12" font-weight="600">C 横盘区</text>
+  <text x="380" y="232" text-anchor="middle" fill="#9ca3af" font-size="9">振幅 < 10%</text>
+  <text x="380" y="244" text-anchor="middle" fill="#9ca3af" font-size="9">低点斜率 > 0</text>
+
+  <!-- B1 突破1 -->
+  <circle cx="500" cy="170" r="6" fill="#3b82f6"/>
+  <line x1="500" y1="170" x2="500" y2="95" stroke="#3b82f6" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrowB1)"/>
+  <text x="500" y="85" text-anchor="middle" fill="#3b82f6" font-size="13" font-weight="700">B1 突破1</text>
+  <text x="500" y="102" text-anchor="middle" fill="#9ca3af" font-size="10">涨幅≥2% · 放量</text>
+  <text x="500" y="114" text-anchor="middle" fill="#9ca3af" font-size="10">MA5>MA10 收盘站上</text>
+
+  <!-- P 整理段 -->
+  <rect x="508" y="165" width="72" height="60" rx="4" fill="rgba(156,163,175,.06)" stroke="#9ca3af" stroke-width="0.8" stroke-dasharray="3,2"/>
+  <text x="544" y="158" text-anchor="middle" fill="#9ca3af" font-size="9">P 整理</text>
+  <text x="544" y="170" text-anchor="middle" fill="#6b7280" font-size="8">回撤≥-7%</text>
+  <text x="544" y="182" text-anchor="middle" fill="#6b7280" font-size="8">缩量</text>
+
+  <!-- B2 突破2 -->
+  <circle cx="610" cy="130" r="7" fill="#a78bfa"/>
+  <line x1="610" y1="130" x2="610" y2="55" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowB2)"/>
+  <text x="610" y="45" text-anchor="middle" fill="#a78bfa" font-size="14" font-weight="700">B2 突破2</text>
+  <text x="610" y="63" text-anchor="middle" fill="#9ca3af" font-size="10">涨幅≥3% · 站上MA60</text>
+  <text x="610" y="76" text-anchor="middle" fill="#9ca3af" font-size="10">成交额>前10日下跌日</text>
+
+  <!-- B1→B2 箭头 -->
+  <line x1="500" y1="160" x2="600" y2="135" stroke="#a78bfa" stroke-width="1" stroke-dasharray="5,3" opacity="0.4"/>
+
+  <!-- 右侧评分摘要 -->
+  <rect x="680" y="100" width="195" height="280" rx="10" fill="rgba(26,26,31,.8)" stroke="rgba(255,255,255,.06)" stroke-width="1"/>
+  <text x="777" y="125" text-anchor="middle" fill="#f59e0b" font-size="12" font-weight="700">评分明细 (满分100)</text>
+  <line x1="700" y1="133" x2="855" y2="133" stroke="rgba(255,255,255,.08)"/>
+
+  <text x="700" y="155" fill="#d4d4d8" font-size="10">HDCP 形态</text><text x="860" y="155" text-anchor="end" fill="#f59e0b" font-size="10">40</text>
+  <text x="710" y="170" fill="#9ca3af" font-size="9">H 前高趋势 15</text>
+  <text x="710" y="183" fill="#9ca3af" font-size="9">D 调整深度 5</text>
+  <text x="710" y="196" fill="#9ca3af" font-size="9">C 横盘质量 5</text>
+  <text x="710" y="209" fill="#9ca3af" font-size="9">P 整理回撤 15</text>
+
+  <text x="700" y="232" fill="#d4d4d8" font-size="10">I1 行业RS250</text><text x="860" y="232" text-anchor="end" fill="#f59e0b" font-size="10">15</text>
+  <text x="710" y="245" fill="#9ca3af" font-size="9">H日L2/L1指数≥80</text>
+  <text x="700" y="260" fill="#d4d4d8" font-size="10">I2 个股H点RS250</text><text x="860" y="260" text-anchor="end" fill="#f59e0b" font-size="10">10</text>
+  <text x="710" y="273" fill="#9ca3af" font-size="9">≥90=10, 80~89=5</text>
+
+  <text x="700" y="296" fill="#d4d4d8" font-size="10">Sig 信号共振</text><text x="860" y="296" text-anchor="end" fill="#f59e0b" font-size="10">25</text>
+  <text x="710" y="309" fill="#9ca3af" font-size="9">累加制, 封顶25</text>
+  <text x="700" y="326" fill="#d4d4d8" font-size="10">Gap B2跳空</text><text x="860" y="326" text-anchor="end" fill="#f59e0b" font-size="10">10</text>
+
+  <line x1="700" y1="338" x2="855" y2="338" stroke="rgba(255,255,255,.08)"/>
+  <text x="700" y="358" fill="#fafafa" font-size="11" font-weight="700">合计</text><text x="860" y="358" text-anchor="end" fill="#f59e0b" font-size="12" font-weight="700">100</text>
+
+  <!-- 底部图例 -->
+  <rect x="200" y="440" width="10" height="10" rx="2" fill="#ef4444"/><text x="216" y="450" fill="#9ca3af" font-size="10">H 前高</text>
+  <rect x="280" y="440" width="10" height="10" rx="2" fill="#10b981"/><text x="296" y="450" fill="#9ca3af" font-size="10">L 最低</text>
+  <rect x="360" y="440" width="10" height="10" rx="2" fill="#f59e0b"/><text x="376" y="450" fill="#9ca3af" font-size="10">C 横盘</text>
+  <rect x="440" y="440" width="10" height="10" rx="2" fill="#3b82f6"/><text x="456" y="450" fill="#9ca3af" font-size="10">B1 突破1</text>
+  <rect x="530" y="440" width="10" height="10" rx="2" fill="#a78bfa"/><text x="546" y="450" fill="#9ca3af" font-size="10">B2 突破2</text>
+</svg>
+</body></html>

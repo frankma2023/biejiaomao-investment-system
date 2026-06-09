@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>投资决策驾驶舱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<style>
+body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)}
+
+/* 页面头 */
+.page-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px}
+.page-header h1{font-family:var(--font-display);font-size:1.2rem;font-weight:400;color:var(--text-primary)}
+.page-header .meta{font-size:.65rem;color:var(--muted)}
+
+/* 大盘环境条 */
+.market-bar{display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:12px;margin-bottom:12px;font-size:.7rem;border:1px solid var(--border);backdrop-filter:blur(12px)}
+.market-bar.green{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.2)}
+.market-bar.yellow{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.2)}
+.market-bar.red{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2)}
+.market-bar .light{font-size:1.4rem}
+.market-bar .stat{display:flex;align-items:center;gap:4px}
+.market-bar .stat .val{font-weight:600;font-family:var(--font-display);font-size:.75rem}
+.market-bar .stat .lbl{color:var(--muted);font-size:.6rem}
+
+/* 按钮 */
+.btn-primary{padding:6px 16px;background:var(--accent-subtle);color:var(--accent);border:1px solid var(--accent-border);border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:all .2s}
+.btn-primary:hover{background:rgba(245,158,11,.18)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-sm{padding:4px 12px;background:rgba(26,26,31,.4);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;font-size:11px;cursor:pointer;font-family:var(--font-body);transition:all .15s}
+.btn-sm:hover{border-color:var(--accent);color:var(--accent)}
+
+/* 候选卡片 */
+.candidate-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:10px;box-shadow:var(--shadow-card);transition:border-color .2s}
+.candidate-card:hover{border-color:rgba(245,158,11,.3)}
+.candidate-card.plus{border-left:3px solid #f59e0b}
+.candidate-card .card-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.candidate-card .stock-name{font-family:var(--font-display);font-size:.95rem;color:var(--text-primary)}
+.candidate-card .stock-code{font-size:.65rem;color:var(--muted);margin-left:6px;font-family:var(--font-mono)}
+.candidate-card .rank-badge{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--accent-subtle);color:var(--accent);font-weight:700;font-size:.75rem;flex-shrink:0}
+.candidate-card .signal-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.badge{display:inline-block;padding:3px 10px;border-radius:8px;font-size:10px;font-weight:600}
+.badge-plus{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.25)}
+.badge-pp{background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.2)}
+.badge-bo{background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.2)}
+.badge-mw{background:rgba(139,92,246,.1);color:#a78bfa;border:1px solid rgba(139,92,246,.2)}
+
+.candidate-card .key-stats{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:.68rem}
+.key-stats .kstat{text-align:center}
+.key-stats .kstat .kv{font-family:var(--font-display);font-weight:700;font-size:.8rem}
+.key-stats .kstat .kl{font-size:.55rem;color:var(--muted)}
+
+/* 简报展开区 */
+.briefing{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.briefing.open{display:block}
+.briefing h4{font-family:var(--font-display);font-size:.75rem;color:var(--accent);margin:10px 0 4px}
+.briefing table{width:100%;border-collapse:collapse;font-size:.62rem}
+.briefing td{padding:3px 8px}
+.briefing td.lbl{color:var(--muted);width:100px;white-space:nowrap}
+.briefing td.val{color:var(--text-primary);font-family:var(--font-mono)}
+.briefing .highlight{color:var(--accent);font-weight:600}
+.briefing .up{color:#ef4444}
+.briefing .down{color:#10b981}
+
+/* 检查单 */
+.checklist{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-top:10px;box-shadow:var(--shadow-card)}
+.checklist h3{font-family:var(--font-display);font-size:.85rem;color:var(--text-primary);margin:0 0 10px}
+.checklist .check-item{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:.7rem;border-bottom:1px solid rgba(255,255,255,.03)}
+.checklist .check-item:last-child{border-bottom:none}
+.checklist input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.checklist .check-label{flex:1}
+.checklist .check-data{font-size:.6rem;color:var(--muted);text-align:right}
+.checklist .all-pass{display:none;text-align:center;padding:8px;color:#10b981;font-weight:600;font-size:.75rem}
+.checklist .all-pass.show{display:block}
+
+/* 空状态 */
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state .icon{font-size:3rem;margin-bottom:12px}
+.loading{text-align:center;padding:60px 20px;color:var(--muted);font-family:var(--font-display)}
+
+/* 浅色覆盖 */
+html[data-theme="light"] .candidate-card{background:rgba(255,255,255,.7);border-color:var(--divider)}
+html[data-theme="light"] .candidate-card .stock-name{color:#374151}
+html[data-theme="light"] .btn-sm{background:rgba(255,255,255,.6)}
+html[data-theme="light"] .checklist{background:rgba(255,255,255,.7);border-color:var(--divider)}
+html[data-theme="light"] .market-bar{background:rgba(255,255,255,.5)}
+</style>
+</head>
+<body>
+<div class="app-container">
+
+<nav id="top-nav"></nav>
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'🦊',brandText:'知行',currentPage:'cockpit'})</script>
+
+<div class="page-header">
+  <div>
+    <h1>🚀 投资决策驾驶舱</h1>
+    <div class="meta" id="run-info">加载中...</div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn-primary" onclick="runPipeline()" id="btn-run">🔄 立即运行管道</button>
+  </div>
+</div>
+
+<div class="market-bar" id="market-bar">
+  <span class="light">⏳</span>
+  <span>加载大盘环境中...</span>
+</div>
+
+<div id="content"><div class="loading">🚀 驾驶舱启动中...</div></div>
+
+<div class="checklist" id="checklist-panel" style="display:none">
+  <h3>📋 下单前五关检查</h3>
+  <div class="check-item">
+    <input type="checkbox" id="chk-1" onchange="checkAllPass()">
+    <span class="check-label">🔬 <b>胜率关</b>：信号类型历史胜率 ≥ 50%？</span>
+    <span class="check-data" id="chk-1-data"></span>
+  </div>
+  <div class="check-item">
+    <input type="checkbox" id="chk-2" onchange="checkAllPass()">
+    <span class="check-label">📊 <b>基本面关</b>：CAN SLIM 总分 ≥ 60？近四季利润无连续下滑？</span>
+    <span class="check-data" id="chk-2-data"></span>
+  </div>
+  <div class="check-item">
+    <input type="checkbox" id="chk-3" onchange="checkAllPass()">
+    <span class="check-label">🌍 <b>大盘关</b>：大盘评级为 🟢 或 🟡？抛盘日 < 5？</span>
+    <span class="check-data" id="chk-3-data"></span>
+  </div>
+  <div class="check-item">
+    <input type="checkbox" id="chk-4" onchange="checkAllPass()">
+    <span class="check-label">💰 <b>仓位关</b>：建议仓位在当前总仓位下不超标？单笔亏损在承受范围内？</span>
+    <span class="check-data" id="chk-4-data"></span>
+  </div>
+  <div class="check-item">
+    <input type="checkbox" id="chk-5" onchange="checkAllPass()">
+    <span class="check-label">🧘 <b>心理关</b>：近 5 笔交易胜率正常？无连续亏损后报复性交易倾向？</span>
+    <span class="check-data" id="chk-5-data"></span>
+  </div>
+  <div class="all-pass" id="all-pass-msg">✅ 五关全部通过，可以下单</div>
+</div>
+
+</div>
+
+<script>
+var candidatesData = [];
+var marketData = null;
+var tradeStats = null;
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+
+async function init() {
+  await Promise.all([loadData(), loadTradeStats()]);
+}
+
+async function loadData() {
+  try {
+    var resp = await fetch('/api/cockpit/latest');
+    var data = await resp.json();
+    candidatesData = data.candidates || [];
+    marketData = data.market || {};
+    document.getElementById('run-info').textContent = data.run_date
+      ? '上次运行: ' + data.run_date + ' · 候选: ' + candidatesData.length + ' 只'
+      : '尚未运行过管道';
+    renderMarket();
+    renderCandidates();
+    if (candidatesData.length > 0) {
+      document.getElementById('checklist-panel').style.display = 'block';
+      fillChecklistData();
+    }
+  } catch(e) {
+    document.getElementById('content').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div>加载失败</div><div style="font-size:.6rem">' + e.message + '</div></div>';
+  }
+}
+
+async function loadTradeStats() {
+  try {
+    var resp = await fetch('/api/discipline/trade-stats');
+    tradeStats = await resp.json();
+  } catch(e) {
+    tradeStats = null;
+  }
+}
+
+// ═══════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════
+
+function renderMarket() {
+  var bar = document.getElementById('market-bar');
+  var m = marketData;
+  if (!m || !m.market_light) {
+    bar.className = 'market-bar yellow';
+    bar.innerHTML = '<span class="light">⏳</span><span>大盘数据加载中...</span>';
+    return;
+  }
+  bar.className = 'market-bar ' + m.market_light;
+  var lightEmoji = {green:'🟢',yellow:'🟡',red:'🔴'}[m.market_light] || '⚪';
+  var ftdText = m.ftd_confirmed ? '已确认' : '未确认';
+  bar.innerHTML =
+    '<span class="light">' + lightEmoji + '</span>' +
+    '<span style="font-weight:600">' + (m.light_label || '') + '</span>' +
+    '<span class="stat"><span class="lbl">追盘日</span><span class="val">' + ftdText + '</span></span>' +
+    '<span class="stat"><span class="lbl">抛盘日</span><span class="val">' + (m.distribution_days||0) + '</span></span>' +
+    '<span class="stat"><span class="lbl">拥挤度</span><span class="val">' + (m.crowding != null ? m.crowding.toFixed(1) : '—') + '</span></span>' +
+    '<span class="stat"><span class="lbl">中证全指</span><span class="val">' + (m.index_trend||'') + '</span></span>';
+}
+
+function renderCandidates() {
+  if (!candidatesData.length) {
+    document.getElementById('content').innerHTML =
+      '<div class="empty-state"><div class="icon">📭</div><div>暂无候选股票</div><div style="font-size:.6rem;margin-top:8px">点击「立即运行管道」执行五级筛选</div></div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < candidatesData.length; i++) {
+    var c = candidatesData[i];
+    var isPlus = c.is_plus || (c.signal_types && c.signal_types.indexOf && c.signal_types.indexOf('mw_plus') >= 0);
+
+    html += '<div class="candidate-card' + (isPlus ? ' plus' : '') + '" id="card-' + i + '">';
+    // 头部
+    html += '<div class="card-header">';
+    html += '<div><span class="rank-badge">#' + (c.rank||(i+1)) + '</span>';
+    html += '<span class="stock-name"><a href="../pattern-scan/?code=' + c.stock_code + '" target="_blank" style="color:var(--accent);text-decoration:none">' + (c.stock_name||c.stock_code) + '</a></span>';
+    html += '<span class="stock-code">' + c.stock_code + '</span></div>';
+    html += '<button class="btn-sm" onclick="toggleBriefing(' + i + ')">📋 简报</button>';
+    html += '</div>';
+
+    // 信号徽章
+    html += '<div class="signal-badges">';
+    var signals = c.signal_types || [];
+    if (typeof signals === 'string') {
+      try { signals = JSON.parse(signals); } catch(e) { signals = [signals]; }
+    }
+    for (var s = 0; s < signals.length; s++) {
+      var sig = signals[s];
+      var cls = 'badge-mw', label = sig;
+      if (sig === 'mw_plus') { cls = 'badge-plus'; label = '⭐ PLUS'; }
+      else if (sig === 'pocket_pivot_b1' || sig === 'pocket_pivot') { cls = 'badge-pp'; label = sig === 'pocket_pivot_b1' ? '🟠 口袋支点(B1重合)' : '🟠 口袋支点'; }
+      else if (sig === 'base_breakout') { cls = 'badge-bo'; label = '🔷 基部突破'; }
+      else if (sig === 'mw_b2') { cls = 'badge-mw'; label = 'MW B2'; }
+      html += '<span class="badge ' + cls + '">' + label + '</span>';
+    }
+    html += '</div>';
+
+    // 关键统计
+    html += '<div class="key-stats">';
+    html += '<div class="kstat"><div class="kv">' + (c.mw_score||'—') + '</div><div class="kl">MW评分</div></div>';
+    html += '<div class="kstat"><div class="kv">' + (c.canslim_total != null ? c.canslim_total : '—') + '</div><div class="kl">CANSLIM</div></div>';
+    html += '<div class="kstat"><div class="kv">' + (c.decline_pct != null ? c.decline_pct.toFixed(1) + '%' : '—') + '</div><div class="kl">调整深度</div></div>';
+    html += '<div class="kstat"><div class="kv">¥' + (c.market_cap != null ? c.market_cap.toFixed(0) + '亿' : '—') + '</div><div class="kl">市值</div></div>';
+    if (c.suggested_position_pct) {
+      html += '<div class="kstat"><div class="kv" style="color:var(--accent)">' + c.suggested_position_pct.toFixed(1) + '%</div><div class="kl">建议仓位</div></div>';
+    }
+    html += '</div>';
+
+    // 简报区
+    html += '<div class="briefing" id="brief-' + i + '">';
+    html += buildBriefingHTML(c);
+    html += '</div>';
+
+    html += '</div>';
+  }
+
+  // 快速统计
+  html += '<div style="text-align:center;padding:8px;color:var(--muted);font-size:.6rem">';
+  html += '候选 ' + candidatesData.length + ' 只 · 点击「简报」展开详细信息 · 在 pattern-scan 中查看K线图</div>';
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function buildBriefingHTML(c) {
+  var h = '';
+  // 信号概要
+  h += '<h4>📡 信号概要</h4>';
+  h += '<table>';
+  h += tr('信号日期', c.signal_date||'—');
+  h += tr('置信度', c.confidence||'—');
+  if (c.h_date) h += tr('前高H点', c.h_date + ' ¥' + (c.h_price||'—'));
+  if (c.l_date) h += tr('低点L点', c.l_date + ' ¥' + (c.l_price||'—'));
+  if (c.decline_pct != null) h += tr('H→L调整', c.decline_pct.toFixed(1) + '%');
+  if (c.consolidation_days) h += tr('盘整天数', c.consolidation_days + '天');
+  if (c.mw_score) h += tr('MW评分', c.mw_score);
+  h += '</table>';
+
+  // 基本面
+  h += '<h4>📊 基本面</h4>';
+  h += '<table>';
+  h += tr('CAN SLIM总分', c.canslim_total != null ? c.canslim_total : '—');
+  h += tr('C 当季EPS', c.canslim_c != null ? c.canslim_c : '—');
+  h += tr('A 年度EPS', c.canslim_a != null ? c.canslim_a : '—');
+  h += tr('N 新事物', c.canslim_n != null ? c.canslim_n : '—');
+  h += tr('S 供需', c.canslim_s != null ? c.canslim_s : '—');
+  h += tr('L 领涨', c.canslim_l != null ? c.canslim_l : '—');
+  h += tr('I 机构', c.canslim_i != null ? c.canslim_i : '—');
+  h += tr('M 市场', c.canslim_m != null ? c.canslim_m : '—');
+  h += tr('市值', c.market_cap != null ? c.market_cap.toFixed(0) + '亿' : '—');
+  h += '</table>';
+
+  // 行业
+  if (c.l1_industry) {
+    h += '<h4>🏭 行业背景</h4>';
+    h += '<table>';
+    h += tr('一级行业', c.l1_industry);
+    if (c.l1_rs250 != null) h += tr('行业RS250', c.l1_rs250);
+    if (c.l1_rs20 != null) h += tr('行业RS20', c.l1_rs20);
+    h += '</table>';
+  }
+
+  // 仓位
+  if (c.suggested_position_pct) {
+    h += '<h4>💰 仓位建议</h4>';
+    h += '<table>';
+    h += tr('建议仓位', '<span class="highlight">' + c.suggested_position_pct.toFixed(1) + '%</span>');
+    if (c.max_loss_amount) h += tr('最大亏损', '¥' + c.max_loss_amount.toFixed(0));
+    if (c.stop_loss_price) h += tr('止损价', '¥' + c.stop_loss_price.toFixed(2));
+    if (c.kelly_position_pct) h += tr('凯利参考', c.kelly_position_pct.toFixed(1) + '%');
+    if (c.target_price) h += tr('止盈参考', '¥' + c.target_price.toFixed(2));
+    h += '</table>';
+  }
+
+  // 止损/止盈
+  if (c.stop_loss_rule) {
+    h += '<h4>🛡 止损/止盈</h4>';
+    h += '<div style="font-size:.62rem;color:var(--text-secondary)">' + c.stop_loss_rule.replace(/\n/g,'<br>') + '</div>';
+    if (c.trailing_stop_rule) {
+      h += '<div style="font-size:.58rem;color:var(--muted);margin-top:4px">' + c.trailing_stop_rule.replace(/\n/g,'<br>') + '</div>';
+    }
+  }
+
+  // 舆情
+  if (c.sentiment_summary) {
+    h += '<h4>📰 舆情</h4>';
+    h += '<div style="font-size:.62rem;color:var(--text-secondary)">' + c.sentiment_summary + '</div>';
+  }
+
+  // 欧奈尔分析
+  if (c.oneil_analysis) {
+    h += '<h4>📖 欧奈尔分析</h4>';
+    h += '<div style="font-size:.62rem;color:var(--text-secondary)">' + c.oneil_analysis + '</div>';
+  }
+
+  return h;
+}
+
+function tr(label, value) {
+  return '<tr><td class="lbl">' + label + '</td><td class="val">' + (value||'—') + '</td></tr>';
+}
+
+function toggleBriefing(idx) {
+  var el = document.getElementById('brief-' + idx);
+  el.classList.toggle('open');
+}
+
+// ═══════════════════════════════════════════
+// 检查单
+// ═══════════════════════════════════════════
+
+function fillChecklistData() {
+  // 胜率关
+  var hasMwp = candidatesData.some(function(c) {
+    var s = c.signal_types; if (typeof s==='string') try{s=JSON.parse(s)}catch(e){}
+    return s && s.indexOf && s.indexOf('mw_plus') >= 0;
+  });
+  document.getElementById('chk-1-data').textContent = hasMwp ? 'MW PLUS 10日胜率 ≈62%' : '待回测数据';
+
+  // 基本面关
+  var minCanslim = 100;
+  candidatesData.forEach(function(c) {
+    if (c.canslim_total != null && c.canslim_total < minCanslim) minCanslim = c.canslim_total;
+  });
+  document.getElementById('chk-2-data').textContent = minCanslim < 100 ? '最低CANSLIM: ' + minCanslim : '—';
+
+  // 大盘关
+  var m = marketData;
+  var ddOk = (m.distribution_days||0) < 5;
+  var lightOk = m.market_light === 'green' || m.market_light === 'yellow';
+  document.getElementById('chk-3-data').textContent =
+    (lightOk ? '✅' : '❌') + '大盘' + (m.light_label||'') + ' | ' +
+    (ddOk ? '✅' : '❌') + '抛盘日' + (m.distribution_days||0);
+
+  // 仓位关
+  document.getElementById('chk-4-data').textContent = '见各票仓位建议';
+
+  // 心理关
+  if (tradeStats) {
+    var wr5 = tradeStats.win_rate_5;
+    var cl = tradeStats.consecutive_losses || 0;
+    var txt = '';
+    if (wr5 != null) txt += '近5胜率:' + wr5 + '% ';
+    txt += '连亏:' + cl + '次';
+    if (cl >= 3) txt += ' ⚠️';
+    document.getElementById('chk-5-data').textContent = txt;
+  } else {
+    document.getElementById('chk-5-data').textContent = '暂无交易记录';
+  }
+}
+
+function checkAllPass() {
+  var all = true;
+  for (var i = 1; i <= 5; i++) {
+    if (!document.getElementById('chk-' + i).checked) { all = false; break; }
+  }
+  document.getElementById('all-pass-msg').classList.toggle('show', all);
+}
+
+// ═══════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════
+
+async function runPipeline() {
+  var btn = document.getElementById('btn-run');
+  btn.disabled = true; btn.textContent = '⏳ 管道运行中...';
+  document.getElementById('content').innerHTML = '<div class="loading">🚀 五级管道筛选中...<br><span style="font-size:.6rem">观察池→市值→行业RS→个股RS→形态信号</span></div>';
+
+  try {
+    var resp = await fetch('/api/cockpit/run', { method: 'POST' });
+    var data = await resp.json();
+    if (data.success) {
+      await loadData();
+    } else {
+      document.getElementById('content').innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>管道运行失败</div><div style="font-size:.6rem">' + (data.error||'') + '</div></div>';
+    }
+  } catch(e) {
+    document.getElementById('content').innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>请求失败</div><div style="font-size:.6rem">' + e.message + '</div></div>';
+  }
+  btn.disabled = false; btn.textContent = '🔄 立即运行管道';
+}
+
+// ═══════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════
+
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+
+// START
+init();
+</script>
+</body>
+</html>
