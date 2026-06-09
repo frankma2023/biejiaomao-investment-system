@@ -437,6 +437,53 @@ def run_pipeline(target_date=None, config=None, db=None, save=False):
     return enriched, stats
 
 
+def _generate_oneil_deep(db, stock_code, stock_name, run_date, briefing_engine):
+    """调用 DeepSeek CLI 预生成深度分析报告"""
+    import subprocess
+    from cockpit.oneil_deep import ONeilDeepAnalyzer
+
+    analyzer = ONeilDeepAnalyzer(db)
+    candidate = {'stock_code': stock_code, 'stock_name': stock_name}
+    stock_info = analyzer._build_stock_profile(stock_code, candidate)
+    market_info = briefing_engine._module_market()
+    prompt = analyzer._build_prompt(stock_code, stock_info, market_info)
+
+    skill = analyzer._load_skill()
+    full_prompt = f"""你是欧奈尔交易顾问，严格遵循《像欧奈尔信徒一样交易》框架。
+请根据以下股票全维度数据，写一篇连贯的深度分析文章（1000字以上）。
+叙事风格，像一位严师在跟你对话，引用欧奈尔名言。
+最后给出明确的综合结论（推荐买入/谨慎买入/观望/不建议）。
+
+{skill[:2000]}
+
+---
+
+{prompt}
+
+---
+请用HTML格式输出（h3标题、p段落、blockquote引用名言）。"""
+
+    DEEPSEEK_EXE = r'D:\dstui\deepseek-tui-windows-x64.exe'
+    result = subprocess.run(
+        [DEEPSEEK_EXE, '-p', full_prompt],
+        capture_output=True, text=True, timeout=180, encoding='utf-8', errors='replace',
+        cwd=r'D:\dstui', shell=False
+    )
+    output = result.stdout.strip() or result.stderr.strip()
+    if not output:
+        print(f"  [oneil_deep] {stock_code} CLI 无输出")
+        return
+
+    # 保存
+    report_dir = os.path.join(PROJECT_ROOT, 'data', 'cockpit', 'oneil', run_date)
+    os.makedirs(report_dir, exist_ok=True)
+    html_content = analyzer._text_to_html(stock_code, stock_info, output, run_date)
+    filepath = os.path.join(report_dir, f'{stock_code}.html')
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    print(f"  [oneil_deep] {stock_code} 报告已生成 ({len(html_content)} bytes)")
+
+
 def save_candidates(db, run_date, candidates, pool_data=None):
     """将候选结果写入 cockpit_daily，含简报（舆情+欧奈尔分析）"""
     from cockpit.briefing import BriefingEngine
@@ -488,6 +535,13 @@ def save_candidates(db, run_date, candidates, pool_data=None):
             oneil_analysis = oneil.get('summary', '')
         except Exception:
             pass
+
+        # 深度分析（管道预生成，DeepSeek CLI）
+        if c.get('rank', 99) <= 5:
+            try:
+                _generate_oneil_deep(db, code, c.get('stock_name',''), run_date, briefing_engine)
+            except Exception as e:
+                print(f"  [oneil_deep] {code} 失败: {e}")
 
         # 止损止盈
         from cockpit.position import calculate_stop_loss, get_trailing_stop_rule_text

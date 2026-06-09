@@ -345,8 +345,10 @@ function buildBriefingHTML(c) {
   if (c.oneil_analysis) {
     h += '<h4>📖 欧奈尔分析（快速评估）</h4>';
     h += '<div style="font-size:.62rem;color:var(--text-secondary)">' + c.oneil_analysis.replace(/\\n/g,'<br>') + '</div>';
-    var reportUrl = '/api/cockpit/oneil-deep?code=' + c.stock_code;
-    h += '<a href="#" onclick="showOneilDeep(\'' + c.stock_code + '\',\'' + (c.stock_name||c.stock_code) + '\');return false" style="display:inline-block;margin-top:6px;font-size:.6rem;color:var(--accent);text-decoration:none;border:1px solid var(--accent-border);padding:4px 12px;border-radius:8px">📖 DeepSeek 深度分析 (1000+字)</a>';
+    if (c.oneil_analysis) {
+      var reportUrl = '/api/cockpit/oneil-report?code=' + c.stock_code + '&date=' + (c.run_date||'');
+      h += '<a href="#" onclick="openOneilReport(\'' + c.stock_code + '\',\'' + (c.run_date||'') + '\');return false" style="display:inline-block;margin-top:6px;font-size:.6rem;color:var(--accent);text-decoration:none;border:1px solid var(--accent-border);padding:4px 12px;border-radius:8px">📖 查看深度分析报告 (1000+字)</a>';
+    }
   }
 
   return h;
@@ -440,15 +442,10 @@ async function runPipeline() {
 // THEME
 // ═══════════════════════════════════════════
 
-function openOneilReport(code, date) {
-  showOneilDeep(code, '');
-}
-
-async function showOneilDeep(code, name) {
+async function openOneilReport(code, date) {
   var modal = document.getElementById('oneil-modal');
   var content = document.getElementById('oneil-modal-content');
   if (!modal) {
-    // 动态创建模态层
     modal = document.createElement('div');
     modal.id = 'oneil-modal';
     modal.style.cssText = 'display:flex;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:999;overflow-y:auto;align-items:flex-start;justify-content:center;padding:40px 20px';
@@ -458,21 +455,29 @@ async function showOneilDeep(code, name) {
     content = document.getElementById('oneil-modal-content');
   }
   modal.style.display = 'flex';
-  content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-display)">🧭 欧奈尔正在深度审视 ' + (name||code) + '...<br><span style="font-size:.65rem">DeepSeek 正在推理，约需 30~60 秒...</span></div>';
 
+  // 先尝试预生成报告
   try {
-    var resp = await fetch('/api/cockpit/oneil-deep?code=' + code);
-    var data = await resp.json();
+    var resp = await fetch('/api/cockpit/oneil-report?code=' + code + '&date=' + date);
+    if (resp.ok) {
+      var html = await resp.text();
+      content.innerHTML = '<iframe srcdoc="' + html.replace(/"/g,'&quot;') + '" style="width:100%;height:70vh;border:none;border-radius:8px"></iframe>';
+      return;
+    }
+  } catch(e) {}
+
+  // 降级：实时 CLI 生成
+  content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-display)">🧭 欧奈尔正在深度审视...<br><span style="font-size:.65rem">DeepSeek 正在推理，约需 30~60 秒...</span></div>';
+  try {
+    var resp2 = await fetch('/api/cockpit/oneil-deep?code=' + code);
+    var data = await resp2.json();
     if (data.html) {
-      content.innerHTML = '<h2 style="font-family:var(--font-display);font-size:1rem;margin:0 0 4px;color:var(--accent)">📖 欧奈尔深度分析：' + (name||code) + '（' + code + '）</h2>' +
-        '<p style="color:var(--muted);font-size:.65rem;margin:0 0 16px">基于《像欧奈尔信徒一样交易》· DeepSeek 生成 · 仅供参考</p>' +
-        data.html +
-        '<p style="font-size:.55rem;color:var(--muted);margin-top:16px;text-align:center"><i>"意见观点无所谓，只有事实以及量价同市场运行一样真实。" —— 比尔·欧奈尔</i></p>';
+      content.innerHTML = '<div style="font-family:var(--font-body);font-size:.75rem;line-height:1.8;color:var(--text-primary)">' + data.html + '</div>';
     } else {
-      content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">❌ 分析失败：无返回内容</div>';
+      content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">❌ 分析失败</div>';
     }
   } catch(e) {
-    content.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444">❌ 请求失败: ' + e.message + '<br><span style="font-size:.7rem;color:var(--muted)">请确认 Flask 服务(8788)已启动</span></div>';
+    content.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444">❌ 请求失败: ' + e.message + '</div>';
   }
 }
 
