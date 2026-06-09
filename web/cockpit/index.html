@@ -252,6 +252,10 @@ function renderCandidates() {
 
     // 关键统计
     html += '<div class="key-stats">';
+    if (c.sentiment_summary) {
+      var shortSent = c.sentiment_summary.length > 60 ? c.sentiment_summary.substring(0,60) + '...' : c.sentiment_summary;
+      html += '<div class="kstat" style="flex-basis:100%"><div class="kv" style="font-size:.65rem;color:var(--text-secondary)">📰 ' + shortSent + '</div></div>';
+    }
     html += '<div class="kstat"><div class="kv">' + (c.mw_score||'—') + '</div><div class="kl">MW评分</div></div>';
     html += '<div class="kstat"><div class="kv">' + (c.canslim_total != null ? c.canslim_total : '—') + '</div><div class="kl">CANSLIM</div></div>';
     html += '<div class="kstat"><div class="kv">' + (c.decline_pct != null ? c.decline_pct.toFixed(1) + '%' : '—') + '</div><div class="kl">调整深度</div></div>';
