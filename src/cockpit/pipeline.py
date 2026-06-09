@@ -429,7 +429,7 @@ def run_pipeline(target_date=None, config=None, db=None, save=False):
 
     # 持久化
     if save:
-        save_candidates(db, target_date, enriched)
+        save_candidates(db, target_date, enriched, pool_data=pool)
 
     if own_db:
         db.close()
@@ -437,10 +437,82 @@ def run_pipeline(target_date=None, config=None, db=None, save=False):
     return enriched, stats
 
 
-def save_candidates(db, run_date, candidates):
-    """将候选结果写入 cockpit_daily"""
+def save_candidates(db, run_date, candidates, pool_data=None):
+    """将候选结果写入 cockpit_daily，含简报（舆情+欧奈尔分析）"""
+    from cockpit.briefing import BriefingEngine
+    from cockpit.sentiment import SentimentEngine
+    from cockpit.oneil_eval import ONeilEvaluator
+
+    briefing_engine = BriefingEngine(db)
+    sentiment_engine = SentimentEngine()
+    oneil_evaluator = ONeilEvaluator(db)
+
+    # 获取大盘数据（所有候选共享）
+    market_data = briefing_engine._module_market()
+
     for c in candidates:
-        signal_types = json.dumps(c.get('signals', []), ensure_ascii=False)
+        code = c['stock_code']
+        stock_name = c.get('stock_name', '')
+
+        # 舆情
+        sentiment_summary = ''
+        try:
+            sent = sentiment_engine.fetch(code, stock_name)
+            sentiment_summary = sent.get('summary', '')
+        except Exception:
+            pass
+
+        # 获取入场参考价（在评估前计算，供评估器使用）
+        signal_date = c.get('signal_date', '')
+        entry_price = None
+        if signal_date:
+            row = db.execute(
+                "SELECT close FROM daily_kline WHERE stock_code=? AND date=?",
+                (code, signal_date)
+            ).fetchone()
+            if row:
+                entry_price = row['close']
+        if not entry_price:
+            row = db.execute(
+                "SELECT close FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 1",
+                (code,)
+            ).fetchone()
+            entry_price = row['close'] if row else 10.0
+
+        c['entry_price_ref'] = entry_price
+
+        # 欧奈尔分析
+        oneil_analysis = ''
+        try:
+            oneil = oneil_evaluator.evaluate(code, c, market_data)
+            oneil_analysis = oneil.get('summary', '')
+        except Exception:
+            pass
+
+        # 止损止盈
+        from cockpit.position import calculate_stop_loss, get_trailing_stop_rule_text
+        signals = c.get('signals', [])
+        primary = signals[0] if signals else 'mw_b2'
+        signal_type_map = {
+            'mw_plus': 'mw_plus', 'mw_b2': 'mw_b2',
+            'pocket_pivot_b1': 'pocket_pivot_base', 'pocket_pivot': 'pocket_pivot_base',
+            'base_breakout': 'base_breakout',
+        }
+        st = signal_type_map.get(primary, 'mw_b2')
+
+        stop_price, stop_rule = calculate_stop_loss(
+            st, entry_price,
+            l_price=c.get('l_price'),
+            b2_low=None,
+            signal_low=entry_price * 0.92
+        )
+
+        # 注入入场价（供评估器使用）
+        c['entry_price_ref'] = entry_price
+        c['stop_loss_price'] = round(stop_price, 2) if stop_price else None
+
+        signal_types_json = json.dumps(c.get('signals', []), ensure_ascii=False)
+
         db.execute("""
             INSERT OR REPLACE INTO cockpit_daily (
                 run_date, stock_code, stock_name, rank,
@@ -451,19 +523,25 @@ def save_candidates(db, run_date, candidates):
                 canslim_s, canslim_l, canslim_i, canslim_m,
                 market_cap, profit_trend,
                 l1_industry, l1_rs250, l1_rs20, l1_pct_5d,
-                theme_indices
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                sentiment_summary, oneil_analysis,
+                stop_loss_price, stop_loss_rule, trailing_stop_rule,
+                target_price, entry_price_ref
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            run_date, c['stock_code'], c.get('stock_name', ''), c.get('rank'),
-            signal_types, c.get('signal_date', ''), c.get('confidence', ''),
+            run_date, code, stock_name, c.get('rank'),
+            signal_types_json, signal_date, c.get('confidence', ''),
             c.get('h_date'), c.get('h_price'), c.get('l_date'), c.get('l_price'),
             c.get('decline_pct'), c.get('consolidation_days'),
             c.get('canslim_total'), c.get('canslim_c'), c.get('canslim_a'), c.get('canslim_n'),
             c.get('canslim_s'), c.get('canslim_l'), c.get('canslim_i'), c.get('canslim_m'),
             c.get('market_cap'), c.get('profit_trend', ''),
             c.get('l1_industry', ''), c.get('l1_rs250'), c.get('l1_rs20'), c.get('l1_pct_5d'),
-            '[]'
+            sentiment_summary, oneil_analysis,
+            round(stop_price, 2) if stop_price else None, stop_rule,
+            get_trailing_stop_rule_text(),
+            c.get('h_price'), entry_price
         ))
+
     db.commit()
 
 

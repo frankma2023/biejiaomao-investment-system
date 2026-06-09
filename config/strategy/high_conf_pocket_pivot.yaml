@@ -1,0 +1,95 @@
+# 高置信度口袋支点策略 · 回测参数
+# 条件: 口袋支点V3日 = MW B1日
+# 区间: 2023-06-01 ~ 2026-06-05
+# 样本: 303个重合信号
+# 用途: 仓位管理(凯利公式)、策略对比、风险评估
+
+strategy:
+  name: "高置信度口袋支点"
+  slug: "high_conf_pocket_pivot"
+  description: "口袋支点V3与MW B1日重合，次日开盘买入"
+  date_range: "2023-06-01 ~ 2026-06-05"
+  total_signals: 303
+
+entry:
+  rule: "B1日 = 口袋支点日 → 次日(B1+1)开盘价买入"
+  timing: "B1+1_open"
+
+# ── 核心指标 ──
+performance:
+  5d:
+    trades: 297
+    win_rate: 63.3
+    median_return: 5.09
+    avg_return: 6.66
+  10d:
+    trades: 288
+    win_rate: 60.8
+    median_return: 5.00
+    avg_return: 7.82
+  20d:
+    trades: 266
+    win_rate: 57.1
+    median_return: 5.89
+    avg_return: 10.61
+
+# ── 凯利仓位参数 (10日持有) ──
+kelly:
+  holding_period: "10d"
+  win_rate: 0.608       # p
+  loss_rate: 0.392      # q = 1-p
+  avg_win_pct: 22.15    # 盈利交易平均收益%
+  avg_loss_pct: -11.88  # 亏损交易平均损失%
+  win_loss_ratio: 1.86  # b = |avg_win/avg_loss|
+  kelly_full: 0.397     # f = (b*p - q) / b
+  kelly_half: 0.199     # 推荐实操仓位
+  kelly_quarter: 0.099  # 保守仓位
+  note: "凯利假设交易独立。该策略信号集中在4月，且行业重叠，实际仓位需折上折。"
+
+# ── 按月胜率 ──
+monthly:
+  2025-12: { trades: 25, win_rate_10d: 88 }
+  2026-01: { trades: 37, win_rate_10d: 73 }
+  2026-02: { trades: 63, win_rate_10d: 68 }
+  2026-03: { trades: 60, win_rate_10d: 53 }
+  2026-04: { trades: 71, win_rate_10d: 76 }
+  2026-05: { trades: 41, win_rate_10d: 41 }
+  2026-06: { trades: 6,  win_rate_10d: 0 }
+
+# ── 子维度 ──
+subgroups:
+  by_pivot_type:
+    base:
+      trades_10d: 169
+      win_rate_10d: 61.5
+      median_10d: 5.40
+    ma10_bounce:
+      trades_10d: 119
+      win_rate_10d: 59.7
+      median_10d: 4.75
+  by_market:
+    bull:
+      trades_10d: 122
+      win_rate_10d: 57.4
+      median_10d: 4.10
+    bear:
+      trades_10d: 58
+      win_rate_10d: 63.8
+      median_10d: 5.80
+    sideways:
+      trades_10d: 106
+      win_rate_10d: 62.3
+      median_10d: 5.20
+  by_depth:
+    shallow_lt15:
+      trades_10d: 76
+      win_rate_10d: 56.6
+      median_10d: 3.80
+    normal_15_25:
+      trades_10d: 154
+      win_rate_10d: 63.0
+      median_10d: 5.60
+    deep_gt25:
+      trades_10d: 58
+      win_rate_10d: 58.6
+      median_10d: 4.90

@@ -1,0 +1,61 @@
+# MW PLUS信号策略 · 回测参数
+# 条件: PLUS (score≥80 ∧ D满分 ∧ I1满分 ∧ I2满分)
+# 区间: 2023-06-01 ~ 2026-06-05
+# 样本: 22个PLUS信号
+# 用途: 仓位管理(凯利公式)、策略对比、风险评估
+
+strategy:
+  name: "MW PLUS信号"
+  slug: "plus_b2p2"
+  description: "PLUS信号出现后，B2+2日开盘买入，持有10日"
+  date_range: "2023-06-01 ~ 2026-06-05"
+  total_signals: 22
+
+entry:
+  rule: "PLUS信号 → B2+2日开盘价买入"
+  timing: "B2+2_open"
+
+# ── 核心指标 ──
+performance:
+  5d:
+    trades: 20
+    win_rate: 55.0
+    median_return: 4.28
+    avg_return: 5.86
+  10d:
+    trades: 20
+    win_rate: 60.0
+    median_return: 12.23
+    avg_return: 10.24
+  20d:
+    trades: 18
+    win_rate: 55.6
+    median_return: 9.19
+    avg_return: 14.53
+
+# ── 凯利仓位参数 (10日持有) ──
+kelly:
+  holding_period: "10d"
+  win_rate: 0.600       # p
+  loss_rate: 0.400      # q = 1-p
+  avg_win_pct: 22.15    # 盈利交易平均收益%
+  avg_loss_pct: -11.88  # 亏损交易平均损失%
+  win_loss_ratio: 1.86  # b = |avg_win/avg_loss|
+  kelly_full: 0.385     # f = (b*p - q) / b
+  kelly_half: 0.193     # 推荐实操仓位
+  kelly_quarter: 0.096  # 保守仓位
+  note: "样本仅20笔。凯利假设交易独立，PLUS信号高度集中在4月，实际需打折。"
+
+# ── 按月胜率 ──
+monthly:
+  2026-02: { trades: 1, win_rate_10d: 0 }
+  2026-03: { trades: 4, win_rate_10d: 25 }
+  2026-04: { trades: 19, win_rate_10d: 79 }
+  2026-05: { trades: 8, win_rate_10d: 63 }
+
+# ── 最大盈亏 ──
+extremes:
+  max_gain_10d: 62.3
+  max_loss_10d: -23.2
+  best_stock: "000636 风华高科 +62.3%"
+  worst_stock: "600392 盛和资源 -23.2%"

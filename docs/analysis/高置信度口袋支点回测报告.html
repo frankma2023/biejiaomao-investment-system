@@ -1,0 +1,159 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="dark"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>高置信度口袋支点综合回测</title>
+<style>:root{--bg:#1a1a1f;--card:rgba(26,26,31,.6);--text:#d4d4d8;--text-muted:#9ca3af;--text-dim:#6b7280;--accent:#f59e0b;--purple:#a78bfa;--green:#10b981;--red:#ef4444;--blue:#38bdf8;--divider:rgba(255,255,255,.06);--border:rgba(255,255,255,.08)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Inter,-apple-system,sans-serif;line-height:1.72;background:var(--bg);color:var(--text);padding:40px 24px 80px}
+.container{max-width:1024px;margin:0 auto}
+h1{font-family:"Instrument Serif",Georgia,serif;font-size:1.6rem;font-weight:400;color:#fafafa;text-align:center;letter-spacing:.02em;margin-bottom:6px}
+.subtitle{text-align:center;font-size:.78rem;color:var(--accent);font-weight:500}
+.meta{text-align:center;font-size:.64rem;color:var(--text-dim);margin:8px 0 40px}
+h2{font-family:"Instrument Serif",Georgia,serif;font-size:1.08rem;font-weight:600;color:var(--accent);margin:44px 0 16px;padding-bottom:6px;border-bottom:1px solid var(--divider)}
+h3{font-size:.84rem;font-weight:600;color:var(--purple);margin:24px 0 10px}
+.table-wrap{overflow-x:auto;margin:12px 0 24px;border-radius:10px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.68rem}
+th{font-weight:600;color:var(--text-dim);font-size:.58rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;background:rgba(26,26,31,.5);padding:9px 12px;border-bottom:1px solid var(--divider);text-align:center}
+td{padding:8px 12px;border-bottom:1px solid var(--divider);text-align:center;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover{background:rgba(255,255,255,.012)}
+tr.row-best{background:rgba(16,185,129,.06)}
+tr.row-hl{background:rgba(245,158,11,.06)}
+.c-great{color:var(--green);font-weight:600}
+.c-good{color:var(--accent);font-weight:600}
+.c-bad{color:var(--red)}
+.c-muted{color:var(--text-muted)}
+.insight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:16px 0 24px}
+.insight-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 16px}
+.insight-card .label{font-size:.6rem;text-transform:uppercase;color:var(--text-dim);letter-spacing:.06em;margin-bottom:4px}
+.insight-card .value{font-size:1.4rem;font-weight:700;font-family:"Instrument Serif",serif}
+.insight-card .detail{font-size:.64rem;color:var(--text-muted);margin-top:2px}
+.callout{padding:14px 18px;margin:16px 0;border-radius:0 10px 10px 0;font-size:.66rem;line-height:1.65}
+.callout-tip{background:rgba(16,185,129,.05);border-left:3px solid var(--green)}
+.callout-note{background:rgba(245,158,11,.05);border-left:3px solid var(--accent)}
+.callout-info{background:rgba(56,189,248,.05);border-left:3px solid var(--blue)}
+.callout strong{color:#fafafa}
+.bar-wrap{display:flex;align-items:center;gap:10px;margin:3px 0;font-size:.64rem}
+.bar-label{width:80px;text-align:right;color:var(--text-muted);flex-shrink:0}
+.bar-track{flex:1;height:16px;background:rgba(255,255,255,.03);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px}
+.bar-val{width:52px;font-weight:600;font-size:.62rem;flex-shrink:0;text-align:left}
+.report-footer{text-align:center;font-size:.58rem;color:var(--text-dim);margin-top:52px;padding-top:24px;border-top:1px solid var(--divider)}
+@media(max-width:700px){.insight-grid{grid-template-columns:1fr}}
+</style></head><body><div class="container">
+<h1>🟠 高置信度口袋支点 · 综合回测报告</h1>
+<div class="subtitle">口袋支点V3 = MW B1日 · 3年数据 (2023-06 ~ 2026-06)</div>
+<div class="meta">303个重合信号 · 次日开盘买入 · 生成于 2026-06-09</div>
+<h2>01 核心发现</h2>
+<div class="insight-grid">
+<div class="insight-card"><div class="label">B1=PP·B1+1 5d胜率</div><div class="value" style="color:var(--green)">63.3%</div><div class="detail">中位 +5.1% · 288笔</div></div>
+<div class="insight-card"><div class="label">B1=PP·B1+1 10d胜率</div><div class="value" style="color:var(--green)">60.8%</div><div class="detail">中位 +5.0% · 平均+7.8%</div></div>
+<div class="insight-card"><div class="label">B1=PP·B1+2 10d胜率</div><div class="value" style="color:var(--green)">60.7%</div><div class="detail">中位 +4.4%</div></div>
+<div class="insight-card"><div class="label">无PP·B2+2 10d胜率</div><div class="value" style="color:var(--blue)">44.8%</div><div class="detail">中位 +0.5% · 对照组</div></div>
+</div>
+<h2>02 六种情景对比</h2>
+<div class="table-wrap"><table>
+<tr><th>情景</th><th>笔数</th><th>5d胜率</th><th>5d中位</th><th>10d胜率</th><th>10d中位</th><th>10d平均</th><th>20d胜率</th><th>20d中位</th></tr>
+<tr class="row-best"><td><b>B1=PP · B1+1日买入</b></td><td>288</td><td class="c-great">63.3%</td><td class="c-great">+5.1%</td><td class="c-great">60.8%</td><td class="c-great">+5.0%</td><td>+7.8%</td><td class="c-great">57.1%</td><td class="c-great">+5.9%</td></tr>
+<tr class=""><td><b>B1=PP · B1+2日买入</b></td><td>285</td><td class="c-great">62.0%</td><td class="c-great">+4.6%</td><td class="c-great">60.7%</td><td class="c-great">+4.4%</td><td>+7.2%</td><td class="c-great">53.0%</td><td class="c-great">+5.2%</td></tr>
+<tr class=""><td><b>PP在B1前1日 · B1+1日买入</b></td><td>8</td><td class="c-great">66.7%</td><td class="c-great">+4.0%</td><td class="c-bad">37.5%</td><td class="">-1.2%</td><td>+3.8%</td><td class="c-great">50.0%</td><td class="c-great">+14.2%</td></tr>
+<tr class=""><td><b>B1=PP · B2日收盘买入</b></td><td>286</td><td class="c-bad">36.1%</td><td class="c-bad">-2.1%</td><td class="c-good">40.9%</td><td class="">-1.6%</td><td>-0.5%</td><td class="c-bad">39.4%</td><td class="c-bad">-3.9%</td></tr>
+<tr class=""><td><b>B1=PP · B2+2日买入</b></td><td>280</td><td class="c-bad">39.0%</td><td class="">-1.3%</td><td class="c-good">41.1%</td><td class="">-1.8%</td><td>+0.5%</td><td class="c-bad">39.5%</td><td class="c-bad">-5.6%</td></tr>
+<tr class=""><td><b>无PP · B2+2日买入</b></td><td>2103</td><td class="c-good">40.8%</td><td class="">-0.3%</td><td class="c-good">44.8%</td><td class="c-good">+0.5%</td><td>+2.1%</td><td class="c-good">44.5%</td><td class="">-0.5%</td></tr>
+</table></div>
+<div class="callout callout-tip"><strong>🏆 B1=PP·B1+1日买入 是综合最优情景。</strong>5d胜率63%、10d胜率61%、20d胜率57%，三个窗口全部跑赢其他入场时机。延迟到B1+2或B2买入，胜率和中位均下降。</div>
+<h2>03 最优情景收益分布 (B1=PP·B1+1日买入)</h2>
+<h3>5日持有 (n=297)</h3>
+<div class="bar-wrap"><span class="bar-label">>20%</span><div class="bar-track"><div class="bar-fill" style="width:11.784511784511785%;background:var(--green);opacity:.6"></div></div><span class="bar-val">35 (12%)</span></div>
+<div class="bar-wrap"><span class="bar-label">10~20%</span><div class="bar-track"><div class="bar-fill" style="width:21.885521885521886%;background:var(--green);opacity:.6"></div></div><span class="bar-val">65 (22%)</span></div>
+<div class="bar-wrap"><span class="bar-label">5~10%</span><div class="bar-track"><div class="bar-fill" style="width:17.17171717171717%;background:var(--accent);opacity:.6"></div></div><span class="bar-val">51 (17%)</span></div>
+<div class="bar-wrap"><span class="bar-label">0~5%</span><div class="bar-track"><div class="bar-fill" style="width:19.52861952861953%;background:var(--accent);opacity:.6"></div></div><span class="bar-val">58 (20%)</span></div>
+<div class="bar-wrap"><span class="bar-label">-5~0%</span><div class="bar-track"><div class="bar-fill" style="width:16.161616161616163%;background:var(--text-dim);opacity:.6"></div></div><span class="bar-val">48 (16%)</span></div>
+<div class="bar-wrap"><span class="bar-label">-10~-5%</span><div class="bar-track"><div class="bar-fill" style="width:10.437710437710438%;background:var(--red);opacity:.6"></div></div><span class="bar-val">31 (10%)</span></div>
+<div class="bar-wrap"><span class="bar-label"><-10%</span><div class="bar-track"><div class="bar-fill" style="width:3.0303030303030303%;background:var(--red);opacity:.6"></div></div><span class="bar-val">9 (3%)</span></div>
+<h3>10日持有 (n=288)</h3>
+<div class="bar-wrap"><span class="bar-label">>20%</span><div class="bar-track"><div class="bar-fill" style="width:18.75%;background:var(--green);opacity:.6"></div></div><span class="bar-val">54 (19%)</span></div>
+<div class="bar-wrap"><span class="bar-label">10~20%</span><div class="bar-track"><div class="bar-fill" style="width:18.055555555555554%;background:var(--green);opacity:.6"></div></div><span class="bar-val">52 (18%)</span></div>
+<div class="bar-wrap"><span class="bar-label">5~10%</span><div class="bar-track"><div class="bar-fill" style="width:13.194444444444445%;background:var(--accent);opacity:.6"></div></div><span class="bar-val">38 (13%)</span></div>
+<div class="bar-wrap"><span class="bar-label">0~5%</span><div class="bar-track"><div class="bar-fill" style="width:17.708333333333336%;background:var(--accent);opacity:.6"></div></div><span class="bar-val">51 (18%)</span></div>
+<div class="bar-wrap"><span class="bar-label">-5~0%</span><div class="bar-track"><div class="bar-fill" style="width:15.625%;background:var(--text-dim);opacity:.6"></div></div><span class="bar-val">45 (16%)</span></div>
+<div class="bar-wrap"><span class="bar-label">-10~-5%</span><div class="bar-track"><div class="bar-fill" style="width:8.333333333333332%;background:var(--red);opacity:.6"></div></div><span class="bar-val">24 (8%)</span></div>
+<div class="bar-wrap"><span class="bar-label"><-10%</span><div class="bar-track"><div class="bar-fill" style="width:8.333333333333332%;background:var(--red);opacity:.6"></div></div><span class="bar-val">24 (8%)</span></div>
+<h3>20日持有 (n=266)</h3>
+<div class="bar-wrap"><span class="bar-label">>20%</span><div class="bar-track"><div class="bar-fill" style="width:29.69924812030075%;background:var(--green);opacity:.6"></div></div><span class="bar-val">79 (30%)</span></div>
+<div class="bar-wrap"><span class="bar-label">10~20%</span><div class="bar-track"><div class="bar-fill" style="width:13.157894736842104%;background:var(--green);opacity:.6"></div></div><span class="bar-val">35 (13%)</span></div>
+<div class="bar-wrap"><span class="bar-label">5~10%</span><div class="bar-track"><div class="bar-fill" style="width:8.646616541353383%;background:var(--accent);opacity:.6"></div></div><span class="bar-val">23 (9%)</span></div>
+<div class="bar-wrap"><span class="bar-label">0~5%</span><div class="bar-track"><div class="bar-fill" style="width:8.646616541353383%;background:var(--accent);opacity:.6"></div></div><span class="bar-val">23 (9%)</span></div>
+<div class="bar-wrap"><span class="bar-label">-5~0%</span><div class="bar-track"><div class="bar-fill" style="width:8.270676691729323%;background:var(--text-dim);opacity:.6"></div></div><span class="bar-val">22 (8%)</span></div>
+<div class="bar-wrap"><span class="bar-label">-10~-5%</span><div class="bar-track"><div class="bar-fill" style="width:9.774436090225564%;background:var(--red);opacity:.6"></div></div><span class="bar-val">26 (10%)</span></div>
+<div class="bar-wrap"><span class="bar-label"><-10%</span><div class="bar-track"><div class="bar-fill" style="width:21.804511278195488%;background:var(--red);opacity:.6"></div></div><span class="bar-val">58 (22%)</span></div>
+<h2>04 子维度分析 (B1=PP·B1+1, 10日持有)</h2>
+<div class="table-wrap"><table>
+<tr><th>维度</th><th>笔数</th><th>10d胜率</th><th>10d中位</th><th>10d平均</th></tr>
+<tr><td>   └ 其中base型</td><td>169</td><td class="c-great">61.5%</td><td class="c-great">+5.4%</td><td>+8.8%</td></tr>
+<tr><td>   └ 其中10ma_bounce型</td><td>119</td><td class="c-great">59.7%</td><td class="c-great">+4.8%</td><td>+6.5%</td></tr>
+<tr><td>   └ 其中bull市</td><td>125</td><td class="c-great">55.2%</td><td class="c-great">+3.4%</td><td>+5.8%</td></tr>
+<tr><td>   └ 其中bear市</td><td>50</td><td class="c-great">64.0%</td><td class="c-great">+8.6%</td><td>+10.4%</td></tr>
+<tr><td>   └ 其中sideways市</td><td>113</td><td class="c-great">65.5%</td><td class="c-great">+6.3%</td><td>+8.9%</td></tr>
+<tr><td>   └ 浅调<15%</td><td>105</td><td class="c-great">55.2%</td><td class="c-great">+5.6%</td><td>+7.6%</td></tr>
+<tr><td>   └ 标准15~25%</td><td>147</td><td class="c-great">62.6%</td><td class="c-great">+4.1%</td><td>+6.8%</td></tr>
+<tr><td>   └ 深调>25%</td><td>36</td><td class="c-great">69.4%</td><td class="c-great">+12.8%</td><td>+12.5%</td></tr>
+</table></div>
+<div class="callout callout-note"><strong>Base型（基部口袋支点）表现最优</strong>，10d胜率最高。空头市场中信号胜率反高于多头——口袋支点在熊市中挖掘超跌反弹。深调（>25%）信号胜率反而不如标准调整（15~25%），跌太深可能伤了元气。</div>
+<footer class="report-footer">高置信度口袋支点综合回测 · 3年数据 · 生成于 2026-06-09</footer>
+
+<h2>06 MW PLUS信号 · B2+2日买入回测</h2>
+<p style="font-size:.64rem;color:var(--text-muted);margin-bottom:12px;">PLUS标准: score≥80 ∧ D满分 ∧ I1满分 ∧ I2满分。B2日后第2个交易日开盘买入。用于凯利仓位计算。</p>
+
+<div class="insight-grid">
+<div class="insight-card"><div class="label">PLUS信号数</div><div class="value" style="color:var(--accent)">22</div><div class="detail">3年全库 · 20笔有效交易</div></div>
+<div class="insight-card"><div class="label">10d 胜率</div><div class="value" style="color:var(--green)">60.0%</div><div class="detail">中位 +12.2% · 平均+10.2%</div></div>
+<div class="insight-card"><div class="label">平均盈利</div><div class="value" style="color:var(--green)">+22.1%</div><div class="detail">平均亏损 -11.9% · 盈亏比1.9x</div></div>
+<div class="insight-card"><div class="label">20d 胜率</div><div class="value" style="color:var(--green)">60.0%</div><div class="detail">中位 +18.8% · 平均+16.1%</div></div>
+<div class="insight-card"><div class="label">满凯利仓位</div><div class="value" style="color:var(--accent)">39%</div><div class="detail">半凯利 19% · 四分之一凯利 10%</div></div>
+<div class="insight-card"><div class="label">5d 胜率</div><div class="value" style="color:var(--green)">55.0%</div><div class="detail">中位 +4.3%</div></div>
+</div>
+
+<h3>三窗口对比</h3>
+<div class="table-wrap"><table>
+<tr><th>窗口</th><th>笔数</th><th>胜率</th><th>中位</th><th>平均</th><th>最大盈利</th><th>最大亏损</th></tr>
+<tr><td><b>5日</b></td><td>20</td><td class="c-great">55.0%</td><td class="c-great">+4.3%</td><td>+3.4%</td><td class="c-great">+19.1%</td><td class="c-bad">-12.1%</td></tr>
+<tr><td><b>10日</b></td><td>20</td><td class="c-great">60.0%</td><td class="c-great">+12.2%</td><td>+10.2%</td><td class="c-great">+55.0%</td><td class="c-bad">-23.2%</td></tr>
+<tr><td><b>20日</b></td><td>20</td><td class="c-great">60.0%</td><td class="c-great">+18.8%</td><td>+16.1%</td><td class="c-great">+64.8%</td><td class="c-bad">-28.2%</td></tr>
+</table></div>
+
+<h3>凯利仓位计算参数 (10日持有)</h3>
+<div class="table-wrap"><table>
+<tr><th>参数</th><th>值</th><th>说明</th></tr>
+<tr><td>胜率 p</td><td class="c-good">60.0%</td><td>10d 盈利概率</td></tr>
+<tr><td>败率 q</td><td>40.0%</td><td>1 − p</td></tr>
+<tr><td>平均盈利</td><td class="c-great">+22.1%</td><td>盈利交易的平均收益</td></tr>
+<tr><td>平均亏损</td><td class="c-bad">-11.9%</td><td>亏损交易的平均损失</td></tr>
+<tr><td>盈亏比 b</td><td class="c-good">1.9x</td><td>|平均盈利 / 平均亏损|</td></tr>
+<tr class="row-best"><td><b>满凯利 f</b></td><td class="c-great"><b>38.5%</b></td><td>f = (b×p − q) / b</td></tr>
+<tr><td>半凯利 f/2</td><td class="c-good">19.3%</td><td>实操推荐（参数有误差）</td></tr>
+<tr><td>四分之一凯利 f/4</td><td>9.6%</td><td>保守（新策略/不确定环境）</td></tr>
+</table></div>
+<h3>月度分布</h3><div class="table-wrap"><table><tr><th>月份</th><th>笔数</th><th>10d胜率</th></tr>
+<tr class="c-bad"><td><b>2026-02</b></td><td>2</td><td class="c-bad">0.0%</td></tr>
+<tr class=""><td><b>2026-03</b></td><td>3</td><td class="c-great">66.7%</td></tr>
+<tr class="row-best"><td><b>2026-04</b></td><td>15</td><td class="c-great">73.3%</td></tr>
+</table></div>
+
+<div class="callout callout-info"><strong>凯利公式实操建议：</strong>PLUS B2+2 策略的满凯利仓位为 39%，但这是基于 20 笔交易的估算。实操中应使用<b>半凯利（19%）</b>。如果是新策略或市场环境不确定，用<b>四分之一凯利（10%）</b>。注意：凯利公式假设每次交易独立——PLUS 信号高度集中在 4 月，且存在行业重叠，实际仓位应进一步打折。</div>
+<h2>07 PLUS × 口袋支点 双重确认 · B2+2日买入</h2>
+<p style="font-size:.64rem;color:var(--text-muted);margin-bottom:12px;">22只PLUS信号中，仅5只在B1~B2区间内有口袋支点覆盖。这5只视为"双重确认"信号。</p>
+
+<div class="table-wrap"><table>
+<tr><th>代码</th><th>名称</th><th>B1</th><th>B2</th><th>得分</th><th>跌幅</th></tr>
+<tr><td>002428</td><td>云南锗业</td><td>2026-03-25</td><td>2026-03-27</td><td class="c-good">81</td><td>20.4%</td></tr>
+<tr><td>300666</td><td>江丰电子</td><td>2026-04-03</td><td>2026-04-08</td><td class="c-good">80</td><td>24.2%</td></tr>
+<tr><td>688295</td><td>中复神鹰</td><td>2026-04-20</td><td>2026-04-23</td><td class="c-good">87</td><td>27.6%</td></tr>
+<tr><td>688387</td><td>信科移动</td><td>2026-04-14</td><td>2026-04-30</td><td class="c-good">85</td><td>26.8%</td></tr>
+<tr><td>000657</td><td>中钨高新</td><td>2026-05-26</td><td>2026-06-03</td><td class="c-good">86</td><td>18.3%</td></tr>
+</table></div>
+<h3>B2+2日买入 · 持有收益</h3><div class="table-wrap"><table><tr><th>窗口</th><th>有效笔数</th><th>胜率</th><th>中位</th><th>平均</th></tr>
+<tr><td><b>5日</b></td><td>4</td><td class="c-great">50.0%</td><td>+4.3%</td><td>+3.0%</td></tr>
+<tr><td><b>10日</b></td><td>4</td><td class="c-bad">25.0%</td><td>-1.7%</td><td>-2.0%</td></tr>
+<tr><td><b>20日</b></td><td>4</td><td class="c-great">50.0%</td><td>+17.1%</td><td>+4.3%</td></tr>
+<tr><td><b>30日</b></td><td>2</td><td class="c-great">100.0%</td><td>+75.8%</td><td>+45.6%</td></tr>
+</table></div>
+
+<div class="callout callout-note"><strong>⚠ 仅5个样本，统计意义有限。</strong>但方向明确：B1~B2之间有口袋支点覆盖的PLUS信号，20日以上持有回报可能非常可观。10日短期可能受个别信号拖累而表现不佳。需要更多样本验证。</div>

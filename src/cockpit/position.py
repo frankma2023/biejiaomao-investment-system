@@ -111,18 +111,18 @@ def calculate_stop_loss(signal_type, entry_price, h_price=None, l_price=None,
     返回: (stop_loss_price, rule_description)
     """
     rules = {
-        'mw_plus': (b2_low, f"MW PLUS B2日最低价 ¥{b2_low:.2f}（突破确认日防守线）"),
-        'mw_b2': (b2_low, f"MW B2日最低价 ¥{b2_low:.2f}（突破确认日防守线）"),
-        'pocket_pivot_base': (signal_low, f"口袋支点信号日最低价 ¥{signal_low:.2f}（启动日防守线）"),
-        'pocket_pivot_continuation': (ma10, f"10日均线 ¥{ma10:.2f}（延续型支撑）"),
-        'pocket_pivot_10ma': (ma10, f"10日均线 ¥{ma10:.2f}（均线支撑）"),
-        'base_breakout': (l_price, f"基部下沿 ¥{l_price:.2f}（结构支撑）"),
+        'mw_plus': (b2_low, 'MW PLUS B2日最低价（突破确认日防守线）'),
+        'mw_b2': (b2_low, 'MW B2日最低价（突破确认日防守线）'),
+        'pocket_pivot_base': (signal_low, '口袋支点信号日最低价（启动日防守线）'),
+        'pocket_pivot_continuation': (ma10, '10日均线（延续型支撑）'),
+        'pocket_pivot_10ma': (ma10, '10日均线（均线支撑）'),
+        'base_breakout': (l_price, '基部下沿（结构支撑）'),
     }
 
     if signal_type in rules:
         price, desc = rules[signal_type]
-        if price and price < entry_price:
-            return price, desc
+        if price and price > 0 and price < entry_price:
+            return price, f"{desc} ¥{price:.2f}"
 
     # 兜底：8% 止损
     fallback = entry_price * 0.92
