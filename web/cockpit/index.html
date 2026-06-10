@@ -57,14 +57,18 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)
 /* 简报展开区 */
 .briefing{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
 .briefing.open{display:block}
-.briefing h4{font-family:var(--font-display);font-size:.75rem;color:var(--accent);margin:10px 0 4px}
-.briefing table{width:100%;border-collapse:collapse;font-size:.62rem}
-.briefing td{padding:3px 8px}
-.briefing td.lbl{color:var(--muted);width:100px;white-space:nowrap}
-.briefing td.val{color:var(--text-primary);font-family:var(--font-mono)}
-.briefing .highlight{color:var(--accent);font-weight:600}
-.briefing .up{color:#ef4444}
-.briefing .down{color:#10b981}
+.briefing-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.briefing-card{background:rgba(26,26,31,.3);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.briefing-card h4{font-family:var(--font-display);font-size:.68rem;color:var(--accent);margin:0 0 6px}
+.briefing-card table{width:100%;border-collapse:collapse;font-size:.58rem}
+.briefing-card td{padding:2px 6px}
+.briefing-card td.lbl{color:var(--muted);width:70px;white-space:nowrap}
+.briefing-card td.val{color:var(--text-primary);font-family:var(--font-mono)}
+.briefing-card .highlight{color:var(--accent);font-weight:600}
+.briefing-card .up{color:#ef4444}
+.briefing-card .down{color:#10b981}
+.briefing-card .card-text{font-size:.58rem;color:var(--text-secondary);line-height:1.5}
+html[data-theme="light"] .briefing-card{background:rgba(255,255,255,.5);border-color:var(--divider)}
 
 /* 检查单 */
 .checklist{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-top:10px;box-shadow:var(--shadow-card)}
@@ -281,10 +285,10 @@ function renderCandidates() {
 }
 
 function buildBriefingHTML(c) {
-  var h = '';
+  var h = '<div class="briefing-grid">';
+
   // 信号概要
-  h += '<h4>📡 信号概要</h4>';
-  h += '<table>';
+  h += '<div class="briefing-card"><h4>📡 信号概要</h4><table>';
   h += tr('信号日期', c.signal_date||'—');
   h += tr('置信度', c.confidence||'—');
   if (c.h_date) h += tr('前高H点', c.h_date + ' ¥' + (c.h_price||'—'));
@@ -292,11 +296,10 @@ function buildBriefingHTML(c) {
   if (c.decline_pct != null) h += tr('H→L调整', c.decline_pct.toFixed(1) + '%');
   if (c.consolidation_days) h += tr('盘整天数', c.consolidation_days + '天');
   if (c.mw_score) h += tr('MW评分', c.mw_score);
-  h += '</table>';
+  h += '</table></div>';
 
   // 基本面
-  h += '<h4>📊 基本面</h4>';
-  h += '<table>';
+  h += '<div class="briefing-card"><h4>📊 基本面</h4><table>';
   h += tr('CAN SLIM总分', c.canslim_total != null ? c.canslim_total : '—');
   h += tr('C 当季EPS', c.canslim_c != null ? c.canslim_c : '—');
   h += tr('A 年度EPS', c.canslim_a != null ? c.canslim_a : '—');
@@ -306,55 +309,54 @@ function buildBriefingHTML(c) {
   h += tr('I 机构', c.canslim_i != null ? c.canslim_i : '—');
   h += tr('M 市场', c.canslim_m != null ? c.canslim_m : '—');
   h += tr('市值', c.market_cap != null ? c.market_cap.toFixed(0) + '亿' : '—');
-  h += '</table>';
+  h += '</table></div>';
 
   // 行业
   if (c.l1_industry) {
-    h += '<h4>🏭 行业背景</h4>';
-    h += '<table>';
+    h += '<div class="briefing-card"><h4>🏭 行业背景</h4><table>';
     h += tr('一级行业', c.l1_industry);
     if (c.l1_rs250 != null) h += tr('行业RS250', c.l1_rs250);
     if (c.l1_rs20 != null) h += tr('行业RS20', c.l1_rs20);
-    h += '</table>';
+    h += '</table></div>';
   }
 
   // 仓位
   if (c.suggested_position_pct) {
-    h += '<h4>💰 仓位建议</h4>';
-    h += '<table>';
+    h += '<div class="briefing-card"><h4>💰 仓位建议</h4><table>';
     h += tr('建议仓位', '<span class="highlight">' + c.suggested_position_pct.toFixed(1) + '%</span>');
     if (c.max_loss_amount) h += tr('最大亏损', '¥' + c.max_loss_amount.toFixed(0));
     if (c.stop_loss_price) h += tr('止损价', '¥' + c.stop_loss_price.toFixed(2));
     if (c.kelly_position_pct) h += tr('凯利参考', c.kelly_position_pct.toFixed(1) + '%');
     if (c.target_price) h += tr('止盈参考', '¥' + c.target_price.toFixed(2));
-    h += '</table>';
+    h += '</table></div>';
   }
 
   // 止损/止盈
   if (c.stop_loss_rule) {
-    h += '<h4>🛡 止损/止盈</h4>';
-    h += '<div style="font-size:.62rem;color:var(--text-secondary)">' + c.stop_loss_rule.replace(/\n/g,'<br>') + '</div>';
+    h += '<div class="briefing-card"><h4>🛡 止损/止盈</h4>';
+    h += '<div class="card-text">' + c.stop_loss_rule.replace(/\n/g,'<br>') + '</div>';
     if (c.trailing_stop_rule) {
-      h += '<div style="font-size:.58rem;color:var(--muted);margin-top:4px">' + c.trailing_stop_rule.replace(/\n/g,'<br>') + '</div>';
+      h += '<div class="card-text" style="margin-top:4px">' + c.trailing_stop_rule.replace(/\n/g,'<br>') + '</div>';
     }
+    h += '</div>';
   }
 
   // 舆情
   if (c.sentiment_summary) {
-    h += '<h4>📰 舆情</h4>';
-    h += '<div style="font-size:.62rem;color:var(--text-secondary)">' + c.sentiment_summary + '</div>';
+    h += '<div class="briefing-card"><h4>📰 舆情</h4>';
+    h += '<div class="card-text">' + c.sentiment_summary + '</div>';
+    h += '</div>';
   }
 
   // 欧奈尔分析
   if (c.oneil_analysis) {
-    h += '<h4>📖 欧奈尔分析（快速评估）</h4>';
-    h += '<div style="font-size:.62rem;color:var(--text-secondary)">' + c.oneil_analysis.replace(/\\n/g,'<br>') + '</div>';
-    if (c.oneil_analysis) {
-      var reportUrl = '/api/cockpit/oneil-report?code=' + c.stock_code + '&date=' + (c.run_date||'');
-      h += '<a href="#" onclick="openOneilReport(\'' + c.stock_code + '\',\'' + (c.run_date||'') + '\');return false" style="display:inline-block;margin-top:6px;font-size:.6rem;color:var(--accent);text-decoration:none;border:1px solid var(--accent-border);padding:4px 12px;border-radius:8px">📖 查看深度分析报告 (1000+字)</a>';
-    }
+    h += '<div class="briefing-card"><h4>📖 欧奈尔评估</h4>';
+    h += '<div class="card-text">' + c.oneil_analysis.replace(/\\n/g,'<br>') + '</div>';
+    h += '<a href="#" onclick="openOneilReport(\'' + c.stock_code + '\',\'' + (c.run_date||'') + '\');return false" style="display:inline-block;margin-top:6px;font-size:.55rem;color:var(--accent);text-decoration:none;border:1px solid var(--accent-border);padding:3px 8px;border-radius:6px">📖 深度分析报告</a>';
+    h += '</div>';
   }
 
+  h += '</div>';
   return h;
 }
 
