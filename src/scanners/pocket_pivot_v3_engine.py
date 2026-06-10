@@ -2,11 +2,9 @@
 口袋支点 V3 识别引擎 — 供 pattern-scan 实时使用
 
 基于 pocket_pivot_v2.py 的检测逻辑，包装为标准引擎接口。
-与独立扫描器 pocket_pivot_v2.py 共用 evaluate_stock 核心逻辑。
-
-用法：engine_registry 自动发现后在 pattern-scan 显示
+v3.2: 多周期扫描，遍历所有历史 bi 峰谷对，捕获各周期口袋支点
 """
-import sys, os, sqlite3, json
+import sys, os, sqlite3
 from datetime import datetime
 
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -19,8 +17,8 @@ ENGINE_META = {
     "name": "pocket_pivot_v3",
     "display_name": "口袋支点V3",
     "category": "breakout",
-    "version": "3.0",
-    "description": "集成MW缠论H/L/C结构的口袋支点检测，三种类型(base/continuation/10ma_bounce)"
+    "version": "3.2",
+    "description": "多周期缠论H/L/C口袋支点检测，base/continuation/10ma_bounce"
 }
 
 
@@ -30,48 +28,57 @@ def sma(values, n):
     return sum(clean[-n:]) / n
 
 
-def _get_structure(code, klines, db):
-    """获取 H/L/C 结构：直接使用 chanlun_structure 共享层，不依赖 MW 信号表"""
+def _get_all_structures(code, klines):
+    """从缠论 bi 峰谷提取所有历史 H-L-C 结构（多周期）"""
     dates = [k['date'] for k in klines]
     n = len(klines)
+    structures = []
 
     try:
         from chanlun_structure import get_bi_list, get_bi_peaks
         bi_list = get_bi_list(code)
-        if bi_list:
-            peaks = get_bi_peaks(bi_list)
-            if peaks:
-                # 在最近200根K线中找最高bi峰
-                lookback = min(200, n - 10)
-                cutoff = n - lookback
-                recent = [p for p in peaks if p['date'] >= dates[cutoff] and p['date'] in dates]
-                if not recent:
-                    recent = peaks[-3:]
-                h_peak = None
-                for p in reversed(recent):
-                    if p['date'] in dates:
-                        h_idx = dates.index(p['date'])
-                        if h_idx < n - 3:
-                            h_peak = p
-                            break
-                if h_peak:
-                    l_idx = h_idx + 1
-                    l_price = klines[l_idx]['close']
-                    for i in range(h_idx + 1, n):
-                        if klines[i]['close'] < l_price:
-                            l_price = klines[i]['close']
-                            l_idx = i
-                    return {
-                        'h_date': h_peak['date'], 'h_price': h_peak['price'],
-                        'l_date': dates[l_idx], 'l_price': l_price,
-                        'c_start': dates[l_idx], 'c_end': dates[-1],
-                        'b1_date': None,
-                        'decline_pct': round((h_peak['price'] - l_price) / h_peak['price'] * 100, 2),
-                    }
+        if not bi_list:
+            return []
+        peaks = get_bi_peaks(bi_list)
+        if len(peaks) < 2:
+            return []
+
+        # 遍历所有峰，为每个峰构建 H-L-C 结构
+        for i in range(len(peaks) - 1):
+            h_peak = peaks[i]
+            if h_peak['date'] not in dates:
+                continue
+            h_idx = dates.index(h_peak['date'])
+            if h_idx >= n - 3:
+                continue  # H 太接近末尾
+
+            # 找 H 之后的最低收盘价作为 L
+            l_idx = h_idx + 1
+            l_price = klines[l_idx]['close']
+            for j in range(h_idx + 1, min(h_idx + 120, n)):
+                if klines[j]['close'] < l_price:
+                    l_price = klines[j]['close']
+                    l_idx = j
+
+            # C 区：L 之后到 H 之后 120 天或下一个峰的起点
+            c_end = min(l_idx + 60, n - 1)
+            if i + 1 < len(peaks) and peaks[i + 1]['date'] in dates:
+                next_h_idx = dates.index(peaks[i + 1]['date'])
+                c_end = min(c_end, next_h_idx - 1)
+
+            decline_pct = round((h_peak['price'] - l_price) / h_peak['price'] * 100, 2)
+
+            structures.append({
+                'h_date': h_peak['date'], 'h_price': h_peak['price'],
+                'l_date': dates[l_idx], 'l_price': l_price,
+                'c_start': dates[l_idx], 'c_end': dates[c_end],
+                'b1_date': None,
+                'decline_pct': decline_pct,
+            })
     except Exception:
         pass
 
-    return None
+    return structures
 
 
 def _evaluate(klines, idx, structure, rps20, rps250):
@@ -89,6 +96,14 @@ def _evaluate(klines, idx, structure, rps20, rps250):
 
     dates = [k['date'] for k in klines]
 
+    # 确保扫描日在 C 区内
+    l_idx_s = dates.index(l_date) if l_date in dates else -1
+    c_end_date = s.get('c_end', '')
+    c_end_idx = dates.index(c_end_date) if c_end_date in dates else idx
+    if l_idx_s < 0: return None
+    if not (l_idx_s <= idx <= min(c_end_idx + 5, n - 1)):
+        return None  # 不在 C 区，跳过
+
     # 基础趋势
     closes = [k['close'] for k in klines[:idx+1]]
     sma10 = sma(closes, 10); sma60 = sma(closes, 60)
@@ -100,24 +115,8 @@ def _evaluate(klines, idx, structure, rps20, rps250):
     if pct_ma10 > 25: return None
 
     # 距L天数
-    l_idx = dates.index(l_date) if l_date in dates else -1
-    days_from_l = idx - l_idx if l_idx >= 0 else 999
+    days_from_l = idx - l_idx_s
     if days_from_l < 3: return None
-
-    # 类型判断
-    in_c_zone = False
-    c_end_date = s.get('c_end', '')
-    if c_start_date and l_idx >= 0:
-        c_end_idx = dates.index(c_end_date) if c_end_date in dates else idx
-        in_c_zone = (l_idx <= idx <= min(c_end_idx + 5, n-1))
-
-    in_p_zone = False
-    if b1_date and b1_date in dates:
-        b1_idx = dates.index(b1_date)
-        days_after_b1 = idx - b1_idx
-        in_p_zone = (3 <= days_after_b1 <= 15) and days_from_l > 15
-
-    is_10ma_bounce = (l <= sma10 * 1.02 and c > klines[idx-1]['close'] if idx > 0 else False)
 
     # 量价
     gain_pct = (c - klines[idx-1]['close']) / klines[idx-1]['close'] * 100 if idx > 0 else 0
@@ -138,21 +137,22 @@ def _evaluate(klines, idx, structure, rps20, rps250):
     prev_highs = [klines[i]['high'] for i in range(max(0, idx-10), idx)]
     if prev_highs and h < max(prev_highs): return None
 
-    # RS（有数据时才检查，无数据时放行）
+    # RS
     if rps20 is not None and rps250 is not None:
         if not (rps20 >= 80 or rps250 >= 80): return None
 
     # 确定类型
     pivot_type = None
     b1_overlap = False
-    if in_c_zone and c > sma10:
+    if c > sma10:
         pivot_type = 'base'
         if b1_date and klines[idx]['date'] == b1_date:
             b1_overlap = True
-    elif in_p_zone and is_10ma_bounce:
-        pivot_type = 'continuation'
-    elif is_10ma_bounce and c > sma60 and sma10 > sma60:
-        pivot_type = '10ma_bounce'
+    elif l <= sma10 * 1.02 and c > klines[idx-1]['close']:
+        if c > sma60 and sma10 > sma60:
+            pivot_type = '10ma_bounce'
+        else:
+            pivot_type = 'continuation'
     else:
         return None
 
@@ -173,7 +173,7 @@ def _evaluate(klines, idx, structure, rps20, rps250):
 
 
 def detect(klines, params=None):
-    """引擎入口：扫描 K 线中的每一天，返回口袋支点信号列表"""
+    """多周期扫描所有历史 bi 峰谷对中的口袋支点"""
     code = None
     for k in klines:
         if k.get('stock_code'):
@@ -184,34 +184,41 @@ def detect(klines, params=None):
     db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
 
-    # RS 数据
-    rps20_map = {}
-    rps250_map = {}
+    rps20_map, rps250_map = {}, {}
     try:
-        rs_rows = db.execute(
-            "SELECT date, rps_20, rps_250 FROM stock_rs_daily WHERE stock_code=?",
-            (code,)
-        ).fetchall()
-        for r in rs_rows:
+        for r in db.execute("SELECT date, rps_20, rps_250 FROM stock_rs_daily WHERE stock_code=?", (code,)):
             rps20_map[r['date']] = r['rps_20']
             rps250_map[r['date']] = r['rps_250']
     except sqlite3.OperationalError:
         pass
 
-    # H/L/C 结构
-    structure = _get_structure(code, klines, db)
+    structures = _get_all_structures(code, klines)
     db.close()
-    if not structure: return []
+    if not structures: return []
 
-    # 扫描每一天
+    # 为每个结构预计算有效日期范围（性能优化）
+    dates = [k['date'] for k in klines]
+    struct_ranges = []
+    for s in structures:
+        l_d = s['l_date']
+        c_end = s.get('c_end', dates[-1])
+        if l_d in dates and c_end in dates:
+            struct_ranges.append((dates.index(l_d), min(dates.index(c_end) + 5, len(klines) - 1), s))
+
     signals = []
     for idx in range(len(klines)):
-        day = klines[idx]['date']
-        if klines[idx].get('close') is None or klines[idx].get('volume') is None: continue
-        rps20 = rps20_map.get(day)
-        rps250 = rps250_map.get(day)
-        result = _evaluate(klines, idx, structure, rps20, rps250)
-        if result:
-            signals.append(result)
+        if klines[idx].get('close') is None or klines[idx].get('volume') is None:
+            continue
+        rps20 = rps20_map.get(klines[idx]['date'])
+        rps250 = rps250_map.get(klines[idx]['date'])
+
+        # 找包含当前 idx 的结构
+        for l_idx_s, c_end_s, s in struct_ranges:
+            if l_idx_s <= idx <= c_end_s:
+                result = _evaluate(klines, idx, s, rps20, rps250)
+                if result:
+                    result['date'] = klines[idx]['date']  # ensure date field
+                    signals.append(result)
+                break  # 每个 idx 只取第一个匹配的结构
 
     return signals
