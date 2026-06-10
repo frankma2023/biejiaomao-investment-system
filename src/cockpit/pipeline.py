@@ -425,6 +425,17 @@ def run_pipeline(target_date=None, config=None, db=None, save=False):
                 if k not in info or info[k] is None:
                     info[k] = p.get(k)
 
+        # 从 pysnowball 获取市值（轻量，不阻塞）
+        if not info.get('market_cap'):
+            try:
+                from cockpit.sentiment import SentimentEngine
+                se = SentimentEngine()
+                quote = se._fetch_quote(code)
+                if quote and quote.get('market_cap', 0) > 0:
+                    info['market_cap'] = round(quote['market_cap'] / 1e8, 0)
+            except Exception:
+                pass
+
         enriched.append(info)
 
     # 持久化
@@ -576,11 +587,12 @@ def save_candidates(db, run_date, candidates, pool_data=None):
                 canslim_total, canslim_c, canslim_a, canslim_n,
                 canslim_s, canslim_l, canslim_i, canslim_m,
                 market_cap, profit_trend,
+                mw_score,
                 l1_industry, l1_rs250, l1_rs20, l1_pct_5d,
                 sentiment_summary, oneil_analysis,
                 stop_loss_price, stop_loss_rule, trailing_stop_rule,
                 target_price, entry_price_ref
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             run_date, code, stock_name, c.get('rank'),
             signal_types_json, signal_date, c.get('confidence', ''),
@@ -589,6 +601,7 @@ def save_candidates(db, run_date, candidates, pool_data=None):
             c.get('canslim_total'), c.get('canslim_c'), c.get('canslim_a'), c.get('canslim_n'),
             c.get('canslim_s'), c.get('canslim_l'), c.get('canslim_i'), c.get('canslim_m'),
             c.get('market_cap'), c.get('profit_trend', ''),
+            c.get('mw_score'),
             c.get('l1_industry', ''), c.get('l1_rs250'), c.get('l1_rs20'), c.get('l1_pct_5d'),
             sentiment_summary, oneil_analysis,
             round(stop_price, 2) if stop_price else None, stop_rule,
