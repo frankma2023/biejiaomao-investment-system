@@ -35,14 +35,16 @@ def _get_structure(code, klines, db):
     dates = [k['date'] for k in klines]
     n = len(klines)
 
-    # 1. MW 信号表
+    # 1. MW 信号表（只取扫描日期之前已存在的结构）
     try:
+        last_date = dates[-1]  # K线最新日期
         row = db.execute("""
             SELECT h_date, h_price, l_date, l_price, c_start, c_end, b1_date, decline_pct
             FROM mw_signal_daily WHERE stock_code=?
             AND h_date < l_date AND h_date IS NOT NULL AND l_date IS NOT NULL
+            AND h_date <= ?
             ORDER BY b2_date DESC LIMIT 1
-        """, (code,)).fetchone()
+        """, (code, last_date)).fetchone()
         if row:
             s = dict(row)
             if s['h_date'] in dates and s['l_date'] in dates:
@@ -73,7 +75,7 @@ def _get_structure(code, klines, db):
                 h_peak = recent[-1] if recent else None
                 if h_peak and h_peak['date'] in dates:
                     h_idx = dates.index(h_peak['date'])
-                    if h_idx < n - 5:
+                    if h_idx < n - 3:  # H 之后至少留 3 根 K 线找 L
                         l_idx = h_idx + 1
                         l_price = klines[l_idx]['close']
                         for i in range(h_idx + 1, n):
