@@ -325,7 +325,31 @@ def detect(klines, indicators=None, bp_params=None):
                         }
                     })
 
-    return failures
+    # 同日期去重：保留最严重的信号（severe > mild），合并触发的规则列表
+    deduped = {}
+    for f in failures:
+        key = f['date']
+        if key not in deduped:
+            deduped[key] = f
+            deduped[key]['triggered_rules'] = [f['failed_rule']]
+        else:
+            existing = deduped[key]
+            existing['triggered_rules'].append(f['failed_rule'])
+            # 保留更严重的
+            severity_order = {'severe': 3, 'confirmed': 2, 'mild': 1}
+            if severity_order.get(f['severity'], 0) > severity_order.get(existing['severity'], 0):
+                # 用更严重的信号替换，但保留合并的规则列表
+                f['triggered_rules'] = existing['triggered_rules']
+                deduped[key] = f
+
+    # 更新 details 中的规则标签为合并后的
+    for f in deduped.values():
+        rules = f.get('triggered_rules', [f['failed_rule']])
+        f['details']['triggered_rules'] = rules
+        if len(rules) > 1:
+            f['details']['rule_label'] = ' + '.join(rules)
+
+    return list(deduped.values())
 
 
 # ═══════════════════════════════════════════════════
