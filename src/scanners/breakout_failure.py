@@ -179,7 +179,7 @@ def detect(klines, indicators=None, bp_params=None):
                     'breakout_low': round(breakout_low, 2), 'failure_day': failure_day,
                     'failed_rule': 'rule_c', 'severity': 'mild',
                     'details': {
-                        'rule_label': '跌回枢轴点', 'current_close': round(day_close, 2),
+                        'rule_label': f'跌回枢轴点({b_date}突破 D+{failure_day})', 'current_close': round(day_close, 2),
                         'volume_ratio': round(day_vol_ratio, 2),
                         'day_chg_pct': round(day_chg_pct, 2),
                         'trough_price': round(trough_price, 2),
@@ -196,7 +196,7 @@ def detect(klines, indicators=None, bp_params=None):
                     'breakout_low': round(breakout_low, 2), 'failure_day': failure_day,
                     'failed_rule': 'rule_b', 'severity': 'severe',
                     'details': {
-                        'rule_label': '跌破突破日最低价', 'current_close': round(day_close, 2),
+                        'rule_label': f'跌破突破日最低价({b_date}突破 D+{failure_day})', 'current_close': round(day_close, 2),
                         'volume_ratio': round(day_vol_ratio, 2),
                         'day_chg_pct': round(day_chg_pct, 2),
                         'trough_price': round(trough_price, 2),
@@ -214,7 +214,7 @@ def detect(klines, indicators=None, bp_params=None):
                     'breakout_low': round(breakout_low, 2), 'failure_day': failure_day,
                     'failed_rule': 'rule_d', 'severity': 'severe',
                     'details': {
-                        'rule_label': '跌破谷底支撑', 'current_close': round(day_close, 2),
+                        'rule_label': f'跌破谷底支撑({b_date}突破 D+{failure_day})', 'current_close': round(day_close, 2),
                         'volume_ratio': round(day_vol_ratio, 2),
                         'day_chg_pct': round(day_chg_pct, 2),
                         'trough_price': round(trough_price, 2),
@@ -235,7 +235,7 @@ def detect(klines, indicators=None, bp_params=None):
                         'breakout_low': round(breakout_low, 2), 'failure_day': failure_day,
                         'failed_rule': 'rule_e', 'severity': 'severe',
                         'details': {
-                            'rule_label': '放量长阴砸穿', 'current_close': round(day_close, 2),
+                            'rule_label': f'放量长阴砸穿({b_date}突破 D+{failure_day})', 'current_close': round(day_close, 2),
                             'volume_ratio': round(day_vol_ratio, 2),
                             'day_chg_pct': round(day_chg_pct, 2),
                             'trough_price': round(trough_price, 2),
@@ -254,7 +254,7 @@ def detect(klines, indicators=None, bp_params=None):
                         'breakout_low': round(breakout_low, 2), 'failure_day': failure_day,
                         'failed_rule': 'rule_f', 'severity': 'severe',
                         'details': {
-                            'rule_label': '连续放量溃败', 'current_close': round(day_close, 2),
+                            'rule_label': f'连续放量溃败({b_date}突破 D+{failure_day})', 'current_close': round(day_close, 2),
                             'volume_ratio': round(day_vol_ratio, 2),
                             'day_chg_pct': round(day_chg_pct, 2),
                             'trough_price': round(trough_price, 2),
@@ -292,7 +292,7 @@ def detect(klines, indicators=None, bp_params=None):
                         'breakout_low': round(breakout_low, 2), 'failure_day': failure_day,
                         'failed_rule': 'rule_g', 'severity': 'confirmed',
                         'details': {
-                            'rule_label': '抛盘日叠加', 'current_close': round(day_close, 2),
+                            'rule_label': f'抛盘日叠加({b_date}突破 D+{failure_day})', 'current_close': round(day_close, 2),
                             'volume_ratio': round(day_vol_ratio, 2),
                             'day_chg_pct': round(day_chg_pct, 2),
                             'trough_price': round(trough_price, 2),
@@ -316,7 +316,7 @@ def detect(klines, indicators=None, bp_params=None):
                         'breakout_low': round(breakout_low, 2), 'failure_day': failure_day,
                         'failed_rule': 'rule_h', 'severity': 'confirmed',
                         'details': {
-                            'rule_label': '窗口结束机构出货', 'current_close': round(day_close, 2),
+                            'rule_label': f'窗口结束机构出货({b_date}突破 D+{failure_day})', 'current_close': round(day_close, 2),
                             'volume_ratio': round(day_vol_ratio, 2),
                             'day_chg_pct': round(day_chg_pct, 2),
                             'trough_price': round(trough_price, 2),
@@ -347,7 +347,9 @@ def detect(klines, indicators=None, bp_params=None):
         rules = f.get('triggered_rules', [f['failed_rule']])
         f['details']['triggered_rules'] = rules
         if len(rules) > 1:
-            f['details']['rule_label'] = ' + '.join(rules)
+            # 合并标签时去掉重复的日期后缀
+            short_rules = [r.replace(f'({f["breakout_date"]}突破 D+{f["failure_day"]})','') for r in rules]
+            f['details']['rule_label'] = ' + '.join(short_rules) + f' ({f["breakout_date"]}突破 D+{f["failure_day"]})'
 
     return list(deduped.values())
 
