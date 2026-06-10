@@ -232,11 +232,11 @@ def detect(
 
         # 信号事件
         if level == 'confirmed' and prev_level != 'confirmed':
-            signals.append({'signal_date': klines[i]['date'], 'count': cnt, 'level': 'distribution_confirmed', 'label': '🔴 大盘见顶确认'})
+            signals.append({'type': 'bearish', 'signal_date': klines[i]['date'], 'count': cnt, 'level': 'distribution_confirmed', 'label': '🔴 大盘见顶确认'})
         elif level == 'warning' and prev_level == 'none':
-            signals.append({'signal_date': klines[i]['date'], 'count': cnt, 'level': 'distribution_warning', 'label': '⚠️ 抛压增加'})
+            signals.append({'type': 'bearish', 'signal_date': klines[i]['date'], 'count': cnt, 'level': 'distribution_warning', 'label': '⚠️ 抛压增加'})
         elif level == 'none' and prev_level != 'none':
-            signals.append({'signal_date': klines[i]['date'], 'count': cnt, 'level': 'distribution_cleared', 'label': '✅ 抛压解除'})
+            signals.append({'type': 'bullish', 'signal_date': klines[i]['date'], 'count': cnt, 'level': 'distribution_cleared', 'label': '✅ 抛压解除'})
         prev_level = level
 
     return {'daily': daily_results, 'counts': counts, 'signals': signals}
