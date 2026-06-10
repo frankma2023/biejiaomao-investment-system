@@ -188,6 +188,17 @@ def detect(
     volumes_w = [w['volume'] for w in weekly]
     nw = len(weekly)
 
+    # 缠论 bi 力度（供加速判断使用）
+    bi_force_data = []
+    if stock_code:
+        try:
+            from .chanlun_structure import get_last_up_bi_force, get_bi_list
+            bi_list = get_bi_list(stock_code)
+            if bi_list:
+                bi_force_data = get_last_up_bi_force(bi_list, count=5)
+        except Exception:
+            pass
+
     # 基线价格
     if baseline_price is None:
         baseline_price = min(w['low'] for w in weekly[-52:]) if nw >= 52 else min(w['low'] for w in weekly)
@@ -304,6 +315,14 @@ def detect(
                 if rs250 >= p['rs250_threshold']:
                     score += 7
                     detail['rs250'] = round(rs250, 1)
+
+            # 6. 缠论 bi 加速确认 (+5 加分)
+            if len(bi_force_data) >= 2:
+                last = bi_force_data[-1]
+                prev_avg = sum(f['power'] for f in bi_force_data[:-1]) / len(bi_force_data[:-1])
+                if prev_avg > 0 and last['power'] >= prev_avg * 1.5:
+                    score += 5
+                    detail['bi_accel'] = {'last_power': round(last['power'],2), 'prev_avg': round(prev_avg,2), 'ratio': round(last['power']/prev_avg,2)}
 
             detail['total_score'] = round(score, 1)
 
