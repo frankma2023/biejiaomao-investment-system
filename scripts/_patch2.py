@@ -1,7 +1,0 @@
-f = open("D:/hanako/investment-system/src/scanners/pocket_pivot_v2.py", "r", encoding="utf-8")
-c = f.read(); f.close()
-c = c.replace("stock['stock_name']", "stock['name']")
-c = c.replace("'max_distribution_days': 4,", "'max_distribution_days': 6,")
-f = open("D:/hanako/investment-system/src/scanners/pocket_pivot_v2.py", "w", encoding="utf-8")
-f.write(c); f.close()
-print("patched")
