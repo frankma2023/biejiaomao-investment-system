@@ -727,12 +727,39 @@ def detect(
     volumes = [r['volume'] for r in daily]
     dates = [r['date'] for r in daily]
 
-    # 1. 峰谷检测
-    peaks, troughs = find_peaks_troughs(
-        daily,
-        window=params['peak_detection_window'],
-        prominence=params['peak_prominence'],
-    )
+    # 1. 峰谷检测（优先缠论 bi，降级窗口法）
+    peaks, troughs = [], []
+    bi_used = False
+
+    if stock_code:
+        try:
+            from .chanlun_structure import get_bi_list, get_bi_peaks, get_bi_troughs
+            bi_list = get_bi_list(stock_code)
+            if bi_list:
+                bi_peaks = get_bi_peaks(bi_list)
+                bi_troughs = get_bi_troughs(bi_list)
+                date_to_idx = {d: i for i, d in enumerate(dates)}
+
+                for p in bi_peaks:
+                    idx = date_to_idx.get(p['date'])
+                    if idx is not None and idx < n:
+                        peaks.append({'idx': idx, 'price': p['price'], 'date': p['date']})
+                for t in bi_troughs:
+                    idx = date_to_idx.get(t['date'])
+                    if idx is not None and idx < n:
+                        troughs.append({'idx': idx, 'price': t['price'], 'date': t['date']})
+
+                if len(peaks) >= 2:
+                    bi_used = True
+        except Exception:
+            pass  # 降级到窗口法
+
+    if not bi_used:
+        peaks, troughs = find_peaks_troughs(
+            daily,
+            window=params['peak_detection_window'],
+            prominence=params['peak_prominence'],
+        )
     if len(peaks) < 2:
         return []
 
@@ -792,11 +819,33 @@ def detect_all(
 
     signals = detect(daily, params, stock_code, freq)
 
-    peaks, troughs = find_peaks_troughs(
-        daily,
-        window=params['peak_detection_window'],
-        prominence=params['peak_prominence'],
-    )
+    # 峰谷数据（与 detect() 保持一致：优先 bi，降级窗口法）
+    peaks, troughs = [], []
+    if stock_code:
+        try:
+            from .chanlun_structure import get_bi_list, get_bi_peaks, get_bi_troughs
+            bi_list = get_bi_list(stock_code)
+            if bi_list:
+                dates = [r['date'] for r in daily]
+                date_to_idx = {d: i for i, d in enumerate(dates)}
+                n = len(daily)
+                for p in get_bi_peaks(bi_list):
+                    idx = date_to_idx.get(p['date'])
+                    if idx is not None and idx < n:
+                        peaks.append({'idx': idx, 'price': p['price'], 'date': p['date']})
+                for t in get_bi_troughs(bi_list):
+                    idx = date_to_idx.get(t['date'])
+                    if idx is not None and idx < n:
+                        troughs.append({'idx': idx, 'price': t['price'], 'date': t['date']})
+        except Exception:
+            pass
+
+    if not peaks:
+        peaks, troughs = find_peaks_troughs(
+            daily,
+            window=params['peak_detection_window'],
+            prominence=params['peak_prominence'],
+        )
 
     return {
         'daily': daily,
