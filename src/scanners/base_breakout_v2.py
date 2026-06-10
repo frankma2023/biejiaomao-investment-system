@@ -203,7 +203,7 @@ def detect(daily, params=None):
     # 参数提取
     dd_min = params.get('drawdown_min', 0.08)
     dd_max = params.get('drawdown_max', 0.40)
-    min_c_days = params.get('min_c_days', 5)
+    min_c_days = params.get('min_c_days', 20)
     c_amp_max = params.get('c_amp_max', 0.15)
     bo_gain = params.get('bo_gain_min', 0.03)
     bo_vol = params.get('bo_vol_ratio', 1.5)
@@ -224,6 +224,8 @@ def detect(daily, params=None):
     if c_closes:
         c_amp = (max(c_closes) - min(c_closes)) / min(c_closes) if min(c_closes) > 0 else 999
         if c_amp > c_amp_max: return []
+    else:
+        c_amp = 0
     
     # 扫描 C 区间及之后的日子，找 BO 突破日
     signals = []
