@@ -48,7 +48,7 @@ def load_params():
         'bo_close_pos_min': 0.50,    # 收盘在日内最低位置
         'require_ma_cross': True,    # 要求 MA10 > MA20
         'rs_threshold': 80,          # RS 最低阈值
-        'quiet_vol_check': True,     # 盘整期量能萎缩检查
+        'quiet_vol_check': False,    # 盘整期量能萎缩检查（V2调试临时关闭）
     }
     if os.path.exists(cfg_path):
         with open(cfg_path, encoding='utf-8') as f:
@@ -67,22 +67,30 @@ def get_hlc_structure(klines, code):
     """
     获取 H/L/C 结构，优先从 mw_signal_daily 表，其次缠论笔
     """
-    # 1. 尝试从 MW 信号表获取
+    # 1. 尝试从 MW 信号表获取（取最近的多个信号，跳过H/L同日或无意义回撤的）
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    row = conn.execute("""
+    rows = conn.execute("""
         SELECT h_date, h_price, l_date, l_price, c_start, c_end, decline_pct
-        FROM mw_signal_daily WHERE stock_code=? ORDER BY b2_date DESC LIMIT 1
-    """, (code,)).fetchone()
+        FROM mw_signal_daily WHERE stock_code=? ORDER BY b2_date DESC LIMIT 5
+    """, (code,)).fetchall()
     conn.close()
+
+    row = None
+    for r in rows:
+        if r['h_date'] and r['l_date'] and r['h_date'] < r['l_date']:
+            row = r
+            break
+    if not row and rows:
+        row = rows[0]  # 兜底
     
-    if row and row['h_date'] and row['l_date']:
+    if row and row['h_date'] and row['l_date'] and row['h_date'] < row['l_date']:
         dates = [k['date'] for k in klines]
         try:
             h_idx = dates.index(row['h_date'])
             l_idx = dates.index(row['l_date'])
             c_start = dates.index(row['c_start']) if row['c_start'] in dates else l_idx
-            c_end = dates.index(row['c_end']) if row['c_end'] in dates else l_idx
+            c_end = len(klines) - 1  # 扫描到最新数据
             # 计算真实回撤深度：从 H 到 K 线区间最低点
             real_low = min(klines[i]['close'] for i in range(h_idx, len(klines)))
             real_decline = round((row['h_price'] - real_low) / row['h_price'] * 100, 2)
@@ -90,7 +98,7 @@ def get_hlc_structure(klines, code):
                 'h_date': row['h_date'], 'h_price': row['h_price'], 'h_idx': h_idx,
                 'l_date': row['l_date'], 'l_price': row['l_price'], 'l_idx': l_idx,
                 'c_start_idx': c_start, 'c_end_idx': c_end,
-                'c_start_date': row['c_start'], 'c_end_date': row['c_end'],
+                'c_start_date': row['c_start'], 'c_end_date': klines[-1]['date'],
                 'decline_pct': real_decline
             }
         except (ValueError, KeyError):
@@ -204,10 +212,13 @@ def detect(daily, params=None):
     c_days = hlc['c_end_idx'] - hlc['c_start_idx'] + 1
     if c_days < min_c_days: return []
     
-    # C 区间振幅检查
-    c_closes = [daily[i]['close'] for i in range(hlc['c_start_idx'], hlc['c_end_idx'] + 1)]
-    c_amp = (max(c_closes) - min(c_closes)) / min(c_closes) if min(c_closes) > 0 else 999
-    if c_amp > c_amp_max: return []
+    # C 区间振幅检查（仅检查L之后的安静盘整段，不包含突破后的涨幅）
+    # 取 C 区前 min_c_days 天的振幅
+    check_days = min(min_c_days * 2, hlc['c_end_idx'] - hlc['c_start_idx'] + 1)
+    c_closes = [daily[i]['close'] for i in range(hlc['c_start_idx'], hlc['c_start_idx'] + check_days)]
+    if c_closes:
+        c_amp = (max(c_closes) - min(c_closes)) / min(c_closes) if min(c_closes) > 0 else 999
+        if c_amp > c_amp_max: return []
     
     # 盘整期量能萎缩
     if quiet_vol and c_days >= 6:
@@ -216,15 +227,14 @@ def detect(daily, params=None):
         v2 = [daily[hlc['c_start_idx'] + mid + i]['volume'] for i in range(mid)]
         if v1 and v2 and sum(v2)/len(v2) > sum(v1)/len(v1) * 1.15: return []
     
-    # 扫描 C 区间之后的日子，找 BO 突破日
+    # 扫描 C 区间及之后的日子，找 BO 突破日
     signals = []
-    today = daily[-1]  # 默认检测最后一天
-    last_idx = n - 1
     
-    # 只在 C 区间之后检查
-    if last_idx <= hlc['c_end_idx']: return []
+    # 从 C 区起点开始扫描到最新数据
+    scan_start = hlc['c_start_idx']
+    scan_end = n - 1
     
-    for t_idx in range(hlc['c_end_idx'] + 1, n):
+    for t_idx in range(scan_start, n):
         k = daily[t_idx]
         c, v, o, h, l = k['close'], k['volume'], k['open'], k['high'], k['low']
         if c <= 0 or v <= 0: continue
@@ -255,14 +265,14 @@ def detect(daily, params=None):
         closes_all = [d['close'] for d in daily[:t_idx+1]]
         ma10 = sma(closes_all, 10)
         ma20 = sma(closes_all, 20)
-        if require_ma and (ma10 is None or ma20 is None or ma10 <= ma20): continue
+        if require_ma and (ma10 is None or ma20 is None or ma10 < ma20): continue
         
         # 收盘站上 MA10 和 MA20
         if ma10 and c <= ma10: continue
         if ma20 and c <= ma20: continue
         
-        # 突破 C 区间最高价
-        c_max = max(daily[i]['close'] for i in range(hlc['c_start_idx'], hlc['c_end_idx'] + 1))
+        # 突破 C 区间最高价（检查到当前日前一天）
+        c_max = max(daily[i]['close'] for i in range(hlc['c_start_idx'], t_idx))
         if c <= c_max: continue
         
         # 当日最高 ≥ 前10天最高（突破前期阻力）
