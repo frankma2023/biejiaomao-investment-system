@@ -439,6 +439,7 @@ def _detect_double_top(
         )
 
         return {
+            'type': 'bearish',
             'pattern': 'double_top',
             'left_peak': left_peak,
             'right_peak': right_peak,
@@ -549,6 +550,7 @@ def _detect_triple_top(
     )
 
     return {
+        'type': 'bearish',
         'pattern': 'triple_top',
         'left_peak': left_peak,
         'middle_peak': middle_peak,
@@ -666,6 +668,7 @@ def _detect_head_shoulders(
     )
     
     return {
+        'type': 'bearish',
         'pattern': 'head_shoulders',
         'left_peak': left_shoulder,
         'right_peak': right_shoulder,

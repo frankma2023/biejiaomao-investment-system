@@ -338,6 +338,7 @@ def detect(
                     del detail['confirmed_by']
 
             signals.append({
+                'type': 'bearish',
                 'signal_date': weekly[end_idx]['date'],
                 'stock_code': stock_code,
                 'signal_type': signal_type,

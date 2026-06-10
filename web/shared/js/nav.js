@@ -33,22 +33,42 @@
     { href: '../top-pattern/',          label: '头部形态',         page: 'top-pattern' },
     { href: '../volume-divergence/',    label: '量价背离',         page: 'volume-divergence' },
     { href: '../breakout-failure/',     label: '突破失败',         page: 'breakout-failure' },
-    { href: '../pattern-scan/',         label: '形态识别',         page: 'pattern-scan' },
     { href: '../discipline/screening-backtest.html', label: '股票精选回测', page: 'screening-backtest' },
     { href: '../discipline/screening-backtest-index.html', label: '指数精选回测', page: 'screening-backtest-index' },
     { href: '../chanlun-backtest-compare/', label: '缠论vs欧奈尔', page: 'chanlun-backtest-compare' },
       { href: '../progress.html',         label: '进展',             page: 'progress' },
 ];
 
+  var PATTERN_ITEMS = [
+    { href: '../pattern-structure/',    label: 'MW分析',           page: 'pattern-structure' },
+    { href: '../pattern-scan/',         label: '形态识别',         page: 'pattern-scan' },
+    { href: '../daily-pattern-scan/',   label: '形态扫描',         page: 'daily-pattern-scan' },
+    { href: '../mw-signals/',           label: 'MW信号',           page: 'mw-signals' },
+  ];
+
+  var DISCIPLINE_ITEMS = [
+    { href: '../discipline/',            label: '知行首页',  page: 'discipline' },
+    { href: '../discipline/screening.html', label: '每日精选',  page: 'screening' },
+    { href: '../discipline/observation.html', label: '观察池', page: 'observation' },
+    { href: '../discipline/watchlist.html', label: '自选池',  page: 'watchlist' },
+    { href: '../discipline/trades.html', label: '交易记录',  page: 'trades' },
+    { href: '../discipline/monitor.html', label: '持仓监控', page: 'monitor' },
+  ];
+
+  var CHANLUN_ITEMS = [
+    { href: '../chanlun/',                   label: '缠论看板',         page: 'chanlun' },
+    { href: '../chanlun-backtest/',          label: '缠论回测',         page: 'chanlun-backtest' },
+    { href: '../chanlun-scan/',              label: '缠论扫描',         page: 'chanlun-scan' },
+    { href: '../discipline/chanlun-daily.html', label: '缠论精选',      page: 'chanlun-daily' },
+    { href: '../chanlun-backtest-compare/',  label: '缠论vs欧奈尔',     page: 'chanlun-backtest-compare' },
+  ];
+
   var MAIN_ITEMS = [
     { href: '../index-scan/',           label: '指数扫描',         page: 'index-scan' },
     { href: '../index-valuation/',      label: '指数估值',         page: 'index-valuation' },
     { href: '../stock-valuation/',      label: '个股扫描',         page: 'stock-valuation' },
     { href: '../market-scan/',          label: '大盘扫描',         page: 'market-scan' },
-    { href: '../daily-pattern-scan/',   label: '形态扫描',         page: 'daily-pattern-scan' },
     { href: '../canslim-scores/',       label: 'CAN SLIM',          page: 'canslim-scores' },
-    { href: '../pattern-scan/',         label: '形态识别',         page: 'pattern-scan' },
-    { href: '../chanlun/',              label: '缠论',             page: 'chanlun' },
     { href: '../cockpit/',             label: '驾驶舱',           page: 'cockpit' },
   ];
 
@@ -65,6 +85,15 @@
     // Home
     html += '<a href="../" class="nav-item' + (cp === 'home' ? ' active' : '') + '">看板</a>';
 
+    // 形态分析 dropdown
+    var isPattern = PATTERN_ITEMS.some(function (p) { return p.page === cp; });
+    html += '<div class="nav-dropdown"><a href="javascript:void(0)" class="nav-item' + (isPattern ? ' active' : '') + '">形态分析</a><div class="nav-dropdown-menu">';
+    for (var k = 0; k < PATTERN_ITEMS.length; k++) {
+      var pt = PATTERN_ITEMS[k];
+      html += '<a href="' + pt.href + '" class="' + (pt.page === cp ? 'active' : '') + '">' + pt.label + '</a>';
+    }
+    html += '</div></div>';
+
     // Backtest dropdown
     var isBacktest = BACKTEST_ITEMS.some(function (b) { return b.page === cp; });
     html += '<div class="nav-dropdown"><a href="javascript:void(0)" class="nav-item' + (isBacktest ? ' active' : '') + '">回测</a><div class="nav-dropdown-menu">';
@@ -74,14 +103,29 @@
     }
     html += '</div></div>';
 
+    // 知行 dropdown
+    var isDiscipline = DISCIPLINE_ITEMS.some(function (d) { return d.page === cp; });
+    html += '<div class="nav-dropdown"><a href="javascript:void(0)" class="nav-item' + (isDiscipline ? ' active' : '') + '">知行</a><div class="nav-dropdown-menu">';
+    for (var d = 0; d < DISCIPLINE_ITEMS.length; d++) {
+      var di = DISCIPLINE_ITEMS[d];
+      html += '<a href="' + di.href + '" class="' + (di.page === cp ? 'active' : '') + '">' + di.label + '</a>';
+    }
+    html += '</div></div>';
+
+    // 缠论 dropdown
+    var isChanlun = CHANLUN_ITEMS.some(function (c) { return c.page === cp; });
+    html += '<div class="nav-dropdown"><a href="javascript:void(0)" class="nav-item' + (isChanlun ? ' active' : '') + '">缠论</a><div class="nav-dropdown-menu">';
+    for (var c = 0; c < CHANLUN_ITEMS.length; c++) {
+      var cl = CHANLUN_ITEMS[c];
+      html += '<a href="' + cl.href + '" class="' + (cl.page === cp ? 'active' : '') + '">' + cl.label + '</a>';
+    }
+    html += '</div></div>';
+
     // Main items
     for (var j = 0; j < MAIN_ITEMS.length; j++) {
       var m = MAIN_ITEMS[j];
       html += '<a href="' + m.href + '" class="nav-item' + (m.page === cp ? ' active' : '') + '">' + m.label + '</a>';
     }
-
-    html += '<a href="../discipline/" class="nav-item' + (cp === 'discipline' ? ' active' : '') + '">知行</a>';
-    html += '<a href="../discipline/screening.html" class="nav-item' + (cp === 'screening' ? ' active' : '') + '">精选</a>';
 
     // Theme toggle
     html += '<button class="theme-toggle" onclick="if(typeof toggleTheme==\'function\')toggleTheme()">◐</button>';

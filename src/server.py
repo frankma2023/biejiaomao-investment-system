@@ -3115,7 +3115,7 @@ def api_pattern_scan():
     for s in signals_out:
         # 归一化：补齐缺失字段
         if 'type' not in s:
-            s['type'] = 'bullish'  # 自研形态引擎默认买入信号
+            s['type'] = 'bullish'  # 兜底：无type字段默认看涨（顶部形态等引擎已自行标注bearish）
         if 'confidence' not in s:
             s['confidence'] = 'medium'
         if 'pivot' not in s:
