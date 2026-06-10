@@ -267,6 +267,9 @@ function renderCandidates() {
     if (c.suggested_position_pct) {
       html += '<div class="kstat"><div class="kv" style="color:var(--accent)">' + c.suggested_position_pct.toFixed(1) + '%</div><div class="kl">建议仓位</div></div>';
     }
+    if (c.rps_250 != null) {
+      html += '<div class="kstat"><div class="kv">' + (c.rps_20||'—') + '/' + (c.rps_60||'—') + '/' + (c.rps_120||'—') + '/' + (c.rps_250||'—') + '</div><div class="kl">RS(20/60/120/250)</div></div>';
+    }
     html += '</div>';
 
     // 简报区
@@ -296,6 +299,7 @@ function buildBriefingHTML(c) {
   if (c.decline_pct != null) h += tr('H→L调整', c.decline_pct.toFixed(1) + '%');
   if (c.consolidation_days) h += tr('盘整天数', c.consolidation_days + '天');
   if (c.mw_score) h += tr('MW评分', c.mw_score);
+  if (c.rps_20 != null) h += tr('RS20/60/120/250', (c.rps_20||'—') + ' / ' + (c.rps_60||'—') + ' / ' + (c.rps_120||'—') + ' / ' + (c.rps_250||'—'));
   h += '</table></div>';
 
   // 基本面

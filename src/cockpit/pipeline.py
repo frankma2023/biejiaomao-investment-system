@@ -436,6 +436,17 @@ def run_pipeline(target_date=None, config=None, db=None, save=False):
             except Exception:
                 pass
 
+        # 从 stock_rs_daily 获取最新 RS 值
+        rs_row = db.execute(
+            "SELECT rps_20, rps_60, rps_120, rps_250 FROM stock_rs_daily WHERE stock_code=? ORDER BY date DESC LIMIT 1",
+            (code,)
+        ).fetchone()
+        if rs_row:
+            info['rps_20'] = rs_row['rps_20']
+            info['rps_60'] = rs_row['rps_60']
+            info['rps_120'] = rs_row['rps_120']
+            info['rps_250'] = rs_row['rps_250']
+
         enriched.append(info)
 
     # 持久化
@@ -588,11 +599,12 @@ def save_candidates(db, run_date, candidates, pool_data=None):
                 canslim_s, canslim_l, canslim_i, canslim_m,
                 market_cap, profit_trend,
                 mw_score,
+                rps_20, rps_60, rps_120, rps_250,
                 l1_industry, l1_rs250, l1_rs20, l1_pct_5d,
                 sentiment_summary, oneil_analysis,
                 stop_loss_price, stop_loss_rule, trailing_stop_rule,
                 target_price, entry_price_ref
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             run_date, code, stock_name, c.get('rank'),
             signal_types_json, signal_date, c.get('confidence', ''),
@@ -602,6 +614,7 @@ def save_candidates(db, run_date, candidates, pool_data=None):
             c.get('canslim_s'), c.get('canslim_l'), c.get('canslim_i'), c.get('canslim_m'),
             c.get('market_cap'), c.get('profit_trend', ''),
             c.get('mw_score'),
+            c.get('rps_20'), c.get('rps_60'), c.get('rps_120'), c.get('rps_250'),
             c.get('l1_industry', ''), c.get('l1_rs250'), c.get('l1_rs20'), c.get('l1_pct_5d'),
             sentiment_summary, oneil_analysis,
             round(stop_price, 2) if stop_price else None, stop_rule,
