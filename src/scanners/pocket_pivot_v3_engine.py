@@ -47,23 +47,27 @@ def _get_structure(code, klines, db):
                 recent = [p for p in peaks if p['date'] >= dates[cutoff] and p['date'] in dates]
                 if not recent:
                     recent = peaks[-3:]
-                h_peak = recent[-1] if recent else None
-                if h_peak and h_peak['date'] in dates:
-                    h_idx = dates.index(h_peak['date'])
-                    if h_idx < n - 3:
-                        l_idx = h_idx + 1
-                        l_price = klines[l_idx]['close']
-                        for i in range(h_idx + 1, n):
-                            if klines[i]['close'] < l_price:
-                                l_price = klines[i]['close']
-                                l_idx = i
-                        return {
-                            'h_date': h_peak['date'], 'h_price': h_peak['price'],
-                            'l_date': dates[l_idx], 'l_price': l_price,
-                            'c_start': dates[l_idx], 'c_end': dates[-1],
-                            'b1_date': None,
-                            'decline_pct': round((h_peak['price'] - l_price) / h_peak['price'] * 100, 2),
-                        }
+                h_peak = None
+                for p in reversed(recent):
+                    if p['date'] in dates:
+                        h_idx = dates.index(p['date'])
+                        if h_idx < n - 3:
+                            h_peak = p
+                            break
+                if h_peak:
+                    l_idx = h_idx + 1
+                    l_price = klines[l_idx]['close']
+                    for i in range(h_idx + 1, n):
+                        if klines[i]['close'] < l_price:
+                            l_price = klines[i]['close']
+                            l_idx = i
+                    return {
+                        'h_date': h_peak['date'], 'h_price': h_peak['price'],
+                        'l_date': dates[l_idx], 'l_price': l_price,
+                        'c_start': dates[l_idx], 'c_end': dates[-1],
+                        'b1_date': None,
+                        'decline_pct': round((h_peak['price'] - l_price) / h_peak['price'] * 100, 2),
+                    }
     except Exception:
         pass
 
