@@ -96,98 +96,84 @@ def get_hlc_structure(klines, code):
         except (ValueError, KeyError):
             pass
     
-    # 2. 兜底：缠论笔检测
-    return get_hlc_from_chanlun(klines, code)
-    """复用口袋支点V3/MW引擎的缠论H/L/C检测"""
-    global _chanlun_cache
-    dates = [k['date'] for k in klines]
+    # 2. 兜底：缠论笔检测（使用共享结构层）
+    return _get_hlc_from_bi(klines, code)
+
+
+def _get_hlc_from_bi(klines, code):
+    """使用缠论共享层辅助的 H/L/C 检测"""
     n = len(klines)
-    
-    bi_list = None
-    if code not in _chanlun_cache:
-        bi_list = None
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            row = conn.execute(
-                "SELECT bi_json FROM chanlun_scan_daily WHERE stock_code=? ORDER BY scan_date DESC LIMIT 1",
-                (code,)).fetchone()
-            conn.close()
-            if row and row[0]:
-                try: bi_list = json.loads(row[0])
-                except: bi_list = None
-        except Exception as e:
-            pass
-        if bi_list is None:
-            try:
-                from scanners.chanlun import analyze
-                result = analyze(code, 'D', 500, data_mode='stock')
-                bi_list = result.get('bi_list', [])
-            except Exception as e:
-                bi_list = []
-        _chanlun_cache[code] = bi_list
-    else:
-        bi_list = _chanlun_cache[code]
-    
-    if not bi_list: return None
-    
-    # 找最近的前高 H（笔顶，方向=向下）
-    tops = [(b['sdt'][:10], b['high']) for b in bi_list if b['direction'] == '向下']
-    tops.sort(key=lambda x: x[0], reverse=True)
-    h_date = h_price = h_idx = None
-    for top_date, top_price in tops:
-        if top_date > klines[-1]['date']: continue
-        try: top_idx = dates.index(top_date)
-        except: continue
-        if top_idx + 1 < n:
-            future_low = min(klines[j]['close'] for j in range(top_idx+1, n))
-            decline = (top_price - future_low) / top_price if top_price > 0 else 0
-            if decline < 0.10: continue
-            pre60_start = max(0, top_idx - 60)
-            pre60_low = min(klines[j]['close'] for j in range(pre60_start, top_idx)) if pre60_start < top_idx else top_price
-            pre_rise = (top_price - pre60_low) / pre60_low if pre60_low > 0 else 0
-            if pre_rise >= 0.20:
-                h_date, h_price, h_idx = top_date, top_price, top_idx
-                break
-    if h_idx is None: return None
-    
-    # 找 L（笔底，方向=向上）
-    bots = [(b['sdt'][:10], b['low']) for b in bi_list if b['direction'] == '向上']
-    l_idx = l_price = None
-    for bot_date, bot_price in bots:
-        if bot_date > h_date:
-            try: l_idx = dates.index(bot_date); l_price = bot_price
-            except: pass
+    if n < 60:
+        return None
+
+    # 从 bi 获取最近的峰作为参考（避免从零扫描）
+    try:
+        from scanners.chanlun_structure import get_bi_list, get_bi_peaks
+        bi_list = get_bi_list(code)
+        bi_peaks = get_bi_peaks(bi_list) if bi_list else []
+    except Exception:
+        bi_peaks = []
+
+    # 在最近 200 根 K 线中找最高点作为 H
+    # 但 H 必须至少在 20 根 K 线之前（给回调留空间）
+    lookback = min(200, n - 20)
+    h_idx = n - lookback
+    h_price = klines[h_idx]['high']
+    for i in range(n - lookback, n - 20):
+        if klines[i]['high'] > h_price:
+            h_price = klines[i]['high']
+            h_idx = i
+
+    # 如果有 bi 峰数据，优先使用 bi 峰（更可靠）
+    if bi_peaks:
+        # 找 bi 峰中与 kline 最高点接近的（日期容差 3 天）
+        for p in reversed(bi_peaks):
+            for i in range(max(0, h_idx - 3), min(n, h_idx + 4)):
+                if abs(klines[i]['high'] - p['price']) / p['price'] < 0.02:
+                    h_idx = i
+                    h_price = klines[i]['high']
+                    break
+            else:
+                continue
             break
-    if l_idx is None: return None
-    
-    # 找 C 区间（L 之后振幅 < 10% 的横盘段）
-    c_start = l_idx; c_end = l_idx
-    for i in range(l_idx, min(l_idx + 30, n)):
-        seg = [klines[j]['close'] for j in range(l_idx, i+1)]
-        seg_min, seg_max = min(seg), max(seg)
-        amp = (seg_max - seg_min) / seg_min if seg_min > 0 else 999
-        if amp <= 0.10: c_end = i
-        elif i - l_idx >= 3: break
-    
+
+    h_date = klines[h_idx]['date']
+
+    # H 之后到当前的最低收盘价 = L
+    l_idx = h_idx + 1
+    l_price = klines[l_idx]['close']
+    for i in range(h_idx + 1, n):
+        if klines[i]['close'] < l_price:
+            l_price = klines[i]['close']
+            l_idx = i
+    l_date = klines[l_idx]['date']
+
+    # 计算回撤深度
+    decline_pct = round((h_price - l_price) / h_price * 100, 2)
+
+    # 横盘区 C：L 之后到当前
+    c_start_idx = l_idx
+    c_end_idx = n - 1
+
     return {
         'h_date': h_date, 'h_price': h_price, 'h_idx': h_idx,
-        'l_date': dates[l_idx], 'l_price': l_price, 'l_idx': l_idx,
-        'c_start_idx': c_start, 'c_end_idx': c_end,
-        'c_start_date': dates[c_start], 'c_end_date': dates[c_end],
-        'decline_pct': round((h_price - l_price) / h_price * 100, 2)
+        'l_date': l_date, 'l_price': l_price, 'l_idx': l_idx,
+        'c_start_idx': c_start_idx, 'c_end_idx': c_end_idx,
+        'c_start_date': l_date, 'c_end_date': klines[-1]['date'],
+        'decline_pct': decline_pct
     }
 
 
 def detect(daily, params=None):
     """
-    检测基部突破信号
+    检测基部突破信号（缠论 H/L/C 结构驱动）。
 
     Args:
-        daily: list[dict], 至少 120 条 K 线 (date, open, high, low, close, volume, amount)
-        params: dict or None, 参数覆盖
+        daily: list[dict], OHLCV K线数据
+        params: dict or None
 
     Returns:
-        list[dict]: 信号列表，每个信号含 signal_date, prior_high_date, trough_date 等
+        list[dict]: 信号列表
     """
     if params is None: params = load_params()
     
