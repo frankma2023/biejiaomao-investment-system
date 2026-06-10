@@ -31,35 +31,10 @@ def sma(values, n):
 
 
 def _get_structure(code, klines, db):
-    """获取 H/L/C 结构：优先 MW 信号，其次缠论 bi"""
+    """获取 H/L/C 结构：直接使用 chanlun_structure 共享层，不依赖 MW 信号表"""
     dates = [k['date'] for k in klines]
     n = len(klines)
 
-    # 1. MW 信号表（只取扫描日期之前已存在的结构）
-    try:
-        last_date = dates[-1]  # K线最新日期
-        row = db.execute("""
-            SELECT h_date, h_price, l_date, l_price, c_start, c_end, b1_date, decline_pct
-            FROM mw_signal_daily WHERE stock_code=?
-            AND h_date < l_date AND h_date IS NOT NULL AND l_date IS NOT NULL
-            AND h_date <= ?
-            ORDER BY b2_date DESC LIMIT 1
-        """, (code, last_date)).fetchone()
-        if row:
-            s = dict(row)
-            if s['h_date'] in dates and s['l_date'] in dates:
-                return {
-                    'h_date': s['h_date'], 'h_price': s['h_price'],
-                    'l_date': s['l_date'], 'l_price': s['l_price'],
-                    'c_start': s['c_start'] or s['l_date'],
-                    'c_end': s['c_end'] or dates[-1],
-                    'b1_date': s.get('b1_date'),
-                    'decline_pct': s.get('decline_pct'),
-                }
-    except sqlite3.OperationalError:
-        pass
-
-    # 2. 缠论 bi 兜底
     try:
         from chanlun_structure import get_bi_list, get_bi_peaks
         bi_list = get_bi_list(code)
@@ -69,13 +44,13 @@ def _get_structure(code, klines, db):
                 # 在最近200根K线中找最高bi峰
                 lookback = min(200, n - 10)
                 cutoff = n - lookback
-                recent = [p for p in peaks if p['date'] >= dates[cutoff]]
+                recent = [p for p in peaks if p['date'] >= dates[cutoff] and p['date'] in dates]
                 if not recent:
                     recent = peaks[-3:]
                 h_peak = recent[-1] if recent else None
                 if h_peak and h_peak['date'] in dates:
                     h_idx = dates.index(h_peak['date'])
-                    if h_idx < n - 3:  # H 之后至少留 3 根 K 线找 L
+                    if h_idx < n - 3:
                         l_idx = h_idx + 1
                         l_price = klines[l_idx]['close']
                         for i in range(h_idx + 1, n):
@@ -228,6 +203,7 @@ def detect(klines, params=None):
     signals = []
     for idx in range(len(klines)):
         day = klines[idx]['date']
+        if klines[idx].get('close') is None or klines[idx].get('volume') is None: continue
         rps20 = rps20_map.get(day)
         rps250 = rps250_map.get(day)
         result = _evaluate(klines, idx, structure, rps20, rps250)
