@@ -113,8 +113,6 @@ def _evaluate(klines, idx, structure, rps20, rps250):
     sma10 = sma(closes, 10); sma60 = sma(closes, 60)
     if sma10 is None or sma60 is None: return None
     if not (c > sma60 and c > sma10): return None
-    sma60_10d = sma(closes[:-10], 60) if len(closes) > 70 else sma60
-    if sma60_10d and sma60 <= sma60_10d: return None
 
     # 延伸
     pct_ma10 = (c - sma10) / sma10 * 100
