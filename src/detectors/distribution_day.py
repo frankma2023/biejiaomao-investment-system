@@ -89,6 +89,7 @@ def detect(klines, params):
         if signal_type:
             results.append({
                 **bar,
+                'type': 'bearish',
                 'signal_type': signal_type,
                 'weight': weight,
                 'total_score': (1 if vol_ratio >= 1.0 else 0) + (4 if cp <= -1.0 else (2 if cp <= -0.5 else (1 if cp <= -0.2 else 0))),
