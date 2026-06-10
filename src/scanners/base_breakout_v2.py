@@ -41,14 +41,14 @@ def load_params():
     defaults = {
         'drawdown_min': 0.08,        # 最小调整深度 8%
         'drawdown_max': 0.40,        # 最大调整深度 40%
-        'min_c_days': 5,             # C 区间最少交易日
+        'min_c_days': 20,            # C 区间最少交易日（欧奈尔要求7~8周，A股放宽到4周）
         'c_amp_max': 0.15,           # C 区间最大振幅
         'bo_gain_min': 0.03,         # 突破日最低涨幅 3%
         'bo_vol_ratio': 1.5,         # 突破日量 vs 20日均量
-        'bo_close_pos_min': 0.50,    # 收盘在日内最低位置
-        'require_ma_cross': True,    # 要求 MA10 > MA20
+        'bo_close_pos_min': 0.50,    # 收盘在日内位置
+        'require_ma60': True,         # 要求收盘 > MA60（欧奈尔50日均线，A股用60日）
         'rs_threshold': 80,          # RS 最低阈值
-        'quiet_vol_check': False,    # 盘整期量能萎缩检查（V2调试临时关闭）
+        'max_extension_pct': 0.30,    # 最大延伸比例（距MA10不超过30%）
     }
     if os.path.exists(cfg_path):
         with open(cfg_path, encoding='utf-8') as f:
@@ -185,7 +185,13 @@ def detect(daily, params=None):
     """
     if params is None: params = load_params()
     
-    code = params.get('stock_code', '') or (daily[-1].get('stock_code', '') if daily else '')
+    # 从 K 线数据或 params 中提取 stock_code
+    code = params.get('stock_code', '')
+    if not code:
+        for k in daily:
+            if k.get('stock_code'):
+                code = k['stock_code']
+                break
     
     n = len(daily)
     if n < 120: return []
@@ -202,9 +208,9 @@ def detect(daily, params=None):
     bo_gain = params.get('bo_gain_min', 0.03)
     bo_vol = params.get('bo_vol_ratio', 1.5)
     bo_pos = params.get('bo_close_pos_min', 0.50)
-    require_ma = params.get('require_ma_cross', True)
+    require_ma60 = params.get('require_ma60', True)
     rs_min = params.get('rs_threshold', 80)
-    quiet_vol = params.get('quiet_vol_check', True)
+    max_ext = params.get('max_extension_pct', 0.30)
     
     decline = hlc['decline_pct']
     if decline < dd_min * 100 or decline > dd_max * 100: return []
@@ -212,20 +218,12 @@ def detect(daily, params=None):
     c_days = hlc['c_end_idx'] - hlc['c_start_idx'] + 1
     if c_days < min_c_days: return []
     
-    # C 区间振幅检查（仅检查L之后的安静盘整段，不包含突破后的涨幅）
-    # 取 C 区前 min_c_days 天的振幅
+    # C 区间振幅检查（仅检查前 min_c_days 天，即盘整早期）
     check_days = min(min_c_days * 2, hlc['c_end_idx'] - hlc['c_start_idx'] + 1)
     c_closes = [daily[i]['close'] for i in range(hlc['c_start_idx'], hlc['c_start_idx'] + check_days)]
     if c_closes:
         c_amp = (max(c_closes) - min(c_closes)) / min(c_closes) if min(c_closes) > 0 else 999
         if c_amp > c_amp_max: return []
-    
-    # 盘整期量能萎缩
-    if quiet_vol and c_days >= 6:
-        mid = c_days // 2
-        v1 = [daily[hlc['c_start_idx'] + i]['volume'] for i in range(mid)]
-        v2 = [daily[hlc['c_start_idx'] + mid + i]['volume'] for i in range(mid)]
-        if v1 and v2 and sum(v2)/len(v2) > sum(v1)/len(v1) * 1.15: return []
     
     # 扫描 C 区间及之后的日子，找 BO 突破日
     signals = []
@@ -249,27 +247,24 @@ def detect(daily, params=None):
         avg20 = sum(vol_20) / len(vol_20) if vol_20 else 0
         if avg20 <= 0 or v < avg20 * bo_vol: continue
         
-        # BO 量 > 前10天最大下跌量
-        max_down = 0
-        for j in range(max(0, t_idx-10), t_idx):
-            if daily[j]['close'] < daily[j-1]['close']:
-                if daily[j]['volume'] > max_down: max_down = daily[j]['volume']
-        if max_down > 0 and v <= max_down: continue
-        
         # 收盘位置
         if h > l:
             pos = (c - l) / (h - l)
             if pos < bo_pos: continue
         
-        # MA10 > MA20
+        # 均线计算
         closes_all = [d['close'] for d in daily[:t_idx+1]]
         ma10 = sma(closes_all, 10)
         ma20 = sma(closes_all, 20)
-        if require_ma and (ma10 is None or ma20 is None or ma10 < ma20): continue
+        ma60 = sma(closes_all, 60)
         
-        # 收盘站上 MA10 和 MA20
+        # 收盘站上 MA10 / MA20 / MA60
         if ma10 and c <= ma10: continue
         if ma20 and c <= ma20: continue
+        if require_ma60 and ma60 and c <= ma60: continue
+        
+        # 延伸检查：距 MA10 不超过 max_extension_pct
+        if ma10 and c > ma10 * (1 + max_ext): continue
         
         # 突破 C 区间最高价（检查到当前日前一天）
         c_max = max(daily[i]['close'] for i in range(hlc['c_start_idx'], t_idx))
@@ -301,6 +296,8 @@ def detect(daily, params=None):
             'close_position': round(pos, 2),
             'ma10': round(ma10, 2) if ma10 else None,
             'ma20': round(ma20, 2) if ma20 else None,
+            'ma60': round(ma60, 2) if ma60 else None,
+            'ma10_cross_ma20': (ma10 or 0) > (ma20 or 0),  # 加分项
             'rps_20': rps20 if rps20 > 0 else None,
             'rps_250': rps250 if rps250 > 0 else None,
             'buy_point': round(c_max + 0.01, 2),
