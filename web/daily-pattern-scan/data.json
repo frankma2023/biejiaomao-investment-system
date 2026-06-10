@@ -1,8 +1,8 @@
 {
   "date": "2026-06-10",
-  "generated": "2026-06-10 18:22:07",
+  "generated": "2026-06-10 19:51:31",
   "count": 3002,
-  "elapsed": 374.0,
+  "elapsed": 1065.7,
   "candidates": [
     {
       "stock_code": "301377",
@@ -5431,6 +5431,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-09",
+          "buy_point": 60.38,
+          "breakout_low": 59.34,
+          "failure_day": 1,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_h (2026-06-09突破 D+1)",
+            "current_close": 59.18,
+            "volume_ratio": 2.05,
+            "day_chg_pct": -9.0,
+            "trough_price": 49.99,
+            "breakout_vol_ratio": 2.06,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -5459,7 +5491,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "301389",
@@ -8872,6 +8904,27 @@
       "ds_type": "稳健龙头",
       "signals": [
         {
+          "signal_date": "2026-06-10",
+          "prior_high_date": "2026-05-06",
+          "prior_high_price": 53.78,
+          "trough_date": "2026-05-21",
+          "trough_price": 42.64,
+          "drawdown_pct": 20.71,
+          "base_days": 15,
+          "c_amplitude": 14.3,
+          "breakout_close": 50.8,
+          "breakout_gain_pct": 3.76,
+          "breakout_vol_ratio": 1.5,
+          "close_position": 0.66,
+          "ma10": 47.23,
+          "ma20": 46.15,
+          "rps_20": null,
+          "rps_250": null,
+          "buy_point": 48.97,
+          "source": "base_breakout_v2",
+          "date": "2026-06-10"
+        },
+        {
           "date": "2026-06-10",
           "close": 50.8,
           "volume": 48723426,
@@ -8922,7 +8975,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "口袋支点·看涨<br>top_pattern·看跌"
+      "signal_summary": "base_breakout_v2·看涨<br>口袋支点·看涨<br>top_pattern·看跌"
     },
     {
       "stock_code": "300478",
@@ -11953,6 +12006,27 @@
           "date": "2026-06-10"
         },
         {
+          "signal_date": "2026-06-10",
+          "prior_high_date": "2026-01-23",
+          "prior_high_price": 6.58,
+          "trough_date": "2026-03-23",
+          "trough_price": 4.5,
+          "drawdown_pct": 31.61,
+          "base_days": 54,
+          "c_amplitude": 8.0,
+          "breakout_close": 7.79,
+          "breakout_gain_pct": 4.85,
+          "breakout_vol_ratio": 1.9,
+          "close_position": 0.83,
+          "ma10": 6.69,
+          "ma20": 6.38,
+          "rps_20": null,
+          "rps_250": null,
+          "buy_point": 7.44,
+          "source": "base_breakout_v2",
+          "date": "2026-06-10"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 7.79,
@@ -11995,7 +12069,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "base_breakout·看涨<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
+      "signal_summary": "base_breakout·看涨<br>base_breakout_v2·看涨<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
     },
     {
       "stock_code": "300936",
@@ -15623,6 +15697,27 @@
           "date": "2026-06-10"
         },
         {
+          "signal_date": "2026-06-10",
+          "prior_high_date": "2026-03-31",
+          "prior_high_price": 4.4,
+          "trough_date": "2026-04-28",
+          "trough_price": 3.64,
+          "drawdown_pct": 17.27,
+          "base_days": 28,
+          "c_amplitude": 9.1,
+          "breakout_close": 6.94,
+          "breakout_gain_pct": 8.44,
+          "breakout_vol_ratio": 2.7,
+          "close_position": 0.9,
+          "ma10": 5.28,
+          "ma20": 4.62,
+          "rps_20": null,
+          "rps_250": null,
+          "buy_point": 6.41,
+          "source": "base_breakout_v2",
+          "date": "2026-06-10"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 6.94,
@@ -15637,7 +15732,7 @@
           "source": "talib"
         }
       ],
-      "signal_summary": "base_breakout·看涨<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）"
+      "signal_summary": "base_breakout·看涨<br>base_breakout_v2·看涨<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）"
     },
     {
       "stock_code": "300721",
@@ -20669,6 +20764,38 @@
       "ds_type": "加速爆发",
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-03",
+          "buy_point": 80.61,
+          "breakout_low": 76.0,
+          "failure_day": 5,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_h (2026-06-03突破 D+5)",
+            "current_close": 64.35,
+            "volume_ratio": 2.45,
+            "day_chg_pct": -14.51,
+            "trough_price": 28.35,
+            "breakout_vol_ratio": 1.82,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -20697,7 +20824,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "002138",
@@ -21000,6 +21127,42 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 24.76,
+          "breakout_low": 23.75,
+          "failure_day": 9,
+          "failed_rule": "rule_f",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_f + rule_h + rule_c + rule_f + rule_h (2026-05-28突破 D+9)",
+            "current_close": 24.45,
+            "volume_ratio": 1.57,
+            "day_chg_pct": 0.41,
+            "trough_price": 16.07,
+            "breakout_vol_ratio": 1.84,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_f",
+              "rule_h",
+              "rule_c",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_f",
+            "rule_h",
+            "rule_c",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -21028,7 +21191,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "600114",
@@ -21524,6 +21687,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 33.85,
+          "breakout_low": 32.52,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_c + rule_b (2026-05-27突破 D+10)",
+            "current_close": 26.71,
+            "volume_ratio": 0.65,
+            "day_chg_pct": -5.82,
+            "trough_price": 24.1,
+            "breakout_vol_ratio": 1.63,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_c",
+              "rule_b"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_c",
+            "rule_b"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -21552,7 +21747,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "002518",
@@ -22839,6 +23034,40 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 15.05,
+          "breakout_low": 15.99,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_b + rule_c + rule_b + rule_e + rule_h (2026-05-27突破 D+10)",
+            "current_close": 15.82,
+            "volume_ratio": 2.48,
+            "day_chg_pct": -5.5,
+            "trough_price": 10.63,
+            "breakout_vol_ratio": 1.92,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_b",
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_b",
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 15.82,
@@ -22881,7 +23110,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "300726",
@@ -23613,6 +23842,46 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 23.39,
+          "breakout_low": 23.56,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h + rule_c + rule_b + rule_f + rule_h (2026-05-27突破 D+10)",
+            "current_close": 21.09,
+            "volume_ratio": 1.6,
+            "day_chg_pct": 0.67,
+            "trough_price": 17.65,
+            "breakout_vol_ratio": 2.48,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 21.09,
@@ -23663,7 +23932,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "K线形态·看涨（看涨吞没）<br>distribution_day·看跌<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>K线形态·看涨（看涨吞没）<br>distribution_day·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "301611",
@@ -26026,6 +26295,46 @@
       "ds_type": "加速爆发",
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-03",
+          "buy_point": 26.98,
+          "breakout_low": 25.56,
+          "failure_day": 5,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_h + rule_c + rule_b + rule_e + rule_h (2026-06-03突破 D+5)",
+            "current_close": 25.48,
+            "volume_ratio": 1.9,
+            "day_chg_pct": -8.44,
+            "trough_price": 17.9,
+            "breakout_vol_ratio": 2.09,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -26054,7 +26363,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "002119",
@@ -26098,8 +26407,51 @@
       "rs_line": 145.14,
       "amount": 4100564538.0,
       "ds_type": null,
-      "signals": [],
-      "signal_summary": "—"
+      "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 18.68,
+          "breakout_low": 19.4,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_f + rule_h + rule_c + rule_b + rule_f + rule_h (2026-05-27突破 D+10)",
+            "current_close": 17.11,
+            "volume_ratio": 1.43,
+            "day_chg_pct": -3.0,
+            "trough_price": 11.36,
+            "breakout_vol_ratio": 4.46,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_f",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_f",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        }
+      ],
+      "signal_summary": "breakout_failure·看跌"
     },
     {
       "stock_code": "600596",
@@ -29030,6 +29382,34 @@
       "ds_type": "加速爆发",
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-03",
+          "buy_point": 13.33,
+          "breakout_low": 12.45,
+          "failure_day": 5,
+          "failed_rule": "rule_h",
+          "severity": "confirmed",
+          "details": {
+            "rule_label": "rule_c + rule_h (2026-06-03突破 D+5)",
+            "current_close": 12.64,
+            "volume_ratio": 1.13,
+            "day_chg_pct": -7.47,
+            "trough_price": 10.2,
+            "breakout_vol_ratio": 2.5,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -29058,7 +29438,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "300939",
@@ -29073,6 +29453,34 @@
       "amount": 321964438.0,
       "ds_type": null,
       "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 73.56,
+          "breakout_low": 70.5,
+          "failure_day": 9,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b (2026-05-28突破 D+9)",
+            "current_close": 55.3,
+            "volume_ratio": 0.66,
+            "day_chg_pct": -2.9,
+            "trough_price": 36.18,
+            "breakout_vol_ratio": 1.73,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b"
+          ],
+          "source": "breakout_failure"
+        },
         {
           "type": "bearish",
           "pattern": "double_top",
@@ -29102,7 +29510,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "301099",
@@ -29482,6 +29890,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-05",
+          "buy_point": 17.66,
+          "breakout_low": 16.71,
+          "failure_day": 3,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_h (2026-06-05突破 D+3)",
+            "current_close": 16.33,
+            "volume_ratio": 1.63,
+            "day_chg_pct": -8.67,
+            "trough_price": 15.11,
+            "breakout_vol_ratio": 2.03,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 16.33,
@@ -29495,7 +29935,7 @@
           "source": "talib"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）"
     },
     {
       "stock_code": "605058",
@@ -32299,6 +32739,27 @@
           "date": "2026-06-10"
         },
         {
+          "signal_date": "2026-06-10",
+          "prior_high_date": "2026-02-27",
+          "prior_high_price": 28.5,
+          "trough_date": "2026-04-03",
+          "trough_price": 19.88,
+          "drawdown_pct": 30.25,
+          "base_days": 45,
+          "c_amplitude": 11.5,
+          "breakout_close": 30.06,
+          "breakout_gain_pct": 7.13,
+          "breakout_vol_ratio": 2.65,
+          "close_position": 0.6,
+          "ma10": 25.21,
+          "ma20": 24.18,
+          "rps_20": null,
+          "rps_250": null,
+          "buy_point": 28.07,
+          "source": "base_breakout_v2",
+          "date": "2026-06-10"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 30.06,
@@ -32313,7 +32774,7 @@
           "source": "talib"
         }
       ],
-      "signal_summary": "base_breakout·看涨<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）"
+      "signal_summary": "base_breakout·看涨<br>base_breakout_v2·看涨<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）"
     },
     {
       "stock_code": "603155",
@@ -33778,6 +34239,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-03",
+          "buy_point": 58.62,
+          "breakout_low": 59.22,
+          "failure_day": 5,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_h (2026-06-03突破 D+5)",
+            "current_close": 56.28,
+            "volume_ratio": 2.93,
+            "day_chg_pct": -5.6,
+            "trough_price": 30.99,
+            "breakout_vol_ratio": 2.54,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 56.28,
@@ -33820,7 +34313,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
     },
     {
       "stock_code": "300420",
@@ -33850,6 +34343,38 @@
       "amount": 945333126.0,
       "ds_type": null,
       "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 11.28,
+          "breakout_low": 11.14,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h (2026-05-27突破 D+10)",
+            "current_close": 10.89,
+            "volume_ratio": 1.55,
+            "day_chg_pct": 4.91,
+            "trough_price": 7.81,
+            "breakout_vol_ratio": 2.42,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
         {
           "type": "bullish",
           "date": "2026-06-10",
@@ -33892,7 +34417,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "K线形态·看涨（看涨吞没）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>K线形态·看涨（看涨吞没）<br>top_pattern·看跌"
     },
     {
       "stock_code": "688352",
@@ -33907,6 +34432,50 @@
       "amount": 723430794.0,
       "ds_type": null,
       "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-01",
+          "buy_point": 19.49,
+          "breakout_low": 19.4,
+          "failure_day": 7,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_f + rule_h + rule_c + rule_b + rule_e + rule_f + rule_h (2026-06-01突破 D+7)",
+            "current_close": 17.92,
+            "volume_ratio": 1.91,
+            "day_chg_pct": -7.01,
+            "trough_price": 11.87,
+            "breakout_vol_ratio": 1.94,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_f",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_f",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
         {
           "type": "bearish",
           "pattern": "double_top",
@@ -33936,7 +34505,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "603730",
@@ -35093,6 +35662,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-05",
+          "buy_point": 6.16,
+          "breakout_low": 6.01,
+          "failure_day": 3,
+          "failed_rule": "rule_e",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_e + rule_h (2026-06-05突破 D+3)",
+            "current_close": 6.03,
+            "volume_ratio": 2.5,
+            "day_chg_pct": -7.52,
+            "trough_price": 3.87,
+            "breakout_vol_ratio": 2.28,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 6.03,
@@ -35135,7 +35734,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
     },
     {
       "stock_code": "300508",
@@ -35372,6 +35971,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-04",
+          "buy_point": 4.48,
+          "breakout_low": 4.44,
+          "failure_day": 4,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h (2026-06-04突破 D+4)",
+            "current_close": 4.39,
+            "volume_ratio": 0.88,
+            "day_chg_pct": 0.46,
+            "trough_price": 4.16,
+            "breakout_vol_ratio": 1.9,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -35400,7 +36029,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "603212",
@@ -35415,6 +36044,38 @@
       "amount": 504332728.0,
       "ds_type": null,
       "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-08",
+          "buy_point": 15.88,
+          "breakout_low": 15.47,
+          "failure_day": 2,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_h (2026-06-08突破 D+2)",
+            "current_close": 15.38,
+            "volume_ratio": 1.5,
+            "day_chg_pct": -7.13,
+            "trough_price": 12.36,
+            "breakout_vol_ratio": 1.86,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
         {
           "type": "bearish",
           "pattern": "double_top",
@@ -35444,7 +36105,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "002446",
@@ -35841,6 +36502,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-01",
+          "buy_point": 5.59,
+          "breakout_low": 5.5,
+          "failure_day": 7,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h (2026-06-01突破 D+7)",
+            "current_close": 4.63,
+            "volume_ratio": 0.99,
+            "day_chg_pct": -6.46,
+            "trough_price": 3.51,
+            "breakout_vol_ratio": 2.16,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -35869,7 +36560,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "605098",
@@ -36727,6 +37418,40 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 7.11,
+          "breakout_low": 6.88,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h + rule_c + rule_b (2026-05-27突破 D+10)",
+            "current_close": 6.65,
+            "volume_ratio": 1.2,
+            "day_chg_pct": 0.61,
+            "trough_price": 5.33,
+            "breakout_vol_ratio": 2.8,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h",
+              "rule_c",
+              "rule_b"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h",
+            "rule_c",
+            "rule_b"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -36755,7 +37480,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "300491",
@@ -36934,6 +37659,46 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 24.02,
+          "breakout_low": 23.41,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h + rule_c + rule_b + rule_f + rule_h (2026-05-27突破 D+10)",
+            "current_close": 20.8,
+            "volume_ratio": 1.59,
+            "day_chg_pct": -2.76,
+            "trough_price": 19.21,
+            "breakout_vol_ratio": 2.55,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -36962,7 +37727,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "600143",
@@ -38431,6 +39196,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 15.17,
+          "breakout_low": 15.15,
+          "failure_day": 9,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h (2026-05-28突破 D+9)",
+            "current_close": 13.71,
+            "volume_ratio": 1.67,
+            "day_chg_pct": -0.22,
+            "trough_price": 10.01,
+            "breakout_vol_ratio": 2.66,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -38459,7 +39256,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "600237",
@@ -38474,6 +39271,38 @@
       "amount": 1017802176.0,
       "ds_type": null,
       "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-04",
+          "buy_point": 11.12,
+          "breakout_low": 10.83,
+          "failure_day": 4,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_h (2026-06-04突破 D+4)",
+            "current_close": 10.7,
+            "volume_ratio": 2.57,
+            "day_chg_pct": -8.55,
+            "trough_price": 8.09,
+            "breakout_vol_ratio": 2.82,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
         {
           "type": "bullish",
           "date": "2026-06-10",
@@ -38517,7 +39346,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
     },
     {
       "stock_code": "603103",
@@ -40121,8 +40950,41 @@
       "rs_line": 101.71,
       "amount": 546168071.0,
       "ds_type": null,
-      "signals": [],
-      "signal_summary": "—"
+      "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 11.01,
+          "breakout_low": 10.71,
+          "failure_day": 9,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h (2026-05-28突破 D+9)",
+            "current_close": 10.17,
+            "volume_ratio": 1.02,
+            "day_chg_pct": -4.33,
+            "trough_price": 8.66,
+            "breakout_vol_ratio": 2.01,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        }
+      ],
+      "signal_summary": "breakout_failure·看跌"
     },
     {
       "stock_code": "603328",
@@ -40137,6 +40999,36 @@
       "amount": 740233848.0,
       "ds_type": null,
       "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-09",
+          "buy_point": 13.32,
+          "breakout_low": 12.93,
+          "failure_day": 1,
+          "failed_rule": "rule_e",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_e + rule_h (2026-06-09突破 D+1)",
+            "current_close": 13.06,
+            "volume_ratio": 1.41,
+            "day_chg_pct": -5.5,
+            "trough_price": 11.45,
+            "breakout_vol_ratio": 1.7,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
         {
           "type": "bearish",
           "pattern": "double_top",
@@ -40166,7 +41058,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "601898",
@@ -40443,6 +41335,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 8.54,
+          "breakout_low": 8.23,
+          "failure_day": 9,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h (2026-05-28突破 D+9)",
+            "current_close": 7.18,
+            "volume_ratio": 0.99,
+            "day_chg_pct": -1.51,
+            "trough_price": 6.2,
+            "breakout_vol_ratio": 2.17,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -40471,7 +41393,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "920808",
@@ -41368,6 +42290,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-29",
+          "buy_point": 30.01,
+          "breakout_low": 29.38,
+          "failure_day": 8,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h (2026-05-29突破 D+8)",
+            "current_close": 28.1,
+            "volume_ratio": 0.97,
+            "day_chg_pct": -1.71,
+            "trough_price": 23.03,
+            "breakout_vol_ratio": 2.5,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 28.1,
@@ -41410,7 +42362,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "603610",
@@ -41528,6 +42480,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-01",
+          "buy_point": 8.89,
+          "breakout_low": 8.5,
+          "failure_day": 7,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h (2026-06-01突破 D+7)",
+            "current_close": 7.53,
+            "volume_ratio": 1.04,
+            "day_chg_pct": -7.27,
+            "trough_price": 5.34,
+            "breakout_vol_ratio": 3.08,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -41556,7 +42540,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "600936",
@@ -42545,8 +43529,43 @@
       "rs_line": 104.15,
       "amount": 1800525131.0,
       "ds_type": null,
-      "signals": [],
-      "signal_summary": "—"
+      "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-01",
+          "buy_point": 7.31,
+          "breakout_low": 7.0,
+          "failure_day": 7,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_f + rule_h (2026-06-01突破 D+7)",
+            "current_close": 5.62,
+            "volume_ratio": 2.22,
+            "day_chg_pct": -7.57,
+            "trough_price": 4.56,
+            "breakout_vol_ratio": 3.22,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        }
+      ],
+      "signal_summary": "breakout_failure·看跌"
     },
     {
       "stock_code": "300219",
@@ -43775,6 +44794,27 @@
           "date": "2026-06-10"
         },
         {
+          "signal_date": "2026-06-10",
+          "prior_high_date": "2025-08-27",
+          "prior_high_price": 8.67,
+          "trough_date": "2026-03-23",
+          "trough_price": 5.41,
+          "drawdown_pct": 37.6,
+          "base_days": 54,
+          "c_amplitude": 5.9,
+          "breakout_close": 8.87,
+          "breakout_gain_pct": 10.05,
+          "breakout_vol_ratio": 1.61,
+          "close_position": 1.0,
+          "ma10": 7.16,
+          "ma20": 7.01,
+          "rps_20": null,
+          "rps_250": null,
+          "buy_point": 8.07,
+          "source": "base_breakout_v2",
+          "date": "2026-06-10"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 8.87,
@@ -43830,7 +44870,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "base_breakout·看涨<br>TA-Lib·看跌（RSI进入超买区(>70)，注意回调风险）<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
+      "signal_summary": "base_breakout·看涨<br>base_breakout_v2·看涨<br>TA-Lib·看跌（RSI进入超买区(>70)，注意回调风险）<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
     },
     {
       "stock_code": "300825",
@@ -44006,6 +45046,44 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 34.2,
+          "breakout_low": 33.56,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h + rule_c + rule_b + rule_f + rule_h (2026-05-27突破 D+10)",
+            "current_close": 33.53,
+            "volume_ratio": 1.37,
+            "day_chg_pct": -3.43,
+            "trough_price": 24.72,
+            "breakout_vol_ratio": 2.52,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -44034,7 +45112,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "688612",
@@ -44249,6 +45327,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-01",
+          "buy_point": 14.31,
+          "breakout_low": 13.4,
+          "failure_day": 7,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_c + rule_b (2026-06-01突破 D+7)",
+            "current_close": 12.71,
+            "volume_ratio": 0.58,
+            "day_chg_pct": -4.58,
+            "trough_price": 12.24,
+            "breakout_vol_ratio": 1.65,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_c",
+              "rule_b"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_c",
+            "rule_b"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -44277,7 +45387,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "002196",
@@ -44658,6 +45768,34 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-03",
+          "buy_point": 9.0,
+          "breakout_low": 8.65,
+          "failure_day": 5,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b (2026-06-03突破 D+5)",
+            "current_close": 7.08,
+            "volume_ratio": 0.65,
+            "day_chg_pct": -7.33,
+            "trough_price": 6.31,
+            "breakout_vol_ratio": 2.09,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 7.08,
@@ -44699,7 +45837,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "603507",
@@ -45368,6 +46506,44 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-03",
+          "buy_point": 19.0,
+          "breakout_low": 18.49,
+          "failure_day": 5,
+          "failed_rule": "rule_f",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_f + rule_h + rule_c + rule_b + rule_f + rule_h (2026-06-03突破 D+5)",
+            "current_close": 18.56,
+            "volume_ratio": 2.89,
+            "day_chg_pct": 5.28,
+            "trough_price": 14.29,
+            "breakout_vol_ratio": 2.57,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_f",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_f",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 18.56,
@@ -45424,7 +46600,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "688605",
@@ -45649,6 +46825,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-03",
+          "buy_point": 7.81,
+          "breakout_low": 7.36,
+          "failure_day": 5,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_h (2026-06-03突破 D+5)",
+            "current_close": 7.13,
+            "volume_ratio": 1.54,
+            "day_chg_pct": -10.2,
+            "trough_price": 6.34,
+            "breakout_vol_ratio": 1.98,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "signal_date": "2026-06-10",
           "count": 3,
@@ -45700,7 +46908,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "distribution_day·看跌<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>distribution_day·看跌<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "600546",
@@ -46673,6 +47881,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-29",
+          "buy_point": 28.01,
+          "breakout_low": 27.22,
+          "failure_day": 8,
+          "failed_rule": "rule_f",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_f + rule_h (2026-05-29突破 D+8)",
+            "current_close": 27.49,
+            "volume_ratio": 5.28,
+            "day_chg_pct": 6.22,
+            "trough_price": 20.18,
+            "breakout_vol_ratio": 6.34,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 27.49,
@@ -46715,7 +47953,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
     },
     {
       "stock_code": "000970",
@@ -46983,6 +48221,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 66.21,
+          "breakout_low": 63.0,
+          "failure_day": 9,
+          "failed_rule": "rule_e",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_e + rule_h (2026-05-28突破 D+9)",
+            "current_close": 63.83,
+            "volume_ratio": 1.43,
+            "day_chg_pct": -5.69,
+            "trough_price": 43.8,
+            "breakout_vol_ratio": 1.95,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -47011,7 +48279,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "600977",
@@ -48364,6 +49632,36 @@
       "signals": [
         {
           "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 10.2,
+          "breakout_low": 9.81,
+          "failure_day": 9,
+          "failed_rule": "rule_f",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_f + rule_h (2026-05-28突破 D+9)",
+            "current_close": 10.13,
+            "volume_ratio": 3.94,
+            "day_chg_pct": 3.26,
+            "trough_price": 8.12,
+            "breakout_vol_ratio": 3.05,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
+          "date": "2026-06-10",
           "close": 10.13,
           "volume": 477024000,
           "close_position": 0.65,
@@ -48432,7 +49730,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "口袋支点·看涨<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>TA-Lib·看涨（MACD金叉，短期趋势转强）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>口袋支点·看涨<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>TA-Lib·看涨（MACD金叉，短期趋势转强）<br>top_pattern·看跌"
     },
     {
       "stock_code": "301069",
@@ -51317,6 +52615,46 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 29.16,
+          "breakout_low": 28.13,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h + rule_c + rule_b + rule_f + rule_h (2026-05-27突破 D+10)",
+            "current_close": 26.41,
+            "volume_ratio": 1.33,
+            "day_chg_pct": -3.79,
+            "trough_price": 23.24,
+            "breakout_vol_ratio": 3.68,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 26.41,
@@ -51358,7 +52696,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "688160",
@@ -51532,6 +52870,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 14.49,
+          "breakout_low": 14.2,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h (2026-05-27突破 D+10)",
+            "current_close": 11.92,
+            "volume_ratio": 0.83,
+            "day_chg_pct": -2.53,
+            "trough_price": 11.7,
+            "breakout_vol_ratio": 1.98,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -51560,7 +52928,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "002293",
@@ -52548,8 +53916,41 @@
       "rs_line": 84.93,
       "amount": 294395679.0,
       "ds_type": null,
-      "signals": [],
-      "signal_summary": "—"
+      "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 23.15,
+          "breakout_low": 23.13,
+          "failure_day": 9,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h (2026-05-28突破 D+9)",
+            "current_close": 21.72,
+            "volume_ratio": 1.12,
+            "day_chg_pct": -2.82,
+            "trough_price": 18.82,
+            "breakout_vol_ratio": 2.64,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        }
+      ],
+      "signal_summary": "breakout_failure·看跌"
     },
     {
       "stock_code": "301168",
@@ -54533,6 +55934,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-04",
+          "buy_point": 4.4,
+          "breakout_low": 4.56,
+          "failure_day": 4,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_h (2026-06-04突破 D+4)",
+            "current_close": 4.01,
+            "volume_ratio": 5.43,
+            "day_chg_pct": -10.09,
+            "trough_price": 3.06,
+            "breakout_vol_ratio": 8.42,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 4.01,
@@ -54575,7 +56008,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
     },
     {
       "stock_code": "000766",
@@ -54726,6 +56159,34 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-01",
+          "buy_point": 16.48,
+          "breakout_low": 16.35,
+          "failure_day": 7,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b (2026-06-01突破 D+7)",
+            "current_close": 16.32,
+            "volume_ratio": 0.84,
+            "day_chg_pct": 0.74,
+            "trough_price": 15.3,
+            "breakout_vol_ratio": 1.72,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -54754,7 +56215,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "920111",
@@ -55865,8 +57326,49 @@
       "rs_line": 114.12,
       "amount": 328894168.0,
       "ds_type": null,
-      "signals": [],
-      "signal_summary": "—"
+      "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 22.91,
+          "breakout_low": 22.65,
+          "failure_day": 9,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h + rule_c + rule_b + rule_f + rule_h (2026-05-28突破 D+9)",
+            "current_close": 22.22,
+            "volume_ratio": 1.75,
+            "day_chg_pct": -2.76,
+            "trough_price": 16.49,
+            "breakout_vol_ratio": 2.83,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        }
+      ],
+      "signal_summary": "breakout_failure·看跌"
     },
     {
       "stock_code": "002948",
@@ -56239,6 +57741,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 10.83,
+          "breakout_low": 10.67,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h (2026-05-27突破 D+10)",
+            "current_close": 9.51,
+            "volume_ratio": 1.07,
+            "day_chg_pct": -1.76,
+            "trough_price": 7.95,
+            "breakout_vol_ratio": 2.21,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -56267,7 +57801,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "300590",
@@ -57453,6 +58987,27 @@
       "ds_type": null,
       "signals": [
         {
+          "signal_date": "2026-06-10",
+          "prior_high_date": "2026-02-06",
+          "prior_high_price": 8.25,
+          "trough_date": "2026-05-28",
+          "trough_price": 6.97,
+          "drawdown_pct": 15.52,
+          "base_days": 10,
+          "c_amplitude": 10.2,
+          "breakout_close": 7.68,
+          "breakout_gain_pct": 5.79,
+          "breakout_vol_ratio": 2.54,
+          "close_position": 0.83,
+          "ma10": 7.3,
+          "ma20": 7.27,
+          "rps_20": null,
+          "rps_250": null,
+          "buy_point": 7.48,
+          "source": "base_breakout_v2",
+          "date": "2026-06-10"
+        },
+        {
           "date": "2026-06-10",
           "close": 7.68,
           "volume": 34156900,
@@ -57521,7 +59076,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "口袋支点·看涨<br>TA-Lib·看涨（价格上穿SMA50，中期趋势转强）<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
+      "signal_summary": "base_breakout_v2·看涨<br>口袋支点·看涨<br>TA-Lib·看涨（价格上穿SMA50，中期趋势转强）<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
     },
     {
       "stock_code": "600395",
@@ -58579,6 +60134,34 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-05",
+          "buy_point": 21.29,
+          "breakout_low": 20.96,
+          "failure_day": 3,
+          "failed_rule": "rule_h",
+          "severity": "confirmed",
+          "details": {
+            "rule_label": "rule_c + rule_h (2026-06-05突破 D+3)",
+            "current_close": 21.25,
+            "volume_ratio": 2.07,
+            "day_chg_pct": -2.52,
+            "trough_price": 17.22,
+            "breakout_vol_ratio": 2.49,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -58607,7 +60190,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "002955",
@@ -61349,6 +62932,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 36.89,
+          "breakout_low": 35.14,
+          "failure_day": 9,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h (2026-05-28突破 D+9)",
+            "current_close": 32.06,
+            "volume_ratio": 0.93,
+            "day_chg_pct": -0.4,
+            "trough_price": 29.3,
+            "breakout_vol_ratio": 2.89,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -61377,7 +62990,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "688182",
@@ -61562,8 +63175,37 @@
       "rs_line": 55.02,
       "amount": 427981372.0,
       "ds_type": null,
-      "signals": [],
-      "signal_summary": "—"
+      "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-29",
+          "buy_point": 5.83,
+          "breakout_low": 5.76,
+          "failure_day": 8,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b (2026-05-29突破 D+8)",
+            "current_close": 5.03,
+            "volume_ratio": 0.56,
+            "day_chg_pct": -3.64,
+            "trough_price": 4.58,
+            "breakout_vol_ratio": 2.68,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b"
+          ],
+          "source": "breakout_failure"
+        }
+      ],
+      "signal_summary": "breakout_failure·看跌"
     },
     {
       "stock_code": "600871",
@@ -62361,6 +64003,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-29",
+          "buy_point": 9.34,
+          "breakout_low": 9.32,
+          "failure_day": 8,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h (2026-05-29突破 D+8)",
+            "current_close": 8.52,
+            "volume_ratio": 0.82,
+            "day_chg_pct": -2.18,
+            "trough_price": 7.95,
+            "breakout_vol_ratio": 2.33,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 8.52,
@@ -62415,7 +64087,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "K线形态·看涨（锤子线）<br>TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>K线形态·看涨（锤子线）<br>TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "000722",
@@ -63672,6 +65344,40 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-01",
+          "buy_point": 8.88,
+          "breakout_low": 8.7,
+          "failure_day": 7,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_f + rule_h (2026-06-01突破 D+7)",
+            "current_close": 8.16,
+            "volume_ratio": 1.43,
+            "day_chg_pct": -3.55,
+            "trough_price": 6.72,
+            "breakout_vol_ratio": 3.72,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 8.16,
@@ -63700,7 +65406,7 @@
           "source": "talib"
         }
       ],
-      "signal_summary": "TA-Lib·看涨（SMA50上穿SMA200，金叉信号）<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看涨（SMA50上穿SMA200，金叉信号）<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）"
     },
     {
       "stock_code": "000519",
@@ -63715,6 +65421,34 @@
       "amount": 858719405.0,
       "ds_type": null,
       "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 18.94,
+          "breakout_low": 17.98,
+          "failure_day": 9,
+          "failed_rule": "rule_h",
+          "severity": "confirmed",
+          "details": {
+            "rule_label": "rule_c + rule_h (2026-05-28突破 D+9)",
+            "current_close": 18.77,
+            "volume_ratio": 1.44,
+            "day_chg_pct": -0.95,
+            "trough_price": 15.69,
+            "breakout_vol_ratio": 3.55,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
         {
           "type": "bearish",
           "date": "2026-06-10",
@@ -63758,7 +65492,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "301439",
@@ -64739,6 +66473,44 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-29",
+          "buy_point": 8.7,
+          "breakout_low": 8.32,
+          "failure_day": 8,
+          "failed_rule": "rule_e",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_e + rule_h + rule_c + rule_b + rule_e + rule_h (2026-05-29突破 D+8)",
+            "current_close": 8.66,
+            "volume_ratio": 3.39,
+            "day_chg_pct": -7.48,
+            "trough_price": 7.6,
+            "breakout_vol_ratio": 1.86,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_e",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_e",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 8.66,
@@ -64795,7 +66567,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "300661",
@@ -66093,6 +67865,42 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-04",
+          "buy_point": 54.11,
+          "breakout_low": 53.31,
+          "failure_day": 4,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_h + rule_c + rule_b + rule_f + rule_h (2026-06-04突破 D+4)",
+            "current_close": 51.08,
+            "volume_ratio": 2.09,
+            "day_chg_pct": -2.13,
+            "trough_price": 42.61,
+            "breakout_vol_ratio": 2.7,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 51.08,
@@ -66135,7 +67943,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "600750",
@@ -67286,6 +69094,34 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-29",
+          "buy_point": 18.14,
+          "breakout_low": 17.91,
+          "failure_day": 8,
+          "failed_rule": "rule_h",
+          "severity": "confirmed",
+          "details": {
+            "rule_label": "rule_c + rule_h (2026-05-29突破 D+8)",
+            "current_close": 17.99,
+            "volume_ratio": 0.87,
+            "day_chg_pct": -1.96,
+            "trough_price": 15.11,
+            "breakout_vol_ratio": 2.06,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -67314,7 +69150,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "002191",
@@ -67528,6 +69364,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 7.77,
+          "breakout_low": 7.62,
+          "failure_day": 9,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h (2026-05-28突破 D+9)",
+            "current_close": 7.16,
+            "volume_ratio": 0.8,
+            "day_chg_pct": -1.51,
+            "trough_price": 6.6,
+            "breakout_vol_ratio": 2.19,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 7.16,
@@ -67569,7 +69435,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "300681",
@@ -68470,6 +70336,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-02",
+          "buy_point": 33.61,
+          "breakout_low": 31.5,
+          "failure_day": 6,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h (2026-06-02突破 D+6)",
+            "current_close": 29.82,
+            "volume_ratio": 1.99,
+            "day_chg_pct": 0.68,
+            "trough_price": 25.46,
+            "breakout_vol_ratio": 3.82,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -68498,7 +70396,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "002901",
@@ -71222,6 +73120,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-04",
+          "buy_point": 4.75,
+          "breakout_low": 4.68,
+          "failure_day": 4,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_h (2026-06-04突破 D+4)",
+            "current_close": 4.67,
+            "volume_ratio": 1.63,
+            "day_chg_pct": -3.91,
+            "trough_price": 4.14,
+            "breakout_vol_ratio": 2.03,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -71250,7 +73180,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "000333",
@@ -71565,6 +73495,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 7.66,
+          "breakout_low": 7.5,
+          "failure_day": 9,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h (2026-05-28突破 D+9)",
+            "current_close": 7.03,
+            "volume_ratio": 1.08,
+            "day_chg_pct": -4.74,
+            "trough_price": 6.89,
+            "breakout_vol_ratio": 1.74,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 7.03,
@@ -71606,7 +73568,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "300976",
@@ -71621,6 +73583,38 @@
       "amount": 687411894.0,
       "ds_type": null,
       "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 91.87,
+          "breakout_low": 87.38,
+          "failure_day": 9,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h (2026-05-28突破 D+9)",
+            "current_close": 67.26,
+            "volume_ratio": 3.83,
+            "day_chg_pct": 6.61,
+            "trough_price": 53.37,
+            "breakout_vol_ratio": 1.83,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
         {
           "type": "bullish",
           "date": "2026-06-10",
@@ -71662,7 +73656,7 @@
           "source": "talib"
         }
       ],
-      "signal_summary": "K线形态·看涨（看涨吞没）<br>TA-Lib·看涨（价格上穿SMA50，中期趋势转强）<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）"
+      "signal_summary": "breakout_failure·看跌<br>K线形态·看涨（看涨吞没）<br>TA-Lib·看涨（价格上穿SMA50，中期趋势转强）<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）"
     },
     {
       "stock_code": "000552",
@@ -71818,6 +73812,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-28",
+          "buy_point": 7.57,
+          "breakout_low": 7.37,
+          "failure_day": 9,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h (2026-05-28突破 D+9)",
+            "current_close": 6.65,
+            "volume_ratio": 0.63,
+            "day_chg_pct": -4.18,
+            "trough_price": 6.47,
+            "breakout_vol_ratio": 2.48,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -71846,7 +73870,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "301348",
@@ -73359,6 +75383,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-29",
+          "buy_point": 14.81,
+          "breakout_low": 14.6,
+          "failure_day": 8,
+          "failed_rule": "rule_e",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_e + rule_h (2026-05-29突破 D+8)",
+            "current_close": 14.77,
+            "volume_ratio": 1.69,
+            "day_chg_pct": -3.21,
+            "trough_price": 10.49,
+            "breakout_vol_ratio": 2.79,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 14.77,
@@ -73373,7 +75427,7 @@
           "source": "talib"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（MACD死叉，短期趋势转弱）"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）"
     },
     {
       "stock_code": "600906",
@@ -75489,6 +77543,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-29",
+          "buy_point": 5.18,
+          "breakout_low": 5.13,
+          "failure_day": 8,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h (2026-05-29突破 D+8)",
+            "current_close": 4.77,
+            "volume_ratio": 1.01,
+            "day_chg_pct": -3.25,
+            "trough_price": 4.56,
+            "breakout_vol_ratio": 1.71,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 4.77,
@@ -75530,7 +77614,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "002617",
@@ -77630,6 +79714,27 @@
       "ds_type": null,
       "signals": [
         {
+          "signal_date": "2026-06-10",
+          "prior_high_date": "2025-09-17",
+          "prior_high_price": 2.37,
+          "trough_date": "2026-04-23",
+          "trough_price": 1.44,
+          "drawdown_pct": 39.24,
+          "base_days": 32,
+          "c_amplitude": 12.5,
+          "breakout_close": 1.77,
+          "breakout_gain_pct": 9.94,
+          "breakout_vol_ratio": 3.08,
+          "close_position": 1.0,
+          "ma10": 1.58,
+          "ma20": 1.54,
+          "rps_20": null,
+          "rps_250": null,
+          "buy_point": 1.67,
+          "source": "base_breakout_v2",
+          "date": "2026-06-10"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 1.77,
@@ -77685,7 +79790,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "K线形态·看涨（看涨吞没）<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
+      "signal_summary": "base_breakout_v2·看涨<br>K线形态·看涨（看涨吞没）<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
     },
     {
       "stock_code": "688609",
@@ -78635,6 +80740,27 @@
       "ds_type": null,
       "signals": [
         {
+          "signal_date": "2026-06-10",
+          "prior_high_date": "2026-02-26",
+          "prior_high_price": 39.1,
+          "trough_date": "2026-03-23",
+          "trough_price": 29.06,
+          "drawdown_pct": 25.68,
+          "base_days": 54,
+          "c_amplitude": 6.2,
+          "breakout_close": 46.9,
+          "breakout_gain_pct": 10.74,
+          "breakout_vol_ratio": 2.56,
+          "close_position": 0.74,
+          "ma10": 41.05,
+          "ma20": 38.13,
+          "rps_20": null,
+          "rps_250": null,
+          "buy_point": 42.5,
+          "source": "base_breakout_v2",
+          "date": "2026-06-10"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 46.9,
@@ -78690,7 +80816,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（RSI进入超买区(>70)，注意回调风险）<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
+      "signal_summary": "base_breakout_v2·看涨<br>TA-Lib·看跌（RSI进入超买区(>70)，注意回调风险）<br>TA-Lib·看涨（成交量放大至50日均量的2倍以上）<br>top_pattern·看跌"
     },
     {
       "stock_code": "002068",
@@ -78999,6 +81125,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-02",
+          "buy_point": 4.19,
+          "breakout_low": 4.16,
+          "failure_day": 6,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h (2026-06-02突破 D+6)",
+            "current_close": 3.68,
+            "volume_ratio": 0.76,
+            "day_chg_pct": -3.16,
+            "trough_price": 3.6,
+            "breakout_vol_ratio": 2.06,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -79027,7 +81183,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "601375",
@@ -80142,6 +82298,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-02",
+          "buy_point": 14.1,
+          "breakout_low": 13.72,
+          "failure_day": 6,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_h (2026-06-02突破 D+6)",
+            "current_close": 13.57,
+            "volume_ratio": 1.43,
+            "day_chg_pct": -3.35,
+            "trough_price": 11.76,
+            "breakout_vol_ratio": 1.93,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 13.57,
@@ -80184,7 +82372,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（MACD死叉，短期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "000001",
@@ -81424,6 +83612,27 @@
       "ds_type": null,
       "signals": [
         {
+          "signal_date": "2026-06-10",
+          "prior_high_date": "2026-01-06",
+          "prior_high_price": 22.35,
+          "trough_date": "2026-05-28",
+          "trough_price": 14.98,
+          "drawdown_pct": 32.98,
+          "base_days": 10,
+          "c_amplitude": 13.8,
+          "breakout_close": 17.05,
+          "breakout_gain_pct": 3.27,
+          "breakout_vol_ratio": 1.56,
+          "close_position": 0.86,
+          "ma10": 16.12,
+          "ma20": 15.73,
+          "rps_20": null,
+          "rps_250": null,
+          "buy_point": 16.52,
+          "source": "base_breakout_v2",
+          "date": "2026-06-10"
+        },
+        {
           "type": "bullish",
           "signal_date": "2026-06-10",
           "count": 2,
@@ -81474,7 +83683,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "distribution_day·看涨<br>口袋支点·看涨<br>top_pattern·看跌"
+      "signal_summary": "base_breakout_v2·看涨<br>distribution_day·看涨<br>口袋支点·看涨<br>top_pattern·看跌"
     },
     {
       "stock_code": "000429",
@@ -85086,6 +87295,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-05",
+          "buy_point": 8.28,
+          "breakout_low": 8.06,
+          "failure_day": 3,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_h (2026-06-05突破 D+3)",
+            "current_close": 8.0,
+            "volume_ratio": 1.7,
+            "day_chg_pct": -3.85,
+            "trough_price": 7.35,
+            "breakout_vol_ratio": 2.4,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 8.0,
@@ -85127,7 +87368,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "600025",
@@ -86286,8 +88527,37 @@
       "rs_line": 60.42,
       "amount": 547162507.0,
       "ds_type": null,
-      "signals": [],
-      "signal_summary": "—"
+      "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-01",
+          "buy_point": 4.18,
+          "breakout_low": 4.25,
+          "failure_day": 7,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b (2026-06-01突破 D+7)",
+            "current_close": 4.11,
+            "volume_ratio": 0.65,
+            "day_chg_pct": -0.48,
+            "trough_price": 4.08,
+            "breakout_vol_ratio": 3.42,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b"
+          ],
+          "source": "breakout_failure"
+        }
+      ],
+      "signal_summary": "breakout_failure·看跌"
     },
     {
       "stock_code": "000650",
@@ -88651,6 +90921,38 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 21.19,
+          "breakout_low": 20.63,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h (2026-05-27突破 D+10)",
+            "current_close": 18.12,
+            "volume_ratio": 1.35,
+            "day_chg_pct": 1.63,
+            "trough_price": 17.3,
+            "breakout_vol_ratio": 3.33,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 18.12,
@@ -88692,7 +90994,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "K线形态·看涨（十字孕线）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>K线形态·看涨（十字孕线）<br>top_pattern·看跌"
     },
     {
       "stock_code": "000723",
@@ -88810,6 +91112,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-03",
+          "buy_point": 5.41,
+          "breakout_low": 5.11,
+          "failure_day": 5,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h (2026-06-03突破 D+5)",
+            "current_close": 4.66,
+            "volume_ratio": 1.27,
+            "day_chg_pct": -7.36,
+            "trough_price": 4.26,
+            "breakout_vol_ratio": 1.71,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 4.66,
@@ -88851,7 +91183,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "600369",
@@ -89645,6 +91977,40 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 8.53,
+          "breakout_low": 8.27,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_e + rule_f + rule_h (2026-05-27突破 D+10)",
+            "current_close": 7.52,
+            "volume_ratio": 1.42,
+            "day_chg_pct": -3.47,
+            "trough_price": 6.88,
+            "breakout_vol_ratio": 2.69,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_e",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_e",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -89673,7 +92039,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "000166",
@@ -91283,6 +93649,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-05",
+          "buy_point": 8.79,
+          "breakout_low": 8.41,
+          "failure_day": 3,
+          "failed_rule": "rule_f",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_f + rule_h (2026-06-05突破 D+3)",
+            "current_close": 8.52,
+            "volume_ratio": 2.0,
+            "day_chg_pct": -2.63,
+            "trough_price": 7.53,
+            "breakout_vol_ratio": 3.02,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bullish",
           "date": "2026-06-10",
           "close": 8.52,
@@ -91324,7 +93720,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "K线形态·看涨（锤子线）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>K线形态·看涨（锤子线）<br>top_pattern·看跌"
     },
     {
       "stock_code": "600900",
@@ -96055,6 +98451,36 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-05",
+          "buy_point": 14.92,
+          "breakout_low": 14.62,
+          "failure_day": 3,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_c + rule_b (2026-06-05突破 D+3)",
+            "current_close": 14.41,
+            "volume_ratio": 1.21,
+            "day_chg_pct": -2.7,
+            "trough_price": 14.0,
+            "breakout_vol_ratio": 1.6,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_c",
+              "rule_b"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_c",
+            "rule_b"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "date": "2026-06-10",
           "close": 14.41,
@@ -96096,7 +98522,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>TA-Lib·看跌（价格下穿SMA50，中期趋势转弱）<br>top_pattern·看跌"
     },
     {
       "stock_code": "300925",
@@ -98059,6 +100485,42 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-29",
+          "buy_point": 5.51,
+          "breakout_low": 5.28,
+          "failure_day": 8,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_h + rule_c + rule_b + rule_h (2026-05-29突破 D+8)",
+            "current_close": 5.07,
+            "volume_ratio": 0.92,
+            "day_chg_pct": -2.12,
+            "trough_price": 4.52,
+            "breakout_vol_ratio": 2.22,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "pattern": "double_top",
           "left_peak": {
@@ -98087,7 +100549,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "002668",
@@ -108911,8 +111373,39 @@
       "rs_line": 94.87,
       "amount": 345775137.0,
       "ds_type": null,
-      "signals": [],
-      "signal_summary": "—"
+      "signals": [
+        {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-06-04",
+          "buy_point": 5.21,
+          "breakout_low": 5.1,
+          "failure_day": 4,
+          "failed_rule": "rule_e",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_e + rule_h (2026-06-04突破 D+4)",
+            "current_close": 5.16,
+            "volume_ratio": 2.44,
+            "day_chg_pct": -3.73,
+            "trough_price": 4.79,
+            "breakout_vol_ratio": 4.58,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_e",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_e",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        }
+      ],
+      "signal_summary": "breakout_failure·看跌"
     },
     {
       "stock_code": "600269",
@@ -126119,6 +128612,27 @@
       "ds_type": null,
       "signals": [
         {
+          "signal_date": "2026-06-10",
+          "prior_high_date": "2025-08-11",
+          "prior_high_price": 7.47,
+          "trough_date": "2026-03-23",
+          "trough_price": 5.94,
+          "drawdown_pct": 20.48,
+          "base_days": 54,
+          "c_amplitude": 5.9,
+          "breakout_close": 7.49,
+          "breakout_gain_pct": 3.31,
+          "breakout_vol_ratio": 1.73,
+          "close_position": 0.88,
+          "ma10": 7.08,
+          "ma20": 6.93,
+          "rps_20": null,
+          "rps_250": null,
+          "buy_point": 7.31,
+          "source": "base_breakout_v2",
+          "date": "2026-06-10"
+        },
+        {
           "type": "bullish",
           "signal_date": "2026-06-10",
           "count": 2,
@@ -126156,7 +128670,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "distribution_day·看涨<br>top_pattern·看跌"
+      "signal_summary": "base_breakout_v2·看涨<br>distribution_day·看涨<br>top_pattern·看跌"
     },
     {
       "stock_code": "688813",
@@ -127420,6 +129934,46 @@
       "ds_type": null,
       "signals": [
         {
+          "date": "2026-06-10",
+          "type": "bearish",
+          "breakout_date": "2026-05-27",
+          "buy_point": 25.72,
+          "breakout_low": 25.04,
+          "failure_day": 10,
+          "failed_rule": "rule_b",
+          "severity": "severe",
+          "details": {
+            "rule_label": "rule_c + rule_b + rule_f + rule_h + rule_c + rule_b + rule_f + rule_h (2026-05-27突破 D+10)",
+            "current_close": 22.5,
+            "volume_ratio": 1.14,
+            "day_chg_pct": -3.02,
+            "trough_price": 19.49,
+            "breakout_vol_ratio": 2.91,
+            "secondary_rules": [],
+            "triggered_rules": [
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h",
+              "rule_c",
+              "rule_b",
+              "rule_f",
+              "rule_h"
+            ]
+          },
+          "triggered_rules": [
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h",
+            "rule_c",
+            "rule_b",
+            "rule_f",
+            "rule_h"
+          ],
+          "source": "breakout_failure"
+        },
+        {
           "type": "bearish",
           "signal_date": "2026-06-10",
           "count": 3,
@@ -127457,7 +130011,7 @@
           "date": "2026-06-10"
         }
       ],
-      "signal_summary": "distribution_day·看跌<br>top_pattern·看跌"
+      "signal_summary": "breakout_failure·看跌<br>distribution_day·看跌<br>top_pattern·看跌"
     },
     {
       "stock_code": "601330",

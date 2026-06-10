@@ -92,85 +92,71 @@ def load_mw_structures(db, codes):
     return structures
 
 def get_hlc_from_chanlun(klines, code, db_conn):
-    """没有 MW 信号时，用缠论笔检测 H/L/C"""
-    global _chanlun_cache
-    dates = [k['date'] for k in klines]
+    """没有 MW 信号时，使用 chanlun_structure 共享层获取 H/L/C"""
+    from scanners.chanlun_structure import get_bi_list, get_bi_peaks, get_bi_troughs
+
     n = len(klines)
-    
-    bi_list = None
-    if code not in _chanlun_cache:
-        if db_conn:
-            row = db_conn.execute(
-                "SELECT bi_json FROM chanlun_scan_daily WHERE stock_code=? ORDER BY scan_date DESC LIMIT 1",
-                (code,)
-            ).fetchone()
-            if row and row[0]:
-                try: bi_list = json.loads(row[0])
-                except: pass
-        if bi_list is None:
-            try:
-                from scanners.chanlun import analyze
-                result = analyze(code, 'D', 500, data_mode='stock')
-                bi_list = result.get('bi_list', [])
-            except:
-                bi_list = []
-        _chanlun_cache[code] = bi_list
-    else:
-        bi_list = _chanlun_cache[code]
-    
+    if n < 60:
+        return None
+
+    bi_list = get_bi_list(code)
     if not bi_list:
         return None
-    
-    # 找最近的前高 H（笔顶）
-    tops = [(b['sdt'][:10], b['high']) for b in bi_list if b['direction'] == '向下']
-    tops.sort(key=lambda x: x[0], reverse=True)
-    h_date = h_price = h_idx = None
-    for top_date, top_price in tops:
-        if top_date > klines[-1]['date']: continue
-        try: top_idx = dates.index(top_date)
-        except: continue
-        if top_idx + 1 < n:
-            future_low = min(klines[j]['close'] for j in range(top_idx+1, n))
-            decline = (top_price - future_low) / top_price if top_price > 0 else 0
-            if decline < 0.10: continue
-            pre60_start = max(0, top_idx-60)
-            pre60_low = min(klines[j]['close'] for j in range(pre60_start, top_idx)) if pre60_start < top_idx else top_price
-            pre_rise = (top_price - pre60_low) / pre60_low if pre60_low > 0 else 0
-            if pre_rise >= 0.20:
-                h_date, h_price, h_idx = top_date, top_price, top_idx
+
+    peaks = get_bi_peaks(bi_list)
+    troughs = get_bi_troughs(bi_list)
+    if len(peaks) < 2 or len(troughs) < 2:
+        return None
+
+    dates = [k['date'] for k in klines]
+
+    # 在最近 200 根 K 线范围内找有效的 H-L 对
+    lookback = min(200, n - 10)
+    # 找 H：lookback 范围内的最高 bi 峰
+    cutoff_idx = n - lookback
+    cutoff_date = dates[cutoff_idx]
+    recent_peaks = [p for p in peaks if p['date'] >= cutoff_date]
+    if not recent_peaks:
+        recent_peaks = peaks[-3:]
+
+    # 取最近的有效峰作为 H
+    h_peak = None
+    for p in reversed(recent_peaks):
+        if p['date'] in dates:
+            h_idx = dates.index(p['date'])
+            # 确保 H 后面有足够空间
+            if h_idx < n - 10:
+                h_peak = p
                 break
-    
-    if h_idx is None: return None
-    
-    # 找 L（笔底）
-    bots = [(b['sdt'][:10], b['low']) for b in bi_list if b['direction'] == '向上']
-    l_date = l_price = l_idx = None
-    for bot_date, bot_price in bots:
-        if bot_date > h_date:
-            try: l_idx = dates.index(bot_date); l_price = bot_price
-            except: pass
-            l_date = bot_date
-            break
-    
-    if l_idx is None: return None
-    
-    # 找 C 区间（L 之后振幅 < 10% 的横盘段）
-    c_start = l_idx; c_end = l_idx
-    for i in range(l_idx, min(l_idx+30, n)):
-        seg = [klines[j]['close'] for j in range(l_idx, i+1)]
-        seg_min, seg_max = min(seg), max(seg)
-        amp = (seg_max - seg_min) / seg_min if seg_min > 0 else 999
-        if amp <= 0.10:
-            c_end = i
-        elif i - l_idx >= 3:
-            break
-    
+    if not h_peak:
+        h_peak = recent_peaks[-1]
+        h_idx = dates.index(h_peak['date']) if h_peak['date'] in dates else n - 30
+
+    h_date = h_peak['date']
+    h_price = h_peak['price']
+
+    # 找 L：H 之后到当前的最低收盘价
+    l_idx = h_idx + 1
+    l_price = klines[l_idx]['close']
+    for i in range(h_idx + 1, n):
+        if klines[i]['close'] < l_price:
+            l_price = klines[i]['close']
+            l_idx = i
+    l_date = dates[l_idx]
+
+    # 回撤深度
+    decline_pct = round((h_price - l_price) / h_price * 100, 2) if h_price else 0
+
+    # C 区间：L 之后到当前
+    c_start = l_idx
+    c_end = n - 1
+
     return {
         'h_date': h_date, 'h_price': h_price,
         'l_date': l_date, 'l_price': l_price,
-        'c_start': dates[c_start], 'c_end': dates[c_end] if c_end < n else dates[-1],
+        'c_start': dates[c_start], 'c_end': dates[c_end],
         'b1_date': None,
-        'decline_pct': round((h_price - l_price) / h_price * 100, 2) if h_price and l_price else None
+        'decline_pct': decline_pct
     }
 
 
@@ -195,11 +181,11 @@ def evaluate_stock(klines, scan_date, structure, rps20, rps250, market_too_beari
     
     # 基础趋势
     closes = [k['close'] for k in klines[:idx+1]]
-    sma10 = sma(closes, 10); sma60 = sma(closes, 50)
+    sma10 = sma(closes, 10); sma60 = sma(closes, 60)
     if sma10 is None or sma60 is None: return None
     if not (c > sma60 and c > sma10): return {'skip': 'trend'}
     
-    sma60_10d = sma(closes[:-10], 50) if len(closes) > 60 else sma60
+    sma60_10d = sma(closes[:-10], 60) if len(closes) > 70 else sma60
     if sma60_10d and sma60 <= sma60_10d: return {'skip': 'trend'}
     
     # 不追延伸
