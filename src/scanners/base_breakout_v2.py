@@ -41,7 +41,7 @@ def load_params():
     defaults = {
         'drawdown_min': 0.08,        # 最小调整深度 8%
         'drawdown_max': 0.40,        # 最大调整深度 40%
-        'min_c_days': 20,            # C 区间最少交易日（欧奈尔要求7~8周，A股放宽到4周）
+        'min_c_days': 10,            # C 区间最少交易日（多周期扫描放宽至2周）
         'c_amp_max': 0.15,           # C 区间最大振幅
         'bo_gain_min': 0.03,         # 突破日最低涨幅 3%
         'bo_vol_ratio': 1.5,         # 突破日量 vs 20日均量
@@ -63,113 +63,51 @@ def sma(values, n):
     return sum(clean[-n:]) / n
 
 
-def get_hlc_structure(klines, code):
-    """
-    获取 H/L/C 结构，优先从 mw_signal_daily 表，其次缠论笔
-    """
-    # 1. 尝试从 MW 信号表获取（取最近的多个信号，跳过H/L同日或无意义回撤的）
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute("""
-        SELECT h_date, h_price, l_date, l_price, c_start, c_end, decline_pct
-        FROM mw_signal_daily WHERE stock_code=? ORDER BY b2_date DESC LIMIT 5
-    """, (code,)).fetchall()
-    conn.close()
-
-    row = None
-    for r in rows:
-        if r['h_date'] and r['l_date'] and r['h_date'] < r['l_date']:
-            row = r
-            break
-    if not row and rows:
-        row = rows[0]  # 兜底
-    
-    if row and row['h_date'] and row['l_date'] and row['h_date'] < row['l_date']:
-        dates = [k['date'] for k in klines]
-        try:
-            h_idx = dates.index(row['h_date'])
-            l_idx = dates.index(row['l_date'])
-            c_start = dates.index(row['c_start']) if row['c_start'] in dates else l_idx
-            c_end = len(klines) - 1  # 扫描到最新数据
-            # 计算真实回撤深度：从 H 到 K 线区间最低点
-            real_low = min(klines[i]['close'] for i in range(h_idx, len(klines)))
-            real_decline = round((row['h_price'] - real_low) / row['h_price'] * 100, 2)
-            return {
-                'h_date': row['h_date'], 'h_price': row['h_price'], 'h_idx': h_idx,
-                'l_date': row['l_date'], 'l_price': row['l_price'], 'l_idx': l_idx,
-                'c_start_idx': c_start, 'c_end_idx': c_end,
-                'c_start_date': row['c_start'], 'c_end_date': klines[-1]['date'],
-                'decline_pct': real_decline
-            }
-        except (ValueError, KeyError):
-            pass
-    
-    # 2. 兜底：缠论笔检测（使用共享结构层）
-    return _get_hlc_from_bi(klines, code)
-
-
-def _get_hlc_from_bi(klines, code):
-    """使用缠论共享层辅助的 H/L/C 检测"""
+def _get_all_hlc_structures(klines, code):
+    """从缠论 bi 峰谷提取所有历史 H-L-C 结构（多周期，不依赖 MW 信号表）"""
     n = len(klines)
-    if n < 60:
-        return None
+    dates = [k['date'] for k in klines]
+    structures = []
 
-    # 从 bi 获取最近的峰作为参考（避免从零扫描）
-    try:
-        from scanners.chanlun_structure import get_bi_list, get_bi_peaks
-        bi_list = get_bi_list(code)
-        bi_peaks = get_bi_peaks(bi_list) if bi_list else []
-    except Exception:
-        bi_peaks = []
+    from scanners.chanlun_structure import get_bi_list, get_bi_peaks
+    bi_list = get_bi_list(code)
+    if not bi_list:
+        return []
+    peaks = get_bi_peaks(bi_list)
+    if len(peaks) < 2:
+        return []
 
-    # 在最近 200 根 K 线中找最高点作为 H
-    # 但 H 必须至少在 20 根 K 线之前（给回调留空间）
-    lookback = min(200, n - 20)
-    h_idx = n - lookback
-    h_price = klines[h_idx]['high']
-    for i in range(n - lookback, n - 20):
-        if klines[i]['high'] > h_price:
-            h_price = klines[i]['high']
-            h_idx = i
-
-    # 如果有 bi 峰数据，优先使用 bi 峰（更可靠）
-    if bi_peaks:
-        # 找 bi 峰中与 kline 最高点接近的（日期容差 3 天）
-        for p in reversed(bi_peaks):
-            for i in range(max(0, h_idx - 3), min(n, h_idx + 4)):
-                if abs(klines[i]['high'] - p['price']) / p['price'] < 0.02:
-                    h_idx = i
-                    h_price = klines[i]['high']
-                    break
-            else:
-                continue
+    for i in range(len(peaks) - 1):
+        h_peak = peaks[i]
+        if h_peak['date'] not in dates:
+            continue
+        h_idx = dates.index(h_peak['date'])
+        if h_idx >= n - 20:
             break
 
-    h_date = klines[h_idx]['date']
+        l_idx = h_idx + 1
+        l_price = klines[l_idx]['close']
+        for j in range(h_idx + 1, min(h_idx + 120, n)):
+            if klines[j]['close'] < l_price:
+                l_price = klines[j]['close']
+                l_idx = j
 
-    # H 之后到当前的最低收盘价 = L
-    l_idx = h_idx + 1
-    l_price = klines[l_idx]['close']
-    for i in range(h_idx + 1, n):
-        if klines[i]['close'] < l_price:
-            l_price = klines[i]['close']
-            l_idx = i
-    l_date = klines[l_idx]['date']
+        c_start_idx = l_idx
+        c_end_idx = n - 1
+        if i + 1 < len(peaks) and peaks[i + 1]['date'] in dates:
+            c_end_idx = min(c_end_idx, dates.index(peaks[i + 1]['date']) - 1)
 
-    # 计算回撤深度
-    decline_pct = round((h_price - l_price) / h_price * 100, 2)
+        decline_pct = round((h_peak['price'] - l_price) / h_peak['price'] * 100, 2)
 
-    # 横盘区 C：L 之后到当前
-    c_start_idx = l_idx
-    c_end_idx = n - 1
+        structures.append({
+            'h_date': h_peak['date'], 'h_price': h_peak['price'], 'h_idx': h_idx,
+            'l_date': dates[l_idx], 'l_price': l_price, 'l_idx': l_idx,
+            'c_start_idx': c_start_idx, 'c_end_idx': c_end_idx,
+            'c_start_date': dates[l_idx], 'c_end_date': dates[c_end_idx],
+            'decline_pct': decline_pct
+        })
 
-    return {
-        'h_date': h_date, 'h_price': h_price, 'h_idx': h_idx,
-        'l_date': l_date, 'l_price': l_price, 'l_idx': l_idx,
-        'c_start_idx': c_start_idx, 'c_end_idx': c_end_idx,
-        'c_start_date': l_date, 'c_end_date': klines[-1]['date'],
-        'decline_pct': decline_pct
-    }
+    return structures
 
 
 def detect(daily, params=None):
@@ -196,9 +134,9 @@ def detect(daily, params=None):
     n = len(daily)
     if n < 120: return []
     
-    # 获取缠论 H/L/C 结构
-    hlc = get_hlc_structure(daily, code)
-    if not hlc: return []
+    # 获取所有历史 H/L/C 结构
+    structures = _get_all_hlc_structures(daily, code)
+    if not structures: return []
     
     # 参数提取
     dd_min = params.get('drawdown_min', 0.08)
@@ -212,98 +150,68 @@ def detect(daily, params=None):
     rs_min = params.get('rs_threshold', 80)
     max_ext = params.get('max_extension_pct', 0.30)
     
-    decline = hlc['decline_pct']
-    if decline < dd_min * 100 or decline > dd_max * 100: return []
-    
-    c_days = hlc['c_end_idx'] - hlc['c_start_idx'] + 1
-    if c_days < min_c_days: return []
-    
-    # C 区间振幅检查（仅检查前 min_c_days 天，即盘整早期）
-    check_days = min(min_c_days * 2, hlc['c_end_idx'] - hlc['c_start_idx'] + 1)
-    c_closes = [daily[i]['close'] for i in range(hlc['c_start_idx'], hlc['c_start_idx'] + check_days)]
-    if c_closes:
-        c_amp = (max(c_closes) - min(c_closes)) / min(c_closes) if min(c_closes) > 0 else 999
-        if c_amp > c_amp_max: return []
-    else:
-        c_amp = 0
-    
-    # 扫描 C 区间及之后的日子，找 BO 突破日
     signals = []
-    
-    # 从 C 区起点开始扫描到最新数据
-    scan_start = hlc['c_start_idx']
-    scan_end = n - 1
-    
-    for t_idx in range(scan_start, n):
-        k = daily[t_idx]
-        c, v, o, h, l = k['close'], k['volume'], k['open'], k['high'], k['low']
-        if c <= 0 or v <= 0: continue
-        
-        # BO 涨幅 ≥ 3%
-        if t_idx == 0: continue
-        gain = (c - daily[t_idx-1]['close']) / daily[t_idx-1]['close']
-        if gain < bo_gain: continue
-        
-        # BO 量 ≥ 20日均量 × 1.5
-        vol_20 = [daily[j]['volume'] for j in range(max(0, t_idx-20), t_idx)]
-        avg20 = sum(vol_20) / len(vol_20) if vol_20 else 0
-        if avg20 <= 0 or v < avg20 * bo_vol: continue
-        
-        # 收盘位置
-        if h > l:
-            pos = (c - l) / (h - l)
+    seen_dates = set()
+
+    for hlc in structures:
+        decline = hlc['decline_pct']
+        if decline < dd_min * 100 or decline > dd_max * 100: continue
+        c_days = hlc['c_end_idx'] - hlc['c_start_idx'] + 1
+        if c_days < min_c_days: continue
+        check_days = min(min_c_days * 2, c_days)
+        c_closes = [daily[i]['close'] for i in range(hlc['c_start_idx'], hlc['c_start_idx'] + check_days)]
+        if c_closes:
+            c_amp = (max(c_closes) - min(c_closes)) / min(c_closes) if min(c_closes) > 0 else 999
+            if c_amp > c_amp_max: continue
+        else:
+            c_amp = 0
+
+        for t_idx in range(hlc['c_start_idx'], hlc['c_end_idx'] + 1):
+            if t_idx == 0: continue
+            k = daily[t_idx]
+            if k['date'] in seen_dates: continue
+            c, v, o, h, l = k['close'], k['volume'], k['open'], k['high'], k['low']
+            if c <= 0 or v <= 0: continue
+            gain = (c - daily[t_idx-1]['close']) / daily[t_idx-1]['close']
+            if gain < bo_gain: continue
+            vol_20 = [daily[j]['volume'] for j in range(max(0, t_idx-20), t_idx)]
+            avg20 = sum(vol_20) / len(vol_20) if vol_20 else 0
+            if avg20 <= 0 or v < avg20 * bo_vol: continue
+            if h > l: pos = (c - l) / (h - l)
+            else: pos = 0
             if pos < bo_pos: continue
-        
-        # 均线计算
-        closes_all = [d['close'] for d in daily[:t_idx+1]]
-        ma10 = sma(closes_all, 10)
-        ma20 = sma(closes_all, 20)
-        ma60 = sma(closes_all, 60)
-        
-        # 收盘站上 MA10 / MA20 / MA60
-        if ma10 and c <= ma10: continue
-        if ma20 and c <= ma20: continue
-        if require_ma60 and ma60 and c <= ma60: continue
-        
-        # 延伸检查：距 MA10 不超过 max_extension_pct
-        if ma10 and c > ma10 * (1 + max_ext): continue
-        
-        # 突破 C 区间最高价（检查到当前日前一天）
-        c_max = max(daily[i]['close'] for i in range(hlc['c_start_idx'], t_idx))
-        if c <= c_max: continue
-        
-        # 当日最高 ≥ 前10天最高（突破前期阻力）
-        prev_highs = [daily[j]['high'] for j in range(max(0, t_idx-10), t_idx)]
-        if prev_highs and h < max(prev_highs): continue
-        
-        # RS 强度（如果有的话）
-        rps20 = k.get('rps_20', 0) or k.get('rps20', 0) or 0
-        rps250 = k.get('rps_250', 0) or k.get('rps250', 0) or 0
-        if rps20 > 0 and rps250 > 0:
-            if rps20 < rs_min and rps250 < rs_min: continue
-        
-        # === 通过所有检查，产生信号 ===
-        signals.append({
-            'signal_date': k['date'],
-            'prior_high_date': hlc['h_date'],
-            'prior_high_price': round(hlc['h_price'], 2),
-            'trough_date': hlc['l_date'],
-            'trough_price': round(hlc['l_price'], 2),
-            'drawdown_pct': hlc['decline_pct'],
-            'base_days': c_days,
-            'c_amplitude': round(c_amp * 100, 1),
-            'breakout_close': round(c, 2),
-            'breakout_gain_pct': round(gain * 100, 2),
-            'breakout_vol_ratio': round(v / avg20, 2) if avg20 > 0 else 0,
-            'close_position': round(pos, 2),
-            'ma10': round(ma10, 2) if ma10 else None,
-            'ma20': round(ma20, 2) if ma20 else None,
-            'ma60': round(ma60, 2) if ma60 else None,
-            'ma10_cross_ma20': (ma10 or 0) > (ma20 or 0),  # 加分项
-            'rps_20': rps20 if rps20 > 0 else None,
-            'rps_250': rps250 if rps250 > 0 else None,
-            'buy_point': round(c_max + 0.01, 2),
-        })
+            closes_all = [d['close'] for d in daily[:t_idx+1]]
+            ma10 = sma(closes_all, 10); ma20 = sma(closes_all, 20); ma60 = sma(closes_all, 60)
+            if ma10 and c <= ma10: continue
+            if ma20 and c <= ma20: continue
+            if require_ma60 and ma60 and c <= ma60: continue
+            if ma10 and c > ma10 * (1 + max_ext): continue
+            c_max = max(daily[i]['close'] for i in range(hlc['c_start_idx'], t_idx))
+            if c <= c_max: continue
+            prev_highs = [daily[j]['high'] for j in range(max(0, t_idx-10), t_idx)]
+            if prev_highs and h < max(prev_highs): continue
+            rps20 = k.get('rps_20', 0) or k.get('rps20', 0) or 0
+            rps250 = k.get('rps_250', 0) or k.get('rps250', 0) or 0
+            if rps20 > 0 and rps250 > 0:
+                if rps20 < rs_min and rps250 < rs_min: continue
+            seen_dates.add(k['date'])
+            signals.append({
+                'signal_date': k['date'],
+                'prior_high_date': hlc['h_date'], 'prior_high_price': round(hlc['h_price'], 2),
+                'trough_date': hlc['l_date'], 'trough_price': round(hlc['l_price'], 2),
+                'drawdown_pct': hlc['decline_pct'], 'base_days': c_days,
+                'c_amplitude': round(c_amp * 100, 1),
+                'breakout_close': round(c, 2), 'breakout_gain_pct': round(gain * 100, 2),
+                'breakout_vol_ratio': round(v / avg20, 2) if avg20 > 0 else 0,
+                'close_position': round(pos, 2),
+                'ma10': round(ma10, 2) if ma10 else None,
+                'ma20': round(ma20, 2) if ma20 else None,
+                'ma60': round(ma60, 2) if ma60 else None,
+                'ma10_cross_ma20': (ma10 or 0) > (ma20 or 0),
+                'rps_20': rps20 if rps20 > 0 else None,
+                'rps_250': rps250 if rps250 > 0 else None,
+                'buy_point': round(c_max + 0.01, 2),
+            })
     
     return signals
 
