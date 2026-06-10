@@ -93,7 +93,7 @@ def load_mw_structures(db, codes):
 
 def get_hlc_from_chanlun(klines, code, db_conn):
     """没有 MW 信号时，使用 chanlun_structure 共享层获取 H/L/C"""
-    from scanners.chanlun_structure import get_bi_list, get_bi_peaks, get_bi_troughs
+    from chanlun_structure import get_bi_list, get_bi_peaks, get_bi_troughs
 
     n = len(klines)
     if n < 60:
