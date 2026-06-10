@@ -80,8 +80,8 @@ def detect(klines, indicators=None, bp_params=None):
     Returns:
         List[Dict]: 失败信号列表，每条符合 PRD 定义的输出格式
     """
-    from scanners.base_breakout import detect as detect_breakout
-    from scanners.base_breakout import load_params as load_bp_params
+    from scanners.base_breakout_v2 import detect as detect_breakout
+    from scanners.base_breakout_v2 import load_params as load_bp_params
 
     params = load_params()
     monitor_days = params['monitor_days']
@@ -363,8 +363,8 @@ def diagnose(klines, breakout_date, check_date, bp_params=None):
     Returns:
         Dict: need/actual 格式的诊断结果
     """
-    from scanners.base_breakout import detect as detect_breakout
-    from scanners.base_breakout import load_params as load_bp_params
+    from scanners.base_breakout_v2 import detect as detect_breakout
+    from scanners.base_breakout_v2 import load_params as load_bp_params
 
     params = load_params()
     vol_ma_days = params['vol_ma_days']
