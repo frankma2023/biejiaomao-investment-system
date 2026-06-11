@@ -116,6 +116,11 @@ html[data-theme="light"] .market-bar{background:rgba(255,255,255,.5)}
   <span>加载大盘环境中...</span>
 </div>
 
+<div style="display:flex;gap:6px;margin-bottom:10px" id="tab-bar" hidden>
+  <button class="tab-btn active" onclick="switchTab('b1')" id="tab-b1">🔔 B1 首发</button>
+  <button class="tab-btn" onclick="switchTab('b2')" id="tab-b2">✅ B2 确认</button>
+  <span style="font-size:.6rem;color:var(--muted);margin-left:auto;align-self:center" id="tab-count"></span>
+</div>
 <div id="content"><div class="loading">🚀 驾驶舱启动中...</div></div>
 
 <div class="checklist" id="checklist-panel" style="display:none">
@@ -154,6 +159,7 @@ html[data-theme="light"] .market-bar{background:rgba(255,255,255,.5)}
 var candidatesData = [];
 var marketData = null;
 var tradeStats = null;
+var currentTab = "b1";
 
 // ═══════════════════════════════════════════
 // INIT
@@ -170,7 +176,7 @@ async function loadData() {
     candidatesData = data.candidates || [];
     marketData = data.market || {};
     document.getElementById('run-info').textContent = data.run_date
-      ? '上次运行: ' + data.run_date + ' · 候选: ' + candidatesData.length + ' 只'
+      ? '上次运行: ' + data.run_date + ' · 候选: ' + filtered.length + ' 只'
       : '尚未运行过管道';
     renderMarket();
     renderCandidates();
@@ -217,15 +223,22 @@ function renderMarket() {
 }
 
 function renderCandidates() {
-  if (!candidatesData.length) {
+  var filtered = candidatesData.filter(function(c){ return c.tab === currentTab; });
+  var b1count = candidatesData.filter(function(c){ return c.tab === "b1"; }).length;
+  var b2count = candidatesData.filter(function(c){ return c.tab === "b2"; }).length;
+  document.getElementById("tab-bar").hidden = !(b1count || b2count);
+  document.getElementById("tab-count").textContent = "B1:" + b1count + " B2:" + b2count;
+  document.getElementById("tab-b1").textContent = "🔔 B1 (" + b1count + ")";
+  document.getElementById("tab-b2").textContent = "✅ B2 (" + b2count + ")";
+  if (!filtered.length) {
     document.getElementById('content').innerHTML =
       '<div class="empty-state"><div class="icon">📭</div><div>暂无候选股票</div><div style="font-size:.6rem;margin-top:8px">点击「立即运行管道」执行五级筛选</div></div>';
     return;
   }
 
   var html = '';
-  for (var i = 0; i < candidatesData.length; i++) {
-    var c = candidatesData[i];
+  for (var i = 0; i < filtered.length; i++) {
+    var c = filtered[i];
     var isPlus = c.is_plus || (c.signal_types && c.signal_types.indexOf && c.signal_types.indexOf('mw_plus') >= 0);
 
     html += '<div class="candidate-card' + (isPlus ? ' plus' : '') + '" id="card-' + i + '">';
@@ -282,7 +295,7 @@ function renderCandidates() {
 
   // 快速统计
   html += '<div style="text-align:center;padding:8px;color:var(--muted);font-size:.6rem">';
-  html += '候选 ' + candidatesData.length + ' 只 · 点击「简报」展开详细信息 · 在 pattern-scan 中查看K线图</div>';
+  html += '候选 ' + filtered.length + ' 只 · 点击「简报」展开详细信息 · 在 pattern-scan 中查看K线图</div>';
 
   document.getElementById('content').innerHTML = html;
 }
@@ -493,6 +506,8 @@ async function openOneilReport(code, date) {
 
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+
+function switchTab(tab) { currentTab = tab; document.getElementById("tab-b1").className = "tab-btn" + (tab==="b1"?" active":""); document.getElementById("tab-b2").className = "tab-btn" + (tab==="b2"?" active":""); renderCandidates(); }
 
 // START
 init();

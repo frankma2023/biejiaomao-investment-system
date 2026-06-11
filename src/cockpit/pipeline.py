@@ -361,6 +361,46 @@ def filter_signals(db, stock_codes, lookback_days=5, max_candidates=5):
     return sorted_candidates[:max_candidates]
 
 
+def filter_b1_signals(db, stock_codes, lookback_days=5, max_candidates=5):
+    """筛选最近 N 天内有 B1 信号的股票"""
+    if not stock_codes:
+        return []
+
+    cutoff = (datetime.now() - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
+    placeholders = ','.join(['?'] * len(stock_codes))
+    params = list(stock_codes)
+
+    rows = db.execute(f"""
+        SELECT stock_code, stock_name, b1_date, b2_date, score, score_v2, is_plus,
+               h_date, h_price, l_date, l_price, decline_pct, h_rs250, ind_name, ind_rs250
+        FROM mw_signal_daily
+        WHERE stock_code IN ({placeholders})
+          AND b1_date >= ?
+        ORDER BY b1_date DESC
+    """, params + [cutoff]).fetchall()
+
+    candidates = []
+    seen = set()
+    for r in rows:
+        code = r['stock_code']
+        if code in seen: continue
+        seen.add(code)
+        candidates.append({
+            'stock_code': code, 'stock_name': r['stock_name'],
+            'signal_type': 'b1', 'signal_date': r['b1_date'],
+            'b2_date': r['b2_date'], 'has_b2': bool(r['b2_date']),
+            'mw_score': r['score_v2'] or r['score'],
+            'is_plus': r['is_plus'],
+            'h_date': r['h_date'], 'h_price': r['h_price'],
+            'l_date': r['l_date'], 'l_price': r['l_price'],
+            'decline_pct': r['decline_pct'], 'h_rs250': r['h_rs250'],
+            'ind_name': r['ind_name'], 'ind_rs250': r['ind_rs250'],
+        })
+        if len(candidates) >= max_candidates: break
+
+    return candidates
+
+
 # ════════════════════════════════════════════════════════
 # 主流程
 # ════════════════════════════════════════════════════════
@@ -404,16 +444,32 @@ def run_pipeline(target_date=None, config=None, db=None, save=False):
     current, rs_results = filter_stock_rs(db, current, cfg.get('stock_rs250_h_min', 80))
     stats['level4_stock_rs'] = len(current)
 
-    # 第五级：形态信号
-    candidates = filter_signals(db, current, cfg.get('signal_lookback_days', 5), cfg.get('max_candidates', 5))
-    stats['level5_signals'] = len(candidates)
+    # 第五级：形态信号（B2）
+    candidates_b2 = filter_signals(db, current, cfg.get('signal_lookback_days', 5), cfg.get('max_candidates', 5))
+    stats['level5_b2_signals'] = len(candidates_b2)
 
-    # 补充基本信息
-    enriched = []
-    for i, c in enumerate(candidates):
-        code = c['stock_code']
+    # B1 信号（独立筛选，不做置信度评分）
+    candidates_b1 = filter_b1_signals(db, current, cfg.get('signal_lookback_days', 5), cfg.get('max_candidates', 5))
+    stats['level5_b1_signals'] = len(candidates_b1)
+
+    # 补充基本信息（B2 + B1 合并，B1 优先排序）
+    all_candidates = []
+    for i, c in enumerate(candidates_b1):
         info = dict(c)
+        info['tab'] = 'b1'
         info['rank'] = i + 1
+        all_candidates.append(info)
+    for i, c in enumerate(candidates_b2):
+        info = dict(c)
+        info['tab'] = 'b2'
+        info['rank'] = len(candidates_b1) + i + 1
+        # 避免 B1 已覆盖的重复
+        if info['stock_code'] not in {x['stock_code'] for x in all_candidates}:
+            all_candidates.append(info)
+
+    enriched = []
+    for info in all_candidates:
+        code = info['stock_code']
 
         # 从观察池补充基本面
         if code in pool:

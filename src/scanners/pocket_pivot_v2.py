@@ -381,7 +381,7 @@ def scan_date(scan_date):
 
 
 def save_to_db(signals):
-    db = sqlite3.connect(DB_PATH); cur = db.cursor()
+    db = sqlite3.connect(DB_PATH, timeout=30)  # 30秒超时，防止并发写冲突; cur = db.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS pocket_pivot_daily (
         id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL, stock_code TEXT NOT NULL,
         stock_name TEXT, pivot_type TEXT, b1_overlap INTEGER,

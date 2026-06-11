@@ -96,9 +96,18 @@ def scan_one_day(date):
         # 执行全市场扫描
         signals = scan_date(date)
 
-        # 如果有信号，保存到数据库
+        # 如果有信号，保存到数据库（重试3次防止并发锁冲突）
         if signals:
-            save_to_db(signals)
+            for attempt in range(3):
+                try:
+                    save_to_db(signals)
+                    break
+                except Exception as e:
+                    if attempt < 2:
+                        import time as _time
+                        _time.sleep(2 * (attempt + 1))  # 递增等待
+                    else:
+                        raise
 
         elapsed = time.time() - t0
         return (date, len(signals), elapsed, None)
