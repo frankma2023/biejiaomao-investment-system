@@ -48,6 +48,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)
 .badge-pp{background:rgba(249,115,22,.1);color:#f97316;border:1px solid rgba(249,115,22,.2)}
 .badge-bo{background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.2)}
 .badge-mw{background:rgba(139,92,246,.1);color:#a78bfa;border:1px solid rgba(139,92,246,.2)}
+.badge-b1{background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.2)}
 
 .candidate-card .key-stats{display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:.68rem}
 .key-stats .kstat{text-align:center}
@@ -176,7 +177,7 @@ async function loadData() {
     candidatesData = data.candidates || [];
     marketData = data.market || {};
     document.getElementById('run-info').textContent = data.run_date
-      ? '上次运行: ' + data.run_date + ' · 候选: ' + filtered.length + ' 只'
+      ? '上次运行: ' + data.run_date + ' · 候选: ' + candidatesData.length + ' 只'
       : '尚未运行过管道';
     renderMarket();
     renderCandidates();
@@ -259,7 +260,7 @@ function renderCandidates() {
     for (var s = 0; s < signals.length; s++) {
       var sig = signals[s];
       var cls = 'badge-mw', label = sig;
-      if (sig === 'mw_plus') { cls = 'badge-plus'; label = '⭐ PLUS'; }
+      if (c.tab === 'b1') { cls = 'badge-b1'; label = '🔔 B1 首发'; } else if (sig === 'mw_plus') { cls = 'badge-plus'; label = '⭐ PLUS'; }
       else if (sig === 'pocket_pivot_b1' || sig === 'pocket_pivot') { cls = 'badge-pp'; label = sig === 'pocket_pivot_b1' ? '🟠 口袋支点(B1重合)' : '🟠 口袋支点'; }
       else if (sig === 'base_breakout') { cls = 'badge-bo'; label = '🔷 基部突破'; }
       else if (sig === 'mw_b2') { cls = 'badge-mw'; label = 'MW B2'; }
