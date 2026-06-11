@@ -487,7 +487,9 @@ class ONeilDeepAnalyzer:
         parts.append(f"- 卖出评分: {market.get('market_sell_score','?')}")
         parts.append(f"- 卖出信号: {market.get('market_sell_signal','?')}")
 
-        parts.append("\n---\n注意：I（机构持股）维度数据因A股散户条件限制不可获取，此项不参与本次评估，请基于其余维度分析。
+        parts.append("
+---
+注意：I（机构持股）维度数据因A股散户条件限制不可获取，此项不参与本次评估，请基于其余维度分析。
 
 请按照欧奈尔交易框架，对上述股票进行全面分析。要求：")
         parts.append("1. 逐条对照10条核心规则给出评估")
