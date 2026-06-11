@@ -505,6 +505,22 @@ def run_pipeline(target_date=None, config=None, db=None, save=False):
             # MW B2 (if this B1 already has a B2)
             if info.get('has_b2') and 'mw_b2' not in b1_signals:
                 b1_signals.append('mw_b2')
+            # pattern-scan 全量信号（TA-Lib、K线形态等）
+            try:
+                ps = db.execute("""
+                    SELECT signals_json FROM pattern_scan_signals
+                    WHERE stock_code=? AND date=?
+                """, (code, b1_date)).fetchone()
+                if ps and ps['signals_json']:
+                    import json
+                    all_sigs = json.loads(ps['signals_json'])
+                    for sig in all_sigs:
+                        src = sig.get('source', '')
+                        if src == 'cdl' and sig.get('type') == 'bullish':
+                            name = sig.get('details', {}).get('cdl_name', '')
+                            if name and name not in b1_signals:
+                                b1_signals.append(name)
+            except: pass
             info['signals'] = b1_signals
 
         # 从 pysnowball 获取市值（轻量，不阻塞）
