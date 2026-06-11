@@ -576,9 +576,9 @@ def _generate_oneil_deep(db, stock_code, stock_name, run_date, briefing_engine):
 
     analyzer = ONeilDeepAnalyzer(db)
     candidate = {'stock_code': stock_code, 'stock_name': stock_name}
-    stock_info = analyzer._build_stock_profile(stock_code, candidate)
+    stock_info = analyzer._build_rich_profile(stock_code, candidate)
     market_info = briefing_engine._module_market()
-    prompt = analyzer._build_prompt(stock_code, stock_info, market_info)
+    prompt = analyzer._build_rich_prompt(stock_code, stock_info)
 
     skill = analyzer._load_skill()
     full_prompt = f"""你是欧奈尔交易顾问，严格遵循《像欧奈尔信徒一样交易》框架。

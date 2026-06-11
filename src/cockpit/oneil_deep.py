@@ -90,444 +90,231 @@ class ONeilDeepAnalyzer:
         html_content = self._text_to_html(stock_code, stock_info, analysis_text, run_date)
         return self._save_html(stock_code, html_content, run_date)
 
-    def _build_stock_profile(self, stock_code, candidate):
-        """构建股票全维度数据"""
+
+    def _build_rich_profile(self, stock_code, candidate):
+        """采集15项全维度数据"""
         code = stock_code
-        profile = {
-            'code': code,
-            'name': candidate.get('stock_name', ''),
-            'signal_date': candidate.get('signal_date', ''),
-        }
+        p = {'code': code, 'name': candidate.get('stock_name', '')}
+        db = self.db
 
-        # 1. MW 信号
-        mw_rows = self.db.execute("""
-            SELECT b2_date, b1_date, score, score_v2, is_plus, confidence,
-                   decline_pct, h_date, h_price, l_date, l_price,
-                   b2_return_pct, b2_is_gap, h_rs250, ind_rs250, ind_name,
-                   score_h, score_d, score_c, score_p, score_i1, score_i2
-            FROM mw_signal_daily
-            WHERE stock_code=? AND b2_date=?
-        """, (code, candidate.get('signal_date', ''))).fetchone()
-
-        if mw_rows:
-            mw = dict(mw_rows)
-            profile['mw_signal'] = {
-                'b2_date': mw['b2_date'], 'b1_date': mw['b1_date'],
-                'score': mw.get('score_v2') or mw.get('score'),
-                'is_plus': bool(mw.get('is_plus')),
-                'confidence': mw.get('confidence'),
-                'decline_pct': mw.get('decline_pct'),
-                'h_date': mw.get('h_date'), 'h_price': mw.get('h_price'),
-                'l_date': mw.get('l_date'), 'l_price': mw.get('l_price'),
-                'b2_return_pct': mw.get('b2_return_pct'),
-                'b2_is_gap': mw.get('b2_is_gap'),
-                'h_rs250': mw.get('h_rs250'),
-                'ind_rs250': mw.get('ind_rs250'),
-                'ind_name': mw.get('ind_name'),
-                'dimensions': {
-                    'H_前高趋势': mw.get('score_h'),
-                    'D_调整深度': mw.get('score_d'),
-                    'C_横盘质量': mw.get('score_c'),
-                    'P_整理回撤': mw.get('score_p'),
-                    'I1_行业RS': mw.get('score_i1'),
-                    'I2_个股RS': mw.get('score_i2'),
-                }
-            }
-
-        # 2. 口袋支点
-        pp_rows = self.db.execute("""
-            SELECT date, pivot_type, b1_overlap, gain_pct, vol_ratio,
-                   close_position, rps_20, rps_250, base_depth, c_days
-            FROM pocket_pivot_daily
-            WHERE stock_code=? AND date >= date(?,'-10 days')
-            ORDER BY date DESC LIMIT 3
-        """, (code, candidate.get('signal_date', ''))).fetchall()
-        profile['pocket_pivots'] = [dict(r) for r in pp_rows]
-
-        # 3. 基部突破
+        # 1. 基本信息
+        p['signal_date'] = candidate.get('signal_date', '')
+        row = db.execute("SELECT name FROM stock_basic WHERE stock_code=?", (code,)).fetchone()
+        p['name'] = p['name'] or (row['name'] if row else code)
+        # 行业
+        ind = db.execute("SELECT industry_name FROM stock_industry WHERE stock_code=? LIMIT 1", (code,)).fetchone()
+        p['industry'] = ind['industry_name'] if ind else ''
+        # 市值 (from pysnowball or market_cap_snapshot)
         try:
-            bo_rows = self.db.execute("""
-                SELECT date, close, change_pct, volume, amount
-                FROM market_breakout_daily
-                WHERE stock_code=? AND date >= date(?,'-10 days')
-                ORDER BY date DESC LIMIT 3
-            """, (code, candidate.get('signal_date', ''))).fetchall()
-            profile['base_breakouts'] = [dict(r) for r in bo_rows]
-        except sqlite3.OperationalError:
-            profile['base_breakouts'] = []
+            from cockpit.sentiment import SentimentEngine
+            q = SentimentEngine()._fetch_quote(code)
+            if q and q.get('market_cap', 0) > 0:
+                p['market_cap_yi'] = round(q['market_cap'] / 1e8, 0)
+        except: pass
+        if not p.get('market_cap_yi'):
+            mc = db.execute("SELECT market_cap FROM market_cap_snapshot WHERE stock_code=?", (code,)).fetchone()
+            p['market_cap_yi'] = round(mc['market_cap'], 0) if mc and mc['market_cap'] else None
 
-        # 4. CANSLIM 评分
-        canslim = {}
-        for field in ['canslim_total', 'canslim_c', 'canslim_a', 'canslim_n',
-                       'canslim_s', 'canslim_l', 'canslim_i', 'canslim_m']:
-            if candidate.get(field) is not None:
-                canslim[field] = candidate[field]
-        if not canslim:
-            obs = self.db.execute("""
-                SELECT canslim_total, canslim_c, canslim_a, canslim_n,
-                       canslim_s, canslim_l, canslim_i, canslim_m, roe, eps_yoy, revenue_yoy
-                FROM discipline_observation_pool
-                WHERE stock_code=? ORDER BY date DESC LIMIT 1
-            """, (code,)).fetchone()
-            if obs:
-                canslim = dict(obs)
-        profile['canslim'] = canslim
+        # 2. 发现路径
+        p['discovery_path'] = '观察池→市值≥50亿→行业RS≥75→个股RS(H点)≥80→形态信号(B1/B2/PP/BO)'
 
-        # 5. 近期涨跌幅和成交量（5/10/20日）
-        profile['price_volume'] = self._calc_price_volume(code)
+        # 3. 大盘环境
+        mh = db.execute("SELECT * FROM market_health_daily ORDER BY date DESC LIMIT 1").fetchone()
+        if mh:
+            p['market_health'] = {'score': mh['total_score'], 'rating': mh['rating'],
+                'ma50_above': mh['ma50_above_value'], 'hl_ratio': mh['hl_ratio_value'],
+                'ad_ratio': mh['ad_ratio_value'], 'vol_breakout': mh['vol_breakout_value']}
+        ms = db.execute("SELECT total_score as score, signal_details as signal FROM market_sell_score_daily ORDER BY date DESC LIMIT 1").fetchone()
+        if ms: p['market_sell'] = {'score': ms['score'], 'signal': ms['signal']}
+        # 成交额
+        amt = db.execute("SELECT date, amount FROM index_daily_kline WHERE stock_code='000985' ORDER BY date DESC LIMIT 20").fetchall()
+        if amt:
+            amt_list = [a['amount'] for a in amt if a['amount']]
+            if amt_list:
+                for d, n in [(5, 'avg5d'), (10, 'avg10d'), (20, 'avg20d')]:
+                    if len(amt_list) >= d: p[f'index_amount_{n}'] = round(sum(amt_list[:d])/d/1e8, 1)
+                # trend
+                if len(amt_list) >= 10:
+                    first5 = sum(amt_list[5:10])/5; last5 = sum(amt_list[:5])/5
+                    p['index_amount_trend'] = '放量' if last5 > first5*1.1 else ('缩量' if last5 < first5*0.9 else '持平')
+        # 中证全指均线
+        idx_k = db.execute("SELECT close FROM index_daily_kline WHERE stock_code='000985' ORDER BY date DESC LIMIT 250").fetchall()
+        if idx_k:
+            closes = [k['close'] for k in idx_k]
+            p['index_close'] = closes[0]
+            for ma_n in [50, 120, 250]:
+                if len(closes) >= ma_n:
+                    ma_v = sum(closes[:ma_n]) / ma_n
+                    p[f'index_ma{ma_n}'] = round(ma_v, 1)
+                    p[f'index_vs_ma{ma_n}'] = round((closes[0]-ma_v)/ma_v*100, 1)
+        # 抛盘日/追盘日
+        snap = db.execute("SELECT dist_30d_count, ftd_30d_count, acc_30d_count FROM market_snapshot_daily ORDER BY date DESC LIMIT 1").fetchone()
+        if snap:
+            p['dist_30d'] = snap['dist_30d_count']; p['ftd_30d'] = snap['ftd_30d_count']; p['acc_30d'] = snap['acc_30d_count']
 
-        # 6. TA-Lib / K线形态（取最近5个交易日）
-        profile['candlestick'] = self._get_candlestick_patterns(code)
+        # 4. 主要指数近10日
+        major_idx = {'000001':'上证','399001':'深证','399006':'创业板','000688':'科创50','000300':'沪深300','000985':'中证全指'}
+        p['major_indices'] = {}
+        for ic, iname in major_idx.items():
+            rows = db.execute(f"SELECT date, close FROM index_daily_kline WHERE stock_code='{ic}' ORDER BY date DESC LIMIT 10").fetchall()
+            if rows: p['major_indices'][iname] = {r['date']: round(r['close'],1) for r in reversed(rows)}
 
-        # 7. 行业RS
-        ind_rows = self.db.execute("""
-            SELECT industry_name FROM stock_industry
-            WHERE stock_code=? AND source='zx' LIMIT 1
-        """, (code,)).fetchone()
-        profile['l1_industry'] = ind_rows['industry_name'] if ind_rows else ''
-        profile['l1_rs250'] = candidate.get('ind_rs250') or candidate.get('l1_rs250')
+        # 5. RS强度
+        rs = db.execute("SELECT rps_20, rps_60, rps_120, rps_250 FROM stock_rs_daily WHERE stock_code=? ORDER BY date DESC LIMIT 1", (code,)).fetchone()
+        if rs: p['rs'] = {'rps20': rs['rps_20'], 'rps60': rs['rps_60'], 'rps120': rs['rps_120'], 'rps250': rs['rps_250']}
 
-        # 8. 当前价格位置（距MA10/MA50/MA200的距离）
-        profile['price_position'] = self._calc_price_position(code)
+        # 6. 行业RS
+        mw_ind = db.execute("SELECT ind_rs250, ind_name FROM mw_signal_daily WHERE stock_code=? AND ind_rs250 IS NOT NULL ORDER BY b2_date DESC LIMIT 1", (code,)).fetchone()
+        if mw_ind: p['ind_rs250'] = mw_ind['ind_rs250']; p['ind_name'] = mw_ind['ind_name']
 
-        # 9. 近5日信号汇总
-        profile['recent_signals'] = candidate.get('signals', [])
+        # 8. 均线位置
+        kl = db.execute("SELECT close FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 250", (code,)).fetchall()
+        if kl:
+            cs = [k['close'] for k in kl]; p['latest_close'] = cs[0]
+            for ma_n in [5,10,20,30,60,120,250]:
+                if len(cs) >= ma_n:
+                    ma_v = sum(cs[:ma_n]) / ma_n
+                    p[f'ma{ma_n}'] = round(ma_v, 2)
+                    p[f'vs_ma{ma_n}'] = round((cs[0]-ma_v)/ma_v*100, 1)
 
-        return profile
+        # 9. 近20天股价
+        kl20 = db.execute("SELECT date, open, high, low, close, volume FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 20", (code,)).fetchall()
+        p['klines_20d'] = [{'date': k['date'], 'o': k['open'], 'h': k['high'], 'l': k['low'], 'c': k['close'], 'v': k['volume']} for k in reversed(kl20)]
 
-    def _calc_price_volume(self, stock_code):
-        """计算近 5/10/20 日涨跌幅和均量趋势"""
-        rows = self.db.execute("""
-            SELECT date, close, volume, change_pct
-            FROM daily_kline
-            WHERE stock_code=?
-            ORDER BY date DESC LIMIT 22
-        """, (stock_code,)).fetchall()
+        # 10. 成交量
+        if kl20:
+            vols = [k['v'] for k in p['klines_20d']]
+            for d, n in [(5, 'vol5d'), (10, 'vol10d'), (20, 'vol20d')]:
+                if len(vols) >= d: p[n] = int(sum(vols[:d]) / d)
 
-        if not rows:
-            return {}
-
-        result = {'latest_close': rows[0]['close'], 'latest_date': rows[0]['date']}
-
-        for period, days in [('5日', 5), ('10日', 10), ('20日', 20)]:
-            if len(rows) >= days + 1:
-                recent = rows[:days]
-                older_close = rows[days]['close'] if len(rows) > days else rows[-1]['close']
-                if older_close and older_close > 0:
-                    pct = (recent[0]['close'] - older_close) / older_close * 100
-                else:
-                    pct = 0
-                avg_vol = sum(r['volume'] for r in recent) / len(recent)
-                # 前半段 vs 后半段均量（判断放量/缩量趋势）
-                half = days // 2
-                first_half_vol = sum(r['volume'] for r in recent[half:]) / half
-                second_half_vol = sum(r['volume'] for r in recent[:half]) / half
-                vol_trend = '放量' if second_half_vol > first_half_vol * 1.1 else (
-                    '缩量' if second_half_vol < first_half_vol * 0.9 else '持平')
-                result[period] = {
-                    'pct': round(pct, 2),
-                    'avg_vol': int(avg_vol),
-                    'vol_trend': vol_trend,
-                }
-            else:
-                result[period] = {'pct': None, 'avg_vol': None, 'vol_trend': '数据不足'}
-
-        # 逐日涨跌（最近10日）
-        daily = []
-        for i in range(min(10, len(rows) - 1)):
-            r = rows[i]
-            raw_pct = r['change_pct']
-            # daily_kline.change_pct 是小数（0.0751=7.51%），需乘100
-            pct = round(raw_pct * 100, 2) if raw_pct is not None and abs(raw_pct) <= 1 else round(raw_pct, 2) if raw_pct else None
-            daily.append({
-                'date': r['date'],
-                'close': r['close'],
-                'pct': pct,
-                'vol': r['volume'],
-            })
-        result['daily_10'] = daily
-
-        return result
-
-    def _get_candlestick_patterns(self, stock_code):
-        """获取最近5日的 TA-Lib K线形态"""
-        rows = self.db.execute("""
-            SELECT date, open, high, low, close, volume
-            FROM daily_kline
-            WHERE stock_code=?
-            ORDER BY date DESC LIMIT 35
-        """, (stock_code,)).fetchall()
-
-        if len(rows) < 5:
-            return []
-
-        patterns = []
-        try:
-            import numpy as np
-            import talib
-
-            closes = np.array([r['close'] for r in reversed(rows)], dtype=np.float64)
-            opens = np.array([r['open'] for r in reversed(rows)], dtype=np.float64)
-            highs = np.array([r['high'] for r in reversed(rows)], dtype=np.float64)
-            lows = np.array([r['low'] for r in reversed(rows)], dtype=np.float64)
-
-            pattern_funcs = [
-                ('CDLDOJI', '十字星', talib.CDLDOJI),
-                ('CDLHAMMER', '锤子线', talib.CDLHAMMER),
-                ('CDLENGULFING', '吞没形态', talib.CDLENGULFING),
-                ('CDLMORNINGSTAR', '启明星', talib.CDLMORNINGSTAR),
-                ('CDLEVENINGSTAR', '黄昏星', talib.CDLEVENINGSTAR),
-                ('CDLHARAMI', '孕线', talib.CDLHARAMI),
-                ('CDLPIERCING', '刺透形态', talib.CDLPIERCING),
-                ('CDLDARKCLOUDCOVER', '乌云盖顶', talib.CDLDARKCLOUDCOVER),
-                ('CDLSHOOTINGSTAR', '射击之星', talib.CDLSHOOTINGSTAR),
-                ('CDLINVERTEDHAMMER', '倒锤子', talib.CDLINVERTEDHAMMER),
-                ('CDL3WHITESOLDIERS', '三白兵', talib.CDL3WHITESOLDIERS),
-                ('CDL3BLACKCROWS', '三只乌鸦', talib.CDL3BLACKCROWS),
-                ('CDLMARUBOZU', '光头光脚', talib.CDLMARUBOZU),
-            ]
-
-            for func_name, cn_name, func in pattern_funcs:
-                result = func(opens, highs, lows, closes)
-                for j in range(max(0, len(result) - 5), len(result)):
-                    if result[j] != 0:
-                        idx = len(rows) - 1 - j
-                        if 0 <= idx < len(rows):
-                            r = rows[idx]
-                            patterns.append({
-                                'date': r['date'],
-                                'pattern': cn_name,
-                                'signal': 'bullish' if result[j] > 0 else 'bearish',
-                                'open': r['open'], 'close': r['close'],
-                                'high': r['high'], 'low': r['low'],
-                            })
-        except ImportError:
-            pass
-
-        return patterns
-
-    def _calc_price_position(self, stock_code):
-        """计算当前价格相对各均线的位置"""
-        rows = self.db.execute("""
-            SELECT close FROM daily_kline
-            WHERE stock_code=?
-            ORDER BY date DESC LIMIT 250
-        """, (stock_code,)).fetchall()
-
-        closes = [r['close'] for r in rows]
-        if not closes:
-            return {}
-
-        latest = closes[0]
-        result = {'latest': latest}
-
-        for period in [10, 20, 50, 60, 120, 200]:
-            if len(closes) >= period:
-                ma = sum(closes[:period]) / period
-                pct = (latest - ma) / ma * 100
-                result[f'MA{period}'] = {'value': round(ma, 2), 'pct': round(pct, 2)}
-
-        return result
-
-    def _build_market_profile(self, market_data):
-        """构建市场环境数据"""
-        m = market_data or {}
-        profile = {
-            'light': m.get('market_light', 'unknown'),
-            'light_label': m.get('light_label', ''),
-            'ftd_confirmed': m.get('ftd_confirmed', False),
-            'distribution_days': m.get('distribution_days', 0),
-            'crowding': m.get('crowding'),
-        }
-
-        # 大盘健康分 + 抛盘日/追盘日/吸筹日
-        try:
-            # 近30日抛盘日
-            dd = self.db.execute("""
-                SELECT COUNT(*) as cnt FROM distribution_day
-                WHERE dd_date >= date('now', '-30 days')
-            """).fetchone()
-            profile['distribution_days_30d'] = dd['cnt'] if dd else 0
-
-            # 最近追盘日
-            ftd = self.db.execute("""
-                SELECT ftd_date FROM follow_through_day
-                WHERE confirmed=1 ORDER BY ftd_date DESC LIMIT 1
-            """).fetchone()
-            profile['last_ftd'] = ftd['ftd_date'] if ftd else '无'
-
-            # 吸筹日
-            ad = self.db.execute("""
-                SELECT COUNT(*) as cnt FROM accumulation_day
-                WHERE ad_date >= date('now', '-30 days')
-            """).fetchone()
-            profile['accumulation_days_30d'] = ad['cnt'] if ad else 0
-
-            # 市场健康分
-            mh = self.db.execute("""
-                SELECT score, risk_level FROM market_health
-                ORDER BY date DESC LIMIT 1
-            """).fetchone()
-            if mh:
-                profile['market_health_score'] = mh['score']
-                profile['market_health_risk'] = mh['risk_level']
-
-            # 卖出评分
-            ms = self.db.execute("""
-                SELECT score, signal FROM market_sell_score
-                ORDER BY date DESC LIMIT 1
-            """).fetchone()
-            if ms:
-                profile['market_sell_score'] = ms['score']
-                profile['market_sell_signal'] = ms['signal']
-
-        except sqlite3.OperationalError:
-            pass
-
-        return profile
-
-    def _build_prompt(self, stock_code, info, market):
-        """构建分析 prompt"""
-        parts = []
-        parts.append(f"## 股票: {info['name']}({stock_code})")
-        parts.append(f"信号日期: {info.get('signal_date', '')}")
-
-        # MW 信号
-        mw = info.get('mw_signal')
+        # 11. H/L/C结构
+        mw = db.execute("SELECT h_date, h_price, l_date, l_price, decline_pct, c_start, c_end FROM mw_signal_daily WHERE stock_code=? AND b2_date=?", (code, candidate.get('signal_date',''))).fetchone()
         if mw:
-            parts.append("\n### MW 信号")
-            parts.append(f"- 类型: {'⭐ PLUS高分信号' if mw['is_plus'] else 'MW B2二次确认'}")
-            parts.append(f"- B2日期: {mw['b2_date']}, B1首次突破: {mw['b1_date']}")
-            parts.append(f"- 综合评分: {mw['score']}/100, 置信度: {mw.get('confidence','')}")
-            parts.append(f"- 调整深度(H→L): {(mw.get('decline_pct') or 0):.1f}%")
-            parts.append(f"- 前高H: {mw.get('h_date')} ¥{(mw.get('h_price') or 0):.2f}")
-            parts.append(f"- 低点L: {mw.get('l_date')} ¥{(mw.get('l_price') or 0):.2f}")
-            parts.append(f"- B2涨幅: {(mw.get('b2_return_pct') or 0):.1f}%")
-            parts.append(f"- B2跳空: {'是' if mw.get('b2_is_gap') else '否'}")
-            parts.append(f"- 前高时点RS250: {mw.get('h_rs250') or '?'}")
-            dims = mw.get('dimensions', {})
-            if dims:
-                parts.append(f"- 维度评分: H={dims.get('H_前高趋势') or '?'} D={dims.get('D_调整深度') or '?'} C={dims.get('C_横盘质量') or '?'} P={dims.get('P_整理回撤') or '?'} I1={dims.get('I1_行业RS') or '?'} I2={dims.get('I2_个股RS') or '?'}")
+            p['hlc'] = {'h_date': mw['h_date'], 'h_price': mw['h_price'], 'l_date': mw['l_date'],
+                        'l_price': mw['l_price'], 'decline_pct': mw['decline_pct']}
 
-        # 口袋支点
-        pp = info.get('pocket_pivots', [])
-        if pp:
-            parts.append("\n### 口袋支点信号")
-            for p in pp[:3]:
-                parts.append(f"- {p['date']}: {p['pivot_type']}, 涨幅{(p.get('gain_pct') or 0):.1f}%, 量比{(p.get('vol_ratio') or 0):.1f}, B1重合:{'是' if p.get('b1_overlap') else '否'}, 盘整{p.get('c_days') or 0}天")
+        # 12. 延伸风险
+        if p.get('ma10') and p.get('latest_close'):
+            ext = (p['latest_close'] - p['ma10']) / p['ma10'] * 100
+            p['extension_risk'] = f"距MA10 {ext:.1f}%{' ⚠️延伸超20%' if ext > 20 else ''}"
 
-        # 基部突破
-        bo = info.get('base_breakouts', [])
-        if bo:
-            parts.append("\n### 基部突破信号")
-            for b in bo[:3]:
-                parts.append(f"- {b['date']}: 涨幅{b.get('change_pct',0):.1f}%")
+        # 13. 买入信号近5日
+        buy_sigs = []
+        sd = candidate.get('signal_date', '')
+        # PP
+        pp = db.execute("SELECT date, pivot_type FROM pocket_pivot_daily WHERE stock_code=? AND date >= date(?, '-5 days')", (code, sd)).fetchall()
+        for r in pp: buy_sigs.append(f"PP-{r['pivot_type']}({r['date']})")
+        # BO
+        try:
+            bo = db.execute("SELECT date FROM market_breakout_daily WHERE stock_code=? AND date >= date(?, '-5 days')", (code, sd)).fetchall()
+            for r in bo: buy_sigs.append(f"BO({r['date']})")
+        except: pass
+        # MW
+        mw_s = db.execute("SELECT b2_date, is_plus FROM mw_signal_daily WHERE stock_code=? AND b2_date >= date(?, '-5 days')", (code, sd)).fetchall()
+        for r in mw_s: buy_sigs.append(f"{'PLUS' if r['is_plus'] else 'MW-B2'}({r['b2_date']})")
+        # Pattern scan (TA-Lib)
+        try:
+            ps = db.execute("SELECT signals_json FROM pattern_scan_signals WHERE stock_code=? AND date >= date(?, '-5 days')", (code, sd)).fetchall()
+            for r in ps:
+                if r['signals_json']:
+                    import json
+                    sigs = json.loads(r['signals_json'])
+                    for s in sigs:
+                        if s.get('type') == 'bullish' and s.get('source') == 'cdl':
+                            buy_sigs.append(f"{s.get('details',{}).get('cdl_name','TA-Lib')}({s.get('date','')})")
+        except: pass
+        p['buy_signals_5d'] = list(set(buy_sigs)) if buy_sigs else ['无']
 
-        # CANSLIM
-        canslim = info.get('canslim', {})
-        if canslim:
-            parts.append("\n### CAN SLIM 评分")
-            parts.append(f"- 总分: {canslim.get('canslim_total','?')}/100")
-            parts.append(f"- C(当季EPS): {canslim.get('canslim_c','?')} A(年度EPS): {canslim.get('canslim_a','?')}")
-            parts.append(f"- N(新事物): {canslim.get('canslim_n','?')} S(供需): {canslim.get('canslim_s','?')}")
-            parts.append(f"- L(领涨): {canslim.get('canslim_l','?')} I(机构): {canslim.get('canslim_i','?')}")
-            parts.append(f"- M(市场): {canslim.get('canslim_m','?')}")
-            parts.append(f"- ROE: {canslim.get('roe','?')}% EPS增速: {canslim.get('eps_yoy','?')}%")
+        # 14. 卖出信号近5日
+        sell_sigs = []
+        try:
+            ps2 = db.execute("SELECT signals_json FROM pattern_scan_signals WHERE stock_code=? AND date >= date(?, '-5 days')", (code, sd)).fetchall()
+            for r in ps2:
+                if r['signals_json']:
+                    import json
+                    sigs = json.loads(r['signals_json'])
+                    for s in sigs:
+                        if s.get('type') == 'bearish':
+                            src = s.get('source',''); detail = s.get('details',{})
+                            label = detail.get('rule_label', detail.get('signal_type', src))
+                            sell_sigs.append(f"{label}({s.get('date','')})")
+        except: pass
+        p['sell_signals_5d'] = list(set(sell_sigs)) if sell_sigs else ['无']
 
-        # 涨跌幅和成交量
-        pv = info.get('price_volume', {})
-        if pv:
-            parts.append("\n### 近期涨跌幅与成交量")
-            parts.append(f"最新价: ¥{pv.get('latest_close','?')} ({pv.get('latest_date','')})")
-            for period in ['5日', '10日', '20日']:
-                d = pv.get(period, {})
-                if d.get('pct') is not None:
-                    parts.append(f"- {period}: {d['pct']:+.2f}%, 均量{d['avg_vol']:,}, {d['vol_trend']}")
+        # 15. 胜率参考
+        try:
+            import yaml
+            ypath = os.path.join(PROJECT_ROOT, 'config', 'strategy', 'high_conf_pocket_pivot.yaml')
+            if os.path.exists(ypath):
+                with open(ypath, encoding='utf-8') as f: yd = yaml.safe_load(f)
+                perf = yd.get('performance',{})
+                kelly = yd.get('kelly',{})
+                p['backtest'] = {'source': '高置信度口袋支点(B1=PP日)', 'period': '2023-06~2026-06', 'samples': yd.get('strategy',{}).get('total_signals','?'),
+                    'win5d': perf.get('5d',{}).get('win_rate'), 'med5d': perf.get('5d',{}).get('median_return'),
+                    'win10d': perf.get('10d',{}).get('win_rate'), 'med10d': perf.get('10d',{}).get('median_return'),
+                    'win20d': perf.get('20d',{}).get('win_rate'), 'med20d': perf.get('20d',{}).get('median_return'),
+                    'kelly_p': kelly.get('win_rate'), 'kelly_b': round(kelly.get('avg_win_pct',0)/kelly.get('avg_loss_pct',1),2) if kelly.get('avg_loss_pct') else None}
+        except: pass
 
-            daily = pv.get('daily_10', [])
-            if daily:
-                parts.append("- 近10日逐日涨跌:")
-                for d in daily[:10]:
-                    parts.append(f"  {d['date']}: {(d['pct'] or 0):+.2f}% (¥{d['close']:.2f})")
+        return p
 
-        # K线形态
-        cdls = info.get('candlestick', [])
-        if cdls:
-            parts.append("\n### TA-Lib K线形态（近5日）")
-            for c in cdls:
-                parts.append(f"- {c['date']}: {c['pattern']}({'看涨' if c['signal']=='bullish' else '看跌'}), O={c['open']:.2f} H={c['high']:.2f} L={c['low']:.2f} C={c['close']:.2f}")
+    def _build_rich_prompt(self, stock_code, info):
+        """构建高质量prompt"""
+        p = info
+        parts = []
+        parts.append(f"## 股票概况""")
+        parts.append(f"- 代码: {p['code']} 名称: {p.get('name','')}""")
+        parts.append(f"- 行业: {p.get('industry','未知')} 市值: {p.get('market_cap_yi','?')}亿""")
+        parts.append(f"- 信号日期: {p.get('signal_date','')}""")
+        parts.append(f"- 发现路径: {p.get('discovery_path','')}""")
 
-        # 价格位置
-        pos = info.get('price_position', {})
-        if pos:
-            parts.append("\n### 当前价格位置（相对均线）")
-            for key in ['MA10', 'MA20', 'MA50', 'MA60', 'MA120', 'MA200']:
-                if key in pos:
-                    d = pos[key]
-                    parts.append(f"- {key}: {d['value']:.2f} (价格{'上方' if d['pct']>=0 else '下方'} {abs(d['pct']):.1f}%)")
-
-        # 行业RS
-        parts.append(f"\n### 行业背景")
-        parts.append(f"- 中证一级行业: {info.get('l1_industry', '未知')}")
-        parts.append(f"- 行业RS250: {info.get('l1_rs250', '?')}")
-
-        # 近期信号汇总
-        sigs = info.get('recent_signals', [])
-        if sigs:
-            parts.append(f"\n### 近期信号: {', '.join(sigs)}")
-
-        # 市场环境
         parts.append("\n## 大盘环境")
-        parts.append(f"- 大盘评级: {market.get('light_label','?')}")
-        parts.append(f"- 近30日抛盘日: {market.get('distribution_days_30d','?')}个")
-        parts.append(f"- 近30日吸筹日: {market.get('accumulation_days_30d','?')}个")
-        parts.append(f"- 最近追盘日: {market.get('last_ftd','?')}")
-        parts.append(f"- 市场健康分: {market.get('market_health_score','?')}")
-        parts.append(f"- 市场健康风险: {market.get('market_health_risk','?')}")
-        parts.append(f"- 卖出评分: {market.get('market_sell_score','?')}")
-        parts.append(f"- 卖出信号: {market.get('market_sell_signal','?')}")
+        mh = p.get('market_health', {})
+        if mh:
+            parts.append(f"- 健康分: {mh.get('score')}/100 评级: {mh.get('rating')}""")
+            parts.append(f"- MA50上方占比: {mh.get('ma50_above')}% 新高新低比: {mh.get('hl_ratio')} 涨跌比: {mh.get('ad_ratio')}""")
+            parts.append(f"- 放量突破数: {mh.get('vol_breakout')}""")
+        ms = p.get('market_sell', {})
+        if ms: parts.append(f"- 卖出评分: {ms.get('score')} 信号: {ms.get('signal')}""")
+        parts.append(f"- 30日抛盘日: {p.get('dist_30d','?')} 追盘日: {p.get('ftd_30d','?')} 吸筹日: {p.get('acc_30d','?')}""")
+        parts.append(f"- 全市场成交额: 5日均{p.get('index_amount_avg5d','?')}亿 10日{p.get('index_amount_avg10d','?')}亿 趋势:{p.get('index_amount_trend','?')}""")
+        parts.append(f"- 中证全指: {p.get('index_close','?')} MA50:{p.get('index_ma50','?')}({p.get('index_vs_ma50','?')}%) MA200:{p.get('index_ma250','?')}({p.get('index_vs_ma250','?')}%)""")
 
-        parts.append("\n---\n注意：I（机构持股）维度数据因A股散户条件限制不可获取，此项不参与本次评估，请基于其余维度分析。\n\n请按照欧奈尔交易框架，对上述股票进行全面分析。要求：")
+        parts.append("\n## 个股技术面")
+        rs = p.get('rs', {})
+        if rs: parts.append(f"- RS强度: RPS20={rs.get('rps20')} RPS60={rs.get('rps60')} RPS120={rs.get('rps120')} RPS250={rs.get('rps250')}""")
+        if p.get('ind_rs250'): parts.append(f"- 行业RS250: {p.get('ind_rs250')} ({p.get('ind_name','')})""")
+        parts.append(f"- 最新价: {p.get('latest_close','?')}""")
+        parts.append("- 均线: " + ", ".join([f"MA{n}={p.get(f'ma{n}','?')}({p.get(f'vs_ma{n}','?')}%)" for n in [5,10,20,30,60,120,250] if p.get(f'ma{n}')]))
+        if p.get('extension_risk'): parts.append(f"- 延伸风险: {p['extension_risk']}""")
+        parts.append(f"- 成交量: 5日均{p.get('vol5d','?')} 10日{p.get('vol10d','?')} 20日{p.get('vol20d','?')}""")
 
-        parts.append("1. 逐条对照10条核心规则给出评估")
-        parts.append("2. 分析口袋支点和基部突破的质量")
-        parts.append("3. 评估CANSLIM各维度的强弱")
-        parts.append("4. 结合大盘环境给出择时建议")
-        parts.append("5. 给出明确的买卖建议（买入/谨慎买入/观望/不建议）")
-        parts.append("6. 至少1000字，用中文撰写")
-        parts.append("7. 用Markdown格式输出，包含标题层级和要点")
+        hlc = p.get('hlc', {})
+        if hlc: parts.append(f"- H/L结构: H={hlc.get('h_date')} ¥{hlc.get('h_price')} L={hlc.get('l_date')} ¥{hlc.get('l_price')} 回撤{hlc.get('decline_pct')}%""")
+
+        parts.append("\n## 信号扫描")
+        parts.append(f"- 买入信号(近5日): {', '.join(p.get('buy_signals_5d',['无']))}""")
+        parts.append(f"- 卖出信号(近5日): {', '.join(p.get('sell_signals_5d',['无']))}""")
+
+        bt = p.get('backtest', {})
+        if bt:
+            parts.append("\n## 回测参考 (" + bt.get('source') + ")")
+            parts.append(f"- 样本: {bt.get('samples')}个 周期: {bt.get('period')}""")
+            parts.append(f"- 5日胜率: {bt.get('win5d')}% 中位: {bt.get('med5d')}%""")
+            parts.append(f"- 10日胜率: {bt.get('win10d')}% 中位: {bt.get('med10d')}%""")
+            if bt.get('kelly_p'):
+                kelly_f = bt['kelly_p'] * bt.get('kelly_b', 1) - (1-bt['kelly_p'])
+                kelly_f = kelly_f / bt.get('kelly_b', 1) if bt.get('kelly_b') else 0
+                parts.append(f"- 凯利仓位参考(1/4): {round(max(0,kelly_f)*25,1)}% (p={bt['kelly_p']} b={bt.get('kelly_b')})""")
+
+        parts.append("\n---")
+        parts.append("你是欧奈尔交易顾问。请基于以上全维度数据，用通俗人话给出分析。要求：""")
+        parts.append(f"1. 直接给买入结论（买入/谨慎/观望/不买），讲清楚核心理由，不要绕弯子""")
+        parts.append(f"2. 仓位建议（参考凯利上限 + 实际建议，单笔亏损 ≤ 账户2%）""")
+        parts.append(f"3. 持有建议（止损位基于H/L结构或8%固定止损、止盈位看H点前高、持有时长建议）""")
+        parts.append(f"4. 用Markdown格式，重点加粗""")
 
         return '\n'.join(parts)
-
-    def _call_deepseek(self, system_prompt, user_prompt):
-        """调用 DeepSeek API"""
-        import urllib.request
-
-        url = f"{DEEPSEEK_BASE_URL}/chat/completions"
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {DEEPSEEK_KEY}',
-        }
-        body = {
-            'model': 'deepseek-chat',
-            'messages': [
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_prompt},
-            ],
-            'temperature': 0.7,
-            'max_tokens': 4096,
-        }
-
-        data = json.dumps(body).encode('utf-8')
-        req = urllib.request.Request(url, data=data, headers=headers, method='POST')
-
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            result = json.loads(resp.read().decode('utf-8'))
-
-        if result.get('choices') and len(result['choices']) > 0:
-            return result['choices'][0]['message']['content']
-        return None
-
     def _text_to_html(self, stock_code, info, text, run_date):
         """将 Markdown 分析文本转为完整 HTML 页面"""
         name = info.get('name', stock_code)
