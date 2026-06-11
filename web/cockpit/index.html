@@ -278,11 +278,14 @@ function renderCandidates() {
     }
     for (var s = 0; s < signals.length; s++) {
       var sig = signals[s];
+      var sigType = typeof sig === 'string' ? sig : sig.type;
+      var sigDate = typeof sig === 'string' ? '' : (sig.date||'');
       var cls = 'badge-mw', label = sig;
-      if (c.tab === 'b1') { cls = 'badge-b1'; label = '🔔 B1 首发'; } else if (sig === 'mw_plus') { cls = 'badge-plus'; label = '⭐ PLUS'; }
-      else if (sig === 'pocket_pivot_b1' || sig === 'pocket_pivot') { cls = 'badge-pp'; label = sig === 'pocket_pivot_b1' ? '🟠 口袋支点(B1重合)' : '🟠 口袋支点'; }
-      else if (sig === 'base_breakout') { cls = 'badge-bo'; label = '🔷 基部突破'; }
-      else if (sig === 'mw_b2') { cls = 'badge-mw'; label = 'MW B2'; }
+      if (sigType === 'mw_plus') { cls = 'badge-plus'; label = '⭐ PLUS'; }
+      else if (sigType === 'pocket_pivot_b1' || sigType === 'pocket_pivot') { cls = 'badge-pp'; label = sigType === 'pocket_pivot_b1' ? '🟠 口袋支点(B1重合)' : '🟠 口袋支点'; }
+      else if (sigType === 'base_breakout') { cls = 'badge-bo'; label = '🔷 基部突破'; }
+      else if (sigType === 'mw_b2') { cls = 'badge-mw'; label = 'MW B2'; }
+      if (sigDate) label += ' ' + sigDate;
       html += '<span class="badge ' + cls + '">' + label + '</span>';
     }
     html += '</div>';
@@ -414,7 +417,9 @@ function fillChecklistData() {
   // 胜率关
   var hasMwp = candidatesData.some(function(c) {
     var s = c.signal_types; if (typeof s==='string') try{s=JSON.parse(s)}catch(e){}
-    return s && s.indexOf && s.indexOf('mw_plus') >= 0;
+    if (!s || !s.length) return false;
+    for (var j=0; j<s.length; j++) { var t = typeof s[j]==='string' ? s[j] : s[j].type; if (t==='mw_plus') return true; }
+    return false;
   });
   document.getElementById('chk-1-data').textContent = hasMwp ? 'MW PLUS 10日胜率 ≈62%' : '待回测数据';
 

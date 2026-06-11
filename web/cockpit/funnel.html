@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>驾驶舱 · 股票过滤漏斗</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d0d12;color:#d4d4d8;font-family:'Inter',-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px}
+.container{max-width:700px;width:100%}
+h1{text-align:center;font-family:'Instrument Serif',Georgia,serif;font-size:1.4rem;font-weight:400;color:#f59e0b;margin-bottom:8px}
+.subtitle{text-align:center;font-size:.62rem;color:#666;margin-bottom:32px}
+
+.funnel{display:flex;flex-direction:column;align-items:center;gap:0}
+.level{position:relative;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;text-align:center;transition:all .3s;cursor:default}
+.level:hover{filter:brightness(1.2);transform:scale(1.02)}
+.level .inner{position:relative;z-index:1;padding:16px 24px}
+.level .icon{font-size:1.2rem;margin-bottom:2px}
+.level .name{font-size:.75rem;font-family:'Instrument Serif',Georgia,serif}
+.level .count{font-size:.55rem;opacity:.75;margin-top:2px}
+.level .desc{font-size:.5rem;opacity:.5;margin-top:1px}
+
+.l1{width:640px;background:linear-gradient(135deg,#1e1e2e,#252540);clip-path:polygon(4% 0,96% 0,92% 100%,8% 100%);border-top:1px solid rgba(139,92,246,.3)}
+.l2{width:560px;background:linear-gradient(135deg,#1a2840,#1e3050);clip-path:polygon(6% 0,94% 0,90% 100%,10% 100%);border-top:1px solid rgba(59,130,246,.3);margin-top:-1px}
+.l3{width:480px;background:linear-gradient(135deg,#1a3028,#1e382e);clip-path:polygon(8% 0,92% 0,88% 100%,12% 100%);border-top:1px solid rgba(16,185,129,.3);margin-top:-1px}
+.l4{width:400px;background:linear-gradient(135deg,#302818,#3a2e1a);clip-path:polygon(10% 0,90% 0,86% 100%,14% 100%);border-top:1px solid rgba(245,158,11,.3);margin-top:-1px}
+.l5{width:320px;background:linear-gradient(135deg,#2a1520,#351a28);clip-path:polygon(12% 0,88% 0,84% 100%,16% 100%);border-top:1px solid rgba(239,68,68,.3);margin-top:-1px}
+
+.result{width:240px;background:linear-gradient(135deg,rgba(245,158,11,.25),rgba(245,158,11,.15));clip-path:polygon(16% 0,84% 0,80% 100%,20% 100%);border-top:2px solid #f59e0b;margin-top:-1px;animation:pulse 2s infinite}
+.result .name{color:#fbbf24}
+.result .count{color:#f59e0b;font-size:.7rem}
+
+@keyframes pulse{0%,100%{box-shadow:0 0 20px rgba(245,158,11,.1)}50%{box-shadow:0 0 40px rgba(245,158,11,.2)}}
+
+.arrow{color:#444;font-size:.7rem;text-align:center;margin:-2px 0}
+.stats{display:flex;justify-content:center;gap:24px;margin-top:28px;flex-wrap:wrap}
+.stat{text-align:center;background:rgba(26,26,31,.6);border:1px solid #2a2a35;border-radius:12px;padding:12px 18px;backdrop-filter:blur(8px)}
+.stat .val{font-family:'Instrument Serif',Georgia,serif;font-size:1.5rem;font-weight:700;color:#f59e0b}
+.stat .lbl{font-size:.55rem;color:#666;margin-top:2px}
+
+.date{text-align:center;margin-top:20px;font-size:.55rem;color:#444}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🚀 投资决策驾驶舱</h1>
+<p class="subtitle">五级硬过滤管道 · 5000+ → 3~5 只候选</p>
+
+<div class="funnel">
+  <div class="level l1">
+    <div class="inner">
+      <div class="icon">🔍</div>
+      <div class="name">第一级 · 观察池过滤</div>
+      <div class="count">414 只</div>
+      <div class="desc">双强股 / 稳健龙头 / 加速爆发</div>
+    </div>
+  </div>
+  <div class="arrow">▼</div>
+  <div class="level l2">
+    <div class="inner">
+      <div class="icon">💎</div>
+      <div class="name">第二级 · 市值门槛</div>
+      <div class="count">414 只</div>
+      <div class="desc">总市值 ≥ 50 亿</div>
+    </div>
+  </div>
+  <div class="arrow">▼</div>
+  <div class="level l3">
+    <div class="inner">
+      <div class="icon">🏭</div>
+      <div class="name">第三级 · 行业 RS 强度</div>
+      <div class="count">378 只</div>
+      <div class="desc">所属行业 RS250 ≥ 75</div>
+    </div>
+  </div>
+  <div class="arrow">▼</div>
+  <div class="level l4">
+    <div class="inner">
+      <div class="icon">📈</div>
+      <div class="name">第四级 · 个股 RS（H点时点）</div>
+      <div class="count">252 只</div>
+      <div class="desc">前高时点 RS250 ≥ 80</div>
+    </div>
+  </div>
+  <div class="arrow">▼</div>
+  <div class="level l5">
+    <div class="inner">
+      <div class="icon">🎯</div>
+      <div class="name">第五级 · 形态信号</div>
+      <div class="count">7 只</div>
+      <div class="desc">近5日 B1首发 / B2确认 / 口袋支点 / 基部突破</div>
+    </div>
+  </div>
+  <div class="arrow">▼</div>
+  <div class="level result">
+    <div class="inner">
+      <div class="icon">⭐</div>
+      <div class="name">驾驶舱候选</div>
+      <div class="count">7 只</div>
+      <div class="desc">5 B1 + 2 B2</div>
+    </div>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="val">414</div><div class="lbl">观察池</div></div>
+  <div class="stat"><div class="val">→</div><div class="lbl">市值</div></div>
+  <div class="stat"><div class="val">378</div><div class="lbl">行业 RS</div></div>
+  <div class="stat"><div class="val">252</div><div class="lbl">个股 RS</div></div>
+  <div class="stat"><div class="val">7</div><div class="lbl">候选</div></div>
+</div>
+
+<p class="date">2026-06-10 · 投资决策驾驶舱 v2.2 · B1优先展示</p>
+</div>
+</body>
+</html>

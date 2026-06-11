@@ -63,6 +63,7 @@ def init_cockpit_table(db):
             stock_code TEXT NOT NULL,
             stock_name TEXT,
             rank INTEGER,
+            tab TEXT,
             signal_types TEXT,
             signal_date TEXT,
             confidence TEXT,
@@ -275,7 +276,7 @@ def filter_signals(db, stock_codes, lookback_days=5, max_candidates=5):
             candidates[code] = {
                 'stock_code': code,
                 'stock_name': r['stock_name'],
-                'signals': [signal_type],
+                'signals': [{'type': signal_type, 'date': r['b2_date']}],
                 'priority': priority,
                 'signal_date': r['b2_date'],
                 'confidence': r['confidence_v2'] or r['confidence'],
@@ -309,7 +310,7 @@ def filter_signals(db, stock_codes, lookback_days=5, max_candidates=5):
         if code not in candidates:
             candidates[code] = {
                 'stock_code': code, 'stock_name': r['stock_name'],
-                'signals': [signal_type], 'priority': priority,
+                'signals': [{'type': signal_type, 'date': r['date']}], 'priority': priority,
                 'signal_date': r['date'],
                 'confidence': '高' if r['b1_overlap'] else '中',
                 'h_date': r['h_date'], 'h_price': None,
@@ -324,8 +325,9 @@ def filter_signals(db, stock_codes, lookback_days=5, max_candidates=5):
             }
         else:
             # 已有MW信号，追加口袋支点
-            if signal_type not in candidates[code]['signals']:
-                candidates[code]['signals'].append(signal_type)
+            existing_types = {s if isinstance(s, str) else s['type'] for s in candidates[code]['signals']}
+            if signal_type not in existing_types:
+                candidates[code]['signals'].append({'type': signal_type, 'date': r['date']})
                 if r['b1_overlap']:
                     candidates[code]['priority'] = min(candidates[code]['priority'], 2)
 
@@ -345,13 +347,14 @@ def filter_signals(db, stock_codes, lookback_days=5, max_candidates=5):
             if code not in candidates:
                 candidates[code] = {
                     'stock_code': code, 'stock_name': '',
-                    'signals': [signal_type], 'priority': 3,
+                    'signals': [{'type': signal_type, 'date': r['date']}], 'priority': 3,
                     'signal_date': r['date'],
                     'confidence': '中',
                 }
             else:
-                if signal_type not in candidates[code]['signals']:
-                    candidates[code]['signals'].append(signal_type)
+                existing_types = {s if isinstance(s, str) else s['type'] for s in candidates[code]['signals']}
+                if signal_type not in existing_types:
+                    candidates[code]['signals'].append({'type': signal_type, 'date': r['date']})
                 candidates[code]['priority'] = min(candidates[code]['priority'], 3)
     except sqlite3.OperationalError:
         pass  # 表不存在时跳过
@@ -485,6 +488,11 @@ def run_pipeline(target_date=None, config=None, db=None, save=False):
         if info.get('tab') == 'b1' and info.get('signal_date'):
             b1_date = info['signal_date']
             b1_signals = list(info.get('signals', []) if isinstance(info.get('signals'), list) else [])
+            def _sig_in(typ):
+                for s in b1_signals:
+                    t = s if isinstance(s, str) else s.get('type', '')
+                    if t == typ: return True
+                return False
             # 口袋支点 on/around B1
             pp_rows = db.execute("""
                 SELECT date, pivot_type, b1_overlap FROM pocket_pivot_daily
@@ -492,19 +500,19 @@ def run_pipeline(target_date=None, config=None, db=None, save=False):
             """, (code, b1_date, b1_date)).fetchall()
             for pp in pp_rows:
                 tag = 'pocket_pivot_b1' if pp['b1_overlap'] else 'pocket_pivot'
-                if tag not in b1_signals: b1_signals.append(tag)
+                if not _sig_in(tag): b1_signals.append({'type': tag, 'date': pp['date']})
             # 基部突破 on/around B1
             try:
                 bo_rows = db.execute("""
                     SELECT date FROM market_breakout_daily
                     WHERE stock_code=? AND date BETWEEN date(?, '-2 days') AND date(?, '+2 days')
                 """, (code, b1_date, b1_date)).fetchall()
-                if bo_rows and 'base_breakout' not in b1_signals:
-                    b1_signals.append('base_breakout')
+                if bo_rows and not _sig_in('base_breakout'):
+                    b1_signals.append({'type': 'base_breakout', 'date': bo_rows[0]['date']})
             except: pass
             # MW B2 (if this B1 already has a B2)
-            if info.get('has_b2') and 'mw_b2' not in b1_signals:
-                b1_signals.append('mw_b2')
+            if info.get('has_b2') and not _sig_in('mw_b2'):
+                b1_signals.append({'type': 'mw_b2', 'date': info.get('b2_date', b1_date)})
             # pattern-scan 全量信号（TA-Lib、K线形态等）
             try:
                 ps = db.execute("""
@@ -516,10 +524,14 @@ def run_pipeline(target_date=None, config=None, db=None, save=False):
                     all_sigs = json.loads(ps['signals_json'])
                     for sig in all_sigs:
                         src = sig.get('source', '')
-                        if src == 'cdl' and sig.get('type') == 'bullish':
-                            name = sig.get('details', {}).get('cdl_name', '')
-                            if name and name not in b1_signals:
-                                b1_signals.append(name)
+                        sig_type = sig.get('type', '')
+                        if src in ('cdl', 'talib') and sig_type == 'bullish':
+                            if src == 'cdl':
+                                name = sig.get('details', {}).get('cdl_name', '')
+                            else:
+                                name = sig.get('details', {}).get('signal_type', '')
+                            if name and not _sig_in(name):
+                                b1_signals.append({'type': name, 'date': b1_date})
             except: pass
             info['signals'] = b1_signals
 
@@ -666,7 +678,8 @@ def save_candidates(db, run_date, candidates, pool_data=None):
         # 止损止盈
         from cockpit.position import calculate_stop_loss, get_trailing_stop_rule_text
         signals = c.get('signals', [])
-        primary = signals[0] if signals else 'mw_b2'
+        primary_raw = signals[0] if signals else 'mw_b2'
+        primary = primary_raw if isinstance(primary_raw, str) else primary_raw.get('type', 'mw_b2')
         signal_type_map = {
             'mw_plus': 'mw_plus', 'mw_b2': 'mw_b2',
             'pocket_pivot_b1': 'pocket_pivot_base', 'pocket_pivot': 'pocket_pivot_base',
@@ -690,6 +703,7 @@ def save_candidates(db, run_date, candidates, pool_data=None):
         db.execute("""
             INSERT OR REPLACE INTO cockpit_daily (
                 run_date, stock_code, stock_name, rank,
+                tab,
                 signal_types, signal_date, confidence,
                 h_date, h_price, l_date, l_price,
                 decline_pct, consolidation_days,
@@ -702,9 +716,10 @@ def save_candidates(db, run_date, candidates, pool_data=None):
                 sentiment_summary, oneil_analysis,
                 stop_loss_price, stop_loss_rule, trailing_stop_rule,
                 target_price, entry_price_ref
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             run_date, code, stock_name, c.get('rank'),
+            c.get('tab', ''),
             signal_types_json, signal_date, c.get('confidence', ''),
             c.get('h_date'), c.get('h_price'), c.get('l_date'), c.get('l_price'),
             c.get('decline_pct'), c.get('consolidation_days'),
@@ -738,17 +753,20 @@ if __name__ == '__main__':
     if args.max:
         config['pipeline']['max_candidates'] = args.max
 
-    print(f"🚀 驾驶舱管道启动 — {args.date}")
+    print(f"[cockpit] Pipeline start - {args.date}")
     candidates, stats = run_pipeline(args.date, config, save=args.save)
 
-    print(f"\n📊 管道统计:")
-    print(f"   观察池: {stats.get('level1_pool', 0)} 只")
-    print(f"   市值≥{config['pipeline']['market_cap_min']}亿: {stats.get('level2_market_cap', 0)} 只")
-    print(f"   行业RS≥{config['pipeline']['industry_rs250_min']}: {stats.get('level3_industry_rs', 0)} 只")
-    print(f"   个股RS(H点)≥{config['pipeline']['stock_rs250_h_min']}: {stats.get('level4_stock_rs', 0)} 只")
-    print(f"   形态信号: {stats.get('level5_signals', 0)} 只")
+    print(f"\n[cockpit] Stats:")
+    print(f"   Level1 pool: {stats.get('level1_pool', 0)}")
+    print(f"   Level2 market_cap>={config['pipeline']['market_cap_min']}: {stats.get('level2_market_cap', 0)}")
+    print(f"   Level3 ind_rs>={config['pipeline']['industry_rs250_min']}: {stats.get('level3_industry_rs', 0)}")
+    print(f"   Level4 stock_rs(H)>={config['pipeline']['stock_rs250_h_min']}: {stats.get('level4_stock_rs', 0)}")
+    print(f"   Level5 B2 signals: {stats.get('level5_b2_signals', 0)}")
+    print(f"   Level5 B1 signals: {stats.get('level5_b1_signals', 0)}")
 
-    print(f"\n🎯 候选股票:")
+    print(f"\n[cockpit] Candidates:")
     for c in candidates:
-        signals_str = ', '.join(c.get('signals', []))
+        raw_sigs = c.get('signals', [])
+        sig_labels = [(s if isinstance(s, str) else f"{s['type']}({s.get('date','')})") for s in raw_sigs]
+        signals_str = ', '.join(sig_labels)
         print(f"   #{c['rank']} {c['stock_code']} {c.get('stock_name','')} | {signals_str} | {c.get('signal_date','')}")
