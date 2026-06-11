@@ -93,6 +93,13 @@ html[data-theme="light"] .candidate-card .stock-name{color:#374151}
 html[data-theme="light"] .btn-sm{background:rgba(255,255,255,.6)}
 html[data-theme="light"] .checklist{background:rgba(255,255,255,.7);border-color:var(--divider)}
 html[data-theme="light"] .market-bar{background:rgba(255,255,255,.5)}
+
+.tab-btn{padding:8px 18px;border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--text-secondary);cursor:pointer;font-size:.7rem;font-family:var(--font-body);transition:all .2s;backdrop-filter:blur(8px);display:inline-flex;align-items:center;gap:6px}
+.tab-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-subtle)}
+.tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 2px 12px rgba(245,158,11,.25)}
+.tab-btn .count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:18px;border-radius:9px;padding:0 6px;font-size:.58rem;font-weight:700;background:rgba(255,255,255,.2)}
+.tab-btn:not(.active) .count{background:var(--accent-subtle);color:var(--accent)}
+html[data-theme="light"] .tab-btn:not(.active) .count{background:rgba(245,158,11,.1)}
 </style>
 </head>
 <body>
@@ -118,8 +125,8 @@ html[data-theme="light"] .market-bar{background:rgba(255,255,255,.5)}
 </div>
 
 <div style="display:flex;gap:6px;margin-bottom:10px" id="tab-bar" hidden>
-  <button class="tab-btn active" onclick="switchTab('b1')" id="tab-b1">🔔 B1 首发</button>
-  <button class="tab-btn" onclick="switchTab('b2')" id="tab-b2">✅ B2 确认</button>
+  <button class="tab-btn active" onclick="switchTab('b1')" id="tab-b1">🔔 B1 首发 <span class="count" id="cnt-b1">0</span></button>
+  <button class="tab-btn" onclick="switchTab('b2')" id="tab-b2">✅ B2 确认 <span class="count" id="cnt-b2">0</span></button>
   <span style="font-size:.6rem;color:var(--muted);margin-left:auto;align-self:center" id="tab-count"></span>
 </div>
 <div id="content"><div class="loading">🚀 驾驶舱启动中...</div></div>
@@ -237,8 +244,8 @@ function renderCandidates() {
   var b2count = candidatesData.filter(function(c){ return c.tab === "b2"; }).length;
   document.getElementById("tab-bar").hidden = !(b1count || b2count);
   document.getElementById("tab-count").textContent = "B1:" + b1count + " B2:" + b2count;
-  document.getElementById("tab-b1").textContent = "🔔 B1 (" + b1count + ")";
-  document.getElementById("tab-b2").textContent = "✅ B2 (" + b2count + ")";
+  document.getElementById("cnt-b1").textContent = b1count;
+  document.getElementById("cnt-b2").textContent = b2count;
   if (!filtered.length) {
     document.getElementById('content').innerHTML =
       '<div class="empty-state"><div class="icon">📭</div><div>暂无候选股票</div><div style="font-size:.6rem;margin-top:8px">点击「立即运行管道」执行五级筛选</div></div>';
