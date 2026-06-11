@@ -718,7 +718,7 @@ def save_candidates(db, run_date, candidates, pool_data=None):
             round(stop_price, 2) if stop_price else None, stop_rule,
             get_trailing_stop_rule_text(),
             c.get('h_price'), entry_price
-        ))
+            ))
 
     db.commit()
 
