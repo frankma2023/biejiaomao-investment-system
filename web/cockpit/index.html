@@ -269,7 +269,7 @@ function renderCandidates() {
     // 信号徽章
     html += '<div class="signal-badges">';
     var signals = c.signal_types || [];
-    if (c.tab === 'b1' || (signals.length === 0 && c.signal_date)) {
+    if (c.tab === 'b1') {
       html += '<span class="badge badge-b1">🔔 B1 ' + (c.signal_date||'') + '</span>';
     }
     if (typeof signals === 'string') {

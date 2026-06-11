@@ -481,6 +481,32 @@ def run_pipeline(target_date=None, config=None, db=None, save=False):
                 if k not in info or info[k] is None:
                     info[k] = p.get(k)
 
+        # B1 辅助信号标签（口袋支点、基部突破等）
+        if info.get('tab') == 'b1' and info.get('signal_date'):
+            b1_date = info['signal_date']
+            b1_signals = list(info.get('signals', []) if isinstance(info.get('signals'), list) else [])
+            # 口袋支点 on/around B1
+            pp_rows = db.execute("""
+                SELECT date, pivot_type, b1_overlap FROM pocket_pivot_daily
+                WHERE stock_code=? AND date BETWEEN date(?, '-2 days') AND date(?, '+2 days')
+            """, (code, b1_date, b1_date)).fetchall()
+            for pp in pp_rows:
+                tag = 'pocket_pivot_b1' if pp['b1_overlap'] else 'pocket_pivot'
+                if tag not in b1_signals: b1_signals.append(tag)
+            # 基部突破 on/around B1
+            try:
+                bo_rows = db.execute("""
+                    SELECT date FROM market_breakout_daily
+                    WHERE stock_code=? AND date BETWEEN date(?, '-2 days') AND date(?, '+2 days')
+                """, (code, b1_date, b1_date)).fetchall()
+                if bo_rows and 'base_breakout' not in b1_signals:
+                    b1_signals.append('base_breakout')
+            except: pass
+            # MW B2 (if this B1 already has a B2)
+            if info.get('has_b2') and 'mw_b2' not in b1_signals:
+                b1_signals.append('mw_b2')
+            info['signals'] = b1_signals
+
         # 从 pysnowball 获取市值（轻量，不阻塞）
         if not info.get('market_cap'):
             try:
