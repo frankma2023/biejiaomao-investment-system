@@ -543,34 +543,36 @@ class ONeilDeepAnalyzer:
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>欧奈尔分析 - {name}({stock_code})</title>
 <style>
-  body {{ font-family: 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-         max-width: 800px; margin: 0 auto; padding: 24px 20px 60px;
-         background: #1a1a1f; color: #d4d4d8; line-height: 1.8; }}
-  h1 {{ font-size: 1.3rem; color: #f59e0b; border-bottom: 1px solid #333; padding-bottom: 8px; }}
-  h2 {{ font-size: 1.05rem; color: #e5e5eb; margin-top: 24px; }}
-  h3 {{ font-size: 0.9rem; color: #a78bfa; }}
-  strong {{ color: #fbbf24; }}
-  em {{ color: #a1a1aa; }}
-  ul, ol {{ padding-left: 20px; }}
-  li {{ margin: 4px 0; }}
-  blockquote {{ border-left: 3px solid #f59e0b; padding-left: 12px; color: #a1a1aa; margin: 12px 0; }}
-  code {{ background: rgba(245,158,11,.1); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono',monospace; }}
-  .meta {{ font-size: 0.65rem; color: #666; text-align: center; margin-bottom: 24px; }}
-  .verdict {{ display: inline-block; padding: 4px 14px; border-radius: 8px; font-weight: 700; margin: 8px 0; }}
-  .verdict.buy {{ background: rgba(16,185,129,.15); color: #10b981; }}
-  .verdict.caution {{ background: rgba(245,158,11,.15); color: #f59e0b; }}
-  .verdict.wait {{ background: rgba(139,139,144,.1); color: #a1a1aa; }}
-  .verdict.avoid {{ background: rgba(239,68,68,.1); color: #ef4444; }}
-  a {{ color: #f59e0b; }}
+  *,*::before,*::after{{box-sizing:border-box}}
+  body{{font-family:'Inter',-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;max-width:780px;margin:0 auto;padding:32px 24px 60px;background:#111118;color:#d4d4d8;line-height:1.9;font-size:15px}}
+  h1{{font-family:'Instrument Serif',Georgia,serif;font-size:1.4rem;font-weight:400;color:#f59e0b;border-bottom:1px solid #2a2a35;padding-bottom:10px;margin-bottom:6px;letter-spacing:.02em}}
+  h2{{font-family:'Instrument Serif',Georgia,serif;font-size:1.1rem;font-weight:400;color:#e5e5eb;margin-top:28px;padding-bottom:4px;border-bottom:1px solid #1e1e28}}
+  h3{{font-size:.9rem;color:#a78bfa;margin-top:20px;font-weight:600}}
+  p{{margin:.7em 0;text-indent:0}}
+  strong{{color:#fbbf24;font-weight:600}}
+  em{{color:#94a3b8;font-style:italic}}
+  ul,ol{{padding-left:22px;margin:.6em 0}}
+  li{{margin:6px 0;line-height:1.7}}
+  li::marker{{color:#f59e0b}}
+  blockquote{{border-left:3px solid #f59e0b;padding:10px 18px;margin:16px 0;background:rgba(245,158,11,.06);border-radius:0 8px 8px 0;color:#a1a1aa;font-style:italic}}
+  code{{background:rgba(245,158,11,.12);padding:2px 8px;border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:.85em;color:#fbbf24}}
+  hr{{border:none;border-top:1px solid #2a2a35;margin:24px 0}}
+  .meta{{font-size:.65rem;color:#555;text-align:center;margin-bottom:28px;letter-spacing:.04em}}
+  .verdict{{display:inline-block;padding:5px 16px;border-radius:8px;font-weight:700;margin:8px 4px;font-size:.9rem}}
+  .verdict.buy{{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.2)}}
+  .verdict.caution{{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.2)}}
+  .verdict.wait{{background:rgba(139,139,144,.08);color:#a1a1aa;border:1px solid rgba(139,139,144,.15)}}
+  .verdict.avoid{{background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.2)}}
+  a{{color:#f59e0b;text-decoration:none;border-bottom:1px dotted rgba(245,158,11,.3)}}
+  a:hover{{border-bottom-style:solid}}
+  .footer{{margin-top:40px;padding-top:14px;border-top:1px solid #2a2a35;font-size:.6rem;color:#444;text-align:center}}
 </style>
 </head>
 <body>
 <h1>欧奈尔深度分析</h1>
 <div class="meta">{name}({stock_code}) · 信号日 {info.get('signal_date','')} · 分析生成 {date_str}</div>
 {html_body}
-<div style="margin-top:32px;padding-top:12px;border-top:1px solid #333;font-size:.6rem;color:#666;text-align:center">
-  基于《像欧奈尔信徒一样交易》框架 · DeepSeek 生成 · 仅供参考，不构成投资建议
-</div>
+<div class="footer">基于《像欧奈尔信徒一样交易》框架 · DeepSeek 生成 · 仅供参考，不构成投资建议</div>
 </body>
 </html>"""
 
