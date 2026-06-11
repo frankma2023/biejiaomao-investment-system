@@ -258,13 +258,13 @@ function renderCandidates() {
     var c = filtered[i];
     var isPlus = c.is_plus || (c.signal_types && c.signal_types.indexOf && c.signal_types.indexOf('mw_plus') >= 0);
 
-    html += '<div class="candidate-card' + (isPlus ? ' plus' : '') + '" id="card-' + i + '">';
+    html += '<div class="candidate-card' + (isPlus ? ' plus' : '') + '" id="card-' + i + '" onclick="toggleBriefing(' + i + ')" style="cursor:pointer">';
     // 头部
     html += '<div class="card-header">';
     html += '<div><span class="rank-badge">#' + (c.rank||(i+1)) + '</span>';
     html += '<span class="stock-name"><a href="../pattern-scan/?code=' + c.stock_code + '" target="_blank" style="color:var(--accent);text-decoration:none">' + (c.stock_name||c.stock_code) + '</a></span>';
     html += '<span class="stock-code">' + c.stock_code + '</span></div>';
-    html += '<button class="btn-sm" onclick="toggleBriefing(' + i + ')">📋 简报</button>';
+    html += '<button class="btn-sm" onclick="event.stopPropagation();openOneilReport(\'' + c.stock_code + '\',\'' + (c.run_date||'') + '\')">📖 欧奈尔分析</button>';
     html += '</div>';
 
     // 信号徽章
