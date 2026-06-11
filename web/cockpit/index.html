@@ -224,6 +224,14 @@ function renderMarket() {
 }
 
 function renderCandidates() {
+  // 推断tab: 有mw_b2→b2, 否则b1
+  for (var i = 0; i < candidatesData.length; i++) {
+    if (!candidatesData[i].tab) {
+      var st = candidatesData[i].signal_types || [];
+      if (typeof st === 'string') { try { st = JSON.parse(st); } catch(e) { st = []; } }
+      candidatesData[i].tab = (st.indexOf && st.indexOf('mw_b2') >= 0) ? 'b2' : 'b1';
+    }
+  }
   var filtered = candidatesData.filter(function(c){ return c.tab === currentTab; });
   var b1count = candidatesData.filter(function(c){ return c.tab === "b1"; }).length;
   var b2count = candidatesData.filter(function(c){ return c.tab === "b2"; }).length;
@@ -254,6 +262,9 @@ function renderCandidates() {
     // 信号徽章
     html += '<div class="signal-badges">';
     var signals = c.signal_types || [];
+    if (c.tab === 'b1' || (signals.length === 0 && c.signal_date)) {
+      html += '<span class="badge badge-b1">🔔 B1 ' + (c.signal_date||'') + '</span>';
+    }
     if (typeof signals === 'string') {
       try { signals = JSON.parse(signals); } catch(e) { signals = [signals]; }
     }
