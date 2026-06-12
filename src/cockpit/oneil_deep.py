@@ -37,8 +37,10 @@ _load_env()
 DEEPSEEK_KEY = os.environ.get('DEEPSEEK_KEY', '')
 DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1')
 
-# trade-like-oneil 技能路径
-SKILL_PATH = os.path.join(os.path.dirname(PROJECT_ROOT), '.hanako', 'skills', 'trade-like-oneil', 'SKILL.md')
+# trade-like-oneil 技能路径（先找用户目录，再找项目本地）
+SKILL_PATH = os.path.join(os.path.expanduser('~'), '.hanako', 'skills', 'trade-like-oneil', 'SKILL.md')
+if not os.path.exists(SKILL_PATH):
+    SKILL_PATH = os.path.join(os.path.dirname(PROJECT_ROOT), '.hanako', 'skills', 'trade-like-oneil', 'SKILL.md')
 
 
 class ONeilDeepAnalyzer:
@@ -167,6 +169,19 @@ class ONeilDeepAnalyzer:
         mw_ind = db.execute("SELECT ind_rs250, ind_name FROM mw_signal_daily WHERE stock_code=? AND ind_rs250 IS NOT NULL ORDER BY b2_date DESC LIMIT 1", (code,)).fetchone()
         if mw_ind: p['ind_rs250'] = mw_ind['ind_rs250']; p['ind_name'] = mw_ind['ind_name']
 
+        # 7. CAN SLIM 评分
+        cs = db.execute("""
+            SELECT score, grade, score_c, score_a, score_n, score_s, score_l, score_i
+            FROM cansim_scores 
+            WHERE stock_code=? AND date=(SELECT MAX(date) FROM cansim_scores WHERE stock_code=?)
+        """, (code, code)).fetchone()
+        if cs:
+            p['canslim'] = {
+                'total': cs['score'], 'grade': cs['grade'],
+                'c': cs['score_c'], 'a': cs['score_a'], 'n': cs['score_n'],
+                's': cs['score_s'], 'l': cs['score_l'], 'i': cs['score_i']
+            }
+
         # 8. 均线位置
         kl = db.execute("SELECT close FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 250", (code,)).fetchall()
         if kl:
@@ -241,6 +256,32 @@ class ONeilDeepAnalyzer:
         except: pass
         p['sell_signals_5d'] = list(set(sell_sigs)) if sell_sigs else ['无']
 
+        # 15a. 逐日信号明细（供prompt用）
+        sbd = {}
+        try:
+            import json as _json2
+            sd2 = candidate.get('signal_date', '')
+            ps_rows = db.execute(
+                "SELECT date, signals_json FROM pattern_scan_signals WHERE stock_code=? AND date >= date(?, '-10 days') ORDER BY date",
+                (code, sd2)
+            ).fetchall()
+            for row in ps_rows:
+                dt = row['date']
+                if dt not in sbd:
+                    sbd[dt] = []
+                if row['signals_json']:
+                    sigs = _json2.loads(row['signals_json'])
+                    for s in sigs:
+                        src = s.get('source', '?')
+                        tp = s.get('type', '?')
+                        detail = s.get('details', {})
+                        label = detail.get('cdl_name') or detail.get('rule_label') or detail.get('signal_type') or src
+                        direction = '↑' if tp == 'bullish' else ('↓' if tp == 'bearish' else '·')
+                        sbd[dt].append(f"{direction}{label}")
+        except:
+            pass
+        p['signals_by_date'] = sbd
+
         # 15. 胜率参考
         try:
             import yaml
@@ -259,60 +300,98 @@ class ONeilDeepAnalyzer:
         return p
 
     def _build_rich_prompt(self, stock_code, info):
-        """构建高质量prompt"""
+        """构建高质量prompt（v2：含CAN SLIM + K线 + 逐日信号）"""
         p = info
         parts = []
-        parts.append(f"## 股票概况""")
-        parts.append(f"- 代码: {p['code']} 名称: {p.get('name','')}""")
-        parts.append(f"- 行业: {p.get('industry','未知')} 市值: {p.get('market_cap_yi','?')}亿""")
-        parts.append(f"- 信号日期: {p.get('signal_date','')}""")
-        parts.append(f"- 发现路径: {p.get('discovery_path','')}""")
+        parts.append("## 股票概况")
+        parts.append(f"- 代码: {p['code']} 名称: {p.get('name','')}")
+        parts.append(f"- 行业: {p.get('industry','未知')} 市值: {p.get('market_cap_yi','?')}亿")
+        parts.append(f"- 信号日期: {p.get('signal_date','')}")
+        parts.append(f"- 发现路径: {p.get('discovery_path','')}")
+
+        parts.append("\n## CAN SLIM 评分")
+        cs = p.get('canslim', {})
+        if cs:
+            parts.append(f"- 总分: {cs.get('total')}/100 评级: {cs.get('grade')}")
+            parts.append(f"- C(当季收益): {cs.get('c')}分 A(年度收益): {cs.get('a')}分 N(新事物): {cs.get('n')}分")
+            parts.append(f"- S(供需): {cs.get('s')}分 L(领涨): {cs.get('l')}分 I(机构): {cs.get('i')}分")
+            parts.append("- \u26a0\ufe0f I(机构认同)得分仅供参考——散户无法获取实时机构持仓数据，该项可能失真，请勿以此为主要判断依据")
+        else:
+            parts.append("- 暂无CAN SLIM评分数据")
 
         parts.append("\n## 大盘环境")
         mh = p.get('market_health', {})
         if mh:
-            parts.append(f"- 健康分: {mh.get('score')}/100 评级: {mh.get('rating')}""")
-            parts.append(f"- MA50上方占比: {mh.get('ma50_above')}% 新高新低比: {mh.get('hl_ratio')} 涨跌比: {mh.get('ad_ratio')}""")
-            parts.append(f"- 放量突破数: {mh.get('vol_breakout')}""")
+            parts.append(f"- 健康分: {mh.get('score')}/100 评级: {mh.get('rating')}")
+            parts.append(f"- MA50上方占比: {mh.get('ma50_above')}% 新高新低比: {mh.get('hl_ratio')} 涨跌比: {mh.get('ad_ratio')}")
+            parts.append(f"- 放量突破数: {mh.get('vol_breakout')}")
         ms = p.get('market_sell', {})
-        if ms: parts.append(f"- 卖出评分: {ms.get('score')} 信号: {ms.get('signal')}""")
-        parts.append(f"- 30日抛盘日: {p.get('dist_30d','?')} 追盘日: {p.get('ftd_30d','?')} 吸筹日: {p.get('acc_30d','?')}""")
-        parts.append(f"- 全市场成交额: 5日均{p.get('index_amount_avg5d','?')}亿 10日{p.get('index_amount_avg10d','?')}亿 趋势:{p.get('index_amount_trend','?')}""")
-        parts.append(f"- 中证全指: {p.get('index_close','?')} MA50:{p.get('index_ma50','?')}({p.get('index_vs_ma50','?')}%) MA200:{p.get('index_ma250','?')}({p.get('index_vs_ma250','?')}%)""")
+        if ms: parts.append(f"- 卖出评分: {ms.get('score')} 信号: {ms.get('signal')}")
+        parts.append(f"- 30日抛盘日: {p.get('dist_30d','?')} 追盘日: {p.get('ftd_30d','?')} 吸筹日: {p.get('acc_30d','?')}")
+        parts.append(f"- 全市场成交额: 5日均{p.get('index_amount_avg5d','?')}亿 10日{p.get('index_amount_avg10d','?')}亿 趋势:{p.get('index_amount_trend','?')}")
+        parts.append(f"- 中证全指: {p.get('index_close','?')} MA50:{p.get('index_ma50','?')}({p.get('index_vs_ma50','?')}%) MA200:{p.get('index_ma250','?')}({p.get('index_vs_ma250','?')}%)")
 
         parts.append("\n## 个股技术面")
         rs = p.get('rs', {})
-        if rs: parts.append(f"- RS强度: RPS20={rs.get('rps20')} RPS60={rs.get('rps60')} RPS120={rs.get('rps120')} RPS250={rs.get('rps250')}""")
-        if p.get('ind_rs250'): parts.append(f"- 行业RS250: {p.get('ind_rs250')} ({p.get('ind_name','')})""")
-        parts.append(f"- 最新价: {p.get('latest_close','?')}""")
+        if rs: parts.append(f"- RS强度: RPS20={rs.get('rps20')} RPS60={rs.get('rps60')} RPS120={rs.get('rps120')} RPS250={rs.get('rps250')}")
+        if p.get('ind_rs250'): parts.append(f"- 行业RS250: {p.get('ind_rs250')} ({p.get('ind_name','')})")
+        parts.append(f"- 最新价: {p.get('latest_close','?')}")
         parts.append("- 均线: " + ", ".join([f"MA{n}={p.get(f'ma{n}','?')}({p.get(f'vs_ma{n}','?')}%)" for n in [5,10,20,30,60,120,250] if p.get(f'ma{n}')]))
-        if p.get('extension_risk'): parts.append(f"- 延伸风险: {p['extension_risk']}""")
-        parts.append(f"- 成交量: 5日均{p.get('vol5d','?')} 10日{p.get('vol10d','?')} 20日{p.get('vol20d','?')}""")
+        if p.get('extension_risk'): parts.append(f"- 延伸风险: {p['extension_risk']}")
+        parts.append(f"- 成交量: 5日均{p.get('vol5d','?')} 10日{p.get('vol10d','?')} 20日{p.get('vol20d','?')}")
 
         hlc = p.get('hlc', {})
-        if hlc: parts.append(f"- H/L结构: H={hlc.get('h_date')} ¥{hlc.get('h_price')} L={hlc.get('l_date')} ¥{hlc.get('l_price')} 回撤{hlc.get('decline_pct')}%""")
+        if hlc: parts.append(f"- H/L结构: H={hlc.get('h_date')} \u00a5{hlc.get('h_price')} L={hlc.get('l_date')} \u00a5{hlc.get('l_price')} 回撤{hlc.get('decline_pct')}%")
+
+        parts.append("\n## 近10日K线（已核实，请勿编造价格数据）")
+        kl = p.get('klines_20d', [])
+        if kl:
+            recent = kl[-10:] if len(kl) >= 10 else kl
+            parts.append("| 日期 | 开盘 | 收盘 | 涨跌幅 | 成交量(手) |")
+            parts.append("|------|------|------|--------|-----------|")
+            prev_c = None
+            for k in recent:
+                day_chg = round((k['c'] - k['o']) / k['o'] * 100, 1) if k['o'] else 0
+                dof_chg = round((k['c'] - prev_c) / prev_c * 100, 1) if prev_c else 0
+                if prev_c:
+                    label = f"{day_chg:+.1f}% (隔日{dof_chg:+.1f}%)"
+                else:
+                    label = f"{day_chg:+.1f}%"
+                parts.append(f"| {k['date']} | {k['o']:.2f} | {k['c']:.2f} | {label} | {k['v']} |")
+                prev_c = k['c']
+        else:
+            parts.append("- 暂无K线数据")
 
         parts.append("\n## 信号扫描")
-        parts.append(f"- 买入信号(近5日): {', '.join(p.get('buy_signals_5d',['无']))}""")
-        parts.append(f"- 卖出信号(近5日): {', '.join(p.get('sell_signals_5d',['无']))}""")
+        parts.append(f"- 买入信号(近5日): {', '.join(p.get('buy_signals_5d',['无']))}")
+        parts.append(f"- 卖出信号(近5日): {', '.join(p.get('sell_signals_5d',['无']))}")
+        sbd = p.get('signals_by_date', {})
+        if sbd:
+            parts.append("- 逐日明细:")
+            for dt in sorted(sbd.keys()):
+                sigs = sbd[dt]
+                parts.append(f"  {dt}: {' | '.join(sigs) if sigs else '无信号'}")
 
         bt = p.get('backtest', {})
         if bt:
             parts.append("\n## 回测参考 (" + bt.get('source') + ")")
-            parts.append(f"- 样本: {bt.get('samples')}个 周期: {bt.get('period')}""")
-            parts.append(f"- 5日胜率: {bt.get('win5d')}% 中位: {bt.get('med5d')}%""")
-            parts.append(f"- 10日胜率: {bt.get('win10d')}% 中位: {bt.get('med10d')}%""")
+            parts.append(f"- 样本: {bt.get('samples')}个 周期: {bt.get('period')}")
+            parts.append(f"- 5日胜率: {bt.get('win5d')}% 中位: {bt.get('med5d')}%")
+            parts.append(f"- 10日胜率: {bt.get('win10d')}% 中位: {bt.get('med10d')}%")
             if bt.get('kelly_p'):
                 kelly_f = bt['kelly_p'] * bt.get('kelly_b', 1) - (1-bt['kelly_p'])
                 kelly_f = kelly_f / bt.get('kelly_b', 1) if bt.get('kelly_b') else 0
-                parts.append(f"- 凯利仓位参考(1/4): {round(max(0,kelly_f)*25,1)}% (p={bt['kelly_p']} b={bt.get('kelly_b')})""")
+                parts.append(f"- 凯利仓位参考(1/4): {round(max(0,kelly_f)*25,1)}% (p={bt['kelly_p']} b={bt.get('kelly_b')})")
 
         parts.append("\n---")
-        parts.append("你是欧奈尔交易顾问。请基于以上全维度数据，用通俗人话给出分析。要求：""")
-        parts.append(f"1. 直接给买入结论（买入/谨慎/观望/不买），讲清楚核心理由，不要绕弯子""")
-        parts.append(f"2. 仓位建议（参考凯利上限 + 实际建议，单笔亏损 ≤ 账户2%）""")
-        parts.append(f"3. 持有建议（止损位基于H/L结构或8%固定止损、止盈位看H点前高、持有时长建议）""")
-        parts.append(f"4. 用Markdown格式，重点加粗""")
+        parts.append("## 分析要求（务必遵守）")
+        parts.append("1. 请按收到的数据，真实、客观地对是否可以买入股票进行评估，既不夸大，也不要过于谨慎小心。没有人要求你百发百中，但要求你专业认真。")
+        parts.append("2. 直接给买入结论（推荐买入/谨慎买入/观望/不建议），讲清楚核心理由，不要绕弯子。")
+        parts.append("3. 如需引用价格、涨跌幅、成交量等数据，只能使用上面「近10日K线」表格中提供的实际数据，严禁凭空编造数字。")
+        parts.append("4. 仓位建议：参考凯利上限，实际建议单笔亏损不超过账户2%。")
+        parts.append("5. 持有建议：止损位基于H/L结构或8%固定止损，止盈位看H点前高。")
+        parts.append("6. I(机构认同)维度因散户数据限制存在失真可能，分析时对此维度保持审慎，勿将其作为核心判断依据。")
+        parts.append("7. 用Markdown格式输出，重点加粗。")
 
         return '\n'.join(parts)
     def _text_to_html(self, stock_code, info, text, run_date):

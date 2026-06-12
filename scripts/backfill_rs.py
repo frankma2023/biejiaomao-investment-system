@@ -61,7 +61,7 @@ def main():
     conn.close()
     print(f"\n完成! {total_dates}天, {written}条记录")
     print("现在可以跑口袋支点回填了:")
-    print(f"  python scripts/backfill_pocket_pivot_v3.py --start {args.start} --end {args.end} --incremental --workers 4")
+    print(f"python scripts/backfill_pocket_pivot_v3.py --start {args.start} --end {args.end} --incremental --workers 4")
 
 if __name__ == '__main__':
     main()

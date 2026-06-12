@@ -735,7 +735,7 @@ RPS120：{rs_data.get('rps_120','—')}，RPS250：{rs_data.get('rps_250','—')
 
     # 3. 调用 DeepSeek CLI（直接用 exe，避免 cmd 包装的参数截断）
     import subprocess, os
-    DEEPSEEK_EXE = r'D:\dstui\deepseek-tui-windows-x64.exe'
+    DEEPSEEK_EXE = r'D:\dstui\codewhale-tui-windows-x64.exe'
 
     prompt = f"""你是欧奈尔交易顾问。请根据以下股票数据，用欧奈尔方法论进行买入决策十二问分析，写一篇连贯的分析文章（不要表格，要叙事风格），引用欧奈尔名言，最后给出综合结论。
 
@@ -745,7 +745,7 @@ RPS120：{rs_data.get('rps_120','—')}，RPS250：{rs_data.get('rps_250','—')
 
     try:
         result = subprocess.run(
-            [DEEPSEEK_EXE, '-p', prompt],
+            [DEEPSEEK_EXE, 'exec', prompt],
             capture_output=True, text=True, timeout=120, encoding='utf-8', errors='replace',
             cwd=r'D:\dstui', shell=False
         )
@@ -863,7 +863,7 @@ AD线斜率20日：{rs_data.get('ad_slope_20d','—')}
 
     # 调用 DeepSeek CLI
     import subprocess, os
-    DEEPSEEK_EXE = r'D:\dstui\deepseek-tui-windows-x64.exe'
+    DEEPSEEK_EXE = r'D:\dstui\codewhale-tui-windows-x64.exe'
 
     prompt = f"""你是欧奈尔交易顾问。请根据以下指数数据，用欧奈尔方法论进行指数分析，重点评估：
 1. 大盘环境（欧奈尔强调3/4的股票跟随大盘，指数方向至关重要）
@@ -879,7 +879,7 @@ AD线斜率20日：{rs_data.get('ad_slope_20d','—')}
 
     try:
         result = subprocess.run(
-            [DEEPSEEK_EXE, '-p', prompt],
+            [DEEPSEEK_EXE, 'exec', prompt],
             capture_output=True, text=True, timeout=120, encoding='utf-8', errors='replace',
             cwd=r'D:\dstui', shell=False
         )

@@ -365,6 +365,19 @@ def detect_all(
     }
 
 
+def detect(
+    daily: List[Dict],
+    params: Optional[Dict] = None,
+    stock_code: str = '',
+) -> List[Dict]:
+    """引擎注册标准接口。调用 detect_all 并提取 all_signals 列表。"""
+    result = detect_all(daily, params, stock_code)
+    signals = result.get('all_signals', [])
+    for s in signals:
+        s['type'] = 'bearish'
+    return signals
+
+
 # ─── CLI ───────────────────────────────────────────────
 
 if __name__ == '__main__':

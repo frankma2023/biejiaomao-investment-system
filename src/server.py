@@ -3686,11 +3686,11 @@ def api_cockpit_oneil_deep():
 
     # 调用 DeepSeek CLI
     import subprocess, os
-    DEEPSEEK_EXE = r'D:\dstui\deepseek-tui-windows-x64.exe'
+    DEEPSEEK_EXE = r'D:\dstui\codewhale-tui-windows-x64.exe'
 
     try:
         result = subprocess.run(
-            [DEEPSEEK_EXE, '-p', full_prompt],
+            [DEEPSEEK_EXE, 'exec', full_prompt],
             capture_output=True, text=True, timeout=180, encoding='utf-8', errors='replace',
             cwd=r'D:\dstui', shell=False
         )

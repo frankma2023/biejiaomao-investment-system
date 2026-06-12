@@ -569,24 +569,25 @@ def run_pipeline(target_date=None, config=None, db=None, save=False):
     return enriched, stats
 
 
-def _generate_oneil_deep(db, stock_code, stock_name, run_date, briefing_engine):
+def _generate_oneil_deep(db, stock_code, stock_name, signal_date, run_date, briefing_engine):
     """调用 DeepSeek CLI 预生成深度分析报告"""
     import subprocess
     from cockpit.oneil_deep import ONeilDeepAnalyzer
 
     analyzer = ONeilDeepAnalyzer(db)
-    candidate = {'stock_code': stock_code, 'stock_name': stock_name}
+    candidate = {'stock_code': stock_code, 'stock_name': stock_name, 'signal_date': signal_date}
     stock_info = analyzer._build_rich_profile(stock_code, candidate)
     market_info = briefing_engine._module_market()
     prompt = analyzer._build_rich_prompt(stock_code, stock_info)
 
     skill = analyzer._load_skill()
     full_prompt = f"""你是欧奈尔交易顾问，严格遵循《像欧奈尔信徒一样交易》框架。
-请根据以下股票全维度数据，写一篇连贯的深度分析文章（1000字以上）。
-叙事风格，像一位严师在跟你对话，引用欧奈尔名言。
-最后给出明确的综合结论（推荐买入/谨慎买入/观望/不建议）。
 
-{skill[:2000]}
+重要背景：
+- 用户是个人散户投资者，无法获取实时的机构持仓数据。CAN SLIM评分中「I(机构认同)」维度可能存在失真，分析时请对此维度保持审慎，勿将其作为核心判断依据。
+- 下面提供的数据（K线价格、涨跌幅、成交量、信号扫描结果）均来自实际数据库，已经过核实。请严格基于这些数据进行分析，严禁凭空编造任何价格数字、涨跌幅或K线形态。
+
+{skill}
 
 ---
 
@@ -595,9 +596,9 @@ def _generate_oneil_deep(db, stock_code, stock_name, run_date, briefing_engine):
 ---
 请用HTML格式输出（h3标题、p段落、blockquote引用名言）。"""
 
-    DEEPSEEK_EXE = r'D:\dstui\deepseek-tui-windows-x64.exe'
+    DEEPSEEK_EXE = r'D:\dstui\codewhale-tui-windows-x64.exe'
     result = subprocess.run(
-        [DEEPSEEK_EXE, '-p', full_prompt],
+        [DEEPSEEK_EXE, 'exec', full_prompt],
         capture_output=True, text=True, timeout=180, encoding='utf-8', errors='replace',
         cwd=r'D:\dstui', shell=False
     )
@@ -671,7 +672,7 @@ def save_candidates(db, run_date, candidates, pool_data=None):
         # 深度分析（管道预生成，DeepSeek CLI）
         if c.get('rank', 99) <= 5:
             try:
-                _generate_oneil_deep(db, code, c.get('stock_name',''), run_date, briefing_engine)
+                _generate_oneil_deep(db, code, c.get('stock_name',''), c.get('signal_date',''), run_date, briefing_engine)
             except Exception as e:
                 print(f"  [oneil_deep] {code} 失败: {e}")
 

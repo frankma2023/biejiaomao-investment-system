@@ -263,72 +263,57 @@ def generate_html(candidates, date_str, elapsed, all_stocks=False):
         )
 
     html = '''<!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN" class="dark">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>每日双强股形态扫描 · 投资手账本</title>
-<link rel="stylesheet" href="../shared/css/theme.css">
-<link rel="stylesheet" href="../shared/css/base.css">
-<link rel="stylesheet" href="../shared/css/xhs-cards.css">
-<link rel="stylesheet" href="../shared/css/components.css">
+<title>每日双强股形态扫描</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
 <style>
-body { font-family: var(--font-display); }
+body { font-family: var(--font-body); background: var(--bg); color: var(--text-primary); }
 .app-container { max-width: 1400px; margin:0 auto; padding:12px 16px; }
-.top-bar { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; background:var(--card-bg); border-radius:18px; margin-bottom:12px; box-shadow:0 1px 6px rgba(0,0,0,0.04); }
-.top-bar h1 { font-size:1.1rem; margin:0; }
-.top-bar .meta { font-size:0.65rem; color:var(--text-tertiary); }
-.table-wrap { background:var(--card-bg); border-radius:18px; padding:10px; box-shadow:0 1px 6px rgba(0,0,0,0.04); overflow-x:auto; }
-table { width:100%; border-collapse:collapse; font-size:0.7rem; table-layout:fixed; }
-#stock-table th:nth-child(1),
-#stock-table th:nth-child(2),
-#stock-table th:nth-child(3),
-#stock-table th:nth-child(4),
-#stock-table th:nth-child(5),
-#stock-table th:nth-child(6),
-#stock-table th:nth-child(7),
-#stock-table th:nth-child(8),
-#stock-table th:nth-child(9) { width:85px; }
-th { padding:8px 8px; text-align:right; font-weight:700; color:var(--text-secondary); font-size:0.6rem; border-bottom:2px solid var(--divider); white-space:nowrap; position:sticky; top:0; background:var(--card-bg); cursor:pointer; }
-th:hover { color:var(--color-accent); }
-td { padding:6px 8px; border-bottom:1px solid var(--divider); white-space:nowrap; text-align:right; }
-tr:hover { background:var(--color-accent-subtle); }
-#stock-table th:nth-child(10) { text-align:center; width:auto; }
-#stock-table td:nth-child(10) { text-align:left; padding-left:10px; width:auto; white-space:normal; }
-.num { font-variant-numeric:tabular-nums; }
-.num span { font-variant-numeric:tabular-nums; }
-.code-link { color:var(--color-accent); font-weight:700; text-decoration:none; }
+.top-bar { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; background:var(--card); border-radius:14px; margin-bottom:12px; border:1px solid var(--border); }
+.top-bar h1 { font-family:var(--font-display); font-size:1.1rem; margin:0; color:var(--text-primary); }
+.top-bar .meta { font-size:0.65rem; color:var(--muted); }
+.table-wrap { background:var(--card); border-radius:14px; padding:10px; border:1px solid var(--border); overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:0.7rem; }
+th { padding:8px 8px; text-align:right; font-weight:700; color:var(--text-secondary); font-size:0.6rem; border-bottom:2px solid var(--border); white-space:nowrap; position:sticky; top:0; background:var(--card); cursor:pointer; }
+th:hover { color:var(--accent); }
+td { padding:6px 8px; border-bottom:1px solid var(--border); white-space:nowrap; text-align:right; }
+tr:hover { background:var(--accent-subtle); }
+.code-link { color:var(--accent); font-weight:700; text-decoration:none; }
 .code-link:hover { text-decoration:underline; }
-.up { color:#E53935; font-weight:700; }
-.down { color:#4CAF50; font-weight:700; }
-.rs-hot { color:#E53935; font-weight:700; }
-.rs-warm { color:#FF9800; font-weight:600; }
+.up { color:#ef4444; font-weight:700; }
+.down { color:#10b981; font-weight:700; }
+.rs-hot { color:#ef4444; font-weight:700; }
+.rs-warm { color:#f59e0b; font-weight:600; }
 .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.58rem; font-weight:700; }
-.ds-double { background:#E8F5E9; color:#2E7D32; border:1px solid #4CAF50; }
-.ds-robust { background:#E3F2FD; color:#1565C0; border:1px solid #2196F3; }
-.ds-burst { background:#FFF3E0; color:#E65100; border:1px solid #FF9800; }
+.ds-double { background:rgba(16,185,129,.1); color:#10b981; }
+.ds-robust { background:rgba(59,130,246,.1); color:#3b82f6; }
+.ds-burst { background:rgba(245,158,11,.1); color:#f59e0b; }
 .sig-text { font-size:0.62rem; color:var(--text-secondary); }
-.sig-none { font-size:0.62rem; color:var(--text-tertiary); }
-.nav-dropdown { position:relative; display:inline-flex; }
-.nav-dropdown-menu { display:none; position:absolute; top:100%; left:0; background:var(--card-bg); border:1px solid var(--divider); border-radius:14px; box-shadow:0 4px 20px rgba(0,0,0,0.08); min-width:150px; padding:6px 0; z-index:200; white-space:nowrap; }
-.nav-dropdown:hover .nav-dropdown-menu { display:block; }
-.nav-dropdown-menu a { display:block; padding:7px 16px; font-size:0.72rem; color:var(--text-secondary); text-decoration:none; }
-.nav-dropdown-menu a:hover { background:var(--color-accent-subtle); color:var(--color-accent); }
-.nav-dropdown-menu a.active { color:var(--color-accent); font-weight:700; }
-.footer { text-align:center; padding:16px; font-size:0.6rem; color:var(--text-tertiary); }
-.filter-bar { display:flex; gap:6px; align-items:center; padding:8px 0; margin-bottom:6px; }
-.filter-bar .filter-label { font-size:0.62rem; font-weight:600; color:var(--text-tertiary); }
-.filter-bar .filter-btn { padding:3px 10px; border:1px solid var(--divider); border-radius:8px; background:var(--card-bg); color:var(--text-secondary); font-size:0.62rem; cursor:pointer; }
-.filter-bar .filter-btn:hover { border-color:var(--color-accent); color:var(--color-accent); }
-.filter-bar .filter-btn.active { background:var(--color-accent); color:#FFF; border-color:var(--color-accent); font-weight:700; }
-.pager-bar { display:flex; gap:6px; align-items:center; padding:6px 0; font-size:0.62rem; color:var(--text-secondary); }
-.pager-bar .pager-info { margin-right:8px; color:var(--text-tertiary); }
-.pager-bar .pager-btn { padding:2px 8px; border:1px solid var(--divider); border-radius:6px; background:var(--card-bg); color:var(--text-secondary); cursor:pointer; font-size:0.6rem; }
-.pager-bar .pager-btn:hover { border-color:var(--color-accent); color:var(--color-accent); }
+.sig-none { font-size:0.62rem; color:var(--muted); }
+.footer { text-align:center; padding:16px; font-size:0.6rem; color:var(--muted); }
+.filter-bar { display:flex; gap:6px; align-items:center; padding:8px 0; margin-bottom:6px; flex-wrap:wrap; }
+.filter-bar .filter-label { font-size:0.62rem; font-weight:600; color:var(--muted); }
+.filter-bar .filter-btn { padding:3px 10px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--text-secondary); cursor:pointer; font-size:0.6rem; font-family:var(--font-body); }
+.filter-bar .filter-btn:hover { border-color:var(--accent); color:var(--accent); }
+.filter-bar .filter-btn.active { background:var(--accent); color:#FFF; border-color:var(--accent); }
+.pager-bar { display:flex; gap:6px; align-items:center; padding:6px 0; font-size:0.62rem; color:var(--text-secondary); flex-wrap:wrap; }
+.pager-bar .pager-info { margin-right:8px; color:var(--muted); }
+.pager-bar .pager-btn { padding:2px 8px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text-secondary); cursor:pointer; font-size:0.6rem; }
+.pager-bar .pager-btn:hover { border-color:var(--accent); color:var(--accent); }
 .pager-bar .pager-btn:disabled { opacity:0.3; cursor:default; }
 .pager-bar .pager-cur { font-weight:700; min-width:50px; text-align:center; }
-.pager-bar .pager-label { font-size:0.58rem; color:var(--text-tertiary); }
-.pager-bar .pager-size { padding:2px 4px; border:1px solid var(--divider); border-radius:6px; background:var(--card-bg); color:var(--text-secondary); font-size:0.6rem; }
+.pager-bar .pager-label { font-size:0.58rem; color:var(--muted); }
+.pager-bar .pager-size { padding:2px 4px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text-secondary); font-size:0.6rem; }
+html[data-theme="light"] .top-bar { background:rgba(255,255,255,.75); }
+html[data-theme="light"] .table-wrap { background:rgba(255,255,255,.75); }
+html[data-theme="light"] th { background:rgba(255,255,255,.75); }
 </style>
 </head>
 <body>
@@ -337,7 +322,7 @@ tr:hover { background:var(--color-accent-subtle); }
 
 <div class="top-bar">
   <div>
-    <h1>📋 ''' + title + ''' <span style="font-size:0.65rem;font-weight:400;color:var(--text-tertiary)">''' + subtitle + '''</span></h1>
+    <h1>📋 ''' + title + ''' <span style="font-size:0.65rem;font-weight:400;color:var(--muted)">''' + subtitle + '''</span></h1>
   </div>
   <div class="meta">
     扫描日期: ''' + date_str + ''' | 股票数: ''' + str(len(candidates)) + ''' | 耗时: ''' + str(round(elapsed, 1)) + '''s | 生成: ''' + now + '''
@@ -558,7 +543,9 @@ initPage();
 sortTable(4); sortDir = -1; sortTable(4);
 </script>
   <script src="../shared/js/nav.js"></script>
-  <script>Nav.init({brandIcon:'📋',brandText:'全市场形态扫描',currentPage:'daily-pattern-scan'})</script>
+  <script>Nav.init({brandIcon:'📋',brandText:'形态扫描',currentPage:'daily-pattern-scan'});
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();</script>
 </body>
 </html>'''
 

@@ -509,7 +509,15 @@ async function openOneilReport(code, date) {
     var resp = await fetch('/api/cockpit/oneil-report?code=' + code + '&date=' + date);
     if (resp.ok) {
       var html = await resp.text();
-      content.innerHTML = html;
+      // 用iframe隔离，防止报告中未scoped的CSS污染驾驶舱页面
+      var oldIframe = content.querySelector('iframe');
+      if (oldIframe) oldIframe.remove();
+      var iframe = document.createElement('iframe');
+      iframe.style.cssText = 'width:100%;min-height:70vh;border:none;background:#111118';
+      content.appendChild(iframe);
+      iframe.contentDocument.open();
+      iframe.contentDocument.write(html);
+      iframe.contentDocument.close();
       return;
     }
   } catch(e) {}
