@@ -105,7 +105,24 @@ class ONeilDeepAnalyzer:
         p['name'] = p['name'] or (row['name'] if row else code)
         # 行业
         ind = db.execute("SELECT industry_name FROM stock_industry WHERE stock_code=? LIMIT 1", (code,)).fetchone()
-        p['industry'] = ind['industry_name'] if ind else ''; obs_ind = db.execute('SELECT industry_name FROM discipline_observation_pool WHERE stock_code=? ORDER BY date DESC LIMIT 1', (code,)).fetchone(); p['industry'] = p['industry'] or (obs_ind['industry_name'] if obs_ind else '未知')
+        p['industry'] = ind['industry_name'] if ind else ''; obs_ind = db.execute('SELECT industry_name FROM discipline_observation_pool WHERE stock_code=? ORDER BY date DESC LIMIT 1', (code,)).fetchone()
+        p['industry'] = p['industry'] or (obs_ind['industry_name'] if obs_ind else '')
+        # 3. index_constituents → index_style.yaml 反查L1行业名
+        if not p['industry']:
+            try:
+                import yaml as _yaml2
+                ic_codes = [r['index_code'] for r in db.execute('SELECT DISTINCT index_code FROM index_constituents WHERE stock_code=?', (code,)).fetchall()]
+                ypath2 = os.path.join(PROJECT_ROOT, 'config', 'index_style.yaml')
+                if os.path.exists(ypath2) and ic_codes:
+                    with open(ypath2, encoding='utf-8') as f2: idx_data = _yaml2.safe_load(f2)
+                    for cat_name, items in idx_data.get('categories', {}).items():
+                        for item in items:
+                            if item['code'] in ic_codes and cat_name in ('sector_l1', 'sector_l2'):
+                                p['industry'] = item['name']
+                                break
+                        if p['industry']: break
+            except: pass
+        if not p['industry']: p['industry'] = '未知'
         # 市值 (from pysnowball or market_cap_snapshot)
         try:
             from cockpit.sentiment import SentimentEngine
