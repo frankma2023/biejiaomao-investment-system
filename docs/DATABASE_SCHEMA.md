@@ -372,7 +372,7 @@
 **数据来源**：理杏仁指数成分股API  
 **写入脚本**：`scripts/fetch_index_constituents.py --constituents-only`  
 **读取场景**：
-- 行业RS v3.0：构建 `{stock_code: industry_index_code}` 映射
+- **行业RS映射（MW信号用）**：`mw_signal.py` 查此表获取股票归属的 L2/L1 指数代码 → 查 `index_rs_daily` 取该指数 `rs_250` → 选最高值作为行业 RS
 - 内部共振验证：获取行业成分股列表
 - `DataFetcher.load_constituents()` 和 `DataFetcher.load_constituent_rs_median()`
 
@@ -422,6 +422,48 @@
 - 行业RS v3.0：`DataFetcher.load_constituent_rs_median()` 聚合为行业RS中位数
 - CSV 导出：`output/rs_daily_YYYYMMDD.csv` + `output/double_strong_YYYYMMDD.csv`
 - Web 看板 API
+
+> ✅ 2026-06-12: 已补齐 2016 年数据，现覆盖 2016-01-04 ~ 2026-06-11（1866 个交易日，~445 万行）
+
+---
+
+## 17b. stock_rs_daily — 个股RS每日结果（新版宽表）
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| stock_code | TEXT | **PK(1)** |
+| date | TEXT | **PK(2)** |
+| close / adj_close | REAL | 收盘价 / 复权收盘价 |
+| ret_20 / ret_60 / ret_120 / ret_250 | REAL | 各周期收益率(%) |
+| rps_20 / rps_60 / rps_120 / rps_250 | REAL | 各周期RPS排名(0~99) |
+| rs_line | REAL | RS线（归一化值） |
+| amount | REAL | 成交额 |
+
+**数据量**：~445 万行（2016-01-04 ~ 2026-06-11，1866 个交易日）  
+**写入脚本**：`scripts/backfill_rs.py`（批量） `src/scanners/stock_rs.py`（每日）  
+**读取场景**：MW 信号 H 点 RS 取值、口袋支点 RS 过滤、CAN SLIM L 维度评分
+
+---
+
+## 17c. index_rs_daily — 指数RS每日结果
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| stock_code | TEXT | **PK(1)**，指数代码（如 000988=全指工业） |
+| date | TEXT | **PK(2)** |
+| close | REAL | 收盘价 |
+| ret_20 / ret_60 / ret_120 / ret_250 | REAL | 各周期收益率(%) |
+| rs_20 / rs_60 / rs_120 / rs_250 | INTEGER | 各周期RS排名（分类内百分位，0~99） |
+| ma50 / ma150 / ma200 | REAL | 均线值 |
+| ad_line | REAL | A/D 线累计值 |
+| ad_slope_20d | REAL | A/D 线 20 日斜率 |
+
+**数据量**：~100 万行（2016-01-01 ~ 2026-06-11，2730 个交易日，408 个指数）  
+**数据来源**：`config/index_style.yaml`，含 5 大分类（market/sector_l1/sector_l2/thematic/strategy）  
+**写入脚本**：`scripts/backfill_index_rs.py`（批量） `src/scanners/index_rs.py`（每日）  
+**读取场景**：
+- **MW 信号行业 RS 映射**：查 `index_constituents` 获取股票归属的 L2/L1 指数 → 取该指数 `rs_250` 最高值 → 写入 `mw_signal_daily.ind_rs250`
+- 最强指数筛选、指数看板
 
 ---
 
@@ -1483,19 +1525,25 @@
 | 55 | discipline_rules_config | 少量 | 规则配置 |
 | 56 | discipline_alerts | 少量 | 告警记录 |
 | 57 | discipline_daily_snapshots | 少量 | 持仓日快照 |
+| 57 | pocket_pivot_daily | ~11,867 | 口袋支点（V1/V3, engine_version） |
+| 58 | index_rs_daily | ~1,003,189 | 指数RS（408指数, 2016~今） |
+| 59 | (market_breakout_v2_daily) | 待建 | 基部突破V2（PRD已定） |
 
 ---
 
-## 数据库统计（2026-05-21）
+## 数据库统计（2026-06-12）
 
 | 指标 | 数值 |
 |------|------|
-| 总表数 | 56 |
+| 总表数 | 58（+2 新增） |
 | 最大表 | fundamental_indicator (~1.25亿行) |
 | K线数据 | daily_kline ~1794万 + weekly_kline ~222万 |
-| RS数据 | rs_daily ~527万 |
+| RS数据 | rs_daily ~527万 + stock_rs_daily ~445万 + index_rs_daily ~100万 |
 | 指数K线 | index_daily_kline ~142万 |
-| MW信号 | mw_signal_daily ~2367条 |
+| MW信号 | mw_signal_daily ~2610条 |
+| 形态扫描 | pattern_scan_signals ~29.7万行（17引擎） |
+| 缠论缓存 | chanlun_scan_daily ~16.5万行（回填中，目标750万） |
+| DB文件大小 | ~42GB（含新增 RS 和缠论数据） |
 
 ---
 
@@ -1589,11 +1637,26 @@ PLUS：总分≥65
 |--------|------|------|
 | stock_code | TEXT | **PK(1)** |
 | date | TEXT | **PK(2)** |
-| signals_json | TEXT | 信号JSON（source/type/details） |
+| signals_json | TEXT | 信号JSON数组，每条含 `source`（引擎名）/ `type`（bullish/bearish）/ `details` |
 
-**数据量**：~3500条/日  
-**写入脚本**：`scripts/daily_pattern_scan.py`  
-**读取场景**：MW信号共振评分
+**已注册引擎（17个）**：
+
+| 类别 | 引擎 | source |
+|------|------|------|
+| 买入-突破 | 基部突破 V1/V2 | `base_breakout`, `base_breakout_v2` |
+| 买入-形态 | 口袋支点 V1/V3 | `pocket_pivot`, `pocket_pivot_v3` |
+| 买入-形态 | 杯柄/双底/平底/碟形 | `cup_handle`, `double_bottom`, `flat_base`, `saucer_base` |
+| 买入-K线 | CDL形态（吞没/锤子等） | `cdl` |
+| 买入-指标 | TA-Lib 指标 | `talib` |
+| 买入-信号 | MW B1/B2 | `mw_signal` |
+| 卖出-形态 | 头肩顶/双重顶/三重顶 | `top_pattern` |
+| 卖出-形态 | 高潮见顶 | `climax_top` |
+| 卖出-形态 | 铁轨线 | `railroad_tracks` |
+| 卖出-指标 | 量价背离 | `volume_divergence` |
+| 卖出-失败 | 基部突破失败 | `breakout_failure` |
+| 卖出-大盘 | 抛盘日 | `distribution_day` |
+
+> ✅ 2026-06-12: `railroad_tracks` 引擎已修复 `detect()` 注册和 `type=bearish` 字段，`climax_top` 已确认正常工作（条件严格，100只中约5只有信号）
 | 指数成分 | constituents ~62万 + weightings ~119万 |
 | 财务数据 | quarterly ~16万 + annual ~5.7万 + financial_statement ~2.8万 |
 | CANSLIM | quarterly_eps ~9.8万 + annual_eps ~1.8万 |

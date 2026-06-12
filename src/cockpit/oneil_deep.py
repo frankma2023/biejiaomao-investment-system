@@ -165,10 +165,25 @@ class ONeilDeepAnalyzer:
         rs = db.execute("SELECT rps_20, rps_60, rps_120, rps_250 FROM stock_rs_daily WHERE stock_code=? ORDER BY date DESC LIMIT 1", (code,)).fetchone()
         if rs: p['rs'] = {'rps20': rs['rps_20'], 'rps60': rs['rps_60'], 'rps120': rs['rps_120'], 'rps250': rs['rps_250']}
 
-        # 6. 行业RS
+        # 6. 行业RS：通过 index_constituents 映射到中证行业指数
         mw_ind = db.execute("SELECT ind_rs250, ind_name FROM mw_signal_daily WHERE stock_code=? AND ind_rs250 IS NOT NULL ORDER BY b2_date DESC LIMIT 1", (code,)).fetchone()
-        if mw_ind: p['ind_rs250'] = mw_ind['ind_rs250']; p['ind_name'] = mw_ind['ind_name']
-        # 无MW行业映射时不做近似填充，个股RS≠行业RS
+        if mw_ind:
+            p['ind_rs250'] = mw_ind['ind_rs250']; p['ind_name'] = mw_ind['ind_name']
+        else:
+            # MW无行业RS时，从 index_constituents → index_rs_daily 取最强行业RS
+            try:
+                ic = db.execute("SELECT DISTINCT index_code FROM index_constituents WHERE stock_code=?", (code,)).fetchall()
+                if ic:
+                    idx_codes = [r['index_code'] for r in ic]
+                    # 取最新日期的行业RS
+                    latest_rs = db.execute("SELECT MAX(date) FROM index_rs_daily").fetchone()
+                    if latest_rs and latest_rs[0]:
+                        placeholders = ','.join(['?']*len(idx_codes))
+                        rs_rows = db.execute(f"SELECT stock_code, rs_250 FROM index_rs_daily WHERE stock_code IN ({placeholders}) AND date=?", idx_codes + [latest_rs[0]]).fetchall()
+                        if rs_rows:
+                            best = max(rs_rows, key=lambda r: r['rs_250'] or 0)
+                            p['ind_rs250'] = best['rs_250']; p['ind_name'] = best['stock_code']
+            except: pass
 
         # 7. CAN SLIM 评分
         cs = db.execute("""
