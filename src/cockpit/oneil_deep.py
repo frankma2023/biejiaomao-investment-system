@@ -347,6 +347,23 @@ class ONeilDeepAnalyzer:
         parts.append(f"- 全市场成交额: 5日均{p.get('index_amount_avg5d','?')}亿 10日{p.get('index_amount_avg10d','?')}亿 趋势:{p.get('index_amount_trend','?')}")
         parts.append(f"- 中证全指: {p.get('index_close','?')} MA50:{p.get('index_ma50','?')}({p.get('index_vs_ma50','?')}%) MA200:{p.get('index_ma250','?')}({p.get('index_vs_ma250','?')}%)")
 
+        # 4. 主要指数近10日收盘
+        mi = p.get('major_indices', {})
+        if mi:
+            parts.append("\n## 主要指数近10日收盘")
+            # Build a compact table: dates as columns, indices as rows
+            all_dates = set()
+            for idx_data in mi.values():
+                all_dates.update(idx_data.keys())
+            all_dates = sorted(all_dates)[-5:]  # last 5 dates for compact display
+            if all_dates:
+                header = "| 指数 | " + " | ".join(d[-5:] for d in all_dates) + " |"
+                parts.append(header)
+                parts.append("|---" * (len(all_dates) + 1) + "|")
+                for iname, idata in mi.items():
+                    vals = [f"{idata.get(d, '-')}" for d in all_dates]
+                    parts.append(f"| {iname} | " + " | ".join(vals) + " |")
+
         parts.append("\n## 个股技术面")
         rs = p.get('rs', {})
         if rs: parts.append(f"- RS强度: RPS20={rs.get('rps20')} RPS60={rs.get('rps60')} RPS120={rs.get('rps120')} RPS250={rs.get('rps250')}")
