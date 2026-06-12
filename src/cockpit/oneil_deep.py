@@ -428,7 +428,26 @@ class ONeilDeepAnalyzer:
         parts.append("6. I(机构认同)维度因散户数据限制存在失真可能，分析时对此维度保持审慎，勿将其作为核心判断依据。")
         parts.append("7. 用Markdown格式输出，重点加粗。")
 
-        return '\n'.join(parts)
+        # ═══ 完整性自检：每项对应PRD一个检查点，遗漏时打印告警 ═══
+        checklist = {
+            '股票概况-代码': '代码:', '股票概况-行业': '行业:', '股票概况-市值': '市值:',
+            'CANSLIM-总分': 'CAN SLIM 评分', 'CANSLIM-I免责': 'I(机构认同)',
+            '大盘-健康分': '健康分:', '大盘-新高新低': '新高新低比:',
+            '大盘-成交额': '全市场成交额:', '大盘-中证全指': '中证全指:',
+            '大盘-抛盘日': '抛盘日:',
+            '主要指数': '主要指数近10日',
+            'RS强度': 'RS强度:', '行业RS': '行业RS250:',
+            '均线': '均线:', '延伸风险': '延伸风险:', '成交量': '成交量:',
+            'H/L结构': 'H/L结构:',
+            '近10日K线': '近10日K线',
+            '买入信号': '买入信号', '卖出信号': '卖出信号',
+            '回测参考': '回测参考', '分析要求': '分析要求',
+        }
+        prompt_text = '\n'.join(parts)
+        missing = [k for k, v in checklist.items() if v not in prompt_text]
+        if missing:
+            print(f"  [prompt] ⚠️ {stock_code} 遗漏: {', '.join(missing)}")
+        return prompt_text
     def _text_to_html(self, stock_code, info, text, run_date):
         """将 Markdown 分析文本转为完整 HTML 页面"""
         name = info.get('name', stock_code)
