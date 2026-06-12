@@ -381,23 +381,24 @@ def scan_date(scan_date):
 
 
 def save_to_db(signals):
-    db = sqlite3.connect(DB_PATH, timeout=30)  # 30秒超时，防止并发写冲突; cur = db.cursor()
+    db = sqlite3.connect(DB_PATH, timeout=30)
+    cur = db.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS pocket_pivot_daily (
         id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL, stock_code TEXT NOT NULL,
-        stock_name TEXT, pivot_type TEXT, b1_overlap INTEGER,
+        stock_name TEXT, engine_version TEXT DEFAULT 'V1', pivot_type TEXT, b1_overlap INTEGER,
         h_date TEXT, l_date TEXT, c_days INTEGER,
         gain_pct REAL, vol_ratio REAL, close_position REAL,
         rps_20 INTEGER, rps_250 INTEGER, sma10 REAL, sma60 REAL,
         pct_from_ma10 REAL, base_depth REAL,
         close REAL, volume INTEGER,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(date, stock_code))""")
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(date, stock_code, engine_version))""")
     for s in signals:
         cur.execute("""INSERT OR REPLACE INTO pocket_pivot_daily
-            (date,stock_code,stock_name,pivot_type,b1_overlap,h_date,l_date,c_days,
+            (date,stock_code,stock_name,engine_version,pivot_type,b1_overlap,h_date,l_date,c_days,
              gain_pct,vol_ratio,close_position,rps_20,rps_250,sma10,sma60,
              pct_from_ma10,base_depth,close,volume)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (s['date'],s['stock_code'],s.get('stock_name',''),s['pivot_type'],
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (s['date'],s['stock_code'],s.get('stock_name',''),'V3',s['pivot_type'],
              int(s.get('b1_overlap',False)),s.get('h_date'),s.get('l_date'),
              s.get('c_days',0),s['gain_pct'],s['vol_ratio'],s['close_position'],
              s['rps_20'],s['rps_250'],s['sma10'],s['sma60'],

@@ -1,0 +1,70 @@
+{
+  "obs_date": "2026-06-12",
+  "pool_size": 434,
+  "run_date": "2026-06-12",
+  "signals": [],
+  "signals_raw": [],
+  "oneil_signals": [],
+  "stats": {
+    "chanlun": {
+      "5d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      }
+    },
+    "full_basket": {
+      "5d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      }
+    },
+    "oneil_advanced": {
+      "5d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      },
+      "10d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      },
+      "20d": {
+        "avg": 0,
+        "win": 0,
+        "n": 0
+      }
+    }
+  },
+  "by_type": {},
+  "by_confidence": {},
+  "market_context": {
+    "oneil_phase": null,
+    "nh_nl_status": null,
+    "trend": "空头排列",
+    "strongest_index_rs": "动量强劲"
+  },
+  "filtered": true
+}

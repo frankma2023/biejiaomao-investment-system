@@ -113,7 +113,7 @@ def save_day_results(db_path, scan_date, results):
 
 
 def get_candidates(date):
-    """获取当天可扫描的股票列表（跳过上市不足60天的新股）"""
+    """获取当天可扫描的股票列表"""
     db = sqlite3.connect(DB)
     db.row_factory = sqlite3.Row
     stocks = db.execute("""
@@ -121,12 +121,7 @@ def get_candidates(date):
         FROM daily_kline k JOIN stock_basic b ON k.stock_code=b.stock_code
         WHERE b.listing_status='normally_listed' AND b.name NOT LIKE '%ST%'
         AND k.date=?
-        AND k.stock_code IN (
-            SELECT stock_code FROM daily_kline
-            WHERE date <= ? AND date >= date(?, '-60 days')
-            GROUP BY stock_code HAVING COUNT(*) >= 40
-        )
-    """, (date, date, date)).fetchall()
+    """, (date,)).fetchall()
     db.close()
     return [(r['stock_code'], r['name']) for r in stocks]
 

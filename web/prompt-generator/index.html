@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Prompt 生成器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<style>
+body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)}
+.app-container{max-width:1000px;margin:0 auto;padding:12px 16px}
+.page-header{margin-bottom:10px}
+.page-header h1{font-family:var(--font-display);font-size:1.2rem;font-weight:400;color:var(--text-primary)}
+.input-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.input-row input{padding:8px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text-primary);font-size:.8rem;font-family:var(--font-mono);width:140px;outline:none}
+.input-row input:focus{border-color:var(--accent)}
+.input-row .btn{padding:8px 18px;border-radius:10px;font-size:.75rem;font-weight:600;cursor:pointer;font-family:var(--font-body);border:none;transition:all .2s}
+.btn-gen{background:var(--accent);color:#fff}
+.btn-gen:hover{opacity:.9}
+.btn-copy{background:var(--card);color:var(--text-secondary);border:1px solid var(--border)!important}
+.btn-copy:hover{border-color:var(--accent)!important;color:var(--accent)}
+.btn-ai{background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.25)!important}
+.btn-ai:hover{background:rgba(16,185,129,.25)}
+.btn-ai:disabled{opacity:.5;cursor:not-allowed}
+.meta{font-size:.62rem;color:var(--muted);margin-bottom:8px}
+.prompt-box{background:#111118;border:1px solid #2a2a35;border-radius:12px;padding:20px 24px;font-family:'JetBrains Mono',monospace;font-size:.68rem;line-height:1.7;color:#c9d1d9;white-space:pre-wrap;max-height:60vh;overflow-y:auto;min-height:200px}
+.result-box{background:#111118;border:1px solid #2a2a35;border-radius:12px;padding:20px 24px;margin-top:10px;font-size:.75rem;line-height:1.8;color:#d4d4d8;max-height:50vh;overflow-y:auto}
+.result-box h2,h3{color:#f59e0b}
+.result-box strong{color:#fbbf24}
+.result-box blockquote{border-left:3px solid #f59e0b;padding-left:12px;color:#a1a1aa}
+.empty{text-align:center;padding:60px;color:var(--muted);font-family:var(--font-display)}
+.loading{text-align:center;padding:40px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="app-container">
+<nav id="top-nav"></nav>
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'🔮',brandText:'Prompt',currentPage:'prompt-generator'})</script>
+
+<div class="page-header"><h1>🔮 Prompt 生成器</h1></div>
+
+<div class="input-row">
+  <input type="text" id="code-input" placeholder="股票代码" value="002046" maxlength="6">
+  <button class="btn btn-gen" onclick="generate()">🔍 生成</button>
+  <span style="font-size:.65rem;color:var(--muted)">信号日期自动取最近5日</span>
+</div>
+<div class="meta" id="meta-info"></div>
+
+<div class="prompt-box" id="prompt-box"><div class="empty">输入股票代码，点击「生成」</div></div>
+
+<div style="margin-top:8px;display:flex;gap:6px">
+  <button class="btn btn-copy" onclick="copyPrompt()" id="btn-copy" disabled>📋 复制</button>
+  <button class="btn btn-ai" onclick="sendToAI()" id="btn-ai" disabled>🧠 发送 DeepSeek 分析</button>
+</div>
+
+<div class="result-box" id="result-box" style="display:none"></div>
+</div>
+
+<script>
+var currentPrompt = '';
+var currentCode = '';
+var currentDate = '';
+
+async function generate() {
+  var code = document.getElementById('code-input').value.trim();
+  if (!code) return;
+  var box = document.getElementById('prompt-box');
+  box.innerHTML = '<div class="loading">⏳ 生成中...</div>';
+  document.getElementById('btn-copy').disabled = true;
+  document.getElementById('btn-ai').disabled = true;
+  document.getElementById('result-box').style.display = 'none';
+  try {
+    var resp = await fetch('/api/prompt-generator?code=' + code);
+    var data = await resp.json();
+    if (data.prompt) {
+      currentPrompt = data.prompt;
+      currentCode = data.code;
+      currentDate = data.date;
+      box.textContent = data.prompt;
+      document.getElementById('meta-info').textContent = data.name + '(' + data.code + ') · 信号日 ' + data.date + ' · ' + data.length + ' 字符';
+      document.getElementById('btn-copy').disabled = false;
+      document.getElementById('btn-ai').disabled = false;
+    } else {
+      box.innerHTML = '<div class="empty">❌ ' + (data.error || '无数据') + '</div>';
+    }
+  } catch(e) {
+    box.innerHTML = '<div class="empty">❌ 请求失败: ' + e.message + '</div>';
+  }
+}
+
+async function copyPrompt() {
+  if (!currentPrompt) return;
+  await navigator.clipboard.writeText(currentPrompt);
+  var btn = document.getElementById('btn-copy');
+  btn.textContent = '✅ 已复制';
+  setTimeout(function(){ btn.textContent = '📋 复制'; }, 2000);
+}
+
+async function sendToAI() {
+  if (!currentPrompt) return;
+  var btn = document.getElementById('btn-ai');
+  btn.disabled = true; btn.textContent = '⏳ 分析中...';
+  var box = document.getElementById('result-box');
+  box.style.display = 'block';
+  box.innerHTML = '<div class="loading">🧠 DeepSeek 正在分析 ' + currentCode + '...<br><span style="font-size:.65rem">约需 30~60 秒</span></div>';
+  try {
+    var resp = await fetch('/api/prompt-generator/analyze', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({prompt: currentPrompt})
+    });
+    var data = await resp.json();
+    box.innerHTML = data.result || '无返回内容';
+  } catch(e) {
+    box.innerHTML = '<div class="empty">❌ 请求失败: ' + e.message + '</div>';
+  }
+  btn.disabled = false; btn.textContent = '🧠 发送 DeepSeek 分析';
+}
+
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+</script>
+</body>
+</html>

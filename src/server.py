@@ -3413,32 +3413,35 @@ def api_mw_signals():
     target_date = request.args.get('date', None)
     start_date = request.args.get('start', None)
     end_date = request.args.get('end', None)
+    signal_type = request.args.get('type', 'b2')  # b1 | b2
+    date_col = 'b1_date' if signal_type == 'b1' else 'b2_date'
     db = get_db()
     
     if start_date and end_date:
         rows = db.execute(
-            "SELECT * FROM mw_signal_daily WHERE b2_date >= ? AND b2_date <= ? ORDER BY b2_date DESC, score DESC",
+            f"SELECT * FROM mw_signal_daily WHERE {date_col} >= ? AND {date_col} <= ? ORDER BY {date_col} DESC, score DESC",
             (start_date, end_date)
         ).fetchall()
     elif target_date:
         rows = db.execute(
-            "SELECT * FROM mw_signal_daily WHERE b2_date=? ORDER BY score DESC", (target_date,)
+            f"SELECT * FROM mw_signal_daily WHERE {date_col}=? ORDER BY score DESC", (target_date,)
         ).fetchall()
     else:
-        row = db.execute("SELECT MAX(b2_date) FROM mw_signal_daily").fetchone()
+        row = db.execute(f"SELECT MAX({date_col}) FROM mw_signal_daily WHERE {date_col} IS NOT NULL").fetchone()
         if not row or not row[0]:
-            return jsonify({'date': None, 'signals': [], 'count': 0, 'dates': []})
+            return jsonify({'date': None, 'signals': [], 'count': 0, 'dates': [], 'type': signal_type})
         target_date = row[0]
         rows = db.execute(
-            "SELECT * FROM mw_signal_daily WHERE b2_date=? ORDER BY score DESC", (target_date,)
+            f"SELECT * FROM mw_signal_daily WHERE {date_col}=? ORDER BY score DESC", (target_date,)
         ).fetchall()
     
     signals = [dict(r) for r in rows]
     
-    # 附加信号共振详情
+    # 附加信号共振详情（B1 查 B1 日，B2 查 B2 日）
     for s in signals:
-        code = s['stock_code']; b2 = s['b2_date']
-        row = db.execute("SELECT signals_json FROM pattern_scan_signals WHERE stock_code=? AND date=?", (code, b2)).fetchone()
+        code = s['stock_code']
+        sig_date = s[date_col]
+        row = db.execute("SELECT signals_json FROM pattern_scan_signals WHERE stock_code=? AND date=?", (code, sig_date)).fetchone()
         s['sig_details'] = []
         if row and row[0]:
             try:
@@ -3453,13 +3456,13 @@ def api_mw_signals():
             except:
                 pass
     
-    # 可用 B2 日期列表
-    avail = db.execute("SELECT DISTINCT b2_date FROM mw_signal_daily ORDER BY b2_date DESC").fetchall()
+    # 可用日期列表
+    avail = db.execute(f"SELECT DISTINCT {date_col} FROM mw_signal_daily WHERE {date_col} IS NOT NULL ORDER BY {date_col} DESC").fetchall()
     dates = [r[0] for r in avail]
     
     return jsonify({
         'date': target_date, 'start': start_date, 'end': end_date,
-        'signals': signals, 'count': len(signals), 'dates': dates
+        'signals': signals, 'count': len(signals), 'dates': dates, 'type': signal_type
     })
 
 
@@ -3633,6 +3636,48 @@ def api_cockpit_briefing():
     return jsonify(briefing)
 
 
+
+
+@app.route('/api/prompt-generator', methods=['GET', 'OPTIONS'])
+def api_prompt_generator():
+    """生成欧奈尔分析 prompt"""
+    if request.method == 'OPTIONS': return '', 204
+    code = request.args.get('code', '')
+    date = request.args.get('date', '')
+    if not code: return jsonify({'error': 'code required'}), 400
+    from cockpit.oneil_deep import ONeilDeepAnalyzer
+    db = get_db()
+    a = ONeilDeepAnalyzer(db)
+    name_row = db.execute("SELECT name FROM stock_basic WHERE stock_code=?", (code,)).fetchone()
+    stock_name = name_row['name'] if name_row else code
+    if not date:
+        mw = db.execute("SELECT b2_date FROM mw_signal_daily WHERE stock_code=? AND b2_date >= date('now','-5 days') ORDER BY b2_date DESC LIMIT 1", (code,)).fetchone()
+        if mw: date = mw['b2_date']
+        else: date = datetime.now().strftime('%Y-%m-%d')
+    info = a._build_rich_profile(code, {'stock_name': stock_name, 'signal_date': date})
+    prompt = a._build_rich_prompt(code, info)
+    return jsonify({'code': code, 'name': stock_name, 'date': date, 'prompt': prompt, 'length': len(prompt)})
+
+
+@app.route('/api/prompt-generator/analyze', methods=['POST', 'OPTIONS'])
+def api_prompt_generator_analyze():
+    """发送 prompt 给 DeepSeek CLI"""
+    if request.method == 'OPTIONS': return '', 204
+    data = request.get_json()
+    if not data or not data.get('prompt'): return jsonify({'error': 'prompt required'}), 400
+    import subprocess
+    DEEPSEEK_EXE = r'D:\dstui\deepseek-tui-windows-x64.exe'
+    try:
+        result = subprocess.run([DEEPSEEK_EXE, '-p', data['prompt']],
+            capture_output=True, text=True, timeout=180, encoding='utf-8', errors='replace',
+            cwd=r'D:\dstui', shell=False)
+        output = result.stdout.strip() or result.stderr.strip()
+        if not output: output = 'AI 未返回内容'
+    except subprocess.TimeoutExpired:
+        output = 'AI 分析超时（180秒）'
+    except Exception as e:
+        output = f'调用失败: {str(e)}'
+    return jsonify({'result': output})
 
 @app.route('/api/cockpit/oneil-deep', methods=['GET', 'OPTIONS'])
 def api_cockpit_oneil_deep():

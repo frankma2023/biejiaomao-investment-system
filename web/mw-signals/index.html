@@ -22,6 +22,12 @@
 .toolbar .btn-sm{font-size:10px;padding:5px 12px;border:1px solid var(--accent-border);border-radius:10px;background:var(--accent-subtle);color:var(--accent);cursor:pointer;font-family:var(--font-body);font-weight:500}
 .toolbar .btn-sm:hover{background:rgba(245,158,11,.18)}
 
+/* Tab 栏 */
+.tab-bar{display:flex;gap:0;margin-bottom:10px;border-bottom:1px solid var(--border)}
+.tab-btn{padding:8px 20px;font-size:.8rem;font-family:var(--font-display);cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;transition:all .2s}
+.tab-btn:hover{color:var(--text-primary)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+
 .signal-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:10px;box-shadow:var(--shadow-card);cursor:pointer;transition:border-color .2s}
 .signal-card:hover{border-color:rgba(245,158,11,.3)}
 .signal-card .top-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
@@ -63,8 +69,13 @@ html[data-theme="light"] .toolbar select,html[data-theme="light"] .toolbar input
   <span class="meta" id="meta-info">加载中...</span>
 </div>
 
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('b1')" id="tab-b1">🔔 B1 突破</button>
+  <button class="tab-btn" onclick="switchTab('b2')" id="tab-b2">B2 确认</button>
+</div>
+
 <div class="toolbar">
-  <span style="font-size:10px;color:var(--muted)">B2日期范围</span>
+  <span style="font-size:10px;color:var(--muted)" id="date-label">B1日期范围</span>
   <input type="date" id="date-start">
   <span style="font-size:10px;color:var(--muted)">~</span>
   <input type="date" id="date-end">
@@ -99,20 +110,26 @@ html[data-theme="light"] .toolbar select,html[data-theme="light"] .toolbar input
 
 <script>
 const API='http://' + window.location.hostname + ':8788';
-var allSignals=[], allDates=[];
+var allSignals=[], allDates=[], currentType='b1';
+
+function switchTab(type){
+  currentType=type;
+  document.getElementById('tab-b1').classList.toggle('active',type==='b1');
+  document.getElementById('tab-b2').classList.toggle('active',type==='b2');
+  document.getElementById('date-label').textContent=(type==='b1'?'B1':'B2')+'日期范围';
+  loadLatest();
+}
 
 async function loadLatest(){
-  // 先静默获取全量数据拿日期列表
-  var r=await fetch(API+'/api/mw/signals');
+  var r=await fetch(API+'/api/mw/signals?type='+currentType);
   var d=await r.json();
   if(d.dates&&d.dates.length){
     var latest=d.dates[0];
     document.getElementById('date-start').value=latest;
     document.getElementById('date-end').value=latest;
-    // 只加载最近一天
-    await loadData('start='+latest+'&end='+latest);
+    await loadData('start='+latest+'&end='+latest+'&type='+currentType);
   }else{
-    document.getElementById('signals').innerHTML='<div class="empty-state">暂无MW信号数据</div>';
+    document.getElementById('signals').innerHTML='<div class="empty-state">暂无'+(currentType==='b1'?'B1':'B2')+'信号数据</div>';
   }
 }
 
@@ -120,7 +137,7 @@ async function queryRange(){
   var s=document.getElementById('date-start').value;
   var e=document.getElementById('date-end').value;
   if(!s||!e) return;
-  await loadData('start='+s+'&end='+e);
+  await loadData('start='+s+'&end='+e+'&type='+currentType);
 }
 
 async function scanRange(){
@@ -139,7 +156,7 @@ async function scanRange(){
     });
     var scanResult=await scanResp.json();
     if(scanResult.error){ el.innerHTML='<div class="empty-state">扫描失败: '+scanResult.error+'</div>'; return; }
-    await loadData('start='+s+'&end='+e);
+    await loadData('start='+s+'&end='+e+'&type='+currentType);
   }catch(err){
     el.innerHTML='<div class="empty-state">扫描失败: '+err.message+'</div>';
   }
@@ -153,7 +170,8 @@ async function loadData(params){
     allDates=d.dates||[];
     var label=d.date||'';
     if(d.start) label=d.start+' ~ '+d.end;
-    document.getElementById('meta-info').textContent='B2日期 '+label+' · '+d.count+'个信号 · 全库共'+allDates.length+'个B2日';
+    var typeLabel=currentType==='b1'?'B1':'B2';
+    document.getElementById('meta-info').textContent=typeLabel+'日期 '+label+' · '+d.count+'个信号 · 全库共'+allDates.length+'个'+typeLabel+'日';
     render();
   }catch(e){
     document.getElementById('signals').innerHTML='<div class="empty-state">加载失败: '+e.message+'</div>';
@@ -204,10 +222,16 @@ function render(){
   el.innerHTML=filtered.map(function(s,i){
     var badgeCls=s.confidence==='高'?'badge-high':s.confidence==='中'?'badge-mid':'badge-low';
     var stars=s.confidence==='高'?'⭐⭐⭐':s.confidence==='中'?'⭐⭐':'⭐';
+    var typeLabel=currentType==='b1'?'B1':'B2';
+    var dateCol=currentType==='b1'?'b1_date':'b2_date';
+    // B1 模式下置信度阈值下调
+    var confMap={'高':'badge-high','中':'badge-mid','低':'badge-low'};
+    var isB1=currentType==='b1';
+    
     return '<div class="signal-card" onclick="toggleExpand('+i+')">'+
       '<div class="top-row">'+
         '<span class="stock-info"><a href="http://localhost:8772/pattern-scan/?code='+s.stock_code+'" target="_blank">'+(s.stock_name||s.stock_code)+'</a><span class="code">'+s.stock_code+'</span></span>'+
-        '<span style="font-size:10px;color:var(--muted)">B2 '+s.b2_date+'</span>'+
+        '<span style="font-size:10px;color:var(--muted)">'+(isB1?'B1 ':'B2 ')+s[dateCol]+'</span>'+
         '<span style="font-size:10px;color:var(--muted)">RS'+(s.h_rs250||'—')+' | '+(s.c_amount_avg?(s.c_amount_avg/10000).toFixed(0)+'万':'—')+'</span>'+
         '<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+' ('+s.score+'分)</span>'+
         (s.is_plus ? '<span class="badge" style="background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.2);margin-left:4px">✦ PLUS</span>' : '') +
@@ -220,32 +244,43 @@ function render(){
         '<span class="node-dot nd-C"></span> C '+s.c_start+'~'+s.c_end+
         ' <span style="color:var(--muted)">→</span> '+
         '<span class="node-dot nd-B1"></span> <b>B1</b> '+s.b1_date+' +'+(s.b1_return_pct||0).toFixed(1)+'%'+
+        (isB1 ? '' :
         ' <span style="color:var(--muted)">→</span> '+
-        '<span class="node-dot nd-B2"></span> <b>B2</b> '+s.b2_date+' +'+(s.b2_return_pct||0).toFixed(1)+'%'+
+        '<span class="node-dot nd-B2"></span> <b>B2</b> '+s.b2_date+' +'+(s.b2_return_pct||0).toFixed(1)+'%')+
       '</div>'+
+      // B1 日共振信号摘要行
+      (isB1 && s.sig_details && s.sig_details.length ?
+        '<div style="font-size:10px;color:var(--accent);margin-top:4px">⚡ 当日共振: '+s.sig_details.map(function(d){return d.source+(d.desc?' '+d.desc:'')}).join(' | ')+'</div>' : '')+
       '<div class="expand" id="exp-'+i+'">'+
         '<table>'+
+          // B2 专属行：仅在 B2 模式显示
+          (isB1 ? '' :
           '<tr><td class="lbl">B2 涨幅</td><td class="val">+'+(s.b2_return_pct||0).toFixed(1)+'%</td>'+
             '<td class="lbl">B2 收盘位</td><td class="val">'+(s.b2_close_pos!=null?s.b2_close_pos+'%':'—')+'</td>'+
             '<td class="lbl">B2 均线</td><td class="val">'+(s.b2_ma_count!=null?s.b2_ma_count+'条':'—')+'</td>'+
-            '<td class="lbl">B2 跳空</td><td class="val">'+(s.b2_is_gap?'是':'否')+'</td></tr>'+
+            '<td class="lbl">B2 跳空</td><td class="val">'+(s.b2_is_gap?'是':'否')+'</td></tr>')+
           '<tr><td class="lbl">B1 涨幅</td><td class="val">+'+(s.b1_return_pct||0).toFixed(1)+'%</td>'+
             '<td class="lbl">B1 量比</td><td class="val">'+(s.b1_vol_ratio!=null?s.b1_vol_ratio:'—')+'</td>'+
             '<td class="lbl">跌幅</td><td class="val">'+(s.decline_pct!=null?(s.decline_pct>0?'+':'')+s.decline_pct.toFixed(1)+'%':'—')+'</td>'+
             '<td class="lbl">横盘振幅</td><td class="val">'+(s.c_amplitude_pct!=null?s.c_amplitude_pct.toFixed(1)+'%':'—')+'</td></tr>'+
-          // 评分明细 (v2.4)
-          '<tr><td class="lbl">H 前高趋势</td><td class="val '+(s.score_h?'sc-ok':'sc-no')+'">'+(s.score_h?'✅ '+s.score_h+'/15 (高点¥'+(s.h_price||0).toFixed(0)+')':'— 0/15 (未在上升趋势)')+'</td>'+
-            '<td class="lbl">D 调整深度</td><td class="val '+(s.score_d?'sc-ok':'sc-no')+'">'+(s.score_d?'✅ '+s.score_d+'/15 (跌幅'+(s.decline_pct||0).toFixed(1)+'%)':'— 0/15 (跌幅'+(s.decline_pct||0).toFixed(1)+'%，需15%~35%)')+'</td></tr>'+
-          '<tr><td class="lbl">C 横盘质量</td><td class="val '+(s.score_c?'sc-ok':'sc-no')+'">'+(s.score_c?'✅ '+s.score_c+'/5 (振幅'+(s.c_amplitude_pct||0).toFixed(1)+'%)':'— 0/5 (振幅'+(s.c_amplitude_pct||0).toFixed(1)+'%，需<10%∧低点抬高)')+'</td>'+
-            '<td class="lbl">P 整理回撤</td><td class="val '+(s.score_p?'sc-ok':'sc-no')+'">'+(s.score_p?'✅ '+s.score_p+'/15 (回撤≥-7%∧缩量)':'— 0/15 (未达标)')+'</td></tr>'+
+          // HDC 评分
+          '<tr><td class="lbl">H 前高趋势</td><td class="val '+(s.score_h?'sc-ok':'sc-no')+'">'+(s.score_h?'✅ '+s.score_h+'/15 (高点¥'+(s.h_price||0).toFixed(0)+')':'— 0/15')+'</td>'+
+            '<td class="lbl">D 调整深度</td><td class="val '+(s.score_d?'sc-ok':'sc-no')+'">'+(s.score_d?'✅ '+s.score_d+'/15 (跌幅'+(s.decline_pct||0).toFixed(1)+'%)':'— 0/15')+'</td></tr>'+
+          '<tr><td class="lbl">C 横盘质量</td><td class="val '+(s.score_c?'sc-ok':'sc-no')+'">'+(s.score_c?'✅ '+s.score_c+'/5 (振幅'+(s.c_amplitude_pct||0).toFixed(1)+'%)':'— 0/5')+'</td>'+
+            // P 仅 B2 显示
+            (isB1 ? '<td class="lbl" colspan="2"></td>' : '<td class="lbl">P 整理回撤</td><td class="val '+(s.score_p?'sc-ok':'sc-no')+'">'+(s.score_p?'✅ '+s.score_p+'/15':'— 0/15')+'</td>')+'</tr>'+
+          // 行业RS
           '<tr style="border-top:1px solid var(--border)"><td class="lbl" colspan="2">'+(s.ind_name?'L2: '+s.ind_code+' '+s.ind_name:'L2指数: '+(s.ind_code||'无L2行业归属'))+'</td>'+
             '<td class="lbl">I-1 行业RS250</td><td class="val '+(s.score_i1?'sc-ok':'sc-no')+'">'+(s.score_i1?'✅ '+s.score_i1+'/15':'— 0/15')+' (RS='+(s.ind_rs250!=null?s.ind_rs250:'—')+')</td></tr>'+
           '<tr><td class="lbl"></td><td class="val"></td>'+
             '<td class="lbl">I-2 个股RS250</td><td class="val '+(s.score_i2?'sc-ok':'sc-no')+'">'+(s.score_i2?'✅ '+s.score_i2+'/15':'— 0/15')+' (RS='+(s.h_rs250!=null?s.h_rs250:'—')+')</td></tr>'+
+          // 共振和跳空
           '<tr><td class="lbl">Sig 信号共振</td><td class="val '+(s.score_sig?'sc-ok':'sc-no')+'">'+(s.score_sig?'✅ '+s.score_sig+'/10':'— 0/10')+'</td>'+
-            '<td class="lbl">Gap 跳空</td><td class="val '+(s.score_gap?'sc-ok':'sc-no')+'">'+(s.score_gap?'✅ '+s.score_gap+'/10 (开盘>前高)':'— 0/10 ('+(s.b2_is_gap?'是':'否')+')')+'</td></tr>'+
+            (isB1 ? '<td class="lbl" colspan="2"></td>' : '<td class="lbl">Gap 跳空</td><td class="val '+(s.score_gap?'sc-ok':'sc-no')+'">'+(s.score_gap?'✅ '+s.score_gap+'/10':'— 0/10')+'</td>')+'</tr>'+
+          // 共振信号详情
           (s.sig_details&&s.sig_details.length?'<tr><td class="lbl" style="font-size:.55rem;color:var(--muted)">共振信号</td><td class="val" colspan="3" style="font-size:.55rem;text-align:left">'+s.sig_details.map(function(d){return '<span style="display:inline-block;background:rgba(245,158,11,.1);padding:1px 6px;border-radius:4px;margin:1px">'+d.source+' '+(d.desc||d.type||'')+'</span>'}).join('')+'</td></tr>':'')+
-          '<tr style="border-top:1px solid var(--border)"><td class="lbl" colspan="4" style="color:var(--accent);font-weight:600">总分: '+s.score+'/100 = 形态'+(s.score_h+s.score_d+s.score_c+s.score_p)+' + 行业'+(s.score_i1||0+s.score_i2||0)+' + 共振'+(s.score_sig||0)+' + 跳空'+(s.score_gap||0)+'</td></tr>'+
+          // 总分
+          '<tr style="border-top:1px solid var(--border)"><td class="lbl" colspan="4" style="color:var(--accent);font-weight:600">总分: '+s.score+'/100 = 形态'+(s.score_h+s.score_d+s.score_c+(isB1?0:s.score_p))+' + 行业'+(s.score_i1||0+s.score_i2||0)+' + 共振'+(s.score_sig||0)+(isB1?'':' + 跳空'+(s.score_gap||0))+'</td></tr>'+
         '</table>'+
         '<div style="margin-top:8px;display:flex;gap:12px">'+
           '<a href="http://localhost:8772/pattern-scan/?code='+s.stock_code+'" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🔍 形态复核 →</a>'+

@@ -65,16 +65,23 @@ DB = os.path.join(os.path.dirname(__file__), '..', 'data', 'lixinger.db')
 
 
 def get_trading_dates(start, end):
-    """获取区间内的交易日列表。
-    以 000001(平安银行) 为参考，取其有交易的日期作为交易日历。"""
+    """获取区间内的交易日列表"""
     db = sqlite3.connect(DB)
     rows = db.execute("""
         SELECT DISTINCT date FROM daily_kline
-        WHERE date >= ? AND date <= ? AND stock_code = '000001'
+        WHERE date >= ? AND date <= ?
         ORDER BY date
     """, (start, end)).fetchall()
     db.close()
     return [r[0] for r in rows]
+
+
+def quarter_to_range(q):
+    import calendar
+    year = int(q[:4]); qnum = int(q[-1])
+    sm = (qnum - 1) * 3 + 1; em = sm + 2
+    ld = calendar.monthrange(year, em)[1]
+    return f"{year}-{sm:02d}-01", f"{year}-{em:02d}-{ld}"
 
 
 def scan_one_day(date):
@@ -120,18 +127,25 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='口袋支点V3 批量补扫 — 多进程版'
     )
-    parser.add_argument('--start', default='2023-06-01',
-                        help='起始日期 YYYY-MM-DD')
-    parser.add_argument('--end', default='2026-06-05',
-                        help='结束日期 YYYY-MM-DD')
+    parser.add_argument('--start', help='起始日期 YYYY-MM-DD')
+    parser.add_argument('--end', help='结束日期 YYYY-MM-DD')
+    parser.add_argument('--quarter', help='按季度运行，如 2016Q1')
     parser.add_argument('--incremental', action='store_true',
                         help='增量模式：跳过已有数据的日期')
     parser.add_argument('--workers', type=int, default=4,
                         help='并行进程数 (默认4，推荐4~8)')
     args = parser.parse_args()
 
+    if args.quarter:
+        start_date, end_date = quarter_to_range(args.quarter)
+    elif args.start and args.end:
+        start_date, end_date = args.start, args.end
+    else:
+        parser.error("需要 --quarter 或 (--start + --end)")
+        sys.exit(1)
+
     # ── 1. 获取交易日列表 ──
-    dates = get_trading_dates(args.start, args.end)
+    dates = get_trading_dates(start_date, end_date)
 
     # ── 2. 增量模式：过滤已有数据的日期 ──
     if args.incremental:
@@ -139,7 +153,7 @@ if __name__ == '__main__':
         # 只查询请求区间内的已有日期
         existing = set(r[0] for r in db.execute(
             "SELECT DISTINCT date FROM pocket_pivot_daily WHERE date >= ? AND date <= ?",
-            (args.start, args.end)
+            (start_date, end_date)
         ).fetchall())
         db.close()
         total_before = len(dates)

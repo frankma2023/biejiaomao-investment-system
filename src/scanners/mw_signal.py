@@ -230,18 +230,10 @@ def scan_stock(klines, scan_date, code=None, conn=None):
 
         b2_idx = i; break
 
-    if b2_idx is None: return False, None
-
-    # ── 检查 B2 必须在扫描日当天或之前,且在最近 N 天内 ──
-    b2_date = dates[b2_idx]
-    scan_dt = datetime.strptime(scan_date, '%Y-%m-%d')
-    b2_dt = datetime.strptime(b2_date, '%Y-%m-%d')
-    if b2_dt > scan_dt:
-        return False, None  # B2 在未来
-    if (scan_dt - b2_dt).days > B2_RECENT_DAYS * 2:
-        return False, None  # B2 太久了
-
-    # ── 6. 辅助评分(形态 H/D/C/P) ──
+    # ── v2.4: B1 可独立保存，不再强制要求 B2 ──
+    # B1 结构完整即可作为独立信号
+    
+    # ── 6. 辅助评分(形态 H/D/C) ── B1 阶段只评 HDC
     # 权重调整：H15 P15 D5 C5（基于回测数据：H+9.1pp, P+6.4pp >> D+4.6pp, C+4.3pp）
     score = {'H': 0, 'D': 0, 'C': 0, 'P': 0}
 
@@ -265,9 +257,9 @@ def scan_stock(klines, scan_date, code=None, conn=None):
     if c_amp < 10 and c_slope > 0:
         score['C'] = 5
 
-    # P: 回撤 ≥ -7% AND 缩量（满分 15）
+    # P: 回撤 ≥ -7% AND 缩量（满分 15）- 仅 B2 存在时计算
     p_vol_avg = 0
-    if b2_idx > b1_idx+1:
+    if b2_idx is not None and b2_idx > b1_idx+1:
         b1_close_val = klines[b1_idx]['close']
         p_dd = 0
         p_vols = []
@@ -353,9 +345,10 @@ def scan_stock(klines, scan_date, code=None, conn=None):
     # ── 8. MA 排列质量评分 — 已移除，替换为 B2 跳空 ──
     # （B2 硬闸已保证站上 MA60，均线排列冗余）
 
-    # ── 8.5 B2 日信号共振评分（10分，累加制）──
+    # ── 8.5 B2 日信号共振评分（10分，累加制，仅 B2 存在时）──
     score_sig = 0
-    if conn and code:
+    if conn and code and b2_idx is not None:
+        b2_date = dates[b2_idx]
         row = conn.execute(
             "SELECT signals_json FROM pattern_scan_signals WHERE date=? AND stock_code=?",
             (b2_date, code)
@@ -368,35 +361,62 @@ def scan_stock(klines, scan_date, code=None, conn=None):
                 for s in (sigs if isinstance(sigs, list) else []):
                     src = s.get('source', '')
                     if src in sources_seen:
-                        continue  # 同 source 去重
+                        continue
                     sources_seen.add(src)
                     if src in ('base_breakout', 'pocket_pivot'):
                         score_sig += 6
                     elif src in ('cdl', 'talib'):
                         score_sig += 1
-                score_sig = min(score_sig, 10)  # 封顶 10
+                score_sig = min(score_sig, 10)
+            except:
+                pass
+    elif conn and code and b2_idx is None:
+        # B1 日共振信号（B1 Tab 展示用）
+        b1_date_sig = dates[b1_idx]
+        row = conn.execute(
+            "SELECT signals_json FROM pattern_scan_signals WHERE date=? AND stock_code=?",
+            (b1_date_sig, code)
+        ).fetchone()
+        if row and row[0]:
+            try:
+                import json
+                sigs = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                sources_seen = set()
+                for s in (sigs if isinstance(sigs, list) else []):
+                    src = s.get('source', '')
+                    if src in sources_seen:
+                        continue
+                    sources_seen.add(src)
+                    if src in ('base_breakout', 'pocket_pivot'):
+                        score_sig += 6
+                    elif src in ('cdl', 'talib'):
+                        score_sig += 1
+                score_sig = min(score_sig, 10)
             except:
                 pass
 
-    # ── 8.6 B2 跳空高开（10分）──
-    score_gap = 10 if (b2_idx > 0 and klines[b2_idx]['open'] > klines[b2_idx-1]['high']) else 0
+    # ── 8.6 B2 跳空高开（10分，仅 B2 存在时）──
+    score_gap = 0
+    if b2_idx is not None and b2_idx > 0:
+        score_gap = 10 if klines[b2_idx]['open'] > klines[b2_idx-1]['high'] else 0
 
-    # ── 8.6 新指标 M1: B2日相对大盘强度（5分）──
+    # ── 8.6 新指标 M1: B2日相对大盘强度（5分，仅 B2 存在时）──
     score_m1 = 0
-    if conn and code:
+    if conn and code and b2_idx is not None:
+        b2_date = dates[b2_idx]
         row985 = conn.execute(
             "SELECT change FROM index_daily_kline WHERE stock_code='000985' AND date=?",
             (b2_date,)
         ).fetchone()
         if row985 and row985[0] is not None:
-            idx_chg = row985[0] * 100  # change 是小数，0.01=1%
+            idx_chg = row985[0] * 100
             b2_ret = (klines[b2_idx]['close']/klines[b2_idx-1]['close']-1)*100 if b2_idx>0 else 0
             if b2_ret > idx_chg:
                 score_m1 = 5
 
-    # ── 8.7 新指标 M2: B1→B2 整理期缩量率（5分）──
+    # ── 8.7 新指标 M2: B1→B2 整理期缩量率（5分，仅 B2 存在时）──
     score_m2 = 0
-    if b2_idx > b1_idx+1:
+    if b2_idx is not None and b2_idx > b1_idx+1:
         p_amounts = [klines[j].get('amount', 0) or 0 for j in range(b1_idx+1, b2_idx)]
         p_amt_avg = sum(p_amounts)/len(p_amounts) if p_amounts else 0
         b1_amount = klines[b1_idx].get('amount', 0) or 0
@@ -407,43 +427,43 @@ def scan_stock(klines, scan_date, code=None, conn=None):
             elif ratio < 0.7:
                 score_m2 = 3
 
-    # ── 8.8 新指标 M3: B2 跳空突破（5分）──
-    score_m3 = 5 if (b2_idx > 0 and klines[b2_idx]['open'] > klines[b2_idx-1]['high']) else 0
+    # ── 8.8 新指标 M3: B2 跳空突破（5分，仅 B2 存在时）──
+    score_m3 = 0
+    if b2_idx is not None and b2_idx > 0:
+        score_m3 = 5 if klines[b2_idx]['open'] > klines[b2_idx-1]['high'] else 0
 
     # ── 9. 综合评分 ──
-    # 体系1（100分）= HDCP(40) + 行业(25) + Sig(25) + 跳空(10)
-    total = sum(score.values()) + score_i1 + score_i2 + score_sig + score_gap
+    # 体系1（100分）= HDCP(40) + 行业(25) + Sig(10) + 跳空(10)
+    # B1-only: HDC(35) + 行业(25) = 60, 有B2时满分100
+    if b2_idx is not None:
+        total = sum(score.values()) + score_i1 + score_i2 + score_sig + score_gap
+    else:
+        total = score['H'] + score['D'] + score['C'] + score_i1 + score_i2 + score_sig
+    
     if total >= 80: conf = '高'
     elif total >= 55: conf = '中'
     else: conf = '低'
 
-    # 体系2（115分）
-    total_v2 = total + score_m1 + score_m2 + score_m3
-    if total_v2 >= 92: conf_v2 = '高'
-    elif total_v2 >= 63: conf_v2 = '中'
-    else: conf_v2 = '低'
+    # 体系2（仅 B2 存在时有意义）
+    if b2_idx is not None:
+        total_v2 = total + score_m1 + score_m2 + score_m3
+        if total_v2 >= 92: conf_v2 = '高'
+        elif total_v2 >= 63: conf_v2 = '中'
+        else: conf_v2 = '低'
+    else:
+        total_v2 = 0
+        conf_v2 = ''
 
-    # ── MW PLUS 标志 ──
-    # 同时满足: 总分≥80 + D满分(15%~35%跌幅) + I1满分(行业RS250≥80)
-    is_plus = (total >= 80 and score['D'] == 5 and score_i1 == 15)
+    # ── MW PLUS 标志（仅 B2 完整时）──
+    is_plus = 0
+    if b2_idx is not None:
+        is_plus = 1 if (total >= 80 and score['D'] == 5 and score_i1 == 15) else 0
 
     # ── 10. 组装结果 ──
-    b1k = klines[b1_idx]; b2k = klines[b2_idx]
-    is_gap = b2_idx > 0 and b2k['open'] > klines[b2_idx-1]['high']
-    b2_pos = (b2k['close']-b2k['low'])/(b2k['high']-b2k['low'])*100 if b2k['high']!=b2k['low'] else 100
-
-    # 量比计算
+    b1k = klines[b1_idx]
+    # B1 量比
     vol_20_b1 = [klines[j]['volume'] for j in range(max(0,b1_idx-20), b1_idx) if klines[j].get('volume')]
     b1_vr = b1k['volume']/(sum(vol_20_b1)/len(vol_20_b1)) if vol_20_b1 else 0
-    vol_20_b2 = [klines[j]['volume'] for j in range(max(0,b2_idx-20), b2_idx) if klines[j].get('volume')]
-    b2_vr = b2k['volume']/(sum(vol_20_b2)/len(vol_20_b2)) if vol_20_b2 else 0
-
-    # 均线突破数
-    b2_ma = 0
-    for p in [5,10,20,30,60]:
-        if b2_idx >= p-1:
-            ma = sum(klines[j]['close'] for j in range(b2_idx-p+1, b2_idx+1))/p
-            if b2k['close'] > ma: b2_ma += 1
 
     # 横盘期日均成交额
     c_amounts = [klines[j].get('amount', 0) or 0 for j in range(c_start, c_end+1)]
@@ -454,29 +474,40 @@ def scan_stock(klines, scan_date, code=None, conn=None):
     h_pre_low = min(klines[j]['close'] for j in range(h_pre_start, h_idx)) if h_pre_start < h_idx else h_price
     h_pre_rise = round((h_price - h_pre_low)/h_pre_low*100, 1) if h_pre_low > 0 else 0
 
-    # P段数据（整理回撤 + 缩量率）
-    p_dd_val = round(p_dd_val, 1) if 'p_dd_val' in dir() else None
-    # 重新计算P段回撤
-    p_max_dd = 0
-    p_vol_sum = 0
-    if b2_idx > b1_idx+1:
+    # B2 相关字段（仅 B2 存在时填充）
+    if b2_idx is not None:
+        b2k = klines[b2_idx]
+        b2_date_val = dates[b2_idx]
+        is_gap = b2_idx > 0 and b2k['open'] > klines[b2_idx-1]['high']
+        b2_pos = (b2k['close']-b2k['low'])/(b2k['high']-b2k['low'])*100 if b2k['high']!=b2k['low'] else 100
+        vol_20_b2 = [klines[j]['volume'] for j in range(max(0,b2_idx-20), b2_idx) if klines[j].get('volume')]
+        b2_vr = b2k['volume']/(sum(vol_20_b2)/len(vol_20_b2)) if vol_20_b2 else 0
+        b2_ma = 0
+        for p in [5,10,20,30,60]:
+            if b2_idx >= p-1:
+                ma = sum(klines[j]['close'] for j in range(b2_idx-p+1, b2_idx+1))/p
+                if b2k['close'] > ma: b2_ma += 1
+        b2_return = round((b2k['close']/klines[b2_idx-1]['close']-1)*100, 2)
+    else:
+        b2_date_val = None; is_gap = 0; b2_pos = None; b2_vr = 0; b2_ma = 0; b2_return = None
+
+    # P段数据
+    p_max_dd = 0; p_vol_ratio_val = 0
+    if b2_idx is not None and b2_idx > b1_idx+1:
         for ii in range(b1_idx+1, b2_idx):
             dd = (klines[ii]['close']/klines[b1_idx]['close']-1)*100
             if dd < p_max_dd: p_max_dd = dd
-            p_vol_sum += klines[ii].get('volume', 0) or 0
+        p_vol_sum = sum(klines[ii].get('volume', 0) or 0 for ii in range(b1_idx+1, b2_idx))
         p_vol_ratio_val = round(p_vol_sum/(b2_idx-b1_idx-1)/klines[b1_idx]['volume'], 2) if klines[b1_idx]['volume'] > 0 else 0
-    else:
-        p_max_dd = 0
-        p_vol_ratio_val = 0
 
     result = {
         'h_date': dates[h_idx], 'h_price': round(h_price, 2),
         'l_date': dates[l_idx], 'l_price': round(l_price, 2),
         'c_start': dates[c_start], 'c_end': dates[c_end],
-        'b1_date': dates[b1_idx], 'b1_return_pct': round((b1k['close']/klines[b1_idx-1]['close']-1)*100, 2),
+        'b1_date': dates[b1_idx], 'b1_return_pct': round((b1k['close']/klines[b1_idx-1]['close']-1)*100, 2) if b1_idx>0 else 0,
         'b1_vol_ratio': round(b1_vr, 2),
-        'b2_date': dates[b2_idx], 'b2_return_pct': round((b2k['close']/klines[b2_idx-1]['close']-1)*100, 2),
-        'b2_close_pos': round(b2_pos, 1),
+        'b2_date': b2_date_val, 'b2_return_pct': b2_return,
+        'b2_close_pos': round(b2_pos, 1) if b2_pos else None,
         'b2_is_gap': 1 if is_gap else 0,
         'b2_ma_count': b2_ma,
         'decline_pct': round(decline, 1),
@@ -488,7 +519,7 @@ def scan_stock(klines, scan_date, code=None, conn=None):
         'p_vol_ratio': p_vol_ratio_val,
         'score': total, 'confidence': conf,
         'score_v2': total_v2, 'confidence_v2': conf_v2,
-        'is_plus': 1 if is_plus else 0,
+        'is_plus': is_plus,
         'score_h': score['H'], 'score_d': score['D'],
         'score_c': score['C'], 'score_p': score['P'],
         'score_i1': score_i1, 'score_i2': score_i2,
@@ -503,34 +534,57 @@ def scan_stock(klines, scan_date, code=None, conn=None):
 
 
 def save_signals(conn, scan_date, signals):
-    """保存信号,以 b2_date 为主维度"""
+    """保存信号。v2.4: B1 可独立保存(b2_date=NULL)，以 (stock_code, b1_date) 为唯一键"""
     for s in signals:
-        conn.execute("""INSERT OR REPLACE INTO mw_signal_daily
-            (b2_date,stock_code,stock_name,confidence,score,confidence_v2,score_v2,
-             h_date,h_price,l_date,l_price,c_start,c_end,
-             b1_date,b1_return_pct,b1_vol_ratio,
-             b2_return_pct,b2_close_pos,b2_is_gap,b2_ma_count,
-             decline_pct,c_amplitude_pct,
-             h_rs20,h_rs250,c_amount_avg,
-             h_pre_rise_pct,p_max_dd_pct,p_vol_ratio,
-             score_h,score_d,score_c,score_p,
-             score_i1,score_i2,score_o1,score_o2,
-             score_ma,score_sig,score_gap,score_m1,score_m2,score_m3,is_plus,
-             ind_rs20,ind_rs250,ind_code,ind_name,scan_date)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (
-            s['b2_date'],s['code'],s.get('name',''),s['confidence'],s['score'],s.get('confidence_v2',''),s.get('score_v2',0),
-            s['h_date'],s['h_price'],s['l_date'],s['l_price'],s['c_start'],s['c_end'],
-            s['b1_date'],s['b1_return_pct'],s['b1_vol_ratio'],
-            s['b2_return_pct'],s['b2_close_pos'],s['b2_is_gap'],s['b2_ma_count'],
-            s['decline_pct'],s['c_amplitude_pct'],
-            s.get('h_rs20'),s.get('h_rs250'),s.get('c_amount_avg',0),
-            s.get('h_pre_rise_pct'),s.get('p_max_dd_pct'),s.get('p_vol_ratio'),
-            s['score_h'],s['score_d'],s['score_c'],s['score_p'],
-            s.get('score_i1',0),s.get('score_i2',0),s.get('score_o1',0),s.get('score_o2',0),
-            s.get('score_ma',0),s.get('score_sig',0),s.get('score_gap',0),s.get('score_m1',0),s.get('score_m2',0),s.get('score_m3',0),s.get('is_plus',0),
-            s.get('ind_rs20'),s.get('ind_rs250'),s.get('ind_code'),s.get('ind_name'),scan_date
-        ))
+        # 检查是否已存在 (stock_code, b1_date)，有则 UPDATE，无则 INSERT
+        existing = conn.execute(
+            "SELECT id FROM mw_signal_daily WHERE stock_code=? AND b1_date=?",
+            (s['code'], s['b1_date'])
+        ).fetchone()
+        if existing and s['b2_date']:
+            # B2 更新：补齐 B2 字段和完整评分
+            conn.execute("""UPDATE mw_signal_daily SET
+                b2_date=?, b2_return_pct=?, b2_close_pos=?, b2_is_gap=?, b2_ma_count=?,
+                confidence=?, score=?, confidence_v2=?, score_v2=?,
+                score_p=?, score_sig=?, score_gap=?, score_m1=?, score_m2=?, score_m3=?, is_plus=?,
+                p_max_dd_pct=?, p_vol_ratio=?, scan_date=?
+                WHERE stock_code=? AND b1_date=?
+            """, (
+                s['b2_date'], s['b2_return_pct'], s['b2_close_pos'], s['b2_is_gap'], s['b2_ma_count'],
+                s['confidence'], s['score'], s.get('confidence_v2',''), s.get('score_v2',0),
+                s['score_p'], s.get('score_sig',0), s.get('score_gap',0),
+                s.get('score_m1',0), s.get('score_m2',0), s.get('score_m3',0), s.get('is_plus',0),
+                s.get('p_max_dd_pct'), s.get('p_vol_ratio'), scan_date,
+                s['code'], s['b1_date']
+            ))
+        else:
+            # 新插入（B1-only 或首次完整信号）
+            conn.execute("""INSERT OR REPLACE INTO mw_signal_daily
+                (b2_date,stock_code,stock_name,confidence,score,confidence_v2,score_v2,
+                 h_date,h_price,l_date,l_price,c_start,c_end,
+                 b1_date,b1_return_pct,b1_vol_ratio,
+                 b2_return_pct,b2_close_pos,b2_is_gap,b2_ma_count,
+                 decline_pct,c_amplitude_pct,
+                 h_rs20,h_rs250,c_amount_avg,
+                 h_pre_rise_pct,p_max_dd_pct,p_vol_ratio,
+                 score_h,score_d,score_c,score_p,
+                 score_i1,score_i2,score_o1,score_o2,
+                 score_ma,score_sig,score_gap,score_m1,score_m2,score_m3,is_plus,
+                 ind_rs20,ind_rs250,ind_code,ind_name,scan_date)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (
+                s['b2_date'],s['code'],s.get('name',''),s['confidence'],s['score'],s.get('confidence_v2',''),s.get('score_v2',0),
+                s['h_date'],s['h_price'],s['l_date'],s['l_price'],s['c_start'],s['c_end'],
+                s['b1_date'],s['b1_return_pct'],s['b1_vol_ratio'],
+                s['b2_return_pct'],s['b2_close_pos'],s['b2_is_gap'],s['b2_ma_count'],
+                s['decline_pct'],s['c_amplitude_pct'],
+                s.get('h_rs20'),s.get('h_rs250'),s.get('c_amount_avg',0),
+                s.get('h_pre_rise_pct'),s.get('p_max_dd_pct'),s.get('p_vol_ratio'),
+                s['score_h'],s['score_d'],s['score_c'],s['score_p'],
+                s.get('score_i1',0),s.get('score_i2',0),s.get('score_o1',0),s.get('score_o2',0),
+                s.get('score_ma',0),s.get('score_sig',0),s.get('score_gap',0),s.get('score_m1',0),s.get('score_m2',0),s.get('score_m3',0),s.get('is_plus',0),
+                s.get('ind_rs20'),s.get('ind_rs250'),s.get('ind_code'),s.get('ind_name'),scan_date
+            ))
     conn.commit()
 
 
@@ -578,10 +632,10 @@ def run_scan(scan_date, fast=False):
             ind_code TEXT, ind_name TEXT,
             scan_date TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(stock_code, b2_date)
+            UNIQUE(stock_code, b1_date)
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_mw_b2date ON mw_signal_daily(b2_date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_mw_b1date ON mw_signal_daily(b1_date)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_mw_code ON mw_signal_daily(stock_code)")
 
     stocks = get_all_stocks(conn)

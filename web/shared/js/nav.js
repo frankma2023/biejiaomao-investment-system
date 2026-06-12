@@ -70,6 +70,7 @@
     { href: '../market-scan/',          label: '大盘扫描',         page: 'market-scan' },
     { href: '../canslim-scores/',       label: 'CAN SLIM',          page: 'canslim-scores' },
     { href: '../cockpit/',             label: '驾驶舱',           page: 'cockpit' },
+    { href: '../prompt-generator/',    label: 'Prompt',           page: 'prompt-generator' },
   ];
 
   function render() {
