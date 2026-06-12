@@ -182,7 +182,7 @@ class ONeilDeepAnalyzer:
                         rs_rows = db.execute(f"SELECT stock_code, rs_250 FROM index_rs_daily WHERE stock_code IN ({placeholders}) AND date=?", idx_codes + [latest_rs[0]]).fetchall()
                         if rs_rows:
                             best = max(rs_rows, key=lambda r: r['rs_250'] or 0)
-                            p['ind_rs250'] = best['rs_250']; p['ind_name'] = best['stock_code']
+                            p['ind_rs250'] = best['rs_250']; p['ind_name'] = f"指数{best['stock_code']}"
             except: pass
 
         # 7. CAN SLIM 评分
@@ -360,7 +360,6 @@ class ONeilDeepAnalyzer:
         if hlc: parts.append(f"- H/L结构: H={hlc.get('h_date')} {hlc.get('h_price')} L={hlc.get('l_date')} {hlc.get('l_price')} 回撤{hlc.get('decline_pct')}%")
 
         hlc = p.get('hlc', {})
-        if hlc: parts.append(f"- H/L结构: H={hlc.get('h_date')} \u00a5{hlc.get('h_price')} L={hlc.get('l_date')} \u00a5{hlc.get('l_price')} 回撤{hlc.get('decline_pct')}%")
 
         parts.append("\n## 近10日K线（已核实，请勿编造价格数据）")
         kl = p.get('klines_20d', [])
