@@ -87,7 +87,7 @@ def load_data(conn, target_date=None, start_date=None):
 
     # 转 Polars DataFrame
     kline = pl.DataFrame(
-        [(r["stock_code"], r["date"], r["adj_close"], r["amount"]) for r in kline_rows],
+        [(r["stock_code"], r["date"], float(r["adj_close"] or 0), float(r["amount"] or 0)) for r in kline_rows],
         schema=["stock_code", "date", "adj_close", "amount"],
         orient="row",
     )

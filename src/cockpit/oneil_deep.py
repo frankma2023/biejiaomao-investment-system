@@ -105,7 +105,7 @@ class ONeilDeepAnalyzer:
         p['name'] = p['name'] or (row['name'] if row else code)
         # 行业
         ind = db.execute("SELECT industry_name FROM stock_industry WHERE stock_code=? LIMIT 1", (code,)).fetchone()
-        p['industry'] = ind['industry_name'] if ind else ''
+        p['industry'] = ind['industry_name'] if ind else ''; obs_ind = db.execute('SELECT industry_name FROM discipline_observation_pool WHERE stock_code=? ORDER BY date DESC LIMIT 1', (code,)).fetchone(); p['industry'] = p['industry'] or (obs_ind['industry_name'] if obs_ind else '未知')
         # 市值 (from pysnowball or market_cap_snapshot)
         try:
             from cockpit.sentiment import SentimentEngine
@@ -168,6 +168,9 @@ class ONeilDeepAnalyzer:
         # 6. 行业RS
         mw_ind = db.execute("SELECT ind_rs250, ind_name FROM mw_signal_daily WHERE stock_code=? AND ind_rs250 IS NOT NULL ORDER BY b2_date DESC LIMIT 1", (code,)).fetchone()
         if mw_ind: p['ind_rs250'] = mw_ind['ind_rs250']; p['ind_name'] = mw_ind['ind_name']
+        else:
+            rs_tmp = db.execute("SELECT rps_250 FROM stock_rs_daily WHERE stock_code=? ORDER BY date DESC LIMIT 1", (code,)).fetchone()
+            if rs_tmp: p['ind_rs250'] = rs_tmp['rps_250']
 
         # 7. CAN SLIM 评分
         cs = db.execute("""
@@ -203,8 +206,8 @@ class ONeilDeepAnalyzer:
                 if len(vols) >= d: p[n] = int(sum(vols[:d]) / d)
 
         # 11. H/L/C结构
-        mw = db.execute("SELECT h_date, h_price, l_date, l_price, decline_pct, c_start, c_end FROM mw_signal_daily WHERE stock_code=? AND b2_date=?", (code, candidate.get('signal_date',''))).fetchone()
-        if mw:
+        mw = db.execute("SELECT h_date, h_price, l_date, l_price, decline_pct, c_start, c_end FROM mw_signal_daily WHERE stock_code=? AND h_date < l_date AND h_date IS NOT NULL ORDER BY b2_date DESC LIMIT 1", (code,)).fetchone()
+        if mw and mw["h_date"] and mw["l_date"]:
             p['hlc'] = {'h_date': mw['h_date'], 'h_price': mw['h_price'], 'l_date': mw['l_date'],
                         'l_price': mw['l_price'], 'decline_pct': mw['decline_pct']}
 
@@ -334,11 +337,14 @@ class ONeilDeepAnalyzer:
         parts.append("\n## 个股技术面")
         rs = p.get('rs', {})
         if rs: parts.append(f"- RS强度: RPS20={rs.get('rps20')} RPS60={rs.get('rps60')} RPS120={rs.get('rps120')} RPS250={rs.get('rps250')}")
+        if p.get("ind_rs250"): parts.append(f"- 行业RS250: {p['ind_rs250']} ({p.get('ind_name','')})")
         if p.get('ind_rs250'): parts.append(f"- 行业RS250: {p.get('ind_rs250')} ({p.get('ind_name','')})")
         parts.append(f"- 最新价: {p.get('latest_close','?')}")
         parts.append("- 均线: " + ", ".join([f"MA{n}={p.get(f'ma{n}','?')}({p.get(f'vs_ma{n}','?')}%)" for n in [5,10,20,30,60,120,250] if p.get(f'ma{n}')]))
         if p.get('extension_risk'): parts.append(f"- 延伸风险: {p['extension_risk']}")
         parts.append(f"- 成交量: 5日均{p.get('vol5d','?')} 10日{p.get('vol10d','?')} 20日{p.get('vol20d','?')}")
+        hlc = p.get("hlc", {})
+        if hlc: parts.append(f"- H/L结构: H={hlc.get('h_date')} {hlc.get('h_price')} L={hlc.get('l_date')} {hlc.get('l_price')} 回撤{hlc.get('decline_pct')}%")
 
         hlc = p.get('hlc', {})
         if hlc: parts.append(f"- H/L结构: H={hlc.get('h_date')} \u00a5{hlc.get('h_price')} L={hlc.get('l_date')} \u00a5{hlc.get('l_price')} 回撤{hlc.get('decline_pct')}%")

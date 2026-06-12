@@ -1,0 +1,33 @@
+{
+  "table": "index_rs_daily",
+  "date_range": [
+    "2016-01-01",
+    "2016-03-31"
+  ],
+  "quarter": "2016Q1",
+  "checked_at": "2026-06-12 14:17:29",
+  "passed": true,
+  "checks": {
+    "date_continuity": {
+      "passed": true,
+      "expected": 65,
+      "actual": 65,
+      "missing": 0
+    },
+    "coverage": {
+      "passed": true,
+      "median": 226,
+      "threshold": 180,
+      "low_days": 0
+    },
+    "value_sanity": {
+      "passed": true,
+      "anomalies": 0
+    },
+    "cross_ref": {
+      "passed": true,
+      "orphans": 0
+    }
+  },
+  "anomalies": []
+}

@@ -19,7 +19,7 @@ def main():
     print(f"区间: {args.start} ~ {args.end}")
     print("计算中 (这一步可能较久，Polars 全量计算)...")
     
-    result = compute(target_date=args.end, start_date=args.start)
+    result = compute(target_date=args.end, start_date=args.start, min_amount_20d=0)
     
     # result 包含 start~end 之间所有交易日的数据
     # 按日期分组，逐日写入
