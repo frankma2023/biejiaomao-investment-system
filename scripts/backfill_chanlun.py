@@ -69,39 +69,47 @@ def scan_stock_worker(args):
 
 
 def save_day_results(db_path, scan_date, results):
-    """将一天的结果写入 chanlun_scan_daily"""
-    db = sqlite3.connect(db_path)
-    try:
-        db.execute("DELETE FROM chanlun_scan_daily WHERE scan_date=?", (scan_date,))
-        
-        rows = []
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        for r in results:
-            if r is None:
-                continue
-            rows.append((
-                scan_date, r['stock_code'], '',
-                r.get('bi_count', 0), r.get('zs_count', 0), r.get('segment_count', 0),
-                r.get('latest_bi_dir', ''), r.get('latest_bi_power', 0),
-                r.get('divergence_count', 0), r.get('latest_div_type', ''),
-                r.get('trade_signal_count', 0), r.get('latest_trade_type', ''),
-                r.get('latest_trade_side', ''), r.get('latest_trade_price', 0),
-                r.get('resonance_strength', ''), now, r.get('bi_json', '[]')
-            ))
-        
-        if rows:
-            db.executemany("""
-                INSERT INTO chanlun_scan_daily
-                (scan_date, stock_code, stock_name, bi_count, zs_count, segment_count,
-                 latest_bi_dir, latest_bi_power, divergence_count, latest_div_type,
-                 trade_signal_count, latest_trade_type, latest_trade_side, latest_trade_price,
-                 resonance_strength, created_at, bi_json)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, rows)
-            db.commit()
-        return len(rows)
-    finally:
-        db.close()
+    """将一天的结果写入 chanlun_scan_daily（带重试，处理并发锁）"""
+    import time as _time
+    for attempt in range(5):
+        try:
+            db = sqlite3.connect(db_path, timeout=30)
+            try:
+                db.execute("DELETE FROM chanlun_scan_daily WHERE scan_date=?", (scan_date,))
+                
+                rows = []
+                now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                for r in results:
+                    if r is None:
+                        continue
+                    rows.append((
+                        scan_date, r['stock_code'], '',
+                        r.get('bi_count', 0), r.get('zs_count', 0), r.get('segment_count', 0),
+                        r.get('latest_bi_dir', ''), r.get('latest_bi_power', 0),
+                        r.get('divergence_count', 0), r.get('latest_div_type', ''),
+                        r.get('trade_signal_count', 0), r.get('latest_trade_type', ''),
+                        r.get('latest_trade_side', ''), r.get('latest_trade_price', 0),
+                        r.get('resonance_strength', ''), now, r.get('bi_json', '[]')
+                    ))
+                
+                if rows:
+                    db.executemany("""
+                        INSERT INTO chanlun_scan_daily
+                        (scan_date, stock_code, stock_name, bi_count, zs_count, segment_count,
+                         latest_bi_dir, latest_bi_power, divergence_count, latest_div_type,
+                         trade_signal_count, latest_trade_type, latest_trade_side, latest_trade_price,
+                         resonance_strength, created_at, bi_json)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """, rows)
+                    db.commit()
+                return len(rows)
+            finally:
+                db.close()
+        except sqlite3.OperationalError as e:
+            if 'locked' in str(e).lower() and attempt < 4:
+                _time.sleep(3 * (attempt + 1))
+            else:
+                raise
 
 
 def get_candidates(date):

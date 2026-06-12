@@ -170,7 +170,7 @@ class ONeilDeepAnalyzer:
         if mw_ind: p['ind_rs250'] = mw_ind['ind_rs250']; p['ind_name'] = mw_ind['ind_name']
         else:
             rs_tmp = db.execute("SELECT rps_250 FROM stock_rs_daily WHERE stock_code=? ORDER BY date DESC LIMIT 1", (code,)).fetchone()
-            if rs_tmp: p['ind_rs250'] = rs_tmp['rps_250']
+            if rs_tmp: p['ind_rs250'] = rs_tmp['rps_250']; p['ind_name'] = '全市场RS250近似'
 
         # 7. CAN SLIM 评分
         cs = db.execute("""
@@ -338,7 +338,6 @@ class ONeilDeepAnalyzer:
         rs = p.get('rs', {})
         if rs: parts.append(f"- RS强度: RPS20={rs.get('rps20')} RPS60={rs.get('rps60')} RPS120={rs.get('rps120')} RPS250={rs.get('rps250')}")
         if p.get("ind_rs250"): parts.append(f"- 行业RS250: {p['ind_rs250']} ({p.get('ind_name','')})")
-        if p.get('ind_rs250'): parts.append(f"- 行业RS250: {p.get('ind_rs250')} ({p.get('ind_name','')})")
         parts.append(f"- 最新价: {p.get('latest_close','?')}")
         parts.append("- 均线: " + ", ".join([f"MA{n}={p.get(f'ma{n}','?')}({p.get(f'vs_ma{n}','?')}%)" for n in [5,10,20,30,60,120,250] if p.get(f'ma{n}')]))
         if p.get('extension_risk'): parts.append(f"- 延伸风险: {p['extension_risk']}")
