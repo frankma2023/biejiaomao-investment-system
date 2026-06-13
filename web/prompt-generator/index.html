@@ -18,13 +18,10 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)
 .input-row input{padding:8px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text-primary);font-size:.8rem;font-family:var(--font-mono);width:140px;outline:none}
 .input-row input:focus{border-color:var(--accent)}
 .input-row .btn{padding:8px 18px;border-radius:10px;font-size:.75rem;font-weight:600;cursor:pointer;font-family:var(--font-body);border:none;transition:all .2s}
-.btn-gen{background:var(--accent);color:#fff}
-.btn-gen:hover{opacity:.9}
-.btn-copy{background:var(--card);color:var(--text-secondary);border:1px solid var(--border)!important}
-.btn-copy:hover{border-color:var(--accent)!important;color:var(--accent)}
-.btn-ai{background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.25)!important}
-.btn-ai:hover{background:rgba(16,185,129,.25)}
-.btn-ai:disabled{opacity:.5;cursor:not-allowed}
+.btn-gen{background:linear-gradient(135deg,var(--accent),#d97706);color:#fff;border:none;box-shadow:0 2px 12px rgba(245,158,11,.25)}.btn-gen:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 4px 16px rgba(245,158,11,.35)}
+.btn-copy{background:var(--card);color:var(--text-secondary);border:1px solid var(--border)!important;backdrop-filter:blur(8px)}.btn-copy:hover{border-color:var(--accent)!important;color:var(--accent);background:var(--accent-subtle)}
+.btn-ai{background:rgba(16,185,129,.08);color:#34d399;border:1px solid rgba(16,185,129,.2)!important;backdrop-filter:blur(8px)}.btn-ai:hover{background:rgba(16,185,129,.18);border-color:rgba(16,185,129,.4)!important;box-shadow:0 2px 12px rgba(16,185,129,.15)}
+.btn-ai:disabled{opacity:.4;cursor:not-allowed}
 .meta{font-size:.62rem;color:var(--muted);margin-bottom:8px}
 .prompt-box{background:#111118;border:1px solid #2a2a35;border-radius:12px;padding:20px 24px;font-family:'JetBrains Mono',monospace;font-size:.68rem;line-height:1.7;color:#c9d1d9;white-space:pre-wrap;max-height:60vh;overflow-y:auto;min-height:200px}
 .result-box{background:#111118;border:1px solid #2a2a35;border-radius:12px;padding:20px 24px;margin-top:10px;font-size:.75rem;line-height:1.8;color:#d4d4d8;max-height:50vh;overflow-y:auto}
