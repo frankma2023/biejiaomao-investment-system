@@ -1,0 +1,37 @@
+{
+  "table": "chanlun_scan_daily",
+  "date_range": [
+    "2025-04-01",
+    "2025-06-30"
+  ],
+  "quarter": "2025Q2",
+  "checked_at": "2026-06-13 15:54:06",
+  "passed": true,
+  "checks": {
+    "date_continuity": {
+      "passed": true,
+      "expected": 60,
+      "actual": 60,
+      "missing": 0
+    },
+    "coverage": {
+      "passed": true,
+      "median": 5210,
+      "threshold": 4168,
+      "low_days": 0
+    },
+    "signal_yield": {
+      "passed": true,
+      "zero_signal_days": 0
+    },
+    "value_sanity": {
+      "passed": true,
+      "anomalies": 0
+    },
+    "cross_ref": {
+      "passed": true,
+      "orphans": 0
+    }
+  },
+  "anomalies": []
+}
