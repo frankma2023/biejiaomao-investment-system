@@ -48,9 +48,10 @@ def discover_engines(force_reload=False):
     engines = {}
     # 排除的模块名（辅助模块、私有模块、非引擎模块）
     EXCLUDE = {
-        'recommend',      # 建议合成层，不是引擎
-        'base_detector',  # 基础工具模块，被其他引擎消费
+        'recommend',          # 建议合成层，不是引擎
+        'base_detector',      # 基础工具模块，被其他引擎消费
         '__init__',
+        'distribution_day',   # 大盘指数级别引擎，不参与个股扫描
     }
 
     for _, name, _ in pkgutil.iter_modules(pkg.__path__):

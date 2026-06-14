@@ -150,7 +150,7 @@ def detect(
             prior_peak_vol = volumes[max_vol_idx]
             shrink_b = prior_peak_vol > 0 and volumes[today_idx] < prior_peak_vol * params.get('nhs_prior_peak_vol_ratio', 0.60)
             if shrink_a or shrink_b:
-                signals.append({
+                signals.append({'type': 'bearish', 
                         'signal_date': dates[today_idx],
                         'stock_code': stock_code,
                         'signal_type': 'new_high_shrink',
@@ -179,7 +179,7 @@ def detect(
                 seg_vols = volumes[today_idx - lb + 1:today_idx + 1]
                 seg_vol_ma = sum(seg_vols) / len(seg_vols)
                 if price_range < params['ss_price_range_max'] and seg_vol_ma / vol_ma > params['ss_vol_ratio_min']:
-                    signals.append({
+                    signals.append({'type': 'bearish', 
                         'signal_date': dates[today_idx],
                         'stock_code': stock_code,
                         'signal_type': 'stall_surge',
@@ -195,7 +195,7 @@ def detect(
     if params.get('enable_drop_surge', True) and today_idx > 0:
         decline = (closes[today_idx - 1] - closes[today_idx]) / closes[today_idx - 1]
         if decline >= params['ds_decline_min'] and vol_ratio > params['ds_vol_ratio_min']:
-            signals.append({
+            signals.append({'type': 'bearish', 
                 'signal_date': dates[today_idx],
                 'stock_code': stock_code,
                 'signal_type': 'drop_surge',
@@ -220,7 +220,7 @@ def detect(
                 and prior_decline >= params['rd_prior_decline_min']
                 and vol_ratio < params['rd_vol_ratio_max']
                 and closes[today_idx] > closes[today_idx - 1]):
-            signals.append({
+            signals.append({'type': 'bearish', 
                 'signal_date': dates[today_idx],
                 'stock_code': stock_code,
                 'signal_type': 'rally_dry',
@@ -243,7 +243,7 @@ def detect(
             recent_high_10 = max(highs[today_idx - 9:today_idx + 1])
             prior_high_10 = max(highs[max(0, today_idx - 20):today_idx - 9])
             if recent_high_10 > prior_high_10 and prior_ma > 0 and recent_ma < prior_ma * 0.70:
-                signals.append({
+                signals.append({'type': 'bearish', 
                     'signal_date': dates[today_idx],
                     'stock_code': stock_code,
                     'signal_type': 'rising_shrink',
@@ -265,7 +265,7 @@ def detect(
             seg_v = volumes[today_idx - 9:today_idx + 1]
             seg_v_ma = sum(seg_v) / len(seg_v)
             if price_range < 0.08 and seg_v_ma < vol_ma * params.get('high_shrink_vol_ratio_max', 0.70):
-                signals.append({
+                signals.append({'type': 'bearish', 
                     'signal_date': dates[today_idx],
                     'stock_code': stock_code,
                     'signal_type': 'high_shrink',
@@ -329,7 +329,7 @@ def detect(
 
         if score >= threshold:
             level = 'strong' if score >= 80 else 'moderate'
-            signals.append({
+            signals.append({'type': 'bearish', 
                 'signal_date': dates[today_idx], 'stock_code': stock_code,
                 'signal_type': 'composite_divergence', 'signal_level': level,
                 'label': f'{"🔴" if score >= 80 else "🟡"} 综合背离({score}分)',

@@ -14,8 +14,8 @@ if SRC_DIR not in sys.path: sys.path.insert(0, SRC_DIR)
 DB_PATH = os.path.join(PROJECT_ROOT, "data", "lixinger.db")
 
 ENGINE_META = {
-    "name": "pocket_pivot_v3",
-    "display_name": "口袋支点V3",
+    "name": "pocket_pivot_v2",
+    "display_name": "口袋支点V2",
     "category": "breakout",
     "version": "3.2",
     "description": "多周期缠论H/L/C口袋支点检测，base/continuation/10ma_bounce"
@@ -156,6 +156,9 @@ def _evaluate(klines, idx, structure, rps20, rps250):
     else:
         return None
 
+    base_depth = s.get('decline_pct') or 0
+    type_cn = '基部' if pivot_type == 'base' else ('延续' if pivot_type == 'continuation' else '10日反弹')
+    desc = type_cn + (' ★B1重合' if b1_overlap else '') + ' | 涨' + str(round(gain_pct,1)) + '% | 盘整' + str(days_from_l) + '天'
     return {
         'type': 'bullish',
         'date': klines[idx]['date'],
@@ -165,8 +168,9 @@ def _evaluate(klines, idx, structure, rps20, rps250):
         'close_position': round(close_pos, 2),
         'details': {
             'signal_type': f'PP-{pivot_type}' + ('+B1' if b1_overlap else ''),
+            'description': desc,
             'h_date': s.get('h_date'), 'l_date': s.get('l_date'),
-            'c_days': days_from_l, 'base_depth': s.get('decline_pct'),
+            'c_days': days_from_l, 'base_depth': base_depth,
             'rps_20': rps20, 'rps_250': rps250,
         }
     }

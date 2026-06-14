@@ -398,7 +398,7 @@ def save_to_db(signals):
              gain_pct,vol_ratio,close_position,rps_20,rps_250,sma10,sma60,
              pct_from_ma10,base_depth,close,volume)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (s['date'],s['stock_code'],s.get('stock_name',''),'V3',s['pivot_type'],
+            (s['date'],s['stock_code'],s.get('stock_name',''),'V2',s['pivot_type'],
              int(s.get('b1_overlap',False)),s.get('h_date'),s.get('l_date'),
              s.get('c_days',0),s['gain_pct'],s['vol_ratio'],s['close_position'],
              s['rps_20'],s['rps_250'],s['sma10'],s['sma60'],

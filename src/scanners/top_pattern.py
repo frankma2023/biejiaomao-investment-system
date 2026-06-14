@@ -451,6 +451,7 @@ def _detect_double_top(
             'signal_level': signal_level,
             'stock_code': stock_code,
             'signal_date': str(dates[as_of_idx]),
+            'type': 'bearish',
         }
 
     return None

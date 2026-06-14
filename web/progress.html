@@ -217,9 +217,31 @@
 
     </div>
 
+            <table style="margin-top:6px">
+          <tr><td colspan="2" style="font-weight:600;color:var(--accent)">2026-06-12 阶段收尾</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>指数RS全量回填 (2016~今, 100万行)</td><td>scripts/backfill_index_rs.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>个股RS补2016年 (59万行)</td><td>scripts/backfill_rs.py</td></tr>
+          <tr><td><span class="pg-dot dot-wip"></span>缠论笔全量回填 (386天/198万行, 17.6GB)</td><td>scripts/backfill_chanlun.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>bi_json拆分为独立表</td><td>scripts/migrate_bi_json.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>季度验收脚本</td><td>scripts/validate_quarter.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>MW引擎B1/B2分离检测 (B1可独立保存)</td><td>src/scanners/mw_signal.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>MW信号前端B1 Tab双面板</td><td>/mw-signals/</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>口袋支点V3→V2统一命名, engine_version</td><td>src/scanners/pocket_pivot_v2_engine.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>铁轨线/高潮见顶/顶部形态/量价背离 type=bearish修复</td><td>src/scanners/*.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>抛盘日引擎从个股扫描排除</td><td>src/engine_registry.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>codewhale-tui替代deepseek-tui (全站4处)</td><td>src/server.py等</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>全信号回测框架PRD v1.0</td><td>docs/product/全信号回测框架_产品需求书.md</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>3份PRD更新 (MW引擎/前端/全市场回填)</td><td>docs/product/*.md</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>DATABASE_SCHEMA.md更新至2026-06-12</td><td>docs/DATABASE_SCHEMA.md</td></tr>
+        </table>
+
     <div class="section-title" style="margin-top:28px">📋 本次开发经验教训</div>
-    <div class="lesson-card"><div class="ln">1. API 返回 JSON 时前端不要用 YAML 解析</div><div class="ld">load_config 返回 dict，前端却检查 data.ok && data.yaml 等不到，白费半天排查。</div></div>
-    <div class="lesson-card"><div class="ln">2. 预计算存表，多页面共享</div><div class="ld">index_rs_daily 每天算一次，最强指数和指数强度两页面都读它。避免重复计算和结果分歧。</div></div>
+    <div class="lesson-card"><div class="ln">1. signal_type 字段必须在引擎层面写死</div><div class="ld">server.py 的兜底逻辑 `if 'type' not in s: s['type']='bullish'` 导致 4 个卖出引擎显示为看涨。根本原因是引擎输出时漏了 type 字段。以后新增引擎必须检查 type 字段。</div></div>
+    <div class="lesson-card"><div class="ln">2. LIKE 查询不能当精确计数用</div><div class="ld">用 LIKE '%top_pattern%' 统计信号数，结果把 talib 信号里的偶发匹配也计入了。JSON 解析才是准确方法。</div></div>
+    <div class="lesson-card"><div class="ln">3. engine_registry EXCLUDE 要区分个股/大盘引擎</div><div class="ld">distribution_day 是指数级别引擎，被注册表拉进个股扫描，每天对 5000 只股票空跑。正确的做法是加入 EXCLUDE 集合。</div></div>
+    <div class="lesson-card"><div class="ln">4. Polars schema inference 对历史数据敏感</div><div class="ld">2016 年的 amount 字段为 NULL，Polars 构造 DataFrame 时类型推断失败。需要显式转换 float(r["amount"] or 0)。</div></div>
+    <div class="lesson-card"><div class="ln">5. 大 TEXT 字段要尽早拆分</div><div class="ld">chanlun_scan_daily 的 bi_json 占 17.6GB，影响全表扫描性能。拆到独立表后主表仅 5GB，查询速度大幅提升。</div></div>
+    <div class="lesson-card"><div class="ln">6. 模块命名要一致</div><div class="ld">pocket_pivot_v2.py 实际是 V3 引擎，pocket_pivot_v3_engine.py 是包装器。V3→V2 统一命名时涉及 6 个文件，app.js 里还有硬编码的 V3 引用和独立 API 调用。一次命名变更牵动面很大。</div></div>果分歧。</div></div>
     <div class="lesson-card"><div class="ln">3. 先对齐算法再写代码</div><div class="ld">RS 公式 (*99 vs *100)、AD 斜率 (百分比 vs 首尾对比) 反复改了 4 轮才对齐。动手前先读产品文档中的公式。</div></div>
     <div class="lesson-card"><div class="ln">4. YAML 文件名与代码中 signal_type 严格一致</div><div class="ld">accumulation vs accumulation_day、theme vs thematic，名不对读不到。</div></div>
     <div class="lesson-card"><div class="ln">5. 大池子 SQL 占位符不要嵌套子查询</div><div class="ld">229 个占位符导致主题池静默失败。拆成两步：先取最新日期，再按日期查。</div></div>

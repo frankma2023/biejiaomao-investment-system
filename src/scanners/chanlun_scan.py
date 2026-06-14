@@ -40,9 +40,14 @@ def _ensure_table(conn):
             latest_trade_side TEXT,
             latest_trade_price REAL,
             resonance_strength TEXT,
-            bi_json TEXT,
             created_at TEXT DEFAULT (datetime('now','localtime')),
             UNIQUE(scan_date, stock_code)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS chanlun_bi_json (
+            stock_code TEXT NOT NULL, scan_date TEXT NOT NULL,
+            bi_json TEXT, PRIMARY KEY(stock_code, scan_date)
         )
     """)
     conn.execute("""
@@ -213,8 +218,8 @@ def run_scan(scan_date=None, all_market=False):
                 (scan_date, stock_code, stock_name, bi_count, zs_count, segment_count,
                  latest_bi_dir, latest_bi_power, divergence_count, latest_div_type,
                  trade_signal_count, latest_trade_type, latest_trade_side, latest_trade_price,
-                 resonance_strength, bi_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 resonance_strength)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 result["scan_date"], result["stock_code"], result["stock_name"],
                 result["bi_count"], result["zs_count"], result["segment_count"],
@@ -222,8 +227,13 @@ def run_scan(scan_date=None, all_market=False):
                 result["divergence_count"], result["latest_div_type"],
                 result["trade_signal_count"], result["latest_trade_type"],
                 result["latest_trade_side"], result["latest_trade_price"],
-                result["resonance_strength"], result["bi_json"]
+                result["resonance_strength"]
             ))
+            if result.get("bi_json"):
+                conn.execute(
+                    "INSERT OR REPLACE INTO chanlun_bi_json (stock_code, scan_date, bi_json) VALUES (?,?,?)",
+                    (result["stock_code"], result["scan_date"], result["bi_json"])
+                )
             scanned += 1
             if result["trade_signal_count"] > 0 or result["divergence_count"] > 0:
                 has_signal += 1

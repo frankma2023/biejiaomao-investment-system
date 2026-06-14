@@ -109,46 +109,6 @@ async function scan() {
     }
     state.data = data;
     
-    // 加载口袋支点V3信号并合并到 engines
-    try {
-      var ppV3Resp = await fetch('http://' + window.location.hostname + ':8788/api/pocket-pivot-v3?code=' + code + '&start=' + document.getElementById('date-start').value + '&end=' + document.getElementById('date-end').value);
-      if (ppV3Resp.ok) {
-        var ppV3Data = await ppV3Resp.json();
-        if (ppV3Data.signals && ppV3Data.signals.length > 0) {
-          // 转换为统一信号格式
-          var ppV3Signals = ppV3Data.signals.map(function(s) {
-            return {
-              date: s.date,
-              source: 'pocket_pivot_v3',
-              type: 'bullish',
-              details: {
-                signal_type: 'pocket_pivot_v3',
-                pivot_type: s.pivot_type,
-                gain_pct: s.gain_pct,
-                vol_ratio: s.vol_ratio,
-                rps_20: s.rps_20,
-                rps_250: s.rps_250,
-                c_days: s.c_days,
-                b1_overlap: s.b1_overlap,
-                description: (s.pivot_type === 'base' ? '基部' : s.pivot_type === 'continuation' ? '延续' : '10日反弹') +
-                  (s.b1_overlap ? '★B1重合' : '') + ' | 涨' + s.gain_pct.toFixed(1) + '% | 盘整' + s.c_days + '天'
-              }
-            };
-          });
-          // 合并到 data.signals
-          data.signals = (data.signals || []).concat(ppV3Signals);
-          // 添加 engine
-          if (!data.engines) data.engines = [];
-          data.engines.push({
-            name: 'pocket_pivot_v3',
-            display_name: '口袋支点V3',
-            category: 'breakout',
-            signals: ppV3Signals
-          });
-        }
-      }
-    } catch(e) { console.log('口袋支点V3加载失败:', e); }
-    
     buildMaps(data.engines);
     renderAll();
   } catch (e) {
@@ -168,7 +128,7 @@ function buildMaps(engines) {
     state.displayNameMap[eng.name] = eng.display_name || eng.name;
     if (eng.name === 'pocket_pivot') {
       state.colorMap[eng.name] = { color: '#FD03E7', symbol: 'pin', size: 15 };
-    } else if (eng.name === 'pocket_pivot_v3') {
+    } else if (eng.name === 'pocket_pivot_v2') {
       state.colorMap[eng.name] = { color: '#FF9800', symbol: 'pin', size: 15 };
     } else if (eng.name === 'mw_signal') {
       state.colorMap[eng.name] = { color: '#a78bfa', symbol: 'diamond', size: 16 };

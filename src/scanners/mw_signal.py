@@ -85,7 +85,7 @@ def scan_stock(klines, scan_date, code=None, conn=None):
     if code not in _chanlun_cache:
         if conn:
             row = conn.execute(
-                "SELECT bi_json FROM chanlun_scan_daily WHERE stock_code=? ORDER BY scan_date DESC LIMIT 1",
+                "SELECT bi_json FROM chanlun_bi_json WHERE stock_code=? ORDER BY scan_date DESC LIMIT 1",
                 (code,)
             ).fetchone()
             if row and row[0]:

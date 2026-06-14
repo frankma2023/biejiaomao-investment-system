@@ -813,8 +813,8 @@ def api_pocket_pivot_rs():
 # API: GET /api/pocket-pivot-v3 — 口袋支点V3信号查询
 # ═══════════════════════════════════════════════
 
-@app.route('/api/pocket-pivot-v3')
-def api_pocket_pivot_v3():
+@app.route('/api/pocket-pivot-v2')
+def api_pocket_pivot_v2():
     code = request.args.get('code', '')
     start = request.args.get('start', '2026-01-01')
     end = request.args.get('end', datetime.now().strftime('%Y-%m-%d'))
@@ -852,7 +852,7 @@ def api_pocket_pivot_v3():
             'h_date': r['h_date'],
             'l_date': r['l_date'],
             'c_days': r['c_days'],
-            'signal_type': 'pocket_pivot_v3'
+            'signal_type': 'pocket_pivot_v2'
         })
     
     return jsonify({'signals': signals, 'count': len(signals)})

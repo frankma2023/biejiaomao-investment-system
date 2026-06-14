@@ -48,9 +48,9 @@ def get_bi_list(stock_code, db=None, max_age_days=5):
 
     try:
         row = db.execute("""
-            SELECT bi_json, scan_date FROM chanlun_scan_daily
-            WHERE stock_code = ? AND bi_json IS NOT NULL
-            ORDER BY scan_date DESC LIMIT 1
+            SELECT bj.bi_json, bj.scan_date FROM chanlun_bi_json bj
+            WHERE bj.stock_code = ?
+            ORDER BY bj.scan_date DESC LIMIT 1
         """, (stock_code,)).fetchone()
 
         if not row:
