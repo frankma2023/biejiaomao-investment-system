@@ -898,7 +898,7 @@ def classify_trend(zs_list, bi_list=None, ubi=None):
 # 主分析函数
 # ═══════════════════════════════════════════════
 
-def analyze(code, freq="D", limit=500, data_mode="auto"):
+def analyze(code, freq="D", limit=500, data_mode="auto", end_date=None):
     """分析单只股票/指数的缠论结构
     
     Args:
@@ -906,6 +906,7 @@ def analyze(code, freq="D", limit=500, data_mode="auto"):
         freq: K线周期 (D/W/M)
         limit: 读取K线数量
         data_mode: 'stock'|'index'|'auto' — 数据表选择，auto 按前缀推断
+        end_date: K线截止日期 (YYYY-MM-DD)，用于回测时防止未来数据泄露
     
     Returns:
         dict: {kline_count, bi_count, fx_count, zs_count, divergence_count,
@@ -930,20 +931,29 @@ def analyze(code, freq="D", limit=500, data_mode="auto"):
             table = "daily_kline"
     
     # 日线数据读取范围：按日期回溯，确保三种周期都覆盖约 3 年
-    # 日线模式用 max(limit, 750)；周/月线需要更多日线来合成
+    # 回填/日更场景：200 根足够画笔和中枢（标准笔中枢 ≈15根，前高回溯最多半年）
     if freq == "D":
-        read_limit = max(limit, 750)
+        read_limit = max(limit, 200)
     else:
         read_limit = max(limit * 3, 900)
     
     conn = _connect()
-    df = pd.read_sql(f"""
-        SELECT date, open, high, low, close, volume, amount
-        FROM {table}
-        WHERE stock_code = ?
-        ORDER BY date DESC
-        LIMIT ?
-    """, conn, params=(code, read_limit))
+    if end_date:
+        df = pd.read_sql(f"""
+            SELECT date, open, high, low, close, volume, amount
+            FROM {table}
+            WHERE stock_code = ? AND date <= ?
+            ORDER BY date DESC
+            LIMIT ?
+        """, conn, params=(code, end_date, read_limit))
+    else:
+        df = pd.read_sql(f"""
+            SELECT date, open, high, low, close, volume, amount
+            FROM {table}
+            WHERE stock_code = ?
+            ORDER BY date DESC
+            LIMIT ?
+        """, conn, params=(code, read_limit))
     conn.close()
     
     if df.empty:

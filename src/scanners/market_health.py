@@ -89,6 +89,32 @@ def ensure_tables():
             amount      REAL,
             PRIMARY KEY (date, stock_code)
         );
+
+        CREATE TABLE IF NOT EXISTS market_health_sector_daily (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            group_name TEXT NOT NULL,
+            group_label TEXT NOT NULL,
+            indices_count INTEGER,
+            stocks_count INTEGER,
+            total_score INTEGER,
+            rating TEXT,
+            position INTEGER,
+            ma50_above_score INTEGER,
+            ma50_above_value REAL,
+            hl_ratio_score INTEGER,
+            hl_ratio_value REAL,
+            ad_ratio_score INTEGER,
+            ad_ratio_value REAL,
+            vol_breakout_score INTEGER,
+            vol_breakout_value INTEGER,
+            margin_5d_score INTEGER,
+            sector_rot_score INTEGER,
+            fear_greed_score INTEGER,
+            score_vs_market INTEGER,
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            UNIQUE(date, group_name)
+        );
     """)
     conn.commit()
     conn.close()
@@ -567,11 +593,433 @@ def compute_all(target_date):
     return total, rating
 
 
+# ═══════════════════════════════════════════════
+# 行业分组健康分（v3.0）
+# ═══════════════════════════════════════════════
+
+def _get_sector_index_rs(conn, target_date):
+    """读取当日所有 L2+主题指数的 RS_60"""
+    rows = conn.execute("""
+        SELECT i.stock_code, i.name, r.rs_60
+        FROM index_daily_kline i
+        JOIN index_rs_daily r ON i.stock_code = r.stock_code AND r.date = i.date
+        WHERE i.date = ? AND (
+            i.stock_code IN (SELECT code FROM index_style WHERE category = 'sector_l2')
+            OR i.stock_code IN (SELECT code FROM index_style WHERE category = 'thematic')
+        )
+    """, (target_date,)).fetchall()
+    
+    # 按 RS_60 分组
+    groups = {'strong': [], 'mid': [], 'weak': []}
+    for r in rows:
+        rs = r['rs_60']
+        if rs >= 75:
+            groups['strong'].append(r['stock_code'])
+        elif rs >= 30:
+            groups['mid'].append(r['stock_code'])
+        else:
+            groups['weak'].append(r['stock_code'])
+    
+    return groups
+
+
+def _get_constituent_weights(conn, index_codes):
+    """从 index_constituents 获取成分股及权重
+    权重 = 该股票在 index_codes 中出现的次数
+    """
+    if not index_codes:
+        return {}, 0
+    placeholders = ','.join('?' * len(index_codes))
+    rows = conn.execute(f"""
+        SELECT stock_code, COUNT(*) as cnt
+        FROM index_constituents
+        WHERE index_code IN ({placeholders})
+          AND date = (SELECT MAX(date) FROM index_constituents)
+        GROUP BY stock_code
+    """, index_codes).fetchall()
+    
+    weights = {r['stock_code']: r['cnt'] for r in rows}
+    total_stocks = len(weights)
+    return weights, total_stocks
+
+
+def _compute_sector_ma50_above(conn, target_date, stock_weights):
+    """带权重的 MA50 上方占比（批量预取+Python算）"""
+    if not stock_weights:
+        return 0, 0
+    codes = list(stock_weights.keys())
+    placeholders = ','.join('?' * len(codes))
+    
+    rows = conn.execute(f"""
+        SELECT stock_code, date, close
+        FROM daily_kline
+        WHERE stock_code IN ({placeholders})
+          AND date >= date(?, '-60 days')
+          AND date <= ?
+        ORDER BY stock_code, date
+    """, (*codes, target_date, target_date)).fetchall()
+    
+    # 按股票分组，取最近60天收盘价
+    stock_closes = {}
+    for r in rows:
+        sc = r['stock_code']
+        if sc not in stock_closes:
+            stock_closes[sc] = []
+        stock_closes[sc].append(r['close'])
+    
+    above_sum = 0
+    total_weight = 0
+    for sc, closes in stock_closes.items():
+        w = stock_weights.get(sc, 0)
+        total_weight += w
+        if len(closes) < 2:
+            continue
+        today_close = closes[-1]
+        if len(closes) >= 51:
+            sma50 = sum(closes[-51:-1]) / 50
+        else:
+            sma50 = sum(closes[:-1]) / (len(closes) - 1)
+        if today_close > sma50:
+            above_sum += w
+    
+    if total_weight <= 0:
+        return 0, 0
+    pct = round(above_sum / total_weight * 100, 1)
+    return pct, None
+
+
+def _compute_sector_ad_ratio(conn, target_date, stock_weights):
+    """带权重的涨跌家数比（5日均值）"""
+    if not stock_weights:
+        return 0
+    codes = list(stock_weights.keys())
+    placeholders = ','.join('?' * len(codes))
+    
+    rows = conn.execute(f"""
+        SELECT date,
+               SUM(CASE WHEN close > prev_close THEN weight ELSE 0 END) as up_w,
+               SUM(CASE WHEN close < prev_close THEN weight ELSE 0 END) as down_w
+        FROM (
+            SELECT k.date, k.close, sw.weight,
+                   LAG(k.close) OVER (PARTITION BY k.stock_code ORDER BY k.date) as prev_close
+            FROM daily_kline k
+            JOIN (SELECT val as code, {len(codes)} as dummy FROM (SELECT 1))
+            LEFT JOIN (VALUES {','.join('('+str(i)+','+str(w)+')' for i,w in enumerate(stock_weights.values()))}) 
+        )
+        WHERE prev_close IS NOT NULL
+        GROUP BY date ORDER BY date DESC LIMIT 5
+    """, (target_date,))
+    
+    # 简化实现：用 Python 做
+    # 拿5日数据，每日期望股票列表一致
+    return _compute_sector_ad_ratio_simple(conn, target_date, stock_weights)
+
+
+def _compute_sector_ad_ratio_simple(conn, target_date, stock_weights):
+    """简化版加权 AD 比：用 Python 处理"""
+    if not stock_weights:
+        return 0
+    codes = list(stock_weights.keys())
+    placeholders = ','.join('?' * len(codes))
+    
+    # 取5天数据
+    rows = conn.execute(f"""
+        SELECT k.date, k.stock_code, k.close,
+               LAG(k.close) OVER (PARTITION BY k.stock_code ORDER BY k.date) as prev_close
+        FROM daily_kline k
+        WHERE k.stock_code IN ({placeholders})
+          AND k.date >= date(?, '-10 days')
+          AND k.date <= ?
+        ORDER BY k.date
+    """, (*codes, target_date, target_date)).fetchall()
+    
+    # 按日期分组
+    daily = {}
+    for r in rows:
+        d = r['date']
+        if d not in daily:
+            daily[d] = {'up_w': 0, 'down_w': 0}
+        w = stock_weights.get(r['stock_code'], 0)
+        if r['prev_close'] is not None:
+            if r['close'] > r['prev_close']:
+                daily[d]['up_w'] += w
+            elif r['close'] < r['prev_close']:
+                daily[d]['down_w'] += w
+    
+    # 取最近5天
+    dates = sorted(daily.keys(), reverse=True)[:5]
+    values = []
+    for d in dates:
+        dw = daily[d]['down_w']
+        if dw > 0:
+            values.append(daily[d]['up_w'] / dw)
+        else:
+            values.append(10.0)
+    avg = sum(values) / len(values) if values else 0
+    return round(avg, 2)
+
+
+def _compute_sector_hl_ratio(conn, target_date, stock_weights):
+    """带权重的新高新低比，5日均值（批量预取+Python算）"""
+    if not stock_weights:
+        return 0
+    codes = list(stock_weights.keys())
+    placeholders = ','.join('?' * len(codes))
+    
+    # 一次性拉取所有需要的K线（最近300天），在Python里算252日高低
+    rows = conn.execute(f"""
+        SELECT stock_code, date, close
+        FROM daily_kline
+        WHERE stock_code IN ({placeholders})
+          AND date >= date(?, '-300 days')
+          AND date <= ?
+        ORDER BY stock_code, date
+    """, (*codes, target_date, target_date)).fetchall()
+    
+    # 按股票分组
+    stock_data = {}
+    for r in rows:
+        sc = r['stock_code']
+        if sc not in stock_data:
+            stock_data[sc] = []
+        stock_data[sc].append({'date': r['date'], 'close': r['close']})
+    
+    # 获取最近5个交易日（从数据中拿）
+    all_dates = sorted(set(r['date'] for r in rows), reverse=True)
+    recent_5 = set(all_dates[:5])
+    
+    daily_records = {d: {'hw': 0.0, 'lw': 0.0} for d in recent_5}
+    
+    for sc, records in stock_data.items():
+        w = float(stock_weights.get(sc, 0))
+        if w <= 0:
+            continue
+        closes = [r['close'] for r in records]
+        dates = [r['date'] for r in records]
+        n = len(closes)
+        # 滑动窗口算252日最高最低
+        for i in range(n):
+            d = dates[i]
+            if d not in recent_5:
+                continue
+            c = closes[i]
+            start = max(0, i-252)
+            window = closes[start:i]
+            if not window:
+                continue
+            if c >= max(window):
+                daily_records[d]['hw'] += w
+            if c <= min(window):
+                daily_records[d]['lw'] += w
+    
+    dates = sorted(daily_records.keys(), reverse=True)[:5]
+    values = []
+    for d in dates:
+        lw = daily_records[d]['lw']
+        if lw > 0:
+            values.append(daily_records[d]['hw'] / lw)
+        elif daily_records[d]['hw'] > 0:
+            values.append(10.0)
+        else:
+            values.append(0)
+    avg = sum(values) / len(values) if values else 0
+    return round(avg, 2)
+
+
+def _compute_sector_vol_breakout(conn, target_date, stock_weights):
+    """带权重的放量突破数（高效版：SQL聚合）"""
+    if not stock_weights:
+        return 0, 0
+    codes = list(stock_weights.keys())
+    placeholders = ','.join('?' * len(codes))
+    
+    # 当天数据 + 50日均量
+    from datetime import datetime, timedelta
+    day50_dt = datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=60)
+    day50 = day50_dt.strftime('%Y-%m-%d')
+    rows = conn.execute(f"""
+        SELECT k.stock_code, k.close, k.volume,
+               (SELECT AVG(sub.volume) FROM daily_kline sub
+                WHERE sub.stock_code=k.stock_code AND sub.date<k.date AND sub.date>=? ) as vol_ma50,
+               (SELECT MAX(sub.close) FROM daily_kline sub
+                WHERE sub.stock_code=k.stock_code AND sub.date<k.date AND sub.date>=date(k.date, '-20 days')) as max_20
+        FROM daily_kline k
+        WHERE k.date = ? AND k.stock_code IN ({placeholders})
+          AND k.close > 0 AND k.volume > 0
+    """, (day50, target_date, *codes)).fetchall()
+    
+    breakout_sum = 0
+    for r in rows:
+        w = stock_weights.get(r['stock_code'], 0)
+        if r['vol_ma50'] and r['volume'] > r['vol_ma50'] * 1.5 \
+           and r['max_20'] and r['close'] > r['max_20']:
+            breakout_sum += w
+    
+    return breakout_sum, None
+
+
+def compute_sector_health_groups(target_date):
+    """计算行业分组健康分，写入 market_health_sector_daily"""
+    conn = get_db()
+    logger.info(f"📊 行业分组健康分 — {target_date}")
+    
+    # 先算全市场的共享值（融资余额、板块轮动、恐慌指数）
+    # 复用 compute_all 已算的结果
+    row = conn.execute("SELECT * FROM market_health_daily WHERE date=?", (target_date,)).fetchone()
+    if not row:
+        logger.warning(f"  ⚠️ 全市场健康分未计算，先执行 compute_all({target_date})")
+        conn.close()
+        return
+    
+    shared_margin = row['margin_5d_score']
+    shared_rot = row['sector_rot_score']
+    shared_fear = row['fear_greed_score']
+    total_market_score = row['total_score']
+    
+    # 加载 index_style.yaml 类别映射
+    # 因为代码里没有直接表，用硬编码的方式查 index_rs_daily 
+    # 直接从 index_rs_daily + index_daily_kline 查
+    
+    # 分池：sector_l2 和 thematic
+    # 从 index_rs_daily 查所有指数的 RS
+    all_index_rs = conn.execute(f"""
+        SELECT r.stock_code, r.rs_60, i.close
+        FROM index_rs_daily r
+        JOIN index_daily_kline i ON r.stock_code = i.stock_code AND r.date = i.date
+        WHERE r.date = ? AND i.date = ?
+    """, (target_date, target_date)).fetchall()
+    
+    # 从 index_style.yaml 获取分类
+    # 使用 Python 解析 yaml 获取分类
+    import yaml
+    yaml_path = os.path.join(PROJECT_DIR, "config", "index_style.yaml")
+    with open(yaml_path, encoding='utf-8') as f:
+        style = yaml.safe_load(f)
+    
+    l2_codes = {item['code'] for item in style['categories'].get('sector_l2', [])}
+    theme_codes = {item['code'] for item in style['categories'].get('thematic', [])}
+    
+    # RS 索引
+    rs_map = {r['stock_code']: r['rs_60'] for r in all_index_rs}
+    
+    # 对每个池分组
+    pools = [
+        ('l2', 'L2', l2_codes),
+        ('theme', '主题', theme_codes),
+    ]
+    
+    all_groups = []
+    
+    for pool_key, pool_label, pool_codes in pools:
+        # 按 RS 分组
+        strong_codes = [c for c in pool_codes if rs_map.get(c, 0) >= 75]
+        mid_codes = [c for c in pool_codes if 30 <= rs_map.get(c, 0) < 75]
+        weak_codes = [c for c in pool_codes if rs_map.get(c, 0) < 30]
+        
+        for suffix, label_suffix, codes in [
+            ('strong', '强势组', strong_codes),
+            ('mid', '中性组', mid_codes),
+            ('weak', '弱势组', weak_codes),
+        ]:
+            group_name = f"{pool_key}_{suffix}"
+            group_label = f"{pool_label}{label_suffix}"
+            
+            if not codes:
+                all_groups.append((group_name, group_label, 0, 0, None, None, None, None, None, None, None, None, 0))
+                continue
+            
+            # 成分股权重
+            weights, stocks_cnt = _get_constituent_weights(conn, codes)
+            if not weights:
+                logger.info(f"  {group_label}: 成分股为空，跳过")
+                all_groups.append((group_name, group_label, len(codes), 0, None, None, None, None, None, None, None, None, 0))
+                continue
+            
+            # 计算各指标
+            ma50_val, _ = _compute_sector_ma50_above(conn, target_date, weights)
+            ma50_s = score_ma50_above(ma50_val)
+            
+            ad_val = _compute_sector_ad_ratio_simple(conn, target_date, weights)
+            ad_s = score_ad_ratio(ad_val)
+            
+            hl_val = _compute_sector_hl_ratio(conn, target_date, weights)
+            hl_s = score_hl_ratio(hl_val)
+            
+            vb_val, _ = _compute_sector_vol_breakout(conn, target_date, weights)
+            vb_s = score_vol_breakout(vb_val, 1) if vb_val else 0
+            
+            # 总分（融资余额/板块轮动/恐慌指数用全市场值）
+            total_s = ma50_s + ad_s + hl_s + vb_s + shared_margin + shared_rot + shared_fear
+            
+            # 评级
+            if total_s >= 80: rating = "A"
+            elif total_s >= 65: rating = "B"
+            elif total_s >= 50: rating = "C"
+            elif total_s >= 35: rating = "D"
+            elif total_s >= 20: rating = "E"
+            else: rating = "F"
+            
+            # 仓位建议
+            if total_s >= 80: position = 70
+            elif total_s >= 65: position = 50
+            elif total_s >= 50: position = 35
+            elif total_s >= 35: position = 20
+            else: position = 0
+            
+            score_diff = total_s - total_market_score
+            
+            logger.info(f"  {group_label}: {len(codes)}指数/{stocks_cnt}只 → {total_s}分/{rating} 仓位{position}%")
+            
+            all_groups.append((group_name, group_label, len(codes), stocks_cnt,
+                               total_s, rating, position, score_diff,
+                               ma50_s, ma50_val, ad_s, ad_val,
+                               hl_s, hl_val, vb_s, vb_val))
+    
+    # 写入数据库
+    conn.execute("DELETE FROM market_health_sector_daily WHERE date = ?", (target_date,))
+    for g in all_groups:
+        gn, gl, icnt, scnt, ts, rt, pos, sdiff, *rest = g
+        if ts is None:
+            conn.execute("""
+                INSERT OR REPLACE INTO market_health_sector_daily
+                (date, group_name, group_label, indices_count, stocks_count,
+                 total_score, rating, position, score_vs_market,
+                 ma50_above_score, ma50_above_value, ad_ratio_score, ad_ratio_value,
+                 hl_ratio_score, hl_ratio_value, vol_breakout_score, vol_breakout_value,
+                 margin_5d_score, sector_rot_score, fear_greed_score)
+                VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, NULL,
+                        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+                        ?, ?, ?)
+            """, (target_date, gn, gl, icnt, scnt, shared_margin, shared_rot, shared_fear))
+        else:
+            conn.execute("""
+                INSERT OR REPLACE INTO market_health_sector_daily
+                (date, group_name, group_label, indices_count, stocks_count,
+                 total_score, rating, position, score_vs_market,
+                 ma50_above_score, ma50_above_value, ad_ratio_score, ad_ratio_value,
+                 hl_ratio_score, hl_ratio_value, vol_breakout_score, vol_breakout_value,
+                 margin_5d_score, sector_rot_score, fear_greed_score)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (target_date, gn, gl, icnt, scnt, ts, rt, pos, sdiff,
+                   rest[0], rest[1], rest[2], rest[3],
+                   rest[4], rest[5], rest[6], rest[7],
+                   shared_margin, shared_rot, shared_fear))
+    
+    conn.commit()
+    conn.close()
+    logger.info(f"📊 行业分组健康分完成: {len(all_groups)} 组")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="大盘健康度计算")
     parser.add_argument("--date", type=str, default=None, help="目标日期 YYYY-MM-DD")
+    parser.add_argument("--sector", action="store_true", help="仅计算行业分组健康分")
     args = parser.parse_args()
 
     target = args.date or dt_date.today().strftime("%Y-%m-%d")
     ensure_tables()
-    compute_all(target)
+    if args.sector:
+        compute_sector_health_groups(target)
+    else:
+        compute_all(target)
+        compute_sector_health_groups(target)

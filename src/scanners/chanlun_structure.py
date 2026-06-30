@@ -8,6 +8,10 @@
   - get_recent_bi()      最近 N 笔
   - get_bi_force()       笔力度/斜率/角度
 
+批量回填时可通过模块变量抑制控制台输出：
+  chanlun_structure._verbose = False      # 不打印 bi 过期信息到屏幕
+  chanlun_structure._log_path = '...'     # 写入日志文件备查
+
 数据格式（bi_json 中每条笔）：
   {sdt, edt, direction, high, low, power, slope, angle, length}
 
@@ -23,6 +27,28 @@ from datetime import datetime
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DB_PATH = os.path.join(PROJECT_ROOT, 'data', 'lixinger.db')
 
+# ── 模块级开关：批量回填时抑制控制台输出 ──
+_verbose = True     # False 时不打印 bi 过期信息到屏幕
+_log_path = None    # 设为文件路径时，过期信息写入该日志
+_target_date = None # 回填场景设为 scan_date，get_bi_list 只取 ≤ 该日期的 bi_json
+
+
+def _log_bi_age(stock_code, age):
+    """统一处理 bi 过期日志"""
+    # 优先检查环境变量（子进程/多路径导入均生效）
+    import os as _os
+    silent = _os.environ.get('CHANLUN_SILENT') == '1'
+    msg = f"[chanlun_structure] {stock_code} bi数据过期 ({age}天前)"
+    if not silent and _verbose:
+        print(msg)
+    if _log_path:
+        try:
+            with open(_log_path, 'a', encoding='utf-8') as f:
+                from datetime import datetime as _dt
+                f.write(f"{_dt.now().isoformat()} {msg}\n")
+        except Exception:
+            pass
+
 
 def _get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -30,14 +56,15 @@ def _get_db():
     return conn
 
 
-def get_bi_list(stock_code, db=None, max_age_days=5):
+def get_bi_list(stock_code, db=None, max_age_days=5, target_date=None):
     """
-    从 chanlun_scan_daily 获取股票的最新笔列表。
+    从 chanlun_bi_json 获取股票的笔列表。
 
     Args:
         stock_code: 股票代码
         db: 数据库连接（可选）
         max_age_days: 数据最大允许天数（超过则返回空，提示数据过期）
+        target_date: 目标日期，取 ≤ 该日期的最近一条 bi_json（回测防未来数据泄露）
 
     Returns:
         list[dict]: 笔列表，按时间排序；无数据时返回 []
@@ -47,11 +74,20 @@ def get_bi_list(stock_code, db=None, max_age_days=5):
         db = _get_db()
 
     try:
-        row = db.execute("""
-            SELECT bj.bi_json, bj.scan_date FROM chanlun_bi_json bj
-            WHERE bj.stock_code = ?
-            ORDER BY bj.scan_date DESC LIMIT 1
-        """, (stock_code,)).fetchone()
+        if target_date is None and _target_date is not None:
+            target_date = _target_date
+        if target_date:
+            row = db.execute("""
+                SELECT bj.bi_json, bj.scan_date FROM chanlun_bi_json bj
+                WHERE bj.stock_code = ? AND bj.scan_date <= ?
+                ORDER BY bj.scan_date DESC LIMIT 1
+            """, (stock_code, target_date)).fetchone()
+        else:
+            row = db.execute("""
+                SELECT bj.bi_json, bj.scan_date FROM chanlun_bi_json bj
+                WHERE bj.stock_code = ?
+                ORDER BY bj.scan_date DESC LIMIT 1
+            """, (stock_code,)).fetchone()
 
         if not row:
             return []
@@ -61,7 +97,7 @@ def get_bi_list(stock_code, db=None, max_age_days=5):
         if scan_date:
             age = (datetime.now() - datetime.strptime(scan_date, '%Y-%m-%d')).days
             if age > max_age_days:
-                print(f"[chanlun_structure] {stock_code} bi数据过期 ({age}天前)")
+                _log_bi_age(stock_code, age)
                 # 仍然返回（可能比没有好）
 
         bi_list = json.loads(row['bi_json']) if row['bi_json'] else []

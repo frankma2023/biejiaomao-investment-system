@@ -46,13 +46,13 @@
 
     <header class="panel-header">
       <h1>📋 欧奈尔投资系统 · 项目进展</h1>
-      <p>2026-06-10（阶段收尾 · 卖出引擎缠论化 + 驾驶舱V2）</p>
+      <p>2026-06-29（阶段收尾 · 行业分组健康分 + Prompt生成器v2）</p>
     </header>
 
     <div class="pg-stats">
-      <div class="pg-stat"><div class="n" style="color:#4CAF50">98</div><div class="l">已完成</div></div>
-      <div class="pg-stat"><div class="n" style="color:#FF9800">0</div><div class="l">进行中</div></div>
-      <div class="pg-stat"><div class="n">2</div><div class="l">待开发</div></div>
+      <div class="pg-stat"><div class="n" style="color:#4CAF50">100</div><div class="l">已完成</div></div>
+      <div class="pg-stat"><div class="n" style="color:#FF9800">2</div><div class="l">进行中</div></div>
+      <div class="pg-stat"><div class="n">0</div><div class="l">待开发</div></div>
     </div>
 
     <div class="section-title">功能模块</div>
@@ -198,9 +198,12 @@
       </div>
 
       <div class="pg-card">
-        <h3>📐 已完成 <span class="badge" style="background:#E8F5E9;color:#2E7D32">1项</span></h3>
+        <h3>📐 大盘环境 <span class="badge" style="background:#E8F5E9;color:#2E7D32">4项</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span>大盘环境卖出评分</td><td>market_sell_score.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>大盘健康度评分卡</td><td>market_health.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>⭐ 行业分组健康分</td><td>market_health.py(v3.0)</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>股票行业分组上下文</td><td>/api/stock-sector-context</td></tr>
         </table>
       </div>
 
@@ -311,8 +314,13 @@
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">59. 引擎包装器让独立扫描器融入 pattern-scan 生态</div><div class="ld">MW信号引擎是独立扫描器（mw_signal.py），不走 engine_registry 接口。创建 mw_signal_engine.py 包装器（detect()+ENGINE_META），自动注册到 pattern-scan 的 K 线图。注意前端读 sig.details.signal_type 而非 sig.details.signal。</div></div>
     <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">60. 274M行表的市值查询不能硬来</div><div class="ld">fundamental_indicator 有 2.74 亿行，按 stock_code IN + metric_code + date 子查询极慢（超时）。V1 降级为「观察池RS筛选已天然排除微盘股」，市值做软标注不阻塞管道。后续方案：预计算市值快照表。</div></div>
 
-<div class="updated">❤️ 投资手账本 · 项目进展</div>
-  </div>
+<div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">61. 行业分组健康分用RS_60动态分组代替固定行业分类</div><div class="ld">最初想按传统行业分类固定划分板块（科技/消费/金融）。但市场结构变化快，手动维护分类不现实。改为按指数RS_60百分位动态分组（≥75强/30~74中/<30弱），强势组自动包含当期领涨板块。不依赖人工分类，风格切换时自动跟随。</div></div>
+
+<div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">62. 成分股权重=在组内指数中出现次数，不归一化</div><div class="ld">最初设计用 count(在强势组)/count(在所有L2) 做权重归一化，但出现了「仅出现在1个强势指数的股票权重=1.0，出现在3个强势指数+4个弱势指数的股票权重=0.75」反直觉结果。改为直接用 count(在组内指数中出现次数)，被越多强势指数确认的股票权重越高。</div></div>
+
+<div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">63. 单线程Flask不能做同步长轮询——后台线程+状态检查是正确模式</div><div class="ld">vibe-trading MCP 调研需 30-600秒，在 Flask 单线程里同步等待会阻塞所有其他请求。改为后台线程执行调研 + 内存 _research_tasks 存储状态 + /api/research/status 轮询端点。前端每 5 秒轮询一次，调研完成后自动插入 prompt。</div></div>
+
+<div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">64. Service Worker 缓存独立于浏览器缓存——Cache-Control 头部无效</div><div class="ld">sw.js 用 cache-first 策略缓存了 HTML 页面，修改文件后浏览器始终加载旧版本。加了 Cache-Control: no-cache 也无用（service worker 拦截在前）。修复：升级缓存策略为 network-first（HTML 始终先请求服务器）+ 缓存名升版 hana-v1→hana-v2 强制清除旧缓存。</div></div>
 <script>
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();

@@ -201,8 +201,9 @@ def detect_for_stock(stock_code, target_date, params=None):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     rows = conn.execute("""SELECT date,open,high,low,close,volume FROM daily_kline
-        WHERE stock_code=? AND date<=? ORDER BY date""",
+        WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 200""",
         (stock_code, target_date)).fetchall()
+    rows.reverse()  # 恢复升序
     if len(rows) < 120: conn.close(); return []
     klines = [dict(r) for r in rows]
     rs_info = get_rs(conn, stock_code, target_date)

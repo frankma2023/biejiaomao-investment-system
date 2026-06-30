@@ -132,7 +132,7 @@ def scan_stock(code, scan_date):
     from scanners.chanlun import analyze
     
     try:
-        r = analyze(code, "D", 500, data_mode="stock")
+        r = analyze(code, "D", 400, data_mode="stock", end_date=scan_date)
         if r.get("error"):
             return None
         

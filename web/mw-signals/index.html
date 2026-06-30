@@ -3,12 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="theme-color" content="#0d0d12">
+<link rel="manifest" href="/manifest.json">
 <title>MW 信号</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<link rel="stylesheet" href="../shared/css/mobile.css">
 <style>
 .page-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .page-header h1{font-family:var(--font-display);font-size:1.2rem;font-weight:400;color:var(--text-primary)}
@@ -230,7 +233,7 @@ function render(){
     
     return '<div class="signal-card" onclick="toggleExpand('+i+')">'+
       '<div class="top-row">'+
-        '<span class="stock-info"><a href="http://localhost:8772/pattern-scan/?code='+s.stock_code+'" target="_blank">'+(s.stock_name||s.stock_code)+'</a><span class="code">'+s.stock_code+'</span></span>'+
+        '<span class="stock-info"><a href="http://'+window.location.hostname+':8772/pattern-scan/?code='+s.stock_code+'" target="_blank">'+(s.stock_name||s.stock_code)+'</a><span class="code">'+s.stock_code+'</span></span>'+
         '<span style="font-size:10px;color:var(--muted)">'+(isB1?'B1 ':'B2 ')+s[dateCol]+'</span>'+
         '<span style="font-size:10px;color:var(--muted)">RS'+(s.h_rs250||'—')+' | '+(s.c_amount_avg?(s.c_amount_avg/10000).toFixed(0)+'万':'—')+'</span>'+
         '<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+' ('+s.score+'分)</span>'+
@@ -283,8 +286,8 @@ function render(){
           '<tr style="border-top:1px solid var(--border)"><td class="lbl" colspan="4" style="color:var(--accent);font-weight:600">总分: '+s.score+'/100 = 形态'+(s.score_h+s.score_d+s.score_c+(isB1?0:s.score_p))+' + 行业'+(s.score_i1||0+s.score_i2||0)+' + 共振'+(s.score_sig||0)+(isB1?'':' + 跳空'+(s.score_gap||0))+'</td></tr>'+
         '</table>'+
         '<div style="margin-top:8px;display:flex;gap:12px">'+
-          '<a href="http://localhost:8772/pattern-scan/?code='+s.stock_code+'" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🔍 形态复核 →</a>'+
-          '<a href="http://localhost:8772/chanlun-backtest/?code='+s.stock_code+'&mode=stock" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🎋 缠论分析 →</a>'+
+          '<a href="http://'+window.location.hostname+':8772/pattern-scan/?code='+s.stock_code+'" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🔍 形态复核 →</a>'++
+          '<a href="http://'+window.location.hostname+':8772/chanlun-backtest/?code='+s.stock_code+'&mode=stock" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🎋 缠论分析 →</a>'+
         '</div>'+
       '</div>'+
     '</div>';
@@ -307,5 +310,6 @@ function toggleTheme(){
 
 loadLatest();
 </script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js")}</script>
 </body>
 </html>

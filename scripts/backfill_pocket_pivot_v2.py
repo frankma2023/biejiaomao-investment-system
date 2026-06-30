@@ -2,7 +2,7 @@
 口袋支点V2 批量补扫脚本
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-功能：对指定日期范围内的每个交易日，运行口袋支点V3引擎进行全市场扫描，
+功能：对指定日期范围内的每个交易日，运行口袋支点V2引擎进行全市场扫描，
       并将识别到的信号保存到 pocket_pivot_daily 表中。
 
 计算内容：
@@ -33,13 +33,13 @@
 
 用法：
   # 全量扫描（覆盖已有数据）
-  python scripts/backfill_pocket_pivot_v3.py --start 2023-06-01 --end 2026-06-05 --workers 4
+  python scripts/backfill_pocket_pivot_v2.py --start 2023-06-01 --end 2026-06-05 --workers 4
 
   # 增量扫描（跳过已有数据的日期）
-  python scripts/backfill_pocket_pivot_v3.py --start 2023-06-01 --end 2026-06-05 --incremental --workers 4
+  python scripts/backfill_pocket_pivot_v2.py --start 2023-06-01 --end 2026-06-05 --incremental --workers 4
 
   # 单进程（便于调试）
-  python scripts/backfill_pocket_pivot_v3.py --start 2026-06-01 --end 2026-06-05 --workers 1
+  python scripts/backfill_pocket_pivot_v2.py --start 2026-06-01 --end 2026-06-05 --workers 1
 
 参数：
   --start       起始日期 (YYYY-MM-DD)，默认 2023-06-01
@@ -94,7 +94,7 @@ def scan_one_day(date):
     """
     t0 = time.time()
     try:
-        # 导入口袋支点V3引擎（文件名是 pocket_pivot_v2.py，实际是V3版本）
+        # 导入口袋支点V2引擎（文件名是 pocket_pivot_v2.py，实际是V3版本）
         from pocket_pivot_v2 import scan_date, save_to_db, CFG
 
         # 回填模式：放宽抛盘日限制（历史熊市中抛盘日可能很多）
@@ -125,7 +125,7 @@ def scan_one_day(date):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='口袋支点V3 批量补扫 — 多进程版'
+        description='口袋支点V2 批量补扫 — 多进程版'
     )
     parser.add_argument('--start', help='起始日期 YYYY-MM-DD')
     parser.add_argument('--end', help='结束日期 YYYY-MM-DD')

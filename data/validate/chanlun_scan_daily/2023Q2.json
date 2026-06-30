@@ -1,0 +1,49 @@
+{
+  "table": "chanlun_scan_daily",
+  "date_range": [
+    "2023-04-01",
+    "2023-06-30"
+  ],
+  "quarter": "2023Q2",
+  "checked_at": "2026-06-14 20:22:52",
+  "passed": false,
+  "checks": {
+    "date_continuity": {
+      "passed": false,
+      "expected": 59,
+      "actual": 20,
+      "missing": 39,
+      "missing_dates": [
+        "2023-04-03",
+        "2023-04-04",
+        "2023-04-06",
+        "2023-04-07",
+        "2023-04-10",
+        "2023-04-11",
+        "2023-04-12",
+        "2023-04-13",
+        "2023-04-14",
+        "2023-04-17"
+      ]
+    },
+    "coverage": {
+      "passed": true,
+      "median": 2811,
+      "threshold": 2248,
+      "low_days": 0
+    },
+    "signal_yield": {
+      "passed": true,
+      "zero_signal_days": 0
+    },
+    "value_sanity": {
+      "passed": true,
+      "anomalies": 0
+    },
+    "cross_ref": {
+      "passed": true,
+      "orphans": 0
+    }
+  },
+  "anomalies": []
+}

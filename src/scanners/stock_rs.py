@@ -55,6 +55,8 @@ def load_data(conn, target_date=None, start_date=None):
         end = datetime.now()
     if start_date:
         start = datetime.strptime(start_date, "%Y-%m-%d")
+        # 往前多拉 2 年历史数据，确保 ret_250 可算
+        start = start - timedelta(days=730)
     else:
         start = end - timedelta(days=LOOKBACK_YEARS * 365)
     start_str = start.strftime("%Y-%m-%d")
@@ -250,10 +252,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="计算A股RS强度")
     parser.add_argument("--date", type=str, default=None, help="目标日期 YYYY-MM-DD")
     parser.add_argument("--start", type=str, default=None, help="起始日期")
+    parser.add_argument("--end", type=str, default=None, help="结束日期（默认今天）")
     args = parser.parse_args()
 
     print("计算中...")
-    result = compute(target_date=args.date, start_date=args.start)
+    result = compute(target_date=args.end or args.date, start_date=args.start)
 
     # 最新日期摘要
     latest_date = result["date"].max()
@@ -274,27 +277,32 @@ if __name__ == "__main__":
                   f"RPS_250={row['rps_250']} RPS_20={row['rps_20']} "
                   f"类型={row['double_strong']}")
 
-    # ── 写入 stock_rs_daily ──
+    # ── 写入 stock_rs_daily（只保存用户要求的日期范围）──
     import sqlite3
     db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "lixinger.db")
     conn = sqlite3.connect(db_path)
-    conn.execute("DELETE FROM stock_rs_daily WHERE date = ?", (str(latest_date),))
-    rows = []
-    for row in latest.iter_rows(named=True):
-        rows.append((
-            row['stock_code'], str(latest_date),
-            row['adj_close'], row['adj_close'],
-            row['ret_20'], row['ret_60'], row['ret_120'], row['ret_250'],
-            row['rps_20'], row['rps_60'], row['rps_120'], row['rps_250'],
-            row['rs_line_norm'], row['amount'],
-        ))
-    conn.executemany(
-        """INSERT INTO stock_rs_daily
-        (stock_code, date, close, adj_close, ret_20, ret_60, ret_120, ret_250,
-         rps_20, rps_60, rps_120, rps_250, rs_line, amount)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        rows
-    )
+    total = 0
+    save_dates = [d for d in result["date"].unique().to_list() if str(d) >= (args.start or '1900-01-01')]
+    for date_val in save_dates:
+        day_data = result.filter(pl.col("date") == date_val)
+        conn.execute("DELETE FROM stock_rs_daily WHERE date = ?", (str(date_val),))
+        rows = []
+        for row in day_data.iter_rows(named=True):
+            rows.append((
+                row['stock_code'], str(date_val),
+                row['adj_close'], row['adj_close'],
+                row['ret_20'], row['ret_60'], row['ret_120'], row['ret_250'],
+                row['rps_20'], row['rps_60'], row['rps_120'], row['rps_250'],
+                row['rs_line_norm'], row['amount'],
+            ))
+        conn.executemany(
+            """INSERT INTO stock_rs_daily
+            (stock_code, date, close, adj_close, ret_20, ret_60, ret_120, ret_250,
+             rps_20, rps_60, rps_120, rps_250, rs_line, amount)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            rows
+        )
+        total += len(rows)
     conn.commit()
     conn.close()
-    print(f"已写入 {len(rows)} 条到 stock_rs_daily")
+    print(f"已写入 {total} 条到 stock_rs_daily（{result['date'].n_unique()} 个日期）")

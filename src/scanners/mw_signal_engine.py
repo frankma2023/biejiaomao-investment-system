@@ -27,7 +27,7 @@ ENGINE_META = {
 }
 
 
-def detect(klines, indicators):
+def detect(klines, indicators=None):
     """
     从 mw_signal_daily 表查询该股票的 MW 信号，
     返回 pattern-scan 兼容的信号列表。

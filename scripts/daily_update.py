@@ -11,7 +11,7 @@
   1. 股票状态更新       (fetch_stock_basic)
   2. 指数日K线          (fetch_index_daily_kline)
   3. 个股日K线          (fetch_stock_daily_kline)
-  4. 个股基本面         (fetch_fundamental_nonfinancial)
+  4. 个股基本面         (fetch_fundamental_nonfinancial — 周一)
   5. 指数拥挤度         (index_crowding)
   6. 融资融券           (fetch_margin_daily)
   7. 大盘健康度         (market_health)
@@ -19,7 +19,7 @@
   9. 大盘扫描快照       (compute_market_snapshot)
   10. 个股RS+指数RS     (stock_rs + index_rs)
   11. 全A股形态扫描     (daily_pattern_scan — 每日)
-  11.5 口袋支点V3扫描    (pocket_pivot_v2 — 每日)
+  11.5 口袋支点V2扫描    (pocket_pivot_v2 — 每日)
   12. 机构持股拉取      (fetch_institutional_holdings — 周一)
   13. 研报拉取          (fetch_stock_reports — 周一)
   14. 回购数据          (fetch_buyback — 周一)
@@ -129,10 +129,10 @@ TASKS = [
     ("📋 股票状态",         [PYTHON_EXE, "scripts/fetch_stock_basic.py"]),
     ("📊 指数日K线",       [PYTHON_EXE, "scripts/fetch_index_daily_kline.py", "--all", "--end", today_str]),
     ("📈 个股日K线",       [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py"]),
-    ("💰 个股基本面",      [PYTHON_EXE, "scripts/fetch_fundamental_nonfinancial.py", "--incremental", "--workers", "4"]),
     ("📐 指数拥挤度",      [PYTHON_EXE, "src/scanners/index_crowding.py", "--date", today_str]),
     ("🔄 融资融券(新API)", [PYTHON_EXE, "scripts/fetch_margin_daily.py"]),
     ("💊 大盘健康度",      [PYTHON_EXE, "src/scanners/market_health.py", "--date", today_str]),
+    ("🔬 行业分组健康分",  [PYTHON_EXE, "src/scanners/market_health.py", "--date", today_str, "--sector"]),
     ("📉 大盘卖出评分",    [PYTHON_EXE, "src/scanners/market_sell_score.py", "--date", today_str]),
     ("📸 大盘扫描快照",    [PYTHON_EXE, "scripts/compute_market_snapshot.py", "--date", today_str]),
 ]
@@ -144,10 +144,14 @@ if not SKIP_RS:
 # 步骤7：全A股形态扫描（依赖个股RS完成，每日执行）
 TASKS.append(("🔎 全A股形态扫描", [PYTHON_EXE, "scripts/daily_pattern_scan.py", "--date", today_str, "--all"]))
 
-# 步骤7.5：口袋支点V3扫描（依赖MW结构的H/L/C，每日执行）
-TASKS.append(("🟠 口袋支点V3", [PYTHON_EXE, "src/scanners/pocket_pivot_v2.py", "--date", today_str, "--save"]))
+# 步骤7.5：口袋支点V2扫描（依赖MW结构的H/L/C，每日执行）
+TASKS.append(("🟠 口袋支点V2", [PYTHON_EXE, "src/scanners/pocket_pivot_v2.py", "--date", today_str, "--save"]))
 
-# 步骤8：机构持股拉取（每周一执行，增量模式）
+# 步骤4.5：个股基本面拉取（每周一执行）
+if date.today().weekday() == 0:
+    TASKS.append(("💰 个股基本面", [PYTHON_EXE, "scripts/fetch_fundamental_nonfinancial.py", "--incremental", "--workers", "4"]))
+else:
+    log(f"⏭️  跳过个股基本面（非周一）")
 if date.today().weekday() == 0:
     TASKS.append(("🏦 机构持股拉取", [PYTHON_EXE, "scripts/fetch_institutional_holdings.py"]))
 else:

@@ -4,122 +4,283 @@
 <meta charset="UTF-8">
 <link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#0d0d12">
 <title>Prompt 生成器</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/css/hanako-glass.css">
 <style>
-body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)}
-.app-container{max-width:1000px;margin:0 auto;padding:12px 16px}
-.page-header{margin-bottom:10px}
-.page-header h1{font-family:var(--font-display);font-size:1.2rem;font-weight:400;color:var(--text-primary)}
-.input-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-.input-row input{padding:8px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text-primary);font-size:.8rem;font-family:var(--font-mono);width:140px;outline:none}
-.input-row input:focus{border-color:var(--accent)}
-.input-row .btn{padding:8px 18px;border-radius:10px;font-size:.75rem;font-weight:600;cursor:pointer;font-family:var(--font-body);border:none;transition:all .2s}
-.btn-gen{background:linear-gradient(135deg,var(--accent),#d97706);color:#fff;border:none;box-shadow:0 2px 12px rgba(245,158,11,.25)}.btn-gen:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 4px 16px rgba(245,158,11,.35)}
-.btn-copy{background:var(--card);color:var(--text-secondary);border:1px solid var(--border)!important;backdrop-filter:blur(8px)}.btn-copy:hover{border-color:var(--accent)!important;color:var(--accent);background:var(--accent-subtle)}
-.btn-ai{background:rgba(16,185,129,.08);color:#34d399;border:1px solid rgba(16,185,129,.2)!important;backdrop-filter:blur(8px)}.btn-ai:hover{background:rgba(16,185,129,.18);border-color:rgba(16,185,129,.4)!important;box-shadow:0 2px 12px rgba(16,185,129,.15)}
+*{box-sizing:border-box}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary);margin:0;min-height:100vh}
+.app-container{max-width:860px;margin:0 auto;padding:20px}
+
+/* 粒子背景保持原有的 */
+
+/* 标题区 */
+.hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:20px}
+.hdr h1{font-family:var(--font-display);font-size:18px;font-weight:400;color:var(--text-primary);margin:0;letter-spacing:.01em}
+.hdr .sub{font-size:10px;color:var(--muted);font-family:var(--font-body)}
+
+/* 输入卡片 */
+.in-card{background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;padding:18px 22px;margin-bottom:14px}
+.in-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.in-row .label{font-size:10px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em;min-width:48px}
+.in-row .input{font-family:var(--font-mono);font-size:14px;padding:7px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.04);color:var(--text-primary);width:120px;outline:none;transition:border-color .2s}
+.in-row .input:focus{border-color:var(--accent)}
+.in-row .name{font-size:13px;color:var(--accent);font-family:var(--font-mono);min-width:70px}
+.in-row .hint{font-size:9px;color:var(--muted);margin-left:auto}
+.in-divider{height:1px;background:var(--border);margin:12px 0}
+
+/* 按钮 */
+.btn{font-family:var(--font-body);font-size:11px;font-weight:600;padding:7px 18px;border-radius:10px;cursor:pointer;border:none;transition:all .2s;display:inline-flex;align-items:center;gap:5px}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#d97706);color:#fff;box-shadow:0 2px 10px rgba(245,158,11,.2)}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 4px 14px rgba(245,158,11,.3)}
+.btn-ghost{background:transparent;color:var(--text-secondary);border:1px solid var(--border)!important}
+.btn-ghost:hover{border-color:var(--accent)!important;color:var(--accent)}
+.btn-ai{background:rgba(16,185,129,.08);color:#34d399;border:1px solid rgba(16,185,129,.2)!important}
+.btn-ai:hover{background:rgba(16,185,129,.18)}
 .btn-ai:disabled{opacity:.4;cursor:not-allowed}
-.meta{font-size:.62rem;color:var(--muted);margin-bottom:8px}
-.prompt-box{background:#111118;border:1px solid #2a2a35;border-radius:12px;padding:20px 24px;font-family:'JetBrains Mono',monospace;font-size:.68rem;line-height:1.7;color:#c9d1d9;white-space:pre-wrap;max-height:60vh;overflow-y:auto;min-height:200px}
-.result-box{background:#111118;border:1px solid #2a2a35;border-radius:12px;padding:20px 24px;margin-top:10px;font-size:.75rem;line-height:1.8;color:#d4d4d8;max-height:50vh;overflow-y:auto}
-.result-box h2,h3{color:#f59e0b}
-.result-box strong{color:#fbbf24}
-.result-box blockquote{border-left:3px solid #f59e0b;padding-left:12px;color:#a1a1aa}
-.empty{text-align:center;padding:60px;color:var(--muted);font-family:var(--font-display)}
-.loading{text-align:center;padding:40px;color:var(--muted)}
+
+/* 复选框组 */
+.chk-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.chk-wrap label{font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:5px;cursor:pointer}
+.chk-wrap input{accent-color:var(--accent);width:14px;height:14px}
+
+/* 自定义课题 */
+.custom-box{width:100%;margin-top:8px;display:none}
+.custom-box textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.03);color:var(--text-primary);font-family:var(--font-mono);font-size:11px;line-height:1.6;resize:vertical;outline:none;transition:border-color .2s;min-height:48px}
+.custom-box textarea:focus{border-color:var(--accent)}
+.custom-box .hint{font-size:9px;color:var(--muted);margin-top:4px}
+
+/* vibe 状态条 */
+.vibe-row{display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:10px;color:var(--muted)}
+
+/* Prompt 区域卡片 */
+.prompt-card{background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:14px}
+.prompt-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border)}
+.prompt-hdr .title{font-family:var(--font-display);font-size:12px;font-weight:400;color:var(--text-secondary)}
+.prompt-hdr .meta{font-size:9px;color:var(--muted)}
+.prompt-hdr .actions{display:flex;gap:6px}
+.prompt-body{background:#111118;padding:18px 20px;font-family:var(--font-mono);font-size:12px;line-height:1.7;color:#c9d1d9;white-space:pre-wrap;max-height:55vh;overflow-y:auto;min-height:140px}
+.prompt-empty{color:var(--muted);text-align:center;padding:50px 20px;font-family:var(--font-display);font-size:13px}
+
+/* 结果卡片 */
+.result-card{background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:14px;display:none}
+.result-hdr{padding:12px 18px;border-bottom:1px solid var(--border);font-family:var(--font-display);font-size:12px;font-weight:400;color:var(--text-secondary)}
+.result-body{padding:18px 20px;font-size:12px;line-height:1.8;color:var(--text-primary);max-height:50vh;overflow-y:auto}
+.result-body h2{font-family:var(--font-display);font-size:13px;font-weight:400;color:var(--accent);margin:10px 0 6px}
+.result-body h3{font-size:12px;color:var(--accent);margin:8px 0 4px}
+.result-body strong{color:var(--accent)}
+.result-body blockquote{border-left:2px solid var(--accent);padding-left:12px;margin:6px 0;color:var(--text-secondary)}
+.result-empty{text-align:center;padding:40px;color:var(--muted);font-family:var(--font-display);font-size:13px}
 </style>
 </head>
 <body>
-<div class="app-container">
+<canvas id="bg-canvas"></canvas>
+<script>
+(function(){var c=document.getElementById('bg-canvas'),w=c.width=window.innerWidth,h=c.height=window.innerHeight;var ctx=c.getContext('2d'),particles=[],N=50;for(var i=0;i<N;i++)particles.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var p=particles[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=w;if(p.x>w)p.x=0;if(p.y<0)p.y=h;if(p.y>h)p.y=0;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(245,158,11,'+p.o+')';ctx.fill()}for(var i=0;i<N;i++){for(var j=i+1;j<N;j++){var dx=particles[i].x-particles[j].x,dy=particles[i].y-particles[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){ctx.beginPath();ctx.moveTo(particles[i].x,particles[i].y);ctx.lineTo(particles[j].x,particles[j].y);ctx.strokeStyle='rgba(245,158,11,'+((100-dist)/100*.06)+')';ctx.stroke()}}}requestAnimationFrame(draw)}draw();window.addEventListener('resize',function(){w=c.width=window.innerWidth;h=c.height=window.innerHeight})})();
+</script>
+
 <nav id="top-nav"></nav>
+<div class="app-container">
+
+<div class="hdr">
+  <h1>🔮 Prompt 生成器</h1>
+  <span class="sub">oneil 技能框架 · 全维度数据采集</span>
+</div>
+
+<!-- 输入卡片 -->
+<div class="in-card">
+  <div class="in-row">
+    <span class="label">股票</span>
+    <input class="input" id="code-input" placeholder="代码" value="" maxlength="6" onblur="lookupName()">
+    <span class="name" id="name-hint"></span>
+    <button class="btn btn-primary" onclick="generate()" style="margin-left:auto">🔍 生成</button>
+  </div>
+
+  <div class="in-divider"></div>
+
+  <div class="chk-wrap">
+    <label><input type="checkbox" id="research-check" onchange="toggleResearch()"> 包含外部调研</label>
+    <label id="autoq-label" style="display:none"><input type="checkbox" id="autoq-check" checked> 自动生成调研问题</label>
+  </div>
+
+  <div class="custom-box" id="custom-box">
+    <textarea id="custom-queries" placeholder="自定义调研课题，一行一个&#10;例：卫星化学 2026年半年报业绩预告&#10;丙烯酸 价格走势 供需 2026" rows="2"></textarea>
+    <div class="hint">留空则自动生成调研问题</div>
+  </div>
+
+  <div class="vibe-row" id="vibe-status">
+    <span>⏳ 检测 vibe-trading 服务...</span>
+  </div>
+</div>
+
+<!-- Prompt 卡片 -->
+<div class="prompt-card">
+  <div class="prompt-hdr">
+    <span class="title">📄 分析 Prompt</span>
+    <span class="meta" id="meta-info"></span>
+    <span style="font-size:9px;color:var(--muted)">信号日期自动取最近5日</span>
+    <span class="actions">
+      <button class="btn btn-ghost" onclick="copyPrompt()" id="btn-copy" disabled>📋 复制</button>
+      <button class="btn btn-ai" onclick="sendToAI()" id="btn-ai" disabled>🧠 分析</button>
+    </span>
+  </div>
+  <div class="prompt-body" id="prompt-body">
+    <div class="prompt-empty">输入股票代码，点击「生成」</div>
+  </div>
+</div>
+
+<!-- 结果卡片 -->
+<div class="result-card" id="result-card">
+  <div class="result-hdr">🧠 DeepSeek 分析结果</div>
+  <div class="result-body" id="result-body"></div>
+</div>
+
+</div><!-- app-container -->
+
 <script src="../shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:'🔮',brandText:'Prompt',currentPage:'prompt-generator'})</script>
-
-<div class="page-header"><h1>🔮 Prompt 生成器</h1></div>
-
-<div class="input-row">
-  <input type="text" id="code-input" placeholder="股票代码" value="002046" maxlength="6">
-  <button class="btn btn-gen" onclick="generate()">🔍 生成</button>
-  <span style="font-size:.65rem;color:var(--muted)">信号日期自动取最近5日</span>
-</div>
-<div class="meta" id="meta-info"></div>
-
-<div class="prompt-box" id="prompt-box"><div class="empty">输入股票代码，点击「生成」</div></div>
-
-<div style="margin-top:8px;display:flex;gap:6px">
-  <button class="btn btn-copy" onclick="copyPrompt()" id="btn-copy" disabled>📋 复制</button>
-  <button class="btn btn-ai" onclick="sendToAI()" id="btn-ai" disabled>🧠 发送 DeepSeek 分析</button>
-</div>
-
-<div class="result-box" id="result-box" style="display:none"></div>
-</div>
-
 <script>
-var currentPrompt = '';
-var currentCode = '';
-var currentDate = '';
+var currentPrompt='',currentCode='',currentDate='',vibeReady=false;
 
-async function generate() {
-  var code = document.getElementById('code-input').value.trim();
-  if (!code) return;
-  var box = document.getElementById('prompt-box');
-  box.innerHTML = '<div class="loading">⏳ 生成中...</div>';
-  document.getElementById('btn-copy').disabled = true;
-  document.getElementById('btn-ai').disabled = true;
-  document.getElementById('result-box').style.display = 'none';
-  try {
-    var resp = await fetch('/api/prompt-generator?code=' + code);
-    var data = await resp.json();
-    if (data.prompt) {
-      currentPrompt = data.prompt;
-      currentCode = data.code;
-      currentDate = data.date;
-      box.textContent = data.prompt;
-      document.getElementById('meta-info').textContent = data.name + '(' + data.code + ') · 信号日 ' + data.date + ' · ' + data.length + ' 字符';
-      document.getElementById('btn-copy').disabled = false;
-      document.getElementById('btn-ai').disabled = false;
-    } else {
-      box.innerHTML = '<div class="empty">❌ ' + (data.error || '无数据') + '</div>';
+async function lookupName(){
+  var code=document.getElementById('code-input').value.trim();
+  if(!code) return;
+  try{
+    var r=await fetch('/api/prompt-generator?code='+code);
+    var d=await r.json();
+    if(d.name&&d.name!==code) document.getElementById('name-hint').textContent=d.name;
+  }catch(e){}
+}
+lookupName();
+
+function toggleResearch(){
+  var ck=document.getElementById('research-check').checked;
+  document.getElementById('custom-box').style.display=ck?'block':'none';
+  document.getElementById('autoq-label').style.display=ck?'flex':'none';
+  if(ck && !vibeReady) checkVibeServer();
+}
+
+async function checkVibeServer(){
+  var st=document.getElementById('vibe-status');
+  try{
+    var r=await fetch('http://localhost:8781/sessions',{signal:AbortSignal.timeout(2000)});
+    if(r.ok||r.status===405){st.innerHTML='<span>●</span><span style="color:var(--rise)">vibe-trading 就绪</span>';vibeReady=true;return;}
+  }catch(e){}
+  st.innerHTML='<span>⏳ 启动 vibe-trading 服务...</span>';
+  try{
+    var r=await fetch('/api/start-vibe',{method:'POST',signal:AbortSignal.timeout(5000)});
+    var d=await r.json();
+    if(d.ok){st.innerHTML='<span>●</span><span style="color:var(--rise)">vibe-trading 已启动</span>';vibeReady=true;}
+    else st.innerHTML='<span>⚠</span><span style="color:var(--accent)">vibe-trading 不可用，将跳过调研</span>';
+  }catch(e){st.innerHTML='<span>⚠</span><span style="color:var(--accent)">vibe-trading 不可用，将跳过调研</span>';}
+}
+// 页面加载时不检测vibe-trading，等用户勾选调研时再启动
+
+async function generate(){
+  var code=document.getElementById('code-input').value.trim();
+  if(!code) return;
+  var body=document.getElementById('prompt-body');
+  body.innerHTML='<div class="prompt-empty">⏳ 生成中...</div>';
+  document.getElementById('btn-copy').disabled=true;
+  document.getElementById('btn-ai').disabled=true;
+  document.getElementById('result-card').style.display='none';
+  document.getElementById('meta-info').textContent='';
+  try{
+    var resp=await fetch('/api/prompt-generator?code='+code);
+    var data=await resp.json();
+    if(!data.prompt){body.innerHTML='<div class="prompt-empty">❌ '+(data.error||'无数据')+'</div>';return;}
+    currentPrompt=data.prompt;currentCode=data.code;currentDate=data.date;
+
+    // 行业分组上下文
+    var sectorCtx=null,marketGroups=[];
+    try{
+      var sr=await fetch('/api/stock-sector-context?code='+code+'&date='+data.date);
+      sectorCtx=await sr.json();
+      var mr=await fetch('/api/market-health?date='+data.date);
+      var mh=await mr.json();
+      if(mh.groups) marketGroups=mh.groups;
+    }catch(e){}
+
+    var oh='你是一个欧奈尔交易顾问，严格遵循欧奈尔交易框架。\n\n## 回答工作流\nStep 1: 判断问题类型\nStep 2: 研究——按大盘→行业分组→个股技术→个股基本面顺序扫描\nStep 3: 运用心智模型回答\n\n## 核心原则\n- 7-8%止损铁律\n- 不在熊市做多\n- 头寸集中，不向下摊平\n- 只交易RS前20%的领涨股\n- 让利润奔跑\n\n';
+
+    var sb='';
+    if(sectorCtx&&sectorCtx.primary_index){
+      sb+='## 行业分组上下文\n- 所属最强指数: '+(sectorCtx.primary_index.name||'?')+' ('+sectorCtx.primary_index.code+', RS_60='+sectorCtx.primary_index.rs_60+')\n';
+      if(sectorCtx.sector_group) sb+='- 所属行业组: '+sectorCtx.sector_group.group_label+' (健康分'+sectorCtx.sector_group.health_score+'/'+sectorCtx.sector_group.rating+', 仓位'+sectorCtx.sector_group.position+'%)\n';
+      sb+='\n';
     }
-  } catch(e) {
-    box.innerHTML = '<div class="empty">❌ 请求失败: ' + e.message + '</div>';
-  }
+    if(marketGroups.length){
+      sb+='## 全市场行业分组速览\n';
+      marketGroups.forEach(function(g){if(g.total_score!==null){var vs=g.score_vs_market?' ↑'+g.score_vs_market+' vs 大盘':'';sb+='- '+g.group_label+': '+g.total_score+'/'+g.rating+' 仓位'+g.position+'%'+vs+'\n';}});
+      sb+='\n';
+    }
+    var finalPrompt=oh+sb+data.prompt;
+
+    // 外部调研
+    if(document.getElementById('research-check').checked){
+      body.innerHTML='<div class="prompt-empty">⏳ 外部调研中...</div>';
+      try{
+        var queries=[];
+        if(!document.getElementById('autoq-check').checked){
+          var ct=document.getElementById('custom-queries').value.trim();
+          if(ct) queries=ct.split('\n').filter(function(l){return l.trim();});
+        }
+        var rr=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,queries:queries})});
+        var rd=await rr.json();
+        if(rd.task_id){
+          body.innerHTML='<div class="prompt-empty">⏳ vibe-trading 调研中...</div>';
+          for(var p=0;p<120;p++){
+            await new Promise(function(r2){setTimeout(r2,5000);});
+            var sr=await fetch('/api/research/status?task_id='+rd.task_id);
+            var sd=await sr.json();
+            if(sd.status==='done'){
+              if(sd.research) finalPrompt+='\n\n════════════════════════════════════════\n【外部调研结果】'+(sd.source==='vibe-trading'?'\n✅ 来源: vibe-trading AI 调研':'')+'\n════════════════════════════════════════\n\n'+sd.research+'\n';
+              break;
+            }
+            body.innerHTML='<div class="prompt-empty">⏳ 调研中...'+((p+1)*5)+'秒</div>';
+          }
+        }
+      }catch(e){}
+    }
+
+    currentPrompt=finalPrompt;
+    body.textContent=finalPrompt;
+    document.getElementById('meta-info').textContent=finalPrompt.length+' 字符';
+    document.getElementById('btn-copy').disabled=false;
+    document.getElementById('btn-ai').disabled=false;
+  }catch(e){body.innerHTML='<div class="prompt-empty">❌ 请求失败: '+e.message+'</div>';}
 }
 
-async function copyPrompt() {
-  if (!currentPrompt) return;
+async function copyPrompt(){
+  if(!currentPrompt) return;
   await navigator.clipboard.writeText(currentPrompt);
-  var btn = document.getElementById('btn-copy');
-  btn.textContent = '✅ 已复制';
-  setTimeout(function(){ btn.textContent = '📋 复制'; }, 2000);
+  var btn=document.getElementById('btn-copy');
+  btn.textContent='✅ 已复制';
+  setTimeout(function(){btn.textContent='📋 复制';},2000);
 }
 
-async function sendToAI() {
-  if (!currentPrompt) return;
-  var btn = document.getElementById('btn-ai');
-  btn.disabled = true; btn.textContent = '⏳ 分析中...';
-  var box = document.getElementById('result-box');
-  box.style.display = 'block';
-  box.innerHTML = '<div class="loading">🧠 DeepSeek 正在分析 ' + currentCode + '...<br><span style="font-size:.65rem">约需 30~60 秒</span></div>';
-  try {
-    var resp = await fetch('/api/prompt-generator/analyze', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({prompt: currentPrompt})
-    });
-    var data = await resp.json();
-    box.innerHTML = data.result || '无返回内容';
-  } catch(e) {
-    box.innerHTML = '<div class="empty">❌ 请求失败: ' + e.message + '</div>';
-  }
-  btn.disabled = false; btn.textContent = '🧠 发送 DeepSeek 分析';
+async function sendToAI(){
+  if(!currentPrompt) return;
+  var btn=document.getElementById('btn-ai');
+  btn.disabled=true;btn.textContent='⏳ 分析中...';
+  var card=document.getElementById('result-card');
+  var body=document.getElementById('result-body');
+  card.style.display='block';
+  body.innerHTML='<div class="result-empty">🧠 DeepSeek 正在分析 '+currentCode+'...</div>';
+  try{
+    var resp=await fetch('/api/prompt-generator/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:currentPrompt})});
+    var data=await resp.json();
+    body.innerHTML=data.result||'<div class="result-empty">无返回内容</div>';
+  }catch(e){body.innerHTML='<div class="result-empty">❌ 请求失败</div>';}
+  btn.disabled=false;btn.textContent='🧠 分析';
 }
 
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 </script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js")}</script>
 </body>
 </html>

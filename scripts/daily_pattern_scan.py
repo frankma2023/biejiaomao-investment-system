@@ -151,8 +151,8 @@ def scan_stock(code, date_str):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
 
-    # 取最近750天K线
-    start_date = (datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=750)).strftime('%Y-%m-%d')
+    # 取最近400天K线（覆盖 climax_top 78周需求）
+    start_date = (datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=400)).strftime('%Y-%m-%d')
     rows = conn.execute("""
         SELECT date, open, high, low, close, volume
         FROM daily_kline
@@ -185,7 +185,10 @@ def format_signal_summary(signals):
 
     source_names = {
         'cdl': 'K线形态', 'talib': 'TA-Lib', 'pocket_pivot': '口袋支点',
-        'double_bottom': '双重底', 'breakout': '标准突破', 'flat_base': '扁平基部'
+        'double_bottom': '双重底', 'breakout': '标准突破', 'flat_base': '扁平基部',
+        'base_breakout_v2': '基部突破V2', 'climax_top': '高潮见顶',
+        'railroad_tracks': '铁轨线', 'top_pattern': '头部形态',
+        'mw_signal': 'MW信号',
     }
 
     parts = []

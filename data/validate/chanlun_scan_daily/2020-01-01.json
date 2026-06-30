@@ -1,0 +1,62 @@
+{
+  "table": "chanlun_scan_daily",
+  "date_range": [
+    "2020-01-01",
+    "2022-12-31"
+  ],
+  "quarter": "2020-01-01_2022-12-31",
+  "checked_at": "2026-06-16 21:35:36",
+  "passed": false,
+  "checks": {
+    "date_continuity": {
+      "passed": false,
+      "expected": 729,
+      "actual": 728,
+      "missing": 1,
+      "missing_dates": [
+        "2021-12-18"
+      ]
+    },
+    "coverage": {
+      "passed": true,
+      "median": 2349,
+      "threshold": 1879,
+      "low_days": 33,
+      "low_samples": [
+        [
+          "2020-01-23",
+          1868
+        ],
+        [
+          "2020-02-03",
+          1741
+        ],
+        [
+          "2020-02-04",
+          1728
+        ],
+        [
+          "2020-02-05",
+          1782
+        ],
+        [
+          "2020-02-06",
+          1821
+        ]
+      ]
+    },
+    "signal_yield": {
+      "passed": true,
+      "zero_signal_days": 0
+    },
+    "value_sanity": {
+      "passed": true,
+      "anomalies": 0
+    },
+    "cross_ref": {
+      "passed": true,
+      "orphans": 0
+    }
+  },
+  "anomalies": []
+}

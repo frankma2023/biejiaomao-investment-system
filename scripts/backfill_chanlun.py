@@ -1,6 +1,6 @@
 """
 缠论笔全市场批量回填 v1.0
-将全市场股票的缠论笔数据从指定起始日期计算至今
+将全市场市值大于50亿的股票的缠论笔数据从指定起始日期计算至今
 
 依赖：src/scanners/chanlun.py、chanlun_scan.py
 输出：chanlun_scan_daily 表
@@ -128,9 +128,9 @@ def get_candidates(date):
     db.row_factory = sqlite3.Row
     stocks = db.execute("""
         SELECT DISTINCT k.stock_code, b.name
-        FROM daily_kline k JOIN stock_basic b ON k.stock_code=b.stock_code
-        WHERE b.listing_status='normally_listed' AND b.name NOT LIKE '%ST%'
-        AND k.date=?
+        FROM daily_kline k
+        JOIN stock_basic b ON k.stock_code = b.stock_code
+        WHERE k.date = ?
     """, (date,)).fetchall()
     db.close()
     return [(r['stock_code'], r['name']) for r in stocks]

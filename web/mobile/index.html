@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="theme-color" content="#0d0d12">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/images/favicon.svg" type="image/svg+xml">
+<title>Hana 投资决策</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;background:#0d0d12;color:#d4d4d8;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:40px 16px 60px}
+  h1{font-family:Georgia,'Instrument Serif',serif;font-size:1.4rem;font-weight:400;color:#f59e0b;margin-bottom:4px;text-align:center}
+  .sub{font-size:.65rem;color:#555;margin-bottom:32px;text-align:center}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:400px}
+  .card{background:#111118;border:1px solid #2a2a35;border-radius:14px;padding:20px 16px;text-align:center;text-decoration:none;color:#d4d4d8;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:8px}
+  .card:active{background:#1a1a22;border-color:#f59e0b}
+  .card .icon{font-size:1.8rem}
+  .card .label{font-size:.7rem;font-weight:500;color:#a1a1aa}
+  .card .desc{font-size:.55rem;color:#555;line-height:1.4}
+  .footer{font-size:.55rem;color:#444;margin-top:32px;text-align:center}
+</style>
+</head>
+<body>
+<h1>Hana</h1>
+<div class="sub">欧奈尔 CAN SLIM 量化投资</div>
+
+<div class="grid">
+  <a class="card" href="/cockpit/">
+    <span class="icon">🧭</span>
+    <span class="label">投资驾驶舱</span>
+    <span class="desc">每日候选 · 欧奈尔分析</span>
+  </a>
+  <a class="card" href="/market-scan/">
+    <span class="icon">📊</span>
+    <span class="label">大盘扫描</span>
+    <span class="desc">健康度 · 成交额 · NHNL</span>
+  </a>
+  <a class="card" href="/pattern-scan/">
+    <span class="icon">🔎</span>
+    <span class="label">形态识别</span>
+    <span class="desc">K线 · 信号 · 缠论</span>
+  </a>
+  <a class="card" href="/mw-signals/">
+    <span class="icon">🔥</span>
+    <span class="label">MW 信号</span>
+    <span class="desc">B1突破 · B2确认</span>
+  </a>
+</div>
+
+<div class="footer">基于《像欧奈尔信徒一样交易》框架 · 仅供参考</div>
+
+<script>
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(function(){})
+}
+</script>
+</body>
+</html>

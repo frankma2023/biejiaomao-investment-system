@@ -1,0 +1,62 @@
+/* ===== Hana 移动端响应式 ===== */
+
+@media (max-width: 768px) {
+  /* 容器 */
+  .app-container { padding: 8px 10px 40px !important; }
+
+  /* 页面头 */
+  .page-header { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .page-header h1 { font-size: 1rem; }
+
+  /* 工具栏折行 */
+  .toolbar { gap: 6px; }
+  .toolbar input[type="date"] { width: 100px; font-size: 10px; padding: 4px 8px; }
+  .toolbar select { font-size: 10px; padding: 4px 8px; }
+  .toolbar .btn-sm { font-size: 9px; padding: 4px 10px; }
+
+  /* 候选卡片 */
+  .candidate-card { padding: 12px 14px; }
+  .candidate-card .card-header { flex-direction: column; align-items: flex-start; }
+  .candidate-card .stock-name { font-size: .85rem; }
+
+  /* 信号卡片 */
+  .signal-card { padding: 12px 14px; }
+  .signal-card .top-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+
+  /* 表格横向滚动 */
+  table { display: block; overflow-x: auto; white-space: nowrap; }
+
+  /* 大盘环境条 */
+  .market-bar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+
+  /* 隐藏桌面专属元素 */
+  .desktop-only { display: none !important; }
+  /* K线图容器缩小 */
+  .chart-wrap { min-height: 280px; }
+
+  /* Tab栏 */
+  .tab-bar { gap: 0; }
+  .tab-btn { padding: 6px 14px; font-size: .7rem; }
+
+  /* ECharts 适配 */
+  .chart-container { height: 240px !important; }
+
+  /* 节点线折行 */
+  .node-line { font-size: 9px; }
+
+  /* 评分表缩小 */
+  .signal-card .expand table { font-size: 9px; }
+  .signal-card .expand td { padding: 2px 6px; }
+
+  /* 按钮缩小 */
+  .btn-primary { font-size: 10px; padding: 5px 12px; }
+
+  /* ===== pattern-scan 专用 ===== */
+  .top-bar { flex-direction: column; gap: 10px; padding: 12px 14px; }
+  .top-bar .fld { min-width: 100% !important; flex: none !important; }
+  .top-bar .fld:first-child { flex: none !important; min-width: 100% !important; }
+  .top-bar input[type="text"] { font-size: 16px; padding: 10px 12px; }
+  .top-bar input[type="date"] { font-size: 14px; padding: 8px 12px; }
+  .btn-scan { width: 100%; padding: 12px; font-size: 14px; }
+  .mode-btn { padding: 6px 14px; font-size: 13px; }
+}

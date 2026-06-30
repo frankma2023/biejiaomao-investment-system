@@ -1528,6 +1528,9 @@
 | 57 | pocket_pivot_daily | ~11,867 | 口袋支点（V1/V3, engine_version） |
 | 58 | index_rs_daily | ~1,003,189 | 指数RS（408指数, 2016~今） |
 | 59 | (market_breakout_v2_daily) | 待建 | 基部突破V2（PRD已定） |
+| 60 | market_health_daily | ~365 | 大盘健康度7指标（每日一条） |
+| 61 | market_health_sector_daily | ~6/天 | 行业分组健康分（6组×每日） |
+| 62 | market_sell_score_daily | ~365 | 大盘卖出评分（每日一条） |
 
 ---
 

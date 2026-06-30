@@ -3,12 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="theme-color" content="#0d0d12">
+<link rel="manifest" href="/manifest.json">
 <title>大盘扫描</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<link rel="stylesheet" href="../shared/css/mobile.css">
 <script src="../shared/js/echarts.min.js"></script>
 <style>
   .top-bar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px}
@@ -41,6 +44,13 @@
     .score-card .sc-sub{font-size:11px;color:var(--text-secondary);margin-top:2px}
     .score-card .sc-chart{flex:1;min-height:70px}
     .score-row .score-hero{display:flex;gap:16px;align-items:center;margin-bottom:0}
+    /* 行业分组卡片（v3.0）*/
+    .sector-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}
+    .sector-card{background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:var(--shadow-card);display:flex;flex-direction:column;min-height:130px;transition:all .2s}
+    .sector-card:hover{transform:translateY(-1px);border-color:var(--border-hover)}
+    .sector-card .sc-title{font-size:10px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+    @media(max-width:900px){.sector-grid{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:500px){.sector-grid{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:700px){.score-row{grid-template-columns:1fr}}
     /* 主要指数卡片 */
     .idx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:14px}
@@ -127,6 +137,12 @@
     <div class="layout"><div id="content"></div></div>
     <div class="modal-overlay" id="breakout-modal" onclick="if(event.target===this)closeBreakoutModal()">
       <div class="modal-box"><button class="modal-close" onclick="closeBreakoutModal()">✕</button><h2>🚀 放量突破个股</h2><div class="modal-sub" id="breakout-meta"></div><div id="breakout-table"></div></div>
+    </div>
+    <div class="modal-overlay" id="sector-modal" onclick="if(event.target===this)closeSectorModal()">
+      <div class="modal-box"><button class="modal-close" onclick="closeSectorModal()">✕</button><h2 id="sector-modal-title">🏭 </h2><div class="modal-sub" id="sector-meta"></div><div id="sector-index-table"></div></div>
+    </div>
+    <div class="modal-overlay" id="constituent-modal" onclick="if(event.target===this)closeConstModal()">
+      <div class="modal-box"><button class="modal-close" onclick="closeConstModal()">✕</button><h2 id="const-modal-title">📋 </h2><div id="const-table"></div></div>
     </div>
   </div>
   
@@ -284,7 +300,45 @@
       });
       html+='</div>';
 
-      
+      // ═══ 行业分组健康分（v3.0）═══
+      if(h.groups&&h.groups.length){
+        html+='<div class="section-hdr" style="margin-top:18px">🏭 行业分组健康分</div>';
+        html+='<div class="sector-grid">';
+        var colorMap={'A':'#10b981','B':'#10b981','C':'#f59e0b','D':'#f59e0b','E':'#ef4444','F':'#ef4444'};
+        var bgMap={'A':{'bg':'rgba(16,185,129,.06)','bd':'rgba(16,185,129,.2)'},'B':{'bg':'rgba(16,185,129,.06)','bd':'rgba(16,185,129,.2)'},'C':{'bg':'rgba(245,158,11,.06)','bd':'rgba(245,158,11,.2)'},'D':{'bg':'rgba(245,158,11,.06)','bd':'rgba(245,158,11,.2)'},'E':{'bg':'rgba(239,68,68,.06)','bd':'rgba(239,68,68,.2)'},'F':{'bg':'rgba(239,68,68,.06)','bd':'rgba(239,68,68,.2)'}};
+        for(var gi=0;gi<h.groups.length;gi++){
+          var g=h.groups[gi];
+          var gColor=colorMap[g.rating]||'#8b8b90';
+          var gBg=bgMap[g.rating]||{'bg':'rgba(139,139,144,.06)','bd':'rgba(139,139,144,.2)'};
+          var vsMarket='';
+          if(g.score_vs_market!==null&&g.score_vs_market!==undefined){
+            var arrow=g.score_vs_market>0?'↑':'↓';
+            vsMarket='<div style="font-size:10px;color:var(--muted);margin-top:3px">'+arrow+Math.abs(g.score_vs_market)+' vs 大盘</div>';
+          }
+          var curDate=h.date||'';
+          html+='<div class="sector-card" style="background:'+gBg.bg+';border:1px solid '+gBg.bd+'" onclick="openSectorModal(\''+g.group_name+'\',\''+g.group_label+'\',\''+curDate+'\')">';
+          html+='<div class="sc-title">'+g.group_label+'</div>';
+          html+='<div style="display:flex;align-items:baseline;gap:6px;margin:4px 0">';
+          html+='<span style="font-family:var(--font-display);font-size:1.8rem;font-weight:400;color:'+gColor+'">'+(g.total_score||'--')+'</span>';
+          html+='<span style="font-size:13px;font-weight:600;color:'+gColor+'">'+g.rating+'</span>';
+          html+='</div>';
+          if(g.indices_count||g.stocks_count){
+            html+='<div style="font-size:10px;color:var(--muted)">'+(g.indices_count||0)+'指数 · '+(g.stocks_count||0)+'只</div>';
+          }
+          html+='<div style="margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">';
+          if(g.position!==null){
+            html+='<div style="font-size:11px;font-weight:500;color:var(--text-secondary)">建议仓位 <span style="color:'+gColor+';font-weight:600">'+g.position+'%</span></div>';
+          }
+          if(g.tech){
+            var t=g.tech;
+            html+='<div style="font-size:9px;color:var(--muted);margin-top:3px">MA50↑'+t.above_ma50+'/'+g.indices_count+' · RS_60均'+t.avg_rs_60+'</div>';
+          }
+          html+=vsMarket;
+          html+='</div></div>';
+        }
+        html+='</div>';
+      }
+
       // ═══ 卖出评分卡片 ═══
       if(sr&&sr.status!=='no_data'){
         const sscore=sr.total_score||0;
@@ -525,6 +579,58 @@
 
     function closeBreakoutModal(){document.getElementById('breakout-modal').classList.remove('show');}
 
+    // ═══ 行业分组钻入 ═══
+    async function openSectorModal(groupName,groupLabel,curDate){
+      document.getElementById('sector-modal').classList.add('show');
+      document.getElementById('sector-modal-title').textContent='🏭 '+groupLabel+' · 指数列表';
+      document.getElementById('sector-meta').textContent='加载中...';
+      document.getElementById('sector-index-table').innerHTML='';
+      try{
+        const r=await fetch(API_BASE+'/api/market-health/sector-indices?group_name='+groupName+(curDate?'&date='+curDate:''));
+        const d=await r.json();
+        document.getElementById('sector-meta').textContent=d.date+' · 共'+d.indices.length+'个指数 · MA50↑'+d.stats.above_ma50+'/'+d.stats.total+' · RS_60均'+d.stats.avg_rs_60;
+        if(!d.indices.length){
+          document.getElementById('sector-index-table').innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">该组暂无指数</div>';return;}
+        var tbl='<table class="bt"><thead><tr><th>代码</th><th>名称</th><th>RS_60</th><th>RS_20</th><th>RS_250</th><th>MA50</th><th>MA200</th><th>20日</th><th>操作</th></tr></thead><tbody>';
+        d.indices.forEach(function(idx){
+          var ma50c=idx.above_ma50?'#10b981':'#ef4444';
+          var ma200c=idx.above_ma200?'#10b981':'#ef4444';
+          var ret20c=idx.ret_20>=0?'#ef4444':'#10b981';
+          tbl+='<tr><td>'+idx.code+'</td><td>'+idx.name+'</td><td style="color:'+(idx.rs_60>=75?'#10b981':idx.rs_60>=30?'#f59e0b':'#ef4444')+';font-weight:600">'+idx.rs_60+'</td>'
+            +'<td>'+idx.rs_20+'</td><td>'+idx.rs_250+'</td>'
+            +'<td style="color:'+ma50c+'">'+(idx.ma50?idx.ma50.toFixed(0):'-')+'</td>'
+            +'<td style="color:'+ma200c+'">'+(idx.ma200?idx.ma200.toFixed(0):'-')+'</td>'
+            +'<td style="color:'+ret20c+'">'+(idx.ret_20?(idx.ret_20.toFixed(1)+'%'):'-')+'</td>'
+            +'<td><button class="btn-glass" onclick="openConstModal(\''+idx.code+'\',\''+idx.name+'\',\''+curDate+'\')">成分股</button></td></tr>';
+        });
+        document.getElementById('sector-index-table').innerHTML=tbl+'</tbody></table>';
+      }catch(e){document.getElementById('sector-meta').textContent='加载失败: '+e.message;}
+    }
+    function closeSectorModal(){document.getElementById('sector-modal').classList.remove('show');}
+
+    async function openConstModal(indexCode,indexName,curDate){
+      document.getElementById('constituent-modal').classList.add('show');
+      document.getElementById('const-modal-title').textContent='📋 '+indexName+' · 成分股';
+      document.getElementById('const-table').innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">加载中...</div>';
+      try{
+        const r=await fetch(API_BASE+'/api/market-health/sector-constituents?index_code='+indexCode+(curDate?'&date='+curDate:''));
+        const d=await r.json();
+        if(!d.stocks||!d.stocks.length){
+          document.getElementById('const-table').innerHTML='<div style="padding:24px;text-align:center;color:var(--muted)">暂无成分股数据</div>';return;}
+        var tbl='<table class="bt"><thead><tr><th>代码</th><th>名称</th><th>收盘</th><th>RPS_20</th><th>RPS_60</th><th>RPS_250</th><th>成交额</th></tr></thead><tbody>';
+        d.stocks.forEach(function(s){
+          tbl+='<tr><td>'+s.code+'</td><td>'+(s.name||'')+'</td>'
+            +'<td>'+(s.close?s.close.toFixed(2):'-')+'</td>'
+            +'<td style="color:'+(s.rps_20>=80?'#ef4444':s.rps_20>=60?'#f59e0b':'#10b981')+'">'+(s.rps_20||0)+'</td>'
+            +'<td>'+(s.rps_60||0)+'</td>'
+            +'<td>'+(s.rps_250||0)+'</td>'
+            +'<td>'+(s.amount?fm(s.amount):'-')+'</td></tr>';
+        });
+        document.getElementById('const-table').innerHTML=tbl+'</tbody></table>';
+      }catch(e){document.getElementById('const-table').innerHTML='加载失败: '+e.message;}
+    }
+    function closeConstModal(){document.getElementById('constituent-modal').classList.remove('show');}
+
     async function computeSnapshot(){
       const btn=event.target; btn.textContent='⏳ 计算中...'; btn.disabled=true;
       try{
@@ -543,5 +649,6 @@
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 </script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js")}</script>
 </body>
 </html>

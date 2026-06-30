@@ -1,5 +1,5 @@
 """
-口袋支点识别引擎 v3.0
+口袋支点识别引擎 v2.0
 集成 MW 信号引擎的缠论 H/L/C 结构
 不再从零猜测盘整，而是在已知的 C 区间内查找量价信号
 """
@@ -130,7 +130,10 @@ def get_hlc_from_chanlun(klines, code, db_conn):
                 break
     if not h_peak:
         h_peak = recent_peaks[-1]
-        h_idx = dates.index(h_peak['date']) if h_peak['date'] in dates else n - 30
+        h_idx = dates.index(h_peak['date']) if h_peak['date'] in dates else min(n - 30, n - 2)
+
+    if h_idx >= n - 2:
+        h_idx = n - 2
 
     h_date = h_peak['date']
     h_price = h_peak['price']
@@ -162,7 +165,7 @@ def get_hlc_from_chanlun(klines, code, db_conn):
 
 # ═══ 核心判断 ═══
 
-def evaluate_stock(klines, scan_date, structure, rps20, rps250, market_too_bearish):
+def evaluate_stock(klines, scan_date, structure, rps20, rps250):
     """在已知 H/L/C 结构下判断口袋支点"""
     n = len(klines)
     if n < 65: return None
@@ -281,8 +284,8 @@ def evaluate_stock(klines, scan_date, structure, rps20, rps250, market_too_beari
     if not (rps20 >= CFG['rs_threshold'] or rps250 >= CFG['rs_threshold']):
         return {'skip': 'rs'} if (in_c_zone or in_p_zone) else None
     
-    # 不要买
-    if market_too_bearish: return {'skip': 'bearish'}
+    # 抛盘日过滤已关闭（人工判断市场环境，此处只做形态识别）
+    # if market_too_bearish: return {'skip': 'bearish'}
     if today.get('amount', 0) < CFG['min_amount']: return {'skip': 'amount'}
     
     # ═══ 确定类型 ═══
@@ -331,38 +334,52 @@ def scan_date(scan_date):
     
     stock_list = [(r['stock_code'], r['name']) for r in stocks]
     codes = [s[0] for s in stock_list]
-    print(f"[1/5] {len(codes)} stocks")
+    print(f"[1/3] {len(codes)} stocks")
     
-    dist = count_distribution_days(db, scan_date)
-    too_bearish = dist >= CFG['max_distribution_days']
-    print(f"[2/5] 抛盘日={dist} {'⚠跳过' if too_bearish else ''}")
+    # ── K线 + RS：回填已预加载到 mw 模块缓存，命中则跳过 SQL ──
+    kline_min = (datetime.strptime(scan_date, '%Y-%m-%d') - timedelta(days=150)).strftime('%Y-%m-%d')
+    kline_cache = {}
+    rs_cache = {}
+    try:
+        import scanners.mw_signal as mw
+        if mw._kline_cache and len(mw._kline_cache) > 100:
+            # 从回填缓存取 K 线，截取最近 150 天
+            code_set = set(codes)
+            for code in code_set:
+                rows = mw._kline_cache.get(code, [])
+                if rows:
+                    sliced = [r for r in rows if r['date'] >= kline_min]
+                    if sliced:
+                        kline_cache[code] = sliced
+            if mw._rs_cache and len(mw._rs_cache) > 100:
+                rs_cache = {code: mw._rs_cache[code] for code in code_set if code in mw._rs_cache}
+            if kline_cache and rs_cache:
+                print(f"[2/3] K-line + RS from cache ({len(kline_cache)}/{len(rs_cache)} stocks, {time.time()-t0:.1f}s)")
+    except Exception:
+        pass
     
-    print(f"[3/5] Loading K-line + RS...")
-    kline_cache = load_klines_batch(db, codes, scan_date)
-    rs_cache = load_rs_batch(db, codes, scan_date)
+    if not kline_cache:
+        print(f"[2/3] Loading K-line + RS...")
+        kline_cache = load_klines_batch(db, codes, scan_date)
+        rs_cache = load_rs_batch(db, codes, scan_date)
     
-    print(f"[4/5] Loading MW structures...")
-    mw_structures = load_mw_structures(db, codes)
-    has_mw = len(mw_structures)
-    print(f"  MW structures: {has_mw}")
-    
-    print(f"[5/5] Scanning...")
+    print(f"[3/3] Scanning...")
     signals, skipped = [], defaultdict(int)
-    
+    chanlun_ok = 0
+
     for i, (code, name) in enumerate(stock_list):
         if i % 1000 == 0 and i > 0: print(f"  ... {i}/{len(stock_list)}")
         
         klines = kline_cache.get(code, [])
         if len(klines) < 65: continue
         
-        # 获取 H/L/C 结构：优先 MW，其次缠论笔
-        structure = mw_structures.get(code)
-        if not structure:
-            structure = get_hlc_from_chanlun(klines, code, db)
+        # H/L/C 结构统一走缠论，与 MW 信号解耦
+        structure = get_hlc_from_chanlun(klines, code, db)
         if not structure: continue
+        chanlun_ok += 1
         
         rps20, rps250 = rs_cache.get(code, (None, None))
-        result = evaluate_stock(klines, scan_date, structure, rps20, rps250, too_bearish)
+        result = evaluate_stock(klines, scan_date, structure, rps20, rps250)
         if result:
             result['stock_code'] = code
             result['stock_name'] = name
@@ -373,15 +390,17 @@ def scan_date(scan_date):
     
     db.close()
     elapsed = time.time() - t0
-    print(f"\n✓ 口袋支点: {len(signals)} | {elapsed:.1f}s")
+    print(f"\n✓ PP V2: {len(signals)} | {elapsed:.1f}s")
     print(f"  漏斗: {dict(skipped)}")
-    print(f"  MW结构: {has_mw} | 缠论补充: {len(stock_list)-has_mw}")
+    print(f"  缠论结构: {chanlun_ok}/{len(stock_list)} 只有效")
     
     return signals
 
 
 def save_to_db(signals):
-    db = sqlite3.connect(DB_PATH, timeout=30)
+    db = sqlite3.connect(DB_PATH, timeout=120)
+    db.execute("PRAGMA busy_timeout=120000")
+    db.execute("PRAGMA wal_autocheckpoint=10000")  # 减少多进程 checkpoint 冲突
     cur = db.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS pocket_pivot_daily (
         id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL, stock_code TEXT NOT NULL,
@@ -393,18 +412,26 @@ def save_to_db(signals):
         close REAL, volume INTEGER,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP, UNIQUE(date, stock_code, engine_version))""")
     for s in signals:
-        cur.execute("""INSERT OR REPLACE INTO pocket_pivot_daily
-            (date,stock_code,stock_name,engine_version,pivot_type,b1_overlap,h_date,l_date,c_days,
-             gain_pct,vol_ratio,close_position,rps_20,rps_250,sma10,sma60,
-             pct_from_ma10,base_depth,close,volume)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (s['date'],s['stock_code'],s.get('stock_name',''),'V2',s['pivot_type'],
-             int(s.get('b1_overlap',False)),s.get('h_date'),s.get('l_date'),
-             s.get('c_days',0),s['gain_pct'],s['vol_ratio'],s['close_position'],
-             s['rps_20'],s['rps_250'],s['sma10'],s['sma60'],
-             s['pct_from_ma10'],s.get('base_depth'),s['close'],s['volume']))
+        for attempt in range(5):
+            try:
+                cur.execute("""INSERT OR REPLACE INTO pocket_pivot_daily
+                    (date,stock_code,stock_name,engine_version,pivot_type,b1_overlap,h_date,l_date,c_days,
+                     gain_pct,vol_ratio,close_position,rps_20,rps_250,sma10,sma60,
+                     pct_from_ma10,base_depth,close,volume)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (s['date'],s['stock_code'],s.get('stock_name',''),'V2',s['pivot_type'],
+                     int(s.get('b1_overlap',False)),s.get('h_date'),s.get('l_date'),
+                     s.get('c_days',0),s['gain_pct'],s['vol_ratio'],s['close_position'],
+                     s['rps_20'],s['rps_250'],s['sma10'],s['sma60'],
+                     s['pct_from_ma10'],s.get('base_depth'),s['close'],s['volume']))
+                break
+            except sqlite3.OperationalError:
+                if attempt < 4:
+                    time.sleep(2)
+                else:
+                    raise
     db.commit(); db.close()
-    print(f"Saved {len(signals)} to DB")
+    print(f"PP V2 已保存 {len(signals)} 条到 DB")
 
 
 if __name__ == '__main__':

@@ -44,6 +44,7 @@
     { href: '../pattern-scan/',         label: '形态识别',         page: 'pattern-scan' },
     { href: '../daily-pattern-scan/',   label: '形态扫描',         page: 'daily-pattern-scan' },
     { href: '../mw-signals/',           label: 'MW信号',           page: 'mw-signals' },
+    { href: '../prompt-generator/',    label: 'Prompt 生成',     page: 'prompt-generator' },
   ];
 
   var DISCIPLINE_ITEMS = [
@@ -70,7 +71,6 @@
     { href: '../market-scan/',          label: '大盘扫描',         page: 'market-scan' },
     { href: '../canslim-scores/',       label: 'CAN SLIM',          page: 'canslim-scores' },
     { href: '../cockpit/',             label: '驾驶舱',           page: 'cockpit' },
-    { href: '../prompt-generator/',    label: 'Prompt',           page: 'prompt-generator' },
   ];
 
   function render() {

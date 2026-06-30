@@ -456,12 +456,71 @@ def api_market_health():
                 pass
         rotations.append(rot)
 
+    # 行业分组健康分（v3.0）
+    group_rows = db.execute(
+        "SELECT * FROM market_health_sector_daily WHERE date = ? ORDER BY group_name", (row['date'],)
+    ).fetchall()
+    
+    # 读取 index_style.yaml 获取池代码到名称的映射
+    import yaml
+    yaml_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'index_style.yaml')
+    with open(yaml_path, encoding='utf-8') as f:
+        style = yaml.safe_load(f)
+    l2_names = {item['code']: item['name'] for item in style['categories'].get('sector_l2', [])}
+    theme_names = {item['code']: item['name'] for item in style['categories'].get('thematic', [])}
+    
+    groups = []
+    for g in group_rows:
+        gn = g['group_name']
+        pool_key = gn.rsplit('_', 1)[0]
+        pool_names = l2_names if pool_key == 'l2' else theme_names
+        
+        # 计算该组的技术健康度
+        codes = list(pool_names.keys())
+        placeholders = ','.join('?' * len(codes))
+        
+        # 确定 RS 条件
+        suffix = gn.rsplit('_', 1)[1]
+        if suffix == 'strong':
+            rs_cond = 'rs_60 >= 75'
+        elif suffix == 'weak':
+            rs_cond = 'rs_60 < 30'
+        else:
+            rs_cond = 'rs_60 >= 30 AND rs_60 < 75'
+        
+        idx_rows = db.execute(f"""
+            SELECT r.rs_60, r.ma50, r.ma200,
+                   r.close, r.ret_20
+            FROM index_rs_daily r
+            WHERE r.date = ? AND r.stock_code IN ({placeholders}) AND ({rs_cond})
+        """, (row['date'], *codes)).fetchall()
+        
+        tech = {
+            'above_ma50': sum(1 for r in idx_rows if r['ma50'] and r['close'] > r['ma50']),
+            'above_ma200': sum(1 for r in idx_rows if r['ma200'] and r['close'] > r['ma200']),
+            'avg_rs_60': round(sum(r['rs_60'] for r in idx_rows) / len(idx_rows), 1) if idx_rows else 0,
+            'positive_20d': sum(1 for r in idx_rows if r['ret_20'] and r['ret_20'] > 0),
+        }
+        
+        groups.append({
+            'group_name': gn,
+            'group_label': g['group_label'],
+            'indices_count': g['indices_count'],
+            'stocks_count': g['stocks_count'],
+            'total_score': g['total_score'],
+            'rating': g['rating'],
+            'position': g['position'],
+            'score_vs_market': g['score_vs_market'],
+            'tech': tech,
+        })
+
     return jsonify({
         'date': row['date'],
         'total_score': row['total_score'],
         'rating': row['rating'],
         'indicators': indicators,
         'rotations': rotations,
+        'groups': groups,
     })
 
 # ═══════════════════════════════════════════════
@@ -523,6 +582,270 @@ def api_market_sell_score():
         'signals': signals,
         'cleared_signals': cleared,
         'signal_details': signal_details,
+    })
+
+
+# ═══════════════════════════════════════════════
+# API: GET /api/market-health/sector-indices
+# ═══════════════════════════════════════════════
+
+@app.route('/api/market-health/sector-indices')
+def api_market_sector_indices():
+    """返回某个行业分组下的指数列表及RS/MA数据"""
+    group_name = request.args.get('group_name', '')
+    target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+    
+    # 解析分组名称获取池和RS条件
+    pool_key, suffix = group_name.rsplit('_', 1)
+    # pool_key: 'l2' or 'theme', suffix: 'strong'/'mid'/'weak'
+    
+    import yaml
+    yaml_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'index_style.yaml')
+    with open(yaml_path, encoding='utf-8') as f:
+        style = yaml.safe_load(f)
+    
+    if pool_key == 'l2':
+        pool_codes = {item['code']: item['name'] for item in style['categories'].get('sector_l2', [])}
+    else:
+        pool_codes = {item['code']: item['name'] for item in style['categories'].get('thematic', [])}
+    
+    db = get_db()
+    
+    # RS阈值
+    if suffix == 'strong':
+        cond = 'rs_60 >= 75'
+    elif suffix == 'weak':
+        cond = 'rs_60 < 30'
+    else:
+        cond = 'rs_60 >= 30 AND rs_60 < 75'
+    
+    codes_list = list(pool_codes.keys())
+    placeholders = ','.join('?' * len(codes_list))
+    rows = db.execute(f"""
+        SELECT r.stock_code, r.rs_20, r.rs_60, r.rs_250,
+               r.ma50, r.ma200, r.ad_slope_display,
+               r.close, r.ret_20, r.ret_60
+        FROM index_rs_daily r
+        WHERE r.date = ? AND r.stock_code IN ({placeholders})
+          AND ({cond})
+        ORDER BY r.rs_60 DESC
+    """, (target_date, *codes_list))
+    
+    indices = []
+    for r in rows:
+        code = r['stock_code']
+        indices.append({
+            'code': code,
+            'name': pool_codes.get(code, code),
+            'rs_20': r['rs_20'],
+            'rs_60': r['rs_60'],
+            'rs_250': r['rs_250'],
+            'close': r['close'],
+            'ma50': r['ma50'],
+            'ma200': r['ma200'],
+            'ad_slope': r['ad_slope_display'] or r['rs_60'],
+            'ret_20': r['ret_20'],
+            'ret_60': r['ret_60'],
+            'above_ma50': r['close'] > r['ma50'] if r['ma50'] else False,
+            'above_ma200': r['close'] > r['ma200'] if r['ma200'] else False,
+        })
+    
+    # 组统计
+    stats = {
+        'total': len(indices),
+        'above_ma50': sum(1 for i in indices if i['above_ma50']),
+        'above_ma200': sum(1 for i in indices if i['above_ma200']),
+        'avg_rs_60': round(sum(i['rs_60'] for i in indices) / len(indices), 1) if indices else 0,
+    }
+    
+    db.close()
+    return jsonify({'group_name': group_name, 'date': target_date, 'indices': indices, 'stats': stats})
+
+
+# ═══════════════════════════════════════════════
+# API: GET /api/market-health/sector-constituents
+# ═══════════════════════════════════════════════
+
+@app.route('/api/market-health/sector-constituents')
+def api_market_sector_constituents():
+    """返回某个指数的成分股及权重/RS"""
+    index_code = request.args.get('index_code', '')
+    target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+    
+    if not index_code:
+        return jsonify({'status': 'no_data', 'stocks': []})
+    
+    db = get_db()
+    
+    # 查成分股
+    rows = db.execute("""
+        SELECT ic.stock_code, ic.date as latest_date,
+               sb.name,
+               k.close, k.volume, k.amount,
+               sr.rps_20, sr.rps_60, sr.rps_250
+        FROM index_constituents ic
+        JOIN stock_basic sb ON ic.stock_code = sb.stock_code
+        LEFT JOIN daily_kline k ON ic.stock_code = k.stock_code AND k.date = ?
+        LEFT JOIN stock_rs_daily sr ON ic.stock_code = sr.stock_code AND sr.date = ?
+        WHERE ic.index_code = ?
+          AND ic.date = (SELECT MAX(date) FROM index_constituents WHERE index_code = ?)
+        ORDER BY k.amount DESC
+        LIMIT 100
+    """, (target_date, target_date, index_code, index_code))
+    
+    stocks = []
+    for r in rows:
+        stocks.append({
+            'code': r['stock_code'],
+            'name': r['name'],
+            'close': r['close'],
+            'volume': r['volume'],
+            'amount': r['amount'],
+            'rps_20': r['rps_20'],
+            'rps_60': r['rps_60'],
+            'rps_250': r['rps_250'],
+        })
+    
+    db.close()
+    return jsonify({'index_code': index_code, 'date': target_date, 'stocks': stocks, 'count': len(stocks)})
+
+
+# ═══════════════════════════════════════════════
+# API: GET /api/stock-sector-context
+# ═══════════════════════════════════════════════
+
+@app.route('/api/stock-sector-context')
+def api_stock_sector_context():
+    """查询某只股票的行业分组上下文（所属最强指数 + 行业组健康分）"""
+    stock_code = request.args.get('code', '').strip()
+    target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+    if not stock_code:
+        return jsonify({'status': 'no_data', 'error': '缺少股票代码'})
+    
+    db = get_db()
+    
+    # 查股票名称
+    row = db.execute("SELECT name FROM stock_basic WHERE stock_code=?", (stock_code,)).fetchone()
+    stock_name = row['name'] if row else ''
+    
+    # 从 index_constituents 查该股票属于哪些指数
+    indices = db.execute("""
+        SELECT ic.index_code, ic.date
+        FROM index_constituents ic
+        WHERE ic.stock_code = ?
+          AND ic.date = (SELECT MAX(date) FROM index_constituents WHERE stock_code = ?)
+    """, (stock_code, stock_code)).fetchall()
+    
+    if not indices:
+        db.close()
+        return jsonify({'status': 'no_data', 'stock_code': stock_code, 'stock_name': stock_name,
+                        'primary_index': None, 'sector_group': None, 'all_indices': []})
+    
+    index_codes = [r['index_code'] for r in indices]
+    
+    # 加载 index_style.yaml 获取指数分类
+    import yaml
+    yaml_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'index_style.yaml')
+    with open(yaml_path, encoding='utf-8') as f:
+        style = yaml.safe_load(f)
+    
+    l2_set = {item['code'] for item in style['categories'].get('sector_l2', [])}
+    theme_set = {item['code'] for item in style['categories'].get('thematic', [])}
+    valid_set = l2_set | theme_set
+    
+    # 只保留 L2 + 主题指数，获取 RS_60
+    placeholders = ','.join('?' * len(index_codes))
+    
+    rs_rows = db.execute(f"""
+        SELECT r.stock_code, r.rs_60, r.rs_250
+        FROM index_rs_daily r
+        WHERE r.date = ? AND r.stock_code IN ({placeholders})
+    """, (target_date, *index_codes)).fetchall()
+    
+    # 构建列表，只保留有效指数
+    all_idx = []
+    for r in rs_rows:
+        code = r['stock_code']
+        if code in valid_set:
+            idx_type = 'sector_l2' if code in l2_set else 'thematic'
+            all_idx.append({
+                'code': code,
+                'rs_60': r['rs_60'],
+                'rs_250': r['rs_250'],
+                'type': idx_type
+            })
+    
+    if not all_idx:
+        db.close()
+        return jsonify({'status': 'no_data', 'stock_code': stock_code, 'stock_name': stock_name,
+                        'primary_index': None, 'sector_group': None, 'all_indices': []})
+    
+    # 取 RS_60 最高的作为 primary_index（相同 RS 时 L2 优先）
+    all_idx.sort(key=lambda x: (-x['rs_60'], 0 if x['type'] == 'sector_l2' else 1))
+    primary = all_idx[0]
+    primary_code = primary['code']
+    
+    # 从 yaml 里查 primary 指数名称
+    primary_name = ''
+    for item in style['categories'].get('sector_l2', []):
+        if item['code'] == primary_code:
+            primary_name = item['name']
+            break
+    if not primary_name:
+        for item in style['categories'].get('thematic', []):
+            if item['code'] == primary_code:
+                primary_name = item['name']
+                break
+    
+    primary_result = {
+        'code': primary_code,
+        'name': primary_name,
+        'rs_60': primary['rs_60'],
+        'rs_250': primary['rs_250'],
+        'index_type': primary['type'],
+    }
+    
+    # 查该指数属于哪个行业分组
+    # 从 market_health_sector_daily 查所有组，判断 primary_code 属于哪个
+    groups = db.execute(
+        "SELECT * FROM market_health_sector_daily WHERE date=?", (target_date,)
+    ).fetchall()
+    
+    sector_group = None
+    for g in groups:
+        gn = g['group_name']
+        pool_key = gn.rsplit('_', 1)[0]  # 'l2' or 'theme'
+        suffix = gn.rsplit('_', 1)[1]    # 'strong' / 'mid' / 'weak'
+        
+        # 获取该组的指数列表
+        pool_codes = l2_set if pool_key == 'l2' else theme_set
+        
+        # 确定 RS 条件
+        if suffix == 'strong':
+            cond = lambda rs: rs >= 75
+        elif suffix == 'weak':
+            cond = lambda rs: rs < 30
+        else:
+            cond = lambda rs: 30 <= rs < 75
+        
+        if primary_code in pool_codes and cond(primary['rs_60']):
+            sector_group = {
+                'group_name': gn,
+                'group_label': g['group_label'],
+                'health_score': g['total_score'],
+                'rating': g['rating'],
+                'position': g['position'],
+                'score_vs_market': g['score_vs_market'],
+            }
+            break
+    
+    db.close()
+    return jsonify({
+        'stock_code': stock_code,
+        'stock_name': stock_name,
+        'primary_index': primary_result,
+        'sector_group': sector_group,
+        'all_indices': all_idx,
     })
 
 
@@ -3638,6 +3961,136 @@ def api_cockpit_briefing():
 
 
 
+@app.route('/api/start-vibe', methods=['POST', 'OPTIONS'])
+def api_start_vibe():
+    """启动 vibe-trading MCP 服务（端口 8781）"""
+    if request.method == 'OPTIONS': return '', 204
+    import subprocess, socket
+    # 先检查是否已在运行
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect(('127.0.0.1', 8781))
+        s.close()
+        return jsonify({'ok': True, 'message': 'already running'})
+    except:
+        pass
+    try:
+        # 启动 vibe-trading 服务
+        vibe_exe = os.path.join(os.path.dirname(sys.executable), 'Scripts', 'vibe-trading.exe')
+        if not os.path.exists(vibe_exe):
+            vibe_exe = 'vibe-trading'
+        subprocess.Popen(
+            [vibe_exe, 'serve', '--port', '8781'],
+            cwd=PROJECT_DIR,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        return jsonify({'ok': True, 'message': 'started'})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
+# 调研任务存储（内存）
+_research_tasks = {}
+
+def _run_vibe(tid, code, name, prompt):
+    import urllib.request, time
+    _research_tasks[tid]['status']='running'
+    try:
+        r=json.loads(urllib.request.urlopen(urllib.request.Request(
+            'http://localhost:8781/sessions',
+            data=json.dumps({'title':f'research-{code}'}).encode(),
+            headers={'Content-Type':'application/json'}),timeout=10).read())
+        sid=r.get('session_id','')
+        if not sid: _research_tasks[tid].update({'status':'done','research':'会话创建失败','source':'error'});return
+        urllib.request.urlopen(urllib.request.Request(
+            f'http://localhost:8781/sessions/{sid}/messages',
+            data=json.dumps({'content':prompt}).encode(),
+            headers={'Content-Type':'application/json'}),timeout=15).read()
+        deadline=time.time()+600
+        while time.time()<deadline:
+            time.sleep(8)
+            try:
+                m=json.loads(urllib.request.urlopen(f'http://localhost:8781/sessions/{sid}/messages?limit=5',timeout=15).read())
+                for x in m:
+                    if x.get('role')=='assistant' and x.get('content'):
+                        _research_tasks[tid].update({'status':'done','research':x['content'],'source':'vibe-trading'});return
+            except:pass
+        _research_tasks[tid].update({'status':'done','research':'（调研超时）','source':'timeout'})
+    except Exception as e:
+        _research_tasks[tid].update({'status':'done','research':f'（调研异常: {e}）','source':'error'})
+
+
+@app.route('/api/research/status', methods=['GET'])
+def api_research_status():
+    tid=request.args.get('task_id','')
+    if not tid or tid not in _research_tasks:
+        return jsonify({'status':'not_found'})
+    t=_research_tasks[tid]; r={'task_id':tid,'code':t['code'],'name':t['name'],'status':t['status'],'source':t['source'],'questions':t['questions']}
+    if t['status']=='done' and t['research']:
+        r['research']=t['research']
+        del _research_tasks[tid]
+    return jsonify(r)
+
+
+@app.route('/api/research', methods=['GET', 'POST', 'OPTIONS'])
+def api_research():
+    """外部调研：优先 vibe-trading MCP（端口 8781），降级到 DDGS 网络搜索"""
+    if request.method == 'OPTIONS': return '', 204
+    
+    code = request.args.get('code', '')
+    custom_queries = []
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        custom_queries = data.get('queries', [])
+        if not code:
+            code = data.get('code', '')
+    if not code: return jsonify({'error': 'code required'}), 400
+    
+    db = get_db()
+    name_row = db.execute("SELECT name FROM stock_basic WHERE stock_code=?", (code,)).fetchone()
+    stock_name = name_row['name'] if name_row else code
+    
+    # 获取 RS 和信号数据用于自动生成问题
+    rs_row = db.execute("""SELECT rps_20, rps_60, rps_120, rps_250 FROM stock_rs_daily
+        WHERE stock_code=? ORDER BY date DESC LIMIT 1""", (code,)).fetchone()
+    cs_row = db.execute("""SELECT score_c, score_a FROM cansim_scores
+        WHERE stock_code=? ORDER BY date DESC LIMIT 1""", (code,)).fetchone()
+    # 检查是否有 MW 信号
+    mw_row = db.execute("""SELECT COUNT(*) as cnt FROM mw_signal_daily
+        WHERE stock_code=? AND b2_date>=date('now','-15 days')""", (code,)).fetchone()
+    has_buy = mw_row and mw_row['cnt'] > 0
+    db.close()
+    
+    has_sell = False  # 简化为仅基于RS和CANSLIM判断
+    rs250 = rs_row['rps_250'] if rs_row else 0
+    c_score = cs_row['score_c'] if cs_row else 0
+    
+    # 生成调研问题
+    if custom_queries:
+        questions = custom_queries
+    else:
+        questions = []
+        questions.append(f"{stock_name}({code})近期有什么重大新闻、公告或管理层变动？")
+        questions.append(f"{stock_name}最近一期财报的关键数据如何？营收和利润增长趋势？")
+        if rs250 >= 90:
+            questions.append(f"{stock_name}(RS_250={rs250})长期强势的驱动力是什么？是否可持续？")
+        if has_buy:
+            questions.append(f"{stock_name}近期出现买入信号，是否有业绩或事件催化剂支撑？")
+        if has_sell:
+            questions.append(f"{stock_name}近期出现卖出信号，触发原因是什么？")
+        if c_score >= 50:
+            questions.append(f"{stock_name}当季收益增长的主要来源是什么？")
+    
+    # 异步启动 vibe-trading 调研（后台线程，不阻塞）
+    combined = '请调研以下问题，逐一回答并标注来源：\n' + '\n'.join(f'{i+1}. {q}' for i, q in enumerate(questions[:8]))
+    tid = f'{code}_{int(datetime.now().timestamp())}'
+    _research_tasks[tid] = {'status':'pending','code':code,'name':stock_name,'questions':questions,'research':'','source':''}
+    import threading
+    threading.Thread(target=_run_vibe, args=(tid, code, stock_name, combined), daemon=True).start()
+    return jsonify({'task_id':tid,'code':code,'name':stock_name,'source':'vibe-trading','questions':questions,'status':'started','message':'调研已启动(最长10分钟)，请稍候...'})
+
+
 @app.route('/api/prompt-generator', methods=['GET', 'OPTIONS'])
 def api_prompt_generator():
     """生成欧奈尔分析 prompt"""
@@ -3668,7 +4121,7 @@ def api_prompt_generator_analyze():
     import subprocess
     DEEPSEEK_EXE = r'D:\dstui\deepseek-tui-windows-x64.exe'
     try:
-        result = subprocess.run([DEEPSEEK_EXE, '-p', data['prompt']],
+        result = subprocess.run([DEEPSEEK_EXE, 'exec', '--model', 'deepseek-v4-flash', data['prompt']],
             capture_output=True, text=True, timeout=180, encoding='utf-8', errors='replace',
             cwd=r'D:\dstui', shell=False)
         output = result.stdout.strip() or result.stderr.strip()

@@ -1,185 +1,123 @@
-#!/usr/bin/env python3
 """
-MW信号回填补丁 — 在依赖数据已就绪的基础上，逐日运行MW信号扫描（支持多进程并行）
+MW 信号批量回填 v1.0
+将全市场 MW B1/B2 信号从指定日期范围计算并写入 mw_signal_daily
 
-前置条件：backfill_mw_data.py 的步骤1~6已执行（RS/CANSLIM/观察池/缠论缓存已就绪）
+依赖：chanlun_bi_json（缠论笔）, stock_rs_daily（个股RS）, index_rs_daily（指数RS）
+输出：mw_signal_daily
 
 用法：
-    python scripts/backfill_mw_signals.py                      # 全量，4进程并行
-    python scripts/backfill_mw_signals.py --workers 6          # 6进程并行
-    python scripts/backfill_mw_signals.py --start 2026-04-01   # 从指定日期
-    python scripts/backfill_mw_signals.py --date 2026-04-14    # 单日
-    python scripts/backfill_mw_signals.py --force              # 强制重扫(忽略已有数据)
+    python scripts/backfill_mw_signals.py --start 2016-01-01 --end 2016-03-31
+    python scripts/backfill_mw_signals.py --quarter 2016Q1 --incremental
+    python scripts/backfill_mw_signals.py --incremental  # 全量增量
+
+性能参考：单日全市场约 15~20 分钟，2535 天约 600~800 小时
+建议按季度分批跑，每个季度约 2~3 小时
 """
+import sys, os, time, argparse, sqlite3
+from datetime import datetime
 
-import subprocess, sys, os, sqlite3, time, threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, date, timedelta
+PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT)
+sys.path.insert(0, os.path.join(PROJECT, 'src'))
 
-PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-os.chdir(PROJECT_DIR)
+DB = os.path.join(PROJECT, 'data', 'lixinger.db')
 
-PYTHON_EXE = r"C:\Program Files\Python312\python.exe"
-if not os.path.exists(PYTHON_EXE):
-    PYTHON_EXE = sys.executable
 
-START_DATE = "2026-01-01"
-SINGLE_DATE = None
-WORKERS = 4
-FORCE = False
-
-for i, arg in enumerate(sys.argv):
-    if arg == "--start" and i + 1 < len(sys.argv):
-        START_DATE = sys.argv[i + 1]
-    if arg == "--date" and i + 1 < len(sys.argv):
-        SINGLE_DATE = sys.argv[i + 1]
-    if arg == "--workers" and i + 1 < len(sys.argv):
-        WORKERS = int(sys.argv[i + 1])
-    if arg == "--force":
-        FORCE = True
-
-TODAY = date.today().strftime("%Y-%m-%d")
-
-# 确保 SQLite WAL 模式 + 合理超时（多进程写入兼容）
-DB_PATH = os.path.join(PROJECT_DIR, "data", "lixinger.db")
-_conn = sqlite3.connect(DB_PATH)
-_conn.execute("PRAGMA journal_mode=WAL")
-_conn.execute("PRAGMA busy_timeout=30000")
-_conn.execute("PRAGMA synchronous=NORMAL")
-_conn.close()
-
-def log(msg):
-    ts = datetime.now().strftime("%H:%M:%S")
-    print(f"[{ts}] {msg}", flush=True)
-
-def run_one_date(ds):
-    """运行单个日期的 MW 扫描，返回 (ds, success, elapsed, output_tail)"""
-    t0 = time.time()
-    cmd = [PYTHON_EXE, "src/scanners/mw_signal.py", "--date", ds]
-
-    env = os.environ.copy()
-    env["PYTHONIOENCODING"] = "utf-8"
-    env["PYTHONUNBUFFERED"] = "1"
-
-    try:
-        proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, encoding="utf-8", errors="replace", env=env
-        )
-        stdout, _ = proc.communicate(timeout=7200)
-        elapsed = time.time() - t0
-        returncode = proc.returncode
-
-        # 提取关键输出行
-        lines = [l.strip() for l in stdout.split("\n") if l.strip()]
-        tail = lines[-3:] if lines else []
-
-        return (ds, returncode == 0, elapsed, tail)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait()
-        return (ds, False, time.time() - t0, ["超时"])
-    except Exception as e:
-        return (ds, False, time.time() - t0, [str(e)])
-
-def trading_dates(start, end):
-    conn = sqlite3.connect(DB_PATH)
-    rows = conn.execute(
-        "SELECT DISTINCT date FROM daily_kline WHERE date >= ? AND date <= ? ORDER BY date LIMIT 500",
+def get_trading_dates(start, end):
+    db = sqlite3.connect(DB)
+    rows = db.execute(
+        "SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date",
         (start, end)
     ).fetchall()
-    conn.close()
+    db.close()
     return [r[0] for r in rows]
 
-def mw_exists(ds):
-    conn = sqlite3.connect(DB_PATH)
-    r = conn.execute("SELECT COUNT(*) FROM mw_signal_daily WHERE b2_date=?", (ds,)).fetchone()
-    conn.close()
-    return r[0] > 0
 
-dates = trading_dates(START_DATE, TODAY)
+def get_existing_dates():
+    db = sqlite3.connect(DB)
+    rows = db.execute("SELECT DISTINCT scan_date FROM mw_signal_daily WHERE scan_date IS NOT NULL").fetchall()
+    db.close()
+    return set(r[0] for r in rows)
 
-todo = []
-for ds in dates:
-    if SINGLE_DATE and ds != SINGLE_DATE:
-        continue
-    if not FORCE and mw_exists(ds):
-        continue
-    todo.append(ds)
 
-log(f"交易日: {len(dates)} 天, 已扫描: {len(dates)-len(todo)} 天, 待扫描: {len(todo)} 天")
-if FORCE:
-    log("⚠ --force 模式：忽略已有数据，全部重扫")
-if not todo:
-    log("全部完成！")
-    sys.exit(0)
+def quarter_to_range(q):
+    import calendar
+    year = int(q[:4]); qnum = int(q[-1])
+    sm = (qnum - 1) * 3 + 1; em = sm + 2
+    ld = calendar.monthrange(year, em)[1]
+    return f"{year}-{sm:02d}-01", f"{year}-{em:02d}-{ld}"
 
-log("=" * 60)
-log(f"🐺 MW信号回填 — {len(todo)} 个交易日, {WORKERS} 进程并行")
-log("=" * 60)
 
-total_start = time.time()
-ok = 0
-fail = 0
-completed = 0
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='MW信号批量回填')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--start', help='起始日期 YYYY-MM-DD（需同时指定 --end）')
+    group.add_argument('--quarter', help='按季度运行，如 2016Q1')
+    parser.add_argument('--end', help='结束日期 YYYY-MM-DD')
+    parser.add_argument('--incremental', action='store_true', help='增量模式：跳过已有扫描的日期')
+    parser.add_argument('--workers', type=int, default=1, help='预留（MW引擎为单进程，暂不支持多进程）')
+    args = parser.parse_args()
 
-# 单日期或单进程 → 串行
-if WORKERS <= 1 or SINGLE_DATE:
-    log("  模式: 串行")
-    for di, ds in enumerate(todo):
-        log(f"📅 {ds}  ({di+1}/{len(todo)})")
-        ds_result = run_one_date(ds)
-        ds_name, ds_ok, ds_elapsed, ds_tail = ds_result
+    if args.quarter:
+        start_date, end_date = quarter_to_range(args.quarter)
+    elif args.start and args.end:
+        start_date, end_date = args.start, args.end
+    else:
+        parser.error("需要 --quarter 或 (--start + --end)")
+        sys.exit(1)
 
-        for line in ds_tail:
-            log(f"    │ {line}")
-        if ds_ok:
-            ok += 1
-            log(f"  ✅ {ds} 完成 ({ds_elapsed:.0f}s)")
-        else:
-            fail += 1
-            log(f"  ❌ {ds} 失败 ({ds_elapsed:.0f}s)")
+    all_dates = get_trading_dates(start_date, end_date)
+    if not all_dates:
+        print(f"区间 {start_date} ~ {end_date} 无交易日")
+        sys.exit(0)
 
-        elapsed = time.time() - total_start
-        remaining = len(todo) - di - 1
-        if di > 0 and remaining > 0:
-            avg = elapsed / (di + 1)
-            eta = avg * remaining
-            speed = avg / 60
-            log(f"  ⏱ 进度 {di+1}/{len(todo)} | 总 {elapsed/60:.0f}min | 单日 {speed:.0f}min | 预计剩余 {eta/60:.0f}min")
-else:
-    log(f"  模式: {WORKERS} 进程并行")
-    # 并行提交所有任务
-    with ThreadPoolExecutor(max_workers=WORKERS) as executor:
-        futures = {executor.submit(run_one_date, ds): ds for ds in todo}
+    if args.incremental:
+        existing = get_existing_dates()
+        dates = [d for d in all_dates if d not in existing]
+        print(f"增量模式: 已完成 {len(all_dates)-len(dates)} 天, 剩余 {len(dates)} 天")
+    else:
+        dates = all_dates
+        print(f"全量模式: {len(dates)} 天 ({dates[0]} ~ {dates[-1]})")
 
-        for future in as_completed(futures):
-            ds = futures[future]
-            try:
-                ds_name, ds_ok, ds_elapsed, ds_tail = future.result()
-            except Exception as e:
-                ds_ok = False
-                ds_elapsed = 0
-                ds_tail = [str(e)]
+    if not dates:
+        print("无需处理")
+        sys.exit(0)
 
+    from scanners.mw_signal import run_scan
+
+    t_start = time.time()
+    completed = 0
+    errors = []
+
+    for i, date in enumerate(dates):
+        t0 = time.time()
+        print(f"[{i+1}/{len(dates)}] {date} ...", end=' ', flush=True)
+        try:
+            run_scan(date, silent=True)
+            # 补充打印当日结果
+            import sqlite3 as _sql
+            _db = _sql.connect(DB, timeout=5)
+            cnt = _db.execute("SELECT COUNT(*) as c, COUNT(CASE WHEN b2_date IS NOT NULL THEN 1 END) as b2, COUNT(CASE WHEN b2_date IS NULL THEN 1 END) as b1only FROM mw_signal_daily WHERE b1_date=?", (date,)).fetchone()
+            _db.close()
+            elapsed = time.time() - t0
             completed += 1
-            if ds_ok:
-                ok += 1
-                log(f"✅ [{completed}/{len(todo)}] {ds} ({ds_elapsed:.0f}s)")
+            if completed > 0:
+                avg = (time.time() - t_start) / completed
+                eta = avg * (len(dates) - i - 1)
+                print(f"✓ B1:{cnt[0]} B2:{cnt[1]} 纯B1:{cnt[2]} ({elapsed:.0f}s) ETA {eta/3600:.1f}h")
             else:
-                fail += 1
-                err = ds_tail[-1][:80] if ds_tail else "未知错误"
-                log(f"❌ [{completed}/{len(todo)}] {ds} ({ds_elapsed:.0f}s): {err}")
+                print(f"✓ ({elapsed:.0f}s)")
+        except Exception as e:
+            elapsed = time.time() - t0
+            errors.append((date, str(e)[:200]))
+            print(f"✗ ({elapsed:.0f}s) {e}")
 
-            # 每5天或每完成一批打印汇总
-            if completed % max(1, WORKERS) == 0:
-                elapsed = time.time() - total_start
-                remaining = len(todo) - completed
-                avg = elapsed / completed if completed > 0 else 0
-                eta = avg * remaining
-                log(f"  📊 进度 {completed}/{len(todo)} | 总 {elapsed/60:.0f}min | 完成{ok} 失败{fail} | 预计剩余 {eta/60:.0f}min")
-
-total_elapsed = time.time() - total_start
-log(f"\n{'=' * 60}")
-log(f"🐺 完成: {total_elapsed/60:.0f}min | 成功{ok} 失败{fail}")
-log(f"{'=' * 60}")
+    total_elapsed = time.time() - t_start
+    print(f"\n=== 完成 ===")
+    print(f"成功: {completed}/{len(dates)} 天")
+    print(f"失败: {len(errors)} 天")
+    print(f"总耗时: {total_elapsed/3600:.1f}h ({total_elapsed/60:.0f}min)")
+    if errors:
+        print(f"失败日期:")
+        for d, e in errors[:10]:
+            print(f"  {d}: {e}")

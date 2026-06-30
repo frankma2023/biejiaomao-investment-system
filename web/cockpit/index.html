@@ -3,12 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="theme-color" content="#0d0d12">
+<link rel="manifest" href="/manifest.json">
 <title>投资决策驾驶舱</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<link rel="stylesheet" href="../shared/css/mobile.css">
 <style>
 body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)}
 
@@ -165,6 +168,7 @@ html[data-theme="light"] .tab-btn:not(.active) .count{background:rgba(245,158,11
 </div>
 
 <script>
+var API_BASE = 'http://' + window.location.hostname + ':8788';
 var candidatesData = [];
 var marketData = null;
 var tradeStats = null;
@@ -180,7 +184,7 @@ async function init() {
 
 async function loadData() {
   try {
-    var resp = await fetch('/api/cockpit/latest');
+    var resp = await fetch(API_BASE + '/api/cockpit/latest');
     var data = await resp.json();
     candidatesData = data.candidates || [];
     marketData = data.market || {};
@@ -200,7 +204,7 @@ async function loadData() {
 
 async function loadTradeStats() {
   try {
-    var resp = await fetch('/api/discipline/trade-stats');
+    var resp = await fetch(API_BASE + '/api/discipline/trade-stats');
     tradeStats = await resp.json();
   } catch(e) {
     tradeStats = null;
@@ -473,7 +477,7 @@ async function runPipeline() {
   document.getElementById('content').innerHTML = '<div class="loading">🚀 五级管道筛选中...<br><span style="font-size:.6rem">观察池→市值→行业RS→个股RS→形态信号</span></div>';
 
   try {
-    var resp = await fetch('/api/cockpit/run', { method: 'POST' });
+    var resp = await fetch(API_BASE + '/api/cockpit/run', { method: 'POST' });
     var data = await resp.json();
     if (data.success) {
       await loadData();
@@ -506,7 +510,7 @@ async function openOneilReport(code, date) {
 
   // 先尝试预生成报告
   try {
-    var resp = await fetch('/api/cockpit/oneil-report?code=' + code + '&date=' + date);
+    var resp = await fetch(API_BASE + '/api/cockpit/oneil-report?code=' + code + '&date=' + date);
     if (resp.ok) {
       var html = await resp.text();
       // 用iframe隔离，防止报告中未scoped的CSS污染驾驶舱页面
@@ -525,7 +529,7 @@ async function openOneilReport(code, date) {
   // 降级：实时 CLI 生成
   content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-display)">🧭 欧奈尔正在深度审视...<br><span style="font-size:.65rem">DeepSeek 正在推理，约需 30~60 秒...</span></div>';
   try {
-    var resp2 = await fetch('/api/cockpit/oneil-deep?code=' + code);
+    var resp2 = await fetch(API_BASE + '/api/cockpit/oneil-deep?code=' + code);
     var data = await resp2.json();
     if (data.html) {
       content.innerHTML = '<div style="font-family:var(--font-body);font-size:.75rem;line-height:1.8;color:var(--text-primary)">' + data.html + '</div>';
@@ -545,5 +549,6 @@ function switchTab(tab) { currentTab = tab; document.getElementById("tab-b1").cl
 // START
 init();
 </script>
+<script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}</script>
 </body>
 </html>
