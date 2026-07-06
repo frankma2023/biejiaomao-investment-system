@@ -13,67 +13,76 @@
 <style>
 *{box-sizing:border-box}
 body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary);margin:0;min-height:100vh}
-.app-container{max-width:860px;margin:0 auto;padding:20px}
-
-/* 粒子背景保持原有的 */
 
 /* 标题区 */
-.hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:20px}
-.hdr h1{font-family:var(--font-display);font-size:18px;font-weight:400;color:var(--text-primary);margin:0;letter-spacing:.01em}
-.hdr .sub{font-size:10px;color:var(--muted);font-family:var(--font-body)}
+.page-header{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+.page-header h1{font-family:var(--font-display);font-size:15px;font-weight:400;color:var(--text-primary);margin:0}
+.page-header .sub{font-size:10px;color:var(--muted)}
 
-/* 输入卡片 */
-.in-card{background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;padding:18px 22px;margin-bottom:14px}
-.in-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.in-row .label{font-size:10px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em;min-width:48px}
-.in-row .input{font-family:var(--font-mono);font-size:14px;padding:7px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.04);color:var(--text-primary);width:120px;outline:none;transition:border-color .2s}
-.in-row .input:focus{border-color:var(--accent)}
-.in-row .name{font-size:13px;color:var(--accent);font-family:var(--font-mono);min-width:70px}
-.in-row .hint{font-size:9px;color:var(--muted);margin-left:auto}
-.in-divider{height:1px;background:var(--border);margin:12px 0}
+/* 输入区 */
+.input-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.input-row .label{font-size:10px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em;min-width:48px}
+.input-row .name{font-size:13px;color:var(--accent);font-family:var(--font-mono);min-width:70px}
+.input-row .hint{font-size:9px;color:var(--muted);margin-left:auto}
 
-/* 按钮 */
-.btn{font-family:var(--font-body);font-size:11px;font-weight:600;padding:7px 18px;border-radius:10px;cursor:pointer;border:none;transition:all .2s;display:inline-flex;align-items:center;gap:5px}
-.btn-primary{background:linear-gradient(135deg,var(--accent),#d97706);color:#fff;box-shadow:0 2px 10px rgba(245,158,11,.2)}
-.btn-primary:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 4px 14px rgba(245,158,11,.3)}
-.btn-ghost{background:transparent;color:var(--text-secondary);border:1px solid var(--border)!important}
-.btn-ghost:hover{border-color:var(--accent)!important;color:var(--accent)}
-.btn-ai{background:rgba(16,185,129,.08);color:#34d399;border:1px solid rgba(16,185,129,.2)!important}
-.btn-ai:hover{background:rgba(16,185,129,.18)}
-.btn-ai:disabled{opacity:.4;cursor:not-allowed}
+/* 模式选择 */
+.mode-group{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 
 /* 复选框组 */
-.chk-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.chk-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:2px}
 .chk-wrap label{font-size:11px;color:var(--text-secondary);display:flex;align-items:center;gap:5px;cursor:pointer}
 .chk-wrap input{accent-color:var(--accent);width:14px;height:14px}
 
 /* 自定义课题 */
-.custom-box{width:100%;margin-top:8px;display:none}
-.custom-box textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.03);color:var(--text-primary);font-family:var(--font-mono);font-size:11px;line-height:1.6;resize:vertical;outline:none;transition:border-color .2s;min-height:48px}
+.custom-box{width:100%;margin-top:6px;display:none}
+.custom-box textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.03);color:var(--text-primary);font-family:var(--font-mono);font-size:11px;line-height:1.6;resize:vertical;outline:none;transition:border-color .2s;min-height:300px}
 .custom-box textarea:focus{border-color:var(--accent)}
 .custom-box .hint{font-size:9px;color:var(--muted);margin-top:4px}
 
 /* vibe 状态条 */
 .vibe-row{display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:10px;color:var(--muted)}
 
-/* Prompt 区域卡片 */
-.prompt-card{background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:14px}
+/* Prompt 卡片 */
 .prompt-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border)}
 .prompt-hdr .title{font-family:var(--font-display);font-size:12px;font-weight:400;color:var(--text-secondary)}
 .prompt-hdr .meta{font-size:9px;color:var(--muted)}
 .prompt-hdr .actions{display:flex;gap:6px}
-.prompt-body{background:#111118;padding:18px 20px;font-family:var(--font-mono);font-size:12px;line-height:1.7;color:#c9d1d9;white-space:pre-wrap;max-height:55vh;overflow-y:auto;min-height:140px}
+.prompt-body{background:rgba(17,17,24,.8);padding:16px 18px;font-family:var(--font-body);font-size:12px;line-height:1.7;color:#c9d1d9;max-height:none;min-height:300px;overflow-y:auto;border-radius:0 0 14px 14px}
 .prompt-empty{color:var(--muted);text-align:center;padding:50px 20px;font-family:var(--font-display);font-size:13px}
 
-/* 结果卡片 */
-.result-card{background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:14px;display:none}
-.result-hdr{padding:12px 18px;border-bottom:1px solid var(--border);font-family:var(--font-display);font-size:12px;font-weight:400;color:var(--text-secondary)}
-.result-body{padding:18px 20px;font-size:12px;line-height:1.8;color:var(--text-primary);max-height:50vh;overflow-y:auto}
-.result-body h2{font-family:var(--font-display);font-size:13px;font-weight:400;color:var(--accent);margin:10px 0 6px}
-.result-body h3{font-size:12px;color:var(--accent);margin:8px 0 4px}
-.result-body strong{color:var(--accent)}
-.result-body blockquote{border-left:2px solid var(--accent);padding-left:12px;margin:6px 0;color:var(--text-secondary)}
+/* 财务表格 */
+.fin-tables{margin-bottom:14px;font-family:var(--font-mono)}
+.fin-table-title{font-size:11px;font-weight:600;color:var(--accent);padding:8px 0 5px;letter-spacing:.03em}
+.fin-tbl{width:100%;border-collapse:collapse;font-size:11px;background:rgba(255,255,255,.02);border-radius:8px;overflow:hidden;margin-bottom:4px}
+.fin-tbl th{background:rgba(255,255,255,.05);color:var(--muted);font-weight:500;padding:4px 6px;text-align:right;border-bottom:1px solid var(--border);font-size:10px}
+.fin-tbl th:first-child{text-align:left}
+.fin-tbl td{padding:3px 6px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text-primary)}
+.fin-tbl td:first-child{text-align:left;color:var(--muted)}
+.fin-tbl tr:last-child td{border-bottom:none}
+.val-warn{color:var(--fall)!important}
+.val-str{color:var(--rise)!important;font-weight:600}
+.prompt-text{white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);font-size:12px;line-height:1.6;color:var(--text-secondary);margin:14px 0 0;padding:12px 0;border-top:1px solid var(--border)}
+
+/* 浅色覆盖 */
+html[data-theme="light"] .prompt-body{background:rgba(255,255,255,.7);color:#374151}
+html[data-theme="light"] .top-bar input,html[data-theme="light"] .top-bar select{background:rgba(255,255,255,.7);border-color:var(--divider);color:var(--text-primary)}
+html[data-theme="light"] .custom-box textarea{background:rgba(255,255,255,.6);border-color:var(--divider);color:var(--text-primary)}
+
+@media(max-width:768px){.input-row{flex-direction:column;align-items:stretch}.input-row .hint{display:none}}
+
+.result-body{padding:18px 20px;font-size:13px;line-height:1.85;color:var(--text-primary);max-height:60vh;overflow-y:auto}
+.result-body h2{font-family:var(--font-display);font-size:14px;font-weight:500;color:var(--accent);margin:14px 0 6px}
+.result-body h3{font-size:13px;font-weight:600;color:var(--accent);margin:10px 0 5px}
+.result-body h4{font-size:12px;font-weight:600;color:var(--text-secondary);margin:8px 0 4px}
+.result-body p{margin:6px 0}
+.result-body strong{color:var(--rise)}
+.result-body li{margin:3px 0;padding-left:4px}
+.result-body blockquote{border-left:3px solid var(--accent);padding:6px 12px;margin:8px 0;background:rgba(255,255,255,.02);border-radius:0 6px 6px 0;color:var(--text-secondary);font-style:italic}
+.result-body code{background:rgba(255,255,255,.06);padding:1px 5px;border-radius:4px;font-family:var(--font-mono);font-size:11px}
+.result-body .md-code{background:#0d0d12;border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;font-size:11px;line-height:1.5;margin:8px 0}
+.result-body .md-code code{background:none;padding:0}
 .result-empty{text-align:center;padding:40px;color:var(--muted);font-family:var(--font-display);font-size:13px}
+.nav-dropdown:hover .nav-dropdown-menu{display:block}
 </style>
 </head>
 <body>
@@ -81,29 +90,33 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)
 <script>
 (function(){var c=document.getElementById('bg-canvas'),w=c.width=window.innerWidth,h=c.height=window.innerHeight;var ctx=c.getContext('2d'),particles=[],N=50;for(var i=0;i<N;i++)particles.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var p=particles[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=w;if(p.x>w)p.x=0;if(p.y<0)p.y=h;if(p.y>h)p.y=0;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(245,158,11,'+p.o+')';ctx.fill()}for(var i=0;i<N;i++){for(var j=i+1;j<N;j++){var dx=particles[i].x-particles[j].x,dy=particles[i].y-particles[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){ctx.beginPath();ctx.moveTo(particles[i].x,particles[i].y);ctx.lineTo(particles[j].x,particles[j].y);ctx.strokeStyle='rgba(245,158,11,'+((100-dist)/100*.06)+')';ctx.stroke()}}}requestAnimationFrame(draw)}draw();window.addEventListener('resize',function(){w=c.width=window.innerWidth;h=c.height=window.innerHeight})})();
 </script>
-
-<nav id="top-nav"></nav>
 <div class="app-container">
 
-<div class="hdr">
-  <h1>🔮 Prompt 生成器</h1>
+<nav id="top-nav"></nav>
+
+<div class="page-header">
+  <h1>Prompt 生成器</h1>
   <span class="sub">oneil 技能框架 · 全维度数据采集</span>
 </div>
 
 <!-- 输入卡片 -->
-<div class="in-card">
-  <div class="in-row">
+<div class="glass-card" style="margin-bottom:10px;padding:14px 18px">
+  <div class="input-row">
     <span class="label">股票</span>
-    <input class="input" id="code-input" placeholder="代码" value="" maxlength="6" onblur="lookupName()">
+    <input class="glass-input" id="code-input" placeholder="代码" value="" maxlength="6" onblur="lookupName()" style="width:100px;font-family:var(--font-mono);font-size:14px">
     <span class="name" id="name-hint"></span>
-    <button class="btn btn-primary" onclick="generate()" style="margin-left:auto">🔍 生成</button>
+    <button class="btn-glass btn-accent" onclick="generate()" style="margin-left:auto">🔍 生成</button>
   </div>
 
-  <div class="in-divider"></div>
+  <div style="height:1px;background:var(--border);margin:10px 0"></div>
 
   <div class="chk-wrap">
-    <label><input type="checkbox" id="research-check" onchange="toggleResearch()"> 包含外部调研</label>
-    <label id="autoq-label" style="display:none"><input type="checkbox" id="autoq-check" checked> 自动生成调研问题</label>
+    <span style="font-size:10px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.05em;min-width:48px">模式</span>
+    <label class="chk-label"><input type="radio" name="mode" value="oneil" checked onchange="toggleMode()"> 欧奈尔分析</label>
+    <label class="chk-label"><input type="radio" name="mode" value="fourmasters" onchange="toggleMode()"> 四大师分析</label>
+    <span style="flex:1"></span>
+    <label class="chk-label" id="research-label"><input type="checkbox" id="research-check" onchange="toggleResearch()"> 外部调研</label>
+    <label class="chk-label" id="autoq-label" style="display:none"><input type="checkbox" id="autoq-check" checked> 自动生成问题</label>
   </div>
 
   <div class="custom-box" id="custom-box">
@@ -117,14 +130,14 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)
 </div>
 
 <!-- Prompt 卡片 -->
-<div class="prompt-card">
+<div class="glass-card" style="margin-bottom:10px;overflow:hidden">
   <div class="prompt-hdr">
     <span class="title">📄 分析 Prompt</span>
     <span class="meta" id="meta-info"></span>
     <span style="font-size:9px;color:var(--muted)">信号日期自动取最近5日</span>
     <span class="actions">
-      <button class="btn btn-ghost" onclick="copyPrompt()" id="btn-copy" disabled>📋 复制</button>
-      <button class="btn btn-ai" onclick="sendToAI()" id="btn-ai" disabled>🧠 分析</button>
+      <button class="btn-glass" onclick="copyPrompt()" id="btn-copy" disabled>📋 复制</button>
+      <button class="btn-glass btn-accent" onclick="sendToAI()" id="btn-ai" disabled>🧠 分析</button>
     </span>
   </div>
   <div class="prompt-body" id="prompt-body">
@@ -133,8 +146,10 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)
 </div>
 
 <!-- 结果卡片 -->
-<div class="result-card" id="result-card">
-  <div class="result-hdr">🧠 DeepSeek 分析结果</div>
+<div class="glass-card" id="result-card" style="display:none;margin-bottom:14px">
+  <div class="prompt-hdr" style="border-bottom:1px solid var(--border)">
+    <span class="title">🧠 DeepSeek 分析结果</span>
+  </div>
   <div class="result-body" id="result-body"></div>
 </div>
 
@@ -155,6 +170,14 @@ async function lookupName(){
   }catch(e){}
 }
 lookupName();
+
+function toggleMode(){
+  var mode=document.querySelector('input[name=mode]:checked').value;
+  var isFour=mode==='fourmasters';
+  document.getElementById('research-label').style.display=isFour?'none':'flex';
+  document.getElementById('autoq-label').style.display='none';
+  document.getElementById('custom-box').style.display='none';
+}
 
 function toggleResearch(){
   var ck=document.getElementById('research-check').checked;
@@ -179,6 +202,157 @@ async function checkVibeServer(){
 }
 // 页面加载时不检测vibe-trading，等用户勾选调研时再启动
 
+async function generateFourMasters(code, body){
+  body.innerHTML='<div class="prompt-empty">⏳ 采集数据...</div>';
+  try{
+    var prepResp=await fetch('/api/four-masters/prepare?code='+code);
+    var prep=await prepResp.json();
+    if(!prep.masters){body.innerHTML='<div class="prompt-empty">❌ 无数据</div>';return;}
+    
+    currentCode=code;
+    currentDate=prep.date||'';
+    
+    // 组装四大师 prompt
+    var prompt='你是一个投资分析助手，请分别以四位投资大师的身份分析以下公司。\n\n';
+    prompt+='## 公司数据\n';
+    var ds=prep.data_snapshot;
+    prompt+='- 股票: '+code+' '+prep.name+'\n';
+    prompt+='- RS强度: RPS_250='+ds.rps250+' RPS_20='+(ds.rps20||'—')+'\n';
+    prompt+='- CANSLIM: C='+ds.c_score+' L='+ds.l_score+'\n';
+    prompt+='- 估值: PE='+(ds.pe||'—')+' PB='+(ds.pb||'—')+' ROE='+(ds.roe||'—')+'%\n';
+    if(ds.eps) prompt+='- EPS: '+ds.eps+'元\n';
+    if(ds.revenue) prompt+='- 营收: '+ds.revenue+'亿\n';
+    if(ds.net_profit) prompt+='- 净利润: '+ds.net_profit+'亿\n';
+    if(ds.gross_margin) prompt+='- 毛利率: '+ds.gross_margin+'%\n';
+    prompt+='- 行业: '+(ds.industry||'—')+'\n';
+    if(ds.debt_ratio) prompt+='- 负债率: '+ds.debt_ratio.toFixed(1)+'%\n';
+    if(ds.has_buy) prompt+='- 有买入信号\n';
+    if(ds.has_sell) prompt+='- 有卖出信号\n';
+    prompt+='\n';
+    
+    // 外部调研
+    var researchText='';
+    if(prep.all_questions&&prep.all_questions.length){
+      body.innerHTML='<div class="prompt-empty">⏳ 外部调研中...</div>';
+      try{
+        var rr=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,queries:prep.all_questions})});
+        var rd=await rr.json();
+        if(rd.task_id){
+          body.innerHTML='<div class="prompt-empty">⏳ 大师调研中...</div>';
+          for(var p=0;p<120;p++){
+            await new Promise(function(r2){setTimeout(r2,5000);});
+            var sr=await fetch('/api/research/status?task_id='+rd.task_id);
+            var sd=await sr.json();
+            if(sd.status==='done'&&sd.research){
+              researchText=sd.research;
+              break;
+            }
+            body.innerHTML='<div class="prompt-empty">⏳ 调研中...'+((p+1)*5)+'秒</div>';
+          }
+        }
+      }catch(e){}
+    }
+    
+    prompt+='## 外部调研结果\n'+(researchText||'（无）')+'\n\n';
+    
+    // 四位大师分析框架（AI Berkshire 升级版）
+    prompt+='## 分析要求\n';
+    prompt+='请基于以下框架进行系统化投资研究分析，每位大师视角输出约400字，最后给出综合投资决策备忘录。\n\n';
+    prompt+='### 前置：信息丰富度评级\n';
+    prompt+='先判断该公司的"AI可研究性"：A级（信息充裕）→ 重点做反面检验；B级（信息适中）→ 标注置信度；C级（信息稀缺）→ 聚焦第一性原理。\n';
+    prompt+='保持偏见自觉：确定性是来自生意本质还是资料数量？\n\n';
+    prompt+='### 第一步：生意本质 — 段永平"对的生意"\n';
+    prompt+='一句话定义这门生意。分析：收入结构（一次性销售还是复购驱动）、毛利率水平与趋势、客户锁定强度、经营杠杆。\n';
+    prompt+='**段永平追问**：好在哪？一句话描述？如果股市关闭5年愿意持有它吗？\n\n';
+    prompt+='### 第二步：护城河 — 巴菲特"经济护城河"\n';
+    prompt+='逐一验证：品牌/定价权、转换成本、网络效应、规模效应、技术/专利壁垒。标注每类"有/无/不明确"。\n';
+    prompt+='判断趋势：过去5年变宽还是变窄？未来5年预判。\n';
+    prompt+='**巴菲特追问**：10年后护城河还在吗？什么能摧毁它？\n\n';
+    prompt+='### 第三步：风险清单 — 芒格"反过来想"\n';
+    prompt+='列出失败路径表格（路径 | 概率 | 影响程度）：技术路线、竞争恶化、需求枯竭、管理层错误、资金链、监管政策。\n';
+    prompt+='**芒格追问**：聪明人为什么不买/做空这家公司？\n\n';
+    prompt+='### 第四步：管理层 — 段永平"对的人"+巴菲特"诚信"\n';
+    prompt+='评估：资本配置能力、股东利益一致性（持股/分红/回购）、组织稳定性、财报质量（营收与现金流匹配度）。\n';
+    prompt+='**段永平追问**：如果CEO退休，公司还能保持竞争力吗？\n\n';
+    prompt+='### 第五步：文明趋势 — 李录"文明演进框架"\n';
+    prompt+='行业是否处于文明级范式转移？TAM天花板多远？公司产业链位置与议价能力？技术会被颠覆吗？\n';
+    prompt+='**李录追问**：20年后回看，这是"标准石油"还是"昙花一现的3Com"？\n\n';
+    prompt+='### 第六步：估值与安全边际\n';
+    prompt+='当前PE/PB/PS分位处于10年什么位置？结合ROE和增速判断估值合理性。\n';
+    prompt+='**段永平追问**：股市关闭5年，愿意以当前价持有吗？\n\n';
+    prompt+='### 第七步：综合投资决策备忘录\n';
+    prompt+='| 维度 | 结论 | 信心度 |\n';
+    prompt+='|------|------|--------|\n';
+    prompt+='| 生意质量（段永平） | | |\n';
+    prompt+='| 护城河（巴菲特） | | |\n';
+    prompt+='| 管理层（段+巴） | | |\n';
+    prompt+='| 最大风险（芒格） | | |\n';
+    prompt+='| 文明趋势（李录） | | |\n';
+    prompt+='| 估值 | | |\n\n';
+    prompt+='| 策略 | 建议 |\n';
+    prompt+='|------|------|\n';
+    prompt+='| 空仓者 | |\n';
+    prompt+='| 持仓者 | |\n';
+    prompt+='| 卖出信号 | |\n';
+    prompt+='| 加仓信号 | |\n\n';
+    prompt+='四位大师模拟点评（每人一段，引用格式）。\n';
+    prompt+='**结尾区分**："AI分析置信度"(取决于资料量) vs "投资确定性"(取决于生意本质)。\n';
+
+    
+    currentPrompt=prompt;
+    // 渲染 HTML 表格 + prompt
+    var html='';
+    var fin=prep.fin_tables;
+    if(fin&&fin.pe&&fin.pe.length){
+      function pctv(arr){return {min:Math.min.apply(null,arr).toFixed(2),avg:(arr.reduce(function(a,b){return a+b},0)/arr.length).toFixed(2),max:Math.max.apply(null,arr).toFixed(2)};}
+      var pp,pb,ps;
+      if(fin.pe&&fin.pe.length) pp=pctv(fin.pe.map(function(x){return x.v}));
+      if(fin.pb&&fin.pb.length) pb=pctv(fin.pb.map(function(x){return x.v}));
+      if(fin.ps&&fin.ps.length) ps=pctv(fin.ps.map(function(x){return x.v}));
+      html+='<div class="fin-tables">';
+      html+='<div class="fin-table-title">📊 估值 10 年分位</div>';
+      html+='<table class="fin-tbl"><thead><tr><th>指标</th><th>10年最低</th><th>10年均值</th><th>10年最高</th><th>当前</th></tr></thead><tbody>';
+      if(pp) html+='<tr><td>PE-TTM</td><td>'+pp.min+'</td><td>'+pp.avg+'</td><td>'+pp.max+'</td><td class="val-cur">'+(fin.pe[fin.pe.length-1].v).toFixed(2)+'</td></tr>';
+      if(pb) html+='<tr><td>PB</td><td>'+pb.min+'</td><td>'+pb.avg+'</td><td>'+pb.max+'</td><td class="val-cur">'+(fin.pb[fin.pb.length-1].v).toFixed(2)+'</td></tr>';
+      if(ps) html+='<tr><td>PS-TTM</td><td>'+ps.min+'</td><td>'+ps.avg+'</td><td>'+ps.max+'</td><td class="val-cur">'+(fin.ps[fin.ps.length-1].v).toFixed(2)+'</td></tr>';
+      html+='</tbody></table>';
+      // 十年财务
+      if(fin.financials&&fin.financials.length){
+        html+='<div class="fin-table-title">📋 近 10 个季度财务数据</div>';
+        html+='<table class="fin-tbl"><thead><tr><th>季度</th><th>营收(亿)</th><th>营收YoY</th><th>净利(亿)</th><th>净利YoY</th><th>毛利率</th><th>ROE</th><th>FCF(亿)</th><th>负债率</th><th>流动</th><th>速动</th></tr></thead><tbody>';
+        var fcs=fin.financials;
+        for(var fi=0;fi<fcs.length;fi++){
+          var f=fcs[fi];
+          html+='<tr><td>'+f.year+'</td><td>'+(f.revenue||'—')+'</td><td'+(f.rev_yoy&&f.rev_yoy<0?' class="val-warn"':'')+'>'+(f.rev_yoy||'—')+'</td><td>'+(f.net_profit||'—')+'</td><td'+(f.np_yoy&&f.np_yoy<0?' class="val-warn"':'')+'>'+(f.np_yoy||'—')+'</td><td>'+f.gross_margin+'</td><td>'+f.roe+'</td><td>'+(f.fcf||'—')+'</td><td>'+f.debt_ratio+'</td><td>'+f.current_ratio+'</td><td>'+f.quick_ratio+'</td></tr>';
+        }
+        html+='</tbody></table>';
+      }
+      // RS 强度
+      if(fin.rs&&fin.rs.length){
+        html+='<div class="fin-table-title">📈 RS 强度 (RPS)</div>';
+        html+='<table class="fin-tbl"><thead><tr><th>日期</th><th>RPS_250</th><th>RPS_20</th></tr></thead><tbody>';
+        var rs=fin.rs;
+        for(var ri=Math.max(0,rs.length-10);ri<rs.length;ri++){
+          html+='<tr><td>'+rs[ri].d+'</td><td'+(rs[ri].rps250>=80?' class="val-str"':'')+'>'+rs[ri].rps250+'</td><td'+(rs[ri].rps20>=80?' class="val-str"':'')+'>'+rs[ri].rps20+'</td></tr>';
+        }
+        html+='</tbody></table>';
+      }
+      html+='</div>';
+      // prompt text
+      html+='<pre class="prompt-text">'+prompt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre>';
+    } else {
+      html=prompt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    body.innerHTML=html;
+    document.getElementById('meta-info').textContent=prep.name+'('+code+') · 四大师分析 · '+prompt.length+' 字符';
+    document.getElementById('btn-copy').disabled=false;
+    document.getElementById('btn-ai').disabled=false;
+    
+  }catch(e){
+    body.innerHTML='<div class="prompt-empty">❌ '+(e.message||'请求失败')+'</div>';
+  }
+}
+
 async function generate(){
   var code=document.getElementById('code-input').value.trim();
   if(!code) return;
@@ -189,6 +363,11 @@ async function generate(){
   document.getElementById('result-card').style.display='none';
   document.getElementById('meta-info').textContent='';
   try{
+    var mode=document.querySelector('input[name=mode]:checked').value;
+    if(mode==='fourmasters'){
+      await generateFourMasters(code, body);
+      return;
+    }
     var resp=await fetch('/api/prompt-generator?code='+code);
     var data=await resp.json();
     if(!data.prompt){body.innerHTML='<div class="prompt-empty">❌ '+(data.error||'无数据')+'</div>';return;}
@@ -223,11 +402,11 @@ async function generate(){
     if(document.getElementById('research-check').checked){
       body.innerHTML='<div class="prompt-empty">⏳ 外部调研中...</div>';
       try{
-        var queries=[];
-        if(!document.getElementById('autoq-check').checked){
-          var ct=document.getElementById('custom-queries').value.trim();
-          if(ct) queries=ct.split('\n').filter(function(l){return l.trim();});
-        }
+        var queries=[],customQs=[];
+        var ct=document.getElementById('custom-queries').value.trim();
+        if(ct) customQs=ct.split('\n').filter(function(l){return l.trim();});
+        // 始终将自定义问题传给后端（后端会合并自动生成的问题）
+        queries=customQs;
         var rr=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,queries:queries})});
         var rd=await rr.json();
         if(rd.task_id){
@@ -247,7 +426,51 @@ async function generate(){
     }
 
     currentPrompt=finalPrompt;
-    body.textContent=finalPrompt;
+    // 渲染 HTML 表格 + prompt
+    var html='';
+    if(data.fin_tables&&data.fin_tables.pe&&data.fin_tables.pe.length){
+      var fin=data.fin_tables;
+      html+='<div class="fin-tables">';
+      // 估值 10 年分位
+      function _pct(arr){return {min:Math.min.apply(null,arr).toFixed(2),avg:(arr.reduce(function(a,b){return a+b},0)/arr.length).toFixed(2),max:Math.max.apply(null,arr).toFixed(2)};}
+      var pp,pb,ps;
+      if(fin.pe&&fin.pe.length) pp=_pct(fin.pe.map(function(x){return x.v}));
+      if(fin.pb&&fin.pb.length) pb=_pct(fin.pb.map(function(x){return x.v}));
+      if(fin.ps&&fin.ps.length) ps=_pct(fin.ps.map(function(x){return x.v}));
+      html+='<div class="fin-table-title">📊 估值 10 年分位</div>';
+      html+='<table class="fin-tbl"><thead><tr><th>指标</th><th>10年最低</th><th>10年均值</th><th>10年最高</th><th>当前</th></tr></thead><tbody>';
+      if(pp) html+='<tr><td>PE-TTM</td><td>'+pp.min+'</td><td>'+pp.avg+'</td><td>'+pp.max+'</td><td class="val-cur">'+(fin.pe[fin.pe.length-1].v).toFixed(2)+'</td></tr>';
+      if(pb) html+='<tr><td>PB</td><td>'+pb.min+'</td><td>'+pb.avg+'</td><td>'+pb.max+'</td><td class="val-cur">'+(fin.pb[fin.pb.length-1].v).toFixed(2)+'</td></tr>';
+      if(ps) html+='<tr><td>PS-TTM</td><td>'+ps.min+'</td><td>'+ps.avg+'</td><td>'+ps.max+'</td><td class="val-cur">'+(fin.ps[fin.ps.length-1].v).toFixed(2)+'</td></tr>';
+      html+='</tbody></table>';
+      // 十年财务
+      if(fin.financials&&fin.financials.length){
+        html+='<div class="fin-table-title">📋 近 10 个季度财务数据</div>';
+        html+='<table class="fin-tbl"><thead><tr><th>季度</th><th>营收(亿)</th><th>营收YoY</th><th>净利(亿)</th><th>净利YoY</th><th>毛利率</th><th>ROE</th><th>FCF(亿)</th><th>负债率</th><th>流动</th><th>速动</th></tr></thead><tbody>';
+        var fcs=fin.financials;
+        for(var fi=0;fi<fcs.length;fi++){
+          var f=fcs[fi];
+          html+='<tr><td>'+f.year+'</td><td>'+(f.revenue||'—')+'</td><td'+(f.rev_yoy&&f.rev_yoy<0?' class="val-warn"':'')+'>'+(f.rev_yoy||'—')+'</td><td>'+(f.net_profit||'—')+'</td><td'+(f.np_yoy&&f.np_yoy<0?' class="val-warn"':'')+'>'+(f.np_yoy||'—')+'</td><td>'+f.gross_margin+'</td><td>'+f.roe+'</td><td>'+(f.fcf||'—')+'</td><td>'+f.debt_ratio+'</td><td>'+f.current_ratio+'</td><td>'+f.quick_ratio+'</td></tr>';
+        }
+        html+='</tbody></table>';
+      }
+      // RS 强度
+      if(fin.rs&&fin.rs.length){
+        html+='<div class="fin-table-title">📈 RS 强度 (RPS)</div>';
+        html+='<table class="fin-tbl"><thead><tr><th>日期</th><th>RPS_250</th><th>RPS_20</th></tr></thead><tbody>';
+        var rs=fin.rs;
+        for(var ri=Math.max(0,rs.length-10);ri<rs.length;ri++){
+          html+='<tr><td>'+rs[ri].d+'</td><td'+(rs[ri].rps250>=80?' class="val-str"':'')+'>'+rs[ri].rps250+'</td><td'+(rs[ri].rps20>=80?' class="val-str"':'')+'>'+rs[ri].rps20+'</td></tr>';
+        }
+        html+='</tbody></table>';
+      }
+      html+='</div>';
+      // prompt text
+      html+='<pre class="prompt-text">'+finalPrompt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre>';
+    } else {
+      html=finalPrompt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    body.innerHTML=html;
     document.getElementById('meta-info').textContent=finalPrompt.length+' 字符';
     document.getElementById('btn-copy').disabled=false;
     document.getElementById('btn-ai').disabled=false;

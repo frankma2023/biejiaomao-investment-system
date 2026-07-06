@@ -1,0 +1,27 @@
+real_samples: 49857
+fake_samples: 49811
+real_mean_ret: 0.33
+fake_mean_ret: 2.2
+diff: -1.87
+real_win_rate: 0.4572
+fake_win_rate: 0.5464
+t_statistic: -26.3112
+p_value: 0.0
+passed: !!python/object/apply:numpy._core.multiarray.scalar
+- !!python/object/apply:numpy.dtype
+  args:
+  - b1
+  - false
+  - true
+  state: !!python/tuple
+  - 3
+  - '|'
+  - null
+  - null
+  - null
+  - -1
+  - -1
+  - 0
+- !!binary |
+  AA==
+verdict: ❌ 未通过：真实信号不优于随机偏移（p=0.0000）。信号可能仅反映市场beta或存在前视偏差。

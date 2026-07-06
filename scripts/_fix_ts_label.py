@@ -1,0 +1,5 @@
+t = open('D:/hanako/investment-system/web/mw-signals/index.html', 'r', encoding='utf-8').read()
+t = t.replace("TS:'+s.tech_score+'/", "技术置信度:'+s.tech_score+'/")
+t = t.replace(">TS:--<", ">技术置信度:--<")
+open('D:/hanako/investment-system/web/mw-signals/index.html', 'w', encoding='utf-8').write(t)
+print('Done')

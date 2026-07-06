@@ -1,0 +1,10 @@
+import sqlite3
+db=sqlite3.connect('D:/hanako/investment-system/data/lixinger.db')
+c=db.cursor()
+c.execute("SELECT MAX(date), COUNT(DISTINCT stock_code) FROM daily_kline WHERE date>='2026-06-28'")
+print('K-line after 6/28:', c.fetchone())
+c.execute("SELECT COUNT(*), MAX(b1_date) FROM mw_signal_daily WHERE tech_score>0 AND b1_date>='2026-06-23'")
+print('TS scored after 6/22:', c.fetchone())
+c.execute("SELECT COUNT(*), MIN(b1_date), MAX(b1_date) FROM mw_signal_daily WHERE b1_date>='2026-06-23' AND stock_code!='_sentinel_'")
+print('Total signals 6/23+:', c.fetchone())
+db.close()

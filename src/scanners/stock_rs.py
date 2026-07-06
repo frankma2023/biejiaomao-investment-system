@@ -34,7 +34,7 @@ DOUBLE_STRONG = {
 
 # 过滤默认值
 DEFAULT_EXCLUDE_ST = True
-DEFAULT_MIN_AMOUNT_20D = 5000_0000  # 5000万（单位：元）
+DEFAULT_MIN_AMOUNT_20D = 0  # 不过滤，全市场覆盖 RS（信号引擎依赖 RS 值，过滤会导致缺失的股票跳过 RS 检查）
 
 # 计算基准：至少需要这么多天历史数据
 LOOKBACK_YEARS = 3  # 从目标日期往回取3年数据，保证250日窗口充足
@@ -282,14 +282,26 @@ if __name__ == "__main__":
     db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "lixinger.db")
     conn = sqlite3.connect(db_path)
     total = 0
-    save_dates = [d for d in result["date"].unique().to_list() if str(d) >= (args.start or '1900-01-01')]
-    for date_val in save_dates:
-        day_data = result.filter(pl.col("date") == date_val)
-        conn.execute("DELETE FROM stock_rs_daily WHERE date = ?", (str(date_val),))
+    if args.start:
+        start_str = args.start[:10]
+        end_str = (args.end or '9999-12-31')[:10]
+    else:
+        # --date 模式：只存指定日期
+        start_str = (args.date or '9999-12-31')[:10]
+        end_str = start_str
+    all_dates_raw = result["date"].unique().to_list()
+    save_dates = []
+    for d in all_dates_raw:
+        s = str(d)[:10]
+        if start_str <= s <= end_str:
+            save_dates.append(s)
+    for date_str in save_dates:
+        day_data = result.filter(pl.col("date").cast(pl.String).str.starts_with(date_str))
+        conn.execute("DELETE FROM stock_rs_daily WHERE date = ?", (date_str,))
         rows = []
         for row in day_data.iter_rows(named=True):
             rows.append((
-                row['stock_code'], str(date_val),
+                row['stock_code'], date_str,
                 row['adj_close'], row['adj_close'],
                 row['ret_20'], row['ret_60'], row['ret_120'], row['ret_250'],
                 row['rps_20'], row['rps_60'], row['rps_120'], row['rps_250'],
@@ -305,4 +317,4 @@ if __name__ == "__main__":
         total += len(rows)
     conn.commit()
     conn.close()
-    print(f"已写入 {total} 条到 stock_rs_daily（{result['date'].n_unique()} 个日期）")
+    print(f"已写入 {total} 条到 stock_rs_daily（{len(save_dates)} 个日期）")

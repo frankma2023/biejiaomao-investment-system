@@ -146,12 +146,11 @@ def set_all_caches(conn, scan_date, stocks):
     # ── 2. 个股 RS 缓存 ──
     mw._rs_cache = {}
     rows = conn.execute(
-        "SELECT stock_code, rps_20, rps_250, date FROM stock_rs_daily WHERE date<=? ORDER BY date DESC",
+        "SELECT stock_code, rps_20, rps_250 FROM stock_rs_daily WHERE date=?",
         (scan_date,)
     ).fetchall()
     for r in rows:
-        if r['stock_code'] not in mw._rs_cache:
-            mw._rs_cache[r['stock_code']] = (r['rps_20'], r['rps_250'])
+        mw._rs_cache[r['stock_code']] = (r['rps_20'], r['rps_250'])
     print(f'  个股RS缓存: {len(mw._rs_cache)} 只, {time.time()-t0:.1f}s'); t0 = time.time()
 
     # ── 3. 行业成分缓存 ──
@@ -164,12 +163,11 @@ def set_all_caches(conn, scan_date, stocks):
     # ── 4. 指数 RS 缓存 ──
     mw._idx_rs_cache = {}
     rows = conn.execute(
-        "SELECT stock_code, rs_20, rs_250 FROM index_rs_daily WHERE date<=? ORDER BY date DESC",
+        "SELECT stock_code, rs_20, rs_250 FROM index_rs_daily WHERE date=?",
         (scan_date,)
     ).fetchall()
     for r in rows:
-        if r['stock_code'] not in mw._idx_rs_cache:
-            mw._idx_rs_cache[r['stock_code']] = (r['rs_20'], r['rs_250'])
+        mw._idx_rs_cache[r['stock_code']] = (r['rs_20'], r['rs_250'])
     print(f'  指数RS缓存: {len(mw._idx_rs_cache)} 个指数, {time.time()-t0:.1f}s'); t0 = time.time()
 
     # ── 5. K线缓存 ──
@@ -293,6 +291,7 @@ def scan_base_breakout_v2(conn, stocks, scan_date):
                         signals.append(sig)
         except:
             pass
+    saved = 0
     if signals:
         cur = conn.cursor()
         for s in signals:
@@ -359,6 +358,7 @@ def scan_sell_signals(conn, stocks, scan_date):
         return klines[-n_days:] if len(klines) > n_days else klines
 
     saved = 0
+    total_produced = 0  # 所有引擎产出的信号数（去重前）
     eng_counts = {'climax_top': 0, 'railroad_tracks': 0, 'head_shoulders': 0, 'triple_top': 0, 'double_top': 0}
     pool = ThreadPoolExecutor(max_workers=3)
     for code, name, klines in candidates:
@@ -375,6 +375,7 @@ def scan_sell_signals(conn, stocks, scan_date):
         existing_sigs = existing_cache.get(code, [])
         existing_keys = {json.dumps(s2, sort_keys=True, default=str) for s2 in existing_sigs}
         for eng_name, sigs in all_results:
+            total_produced += len(sigs)
             for s in sigs:
                 key = json.dumps(s, sort_keys=True, default=str)
                 if key not in existing_keys:
@@ -394,8 +395,8 @@ def scan_sell_signals(conn, stocks, scan_date):
 
     pool.shutdown(wait=True)
     conn.commit()
-    print(f'  Sell: 高潮见顶={eng_counts["climax_top"]} 铁轨线={eng_counts["railroad_tracks"]} 头肩顶={eng_counts["head_shoulders"]} 三重顶={eng_counts["triple_top"]} 双重顶={eng_counts["double_top"]} 合计={saved} ({time.time()-t0:.0f}s)', flush=True)
-    return saved
+    print(f'  Sell: 高潮见顶={eng_counts["climax_top"]} 铁轨线={eng_counts["railroad_tracks"]} 头肩顶={eng_counts["head_shoulders"]} 三重顶={eng_counts["triple_top"]} 双重顶={eng_counts["double_top"]} 合计={total_produced} ({time.time()-t0:.0f}s)', flush=True)
+    return total_produced
 
 
 def init_tables():

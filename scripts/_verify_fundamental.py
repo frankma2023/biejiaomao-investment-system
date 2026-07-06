@@ -1,0 +1,10 @@
+import sqlite3
+db=sqlite3.connect('D:/hanako/investment-system/data/lixinger.db')
+c=db.cursor()
+c.execute("SELECT COUNT(DISTINCT stock_code), MIN(date), MAX(date) FROM index_fundamental_daily WHERE date>='2026-07-01'")
+print('7/1+ 指数数/日期范围:', c.fetchone())
+c.execute("SELECT COUNT(DISTINCT stock_code) FROM index_fundamental_daily WHERE date>='2026-06-30'")
+print('6/30+ 指数数:', c.fetchone()[0])
+c.execute("SELECT date, COUNT(DISTINCT stock_code) FROM index_fundamental_daily WHERE date>='2026-06-28' GROUP BY date ORDER BY date DESC LIMIT 5")
+for r in c.fetchall(): print(f'  {r[0]}: {r[1]} 指数')
+db.close()

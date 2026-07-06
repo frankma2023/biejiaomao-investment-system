@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MW 信号回测总结</title>
+<style>
+:root { --bg: #0d0d12; --card: rgba(26,26,31,.85); --text: #e4e4e8; --muted: #8b8b90; --accent: #f59e0b; --rise: #ef4444; --fall: #10b981; --border: rgba(255,255,255,.06); }
+* { box-sizing: border-box; margin: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; padding: 32px 24px; max-width: 800px; margin: 0 auto; }
+h1 { font-size: 1.3rem; font-weight: 700; margin-bottom: 2px; }
+h1 + p { font-size: 0.65rem; color: var(--muted); margin-bottom: 32px; }
+h2 { font-size: 0.95rem; font-weight: 600; margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+h3 { font-size: 0.82rem; font-weight: 600; margin: 16px 0 6px; color: var(--accent); }
+p, li { font-size: 0.75rem; color: #b0b0b8; }
+ul, ol { padding-left: 18px; }
+li { margin-bottom: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.7rem; margin: 10px 0 16px; }
+th { text-align: left; padding: 6px 10px; color: var(--muted); font-weight: 500; font-size: 0.62rem; text-transform: uppercase; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.02); }
+td { padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,.03); }
+td.r { text-align: right; font-variant-numeric: tabular-nums; }
+.up { color: var(--rise); font-weight: 600; }
+.down { color: var(--fall); }
+.best { background: rgba(239,68,68,0.04); }
+blockquote { margin: 10px 0; padding: 8px 14px; border-left: 3px solid var(--accent); background: rgba(245,158,11,0.04); font-size: 0.7rem; color: #c0c0c8; border-radius: 0 6px 6px 0; }
+code { font-family: 'SF Mono', 'JetBrains Mono', monospace; font-size: 0.68rem; background: rgba(255,255,255,.04); padding: 1px 5px; border-radius: 4px; }
+pre { background: rgba(255,255,255,.03); padding: 12px 16px; border-radius: 8px; overflow-x: auto; font-size: 0.65rem; line-height: 1.6; color: #a0a0b0; border: 1px solid var(--border); }
+.badge { display: inline-block; padding: 1px 7px; border-radius: 5px; font-size: 0.6rem; font-weight: 600; }
+.badge-h { background: rgba(239,68,68,0.12); color: #ef4444; }
+.badge-m { background: rgba(245,158,11,0.12); color: #f59e0b; }
+.badge-l { background: rgba(139,139,144,0.12); color: #8b8b90; }
+.badge-p { background: rgba(16,185,129,0.12); color: #10b981; }
+</style>
+</head>
+<body>
+
+<h1>MW 信号回测总结</h1>
+<p>2024-01-01 ~ 2026-06-22 · 37,978 条 B1 信号 · 3,789 万笔交易 · 成本 0.3% · 前复权价</p>
+
+<h2>1. 置信度体系</h2>
+
+<h3>B1-only（无 B2，满分 75）— v3.4 实证重建</h3>
+<table>
+<tr><th>置信度</th><th>分数</th><th class="r">B2 确认率</th><th class="r">H20 预期</th><th class="r">占比</th></tr>
+<tr><td><span class="badge badge-h">高</span></td><td>≥ 55</td><td class="r">62%</td><td class="r up">+10.6%</td><td class="r">1.1%</td></tr>
+<tr><td><span class="badge badge-m">中</span></td><td>40 ~ 54</td><td class="r">48%</td><td class="r up">+5.0%</td><td class="r">12.8%</td></tr>
+<tr><td><span class="badge badge-l">低</span></td><td>&lt; 40</td><td class="r">40%</td><td class="r">~0%</td><td class="r">86.1%</td></tr>
+</table>
+
+<h3>B1+B2（有 B2，满分 100）</h3>
+<table>
+<tr><th>置信度</th><th>分数</th></tr>
+<tr><td><span class="badge badge-h">高</span></td><td>≥ 80</td></tr>
+<tr><td><span class="badge badge-m">中</span></td><td>55 ~ 79</td></tr>
+<tr><td><span class="badge badge-l">低</span></td><td>&lt; 55</td></tr>
+</table>
+
+<p><span class="badge badge-p">✦ PLUS</span> = 总分 ≥ 80 + D 满分 + I1 满分（行业 RS250 ≥ 80）</p>
+
+<h2>2. 核心回测数据</h2>
+
+<h3>2.1 B1+B2 组合表现（H20 / T+1_O 买入）</h3>
+<table>
+<tr><th></th><th class="r">样本</th><th class="r">胜率</th><th class="r">净收益</th><th class="r">盈亏比</th><th class="r">凯利</th><th class="r">超额</th></tr>
+<tr class="best"><td><span class="badge badge-h">高</span></td><td class="r">35 ⚠</td><td class="r up">82.9%</td><td class="r up">+22.1%</td><td class="r">2.35</td><td class="r up">75.6%</td><td class="r up">+20.2%</td></tr>
+<tr><td><span class="badge badge-m">中</span></td><td class="r">1,062</td><td class="r up">78.7%</td><td class="r up">+17.2%</td><td class="r">3.05</td><td class="r up">71.7%</td><td class="r up">+14.6%</td></tr>
+<tr><td><span class="badge badge-l">低</span></td><td class="r">6,363</td><td class="r up">65.7%</td><td class="r up">+9.0%</td><td class="r">2.06</td><td class="r">49.1%</td><td class="r up">+7.3%</td></tr>
+<tr><td><span class="badge badge-p">✦ PLUS</span></td><td class="r">21 ⚠</td><td class="r up">90.5%</td><td class="r up">+27.7%</td><td class="r">27.35</td><td class="r up">90.1%</td><td class="r up">+23.8%</td></tr>
+</table>
+<blockquote>⚠ 高置信和 PLUS 样本极少（35/21），需 2016-2022 数据补完后重新验证。PLUS 盈亏比 27.35 是统计异常（亏损端几乎为零）。</blockquote>
+
+<h3>2.2 B1-only 各持有期（无 B2，T+1_O）</h3>
+<table>
+<tr><th>持有期</th><th class="r">高 (≥55)</th><th class="r">中 (40~54)</th><th class="r">低 (<40)</th></tr>
+<tr><td>H5</td><td class="r down">-3.0% (92)</td><td class="r down">-2.6% (982)</td><td class="r down">-3.9% (10,750)</td></tr>
+<tr><td>H10</td><td class="r down">-3.5% (89)</td><td class="r down">-3.3% (973)</td><td class="r down">-5.0% (10,703)</td></tr>
+<tr><td>H20</td><td class="r down">-0.7% (84)</td><td class="r down">-3.0% (926)</td><td class="r down">-6.2% (10,475)</td></tr>
+<tr><td>H60</td><td class="r up">+1.5% (72)</td><td class="r up">+1.9% (872)</td><td class="r down">-2.8% (10,077)</td></tr>
+</table>
+
+<h2>3. B1 入场 vs B2 入场（同一信号）</h2>
+<table>
+<tr><th></th><th colspan="2">B1 日买入</th><th colspan="2">B2 日买入</th></tr>
+<tr><th></th><th class="r">胜率</th><th class="r">净收益</th><th class="r">胜率</th><th class="r">净收益</th></tr>
+<tr class="best"><td><span class="badge badge-h">高</span></td><td class="r up">83%</td><td class="r up">+22.1%</td><td class="r down">65%</td><td class="r down">+13.4%</td></tr>
+<tr><td><span class="badge badge-m">中</span></td><td class="r up">79%</td><td class="r up">+17.2%</td><td class="r down">48%</td><td class="r down">+5.0%</td></tr>
+<tr><td><span class="badge badge-l">低</span></td><td class="r up">66%</td><td class="r up">+9.0%</td><td class="r down">36%</td><td class="r down">-1.5%</td></tr>
+</table>
+<blockquote><strong>B2 日买入胜率比 B1 日低 15-31pp。</strong>B2 是确认信号，不是加仓信号。</blockquote>
+
+<h2>4. 共现信号</h2>
+<h3>4.1 B1 日前后窗口 × PP_V1/PP_V2/BO_V2（B1 日买入，H20）</h3>
+<table>
+<tr><th>窗口</th><th class="r">无共现</th><th class="r">+PP_V1</th><th class="r">+PP_V2</th><th class="r">+BO_V2</th></tr>
+<tr><td>±3天</td><td class="r">67%/+9.8%</td><td class="r up">70%/+11.8%</td><td class="r">60%/+8.9%</td><td class="r">59%/+6.1%</td></tr>
+<tr class="best"><td>±5天</td><td class="r">67%/+10.0%</td><td class="r up">71%/+11.4%</td><td class="r">58%/+7.7%</td><td class="r">58%/+6.6%</td></tr>
+<tr><td>±10天</td><td class="r">66%/+10.0%</td><td class="r up">71%/+11.0%</td><td class="r">61%/+8.3%</td><td class="r">62%/+6.9%</td></tr>
+</table>
+<p><strong>只有 PP_V1 是有效加分项</strong>（胜率 +4pp）。PP_V2 和 BO_V2 不加分。</p>
+
+<h3>PP_V1 精确窗口分析（v1.2）</h3>
+<blockquote><strong>关键发现：PP_V1 出现在 B1 之后才是加分，出现在 B1 之前是减分。</strong></blockquote>
+<p>基准（技术极高+很高，TS≥75，无PP_V1）：51.3%胜率，+1.90%收益（3,181条）。</p>
+
+<h4>PP_V1 在 B1 之后（趋势确认）</h4>
+<table>
+<tr><th>窗口</th><th class="r">信号</th><th class="r">胜率</th><th class="r">收益</th><th class="r">vs基准</th></tr>
+<tr class="best"><td>B1后4-5天</td><td class="r">431</td><td class="r up">72.2%</td><td class="r up">+10.33%</td><td class="r up">+21pp</td></tr>
+<tr><td>B1后1-3天</td><td class="r">782</td><td class="r up">68.0%</td><td class="r up">+9.74%</td><td class="r up">+17pp</td></tr>
+<tr><td>B1后1-5天</td><td class="r">1,046</td><td class="r up">67.8%</td><td class="r up">+9.33%</td><td class="r up">+17pp</td></tr>
+</table>
+
+<h4>PP_V1 在 B1 之前（信号透支）</h4>
+<table>
+<tr><th>窗口</th><th class="r">信号</th><th class="r">胜率</th><th class="r">收益</th><th class="r">vs基准</th></tr>
+<tr><td>B1前1-3天</td><td class="r">375</td><td class="r down">46.7%</td><td class="r down">+3.49%</td><td class="r down">-5pp</td></tr>
+<tr><td>B1前4-5天</td><td class="r">195</td><td class="r down">42.1%</td><td class="r down">-1.14%</td><td class="r down">-9pp</td></tr>
+</table>
+<p><strong>操作含义：B1日买入后第1-5天出现PP_V1 = 加仓/坚定持有。B1前就有PP_V1 = 行情透支，减仓或不追。</strong></p>
+
+<h2>5. 市场环境</h2>
+<table>
+<tr><th>环境</th><th class="r">高置信</th><th class="r">中置信</th><th class="r">PLUS</th></tr>
+<tr class="best"><td>震荡市</td><td class="r up">90%/+25.8% (20)</td><td class="r up">86%/+20.5% (539)</td><td class="r up">92%/+26.2% (13)</td></tr>
+<tr><td>牛市</td><td class="r">71%/+17.1% (14)</td><td class="r">71%/+13.6% (512)</td><td class="r">88%/+30.2% (8)</td></tr>
+<tr><td>熊市</td><td class="r">—</td><td class="r">100%/+26.3% (11)</td><td class="r">—</td></tr>
+</table>
+<blockquote>
+<strong>判定标准</strong>：中证全指 MA50 20日斜率 > +0.5% 且价格在 MA200 上方 = 牛市；斜率 < -0.5% 且价格在 MA200 下方 = 熊市；其余 = 震荡市。<br>
+期间分布：牛市 36% · 熊市 6% · 震荡市 58%
+</blockquote>
+
+<h2>6. 行业 RS</h2>
+<table>
+<tr><th>行业RS250</th><th class="r">高置信</th><th class="r">中置信</th><th class="r">PLUS</th></tr>
+<tr class="best"><td>75~85</td><td class="r up">88%/+32.9% (8)</td><td class="r up">85%/+16.8% (65)</td><td class="r up">100%/+43.2% (3)</td></tr>
+<tr><td>≥85</td><td class="r">78%/+18.0% (23)</td><td class="r">72%/+12.1% (189)</td><td class="r">89%/+25.2% (18)</td></tr>
+<tr><td>60~75</td><td class="r">100%/+24.1% (4)</td><td class="r">75%/+16.5% (80)</td><td class="r">—</td></tr>
+<tr><td>&lt;60</td><td class="r">—</td><td class="r">79%/+16.6% (149)</td><td class="r">—</td></tr>
+</table>
+<p>行业 RS 75~85 是最优区间，优于 ≥85。</p>
+
+<h2>7. 投资决策规则</h2>
+<pre>B1 信号出现
+│
+├─ B1-only 分数 &lt; 40 → 放弃
+│   （B2 确认率仅 40%，H20 净收益≈0）
+│
+├─ B1-only 分数 ≥ 40 → 关注
+│   │
+│   ├─ 次日开盘（T+1_O）买入
+│   │   （T+2/T+3 延迟会侵蚀胜率）
+│   │
+│   ├─ 等待 B2 确认
+│   │   ├─ B2 出现 → 继续持有至 H20~H60
+│   │   │   ├─ 高/中置信度 → 目标 H20（+17%~+22%）
+│   │   │   ├─ 窗口内有 PP_V1 共现 → 加分
+│   │   │   └─ 震荡市中持有信心更高
+│   │   └─ B2 未出现 → H60 考虑止损
+│   │
+│   ├─ 不在 B2 日追买
+│   │   （B2 日买入胜率比 B1 日低 15-31pp）
+│   │
+│   └─ PLUS 信号 → 满仓持有
+│       （胜率 91%，收益 28%，下行风险极低）
+│
+└─ 环境偏好：震荡市 &gt; 牛市
+    行业偏好：RS 75~85 &gt; RS ≥85</pre>
+
+<h2>8. 延时买入</h2>
+<table>
+<tr><th></th><th class="r">T+1</th><th class="r">T+2</th><th class="r">T+3</th></tr>
+<tr><td><span class="badge badge-h">高</span></td><td class="r up">83%/+22.1%</td><td class="r">82%/+22.4%</td><td class="r down">76%/+19.6%</td></tr>
+<tr><td><span class="badge badge-m">中</span></td><td class="r up">79%/+17.2%</td><td class="r">78%/+16.7%</td><td class="r down">72%/+13.6%</td></tr>
+</table>
+<p>每多等一天，胜率掉 3~7pp。</p>
+
+<h2>9. 前视偏差审计</h2>
+<table>
+<tr><th></th><th class="r">真实信号</th><th class="r">随机偏移 ±5天</th></tr>
+<tr><td>胜率</td><td class="r">45.7%</td><td class="r up">54.6%</td></tr>
+<tr><td>净收益</td><td class="r">+0.33%</td><td class="r up">+2.20%</td></tr>
+</table>
+<blockquote>审计未通过（p≈0）。信号日附近随机日期的收益反而更高，说明 MW 信号<strong>滞后于价格</strong>——它确认已发生的突破，而非预测突破。这不否定信号的持有确认价值，但说明它不应被用作预测工具。</blockquote>
+
+<h2>10. 最终评估</h2>
+
+<h3>MW 信号有价值吗？</h3>
+<p><strong>有，但价值不在选股，在择时确认。</strong></p>
+
+<h3>它能做什么</h3>
+<ul>
+  <li>B1+B2 中置信以上：79-83% 胜率，+17-22% 净收益（1,062 样本）</li>
+  <li>阻止你在错误时间进场：B1-only 全线亏损，B2 日追买砍半</li>
+  <li>震荡市里最可靠：90% 胜率</li>
+</ul>
+
+<h3>它不能做什么</h3>
+<ul>
+  <li>不能单独选股：需要管道（行业+RPS）配合</li>
+  <li>牛市反而表现差：71% vs 震荡市 90%</li>
+  <li>熊市无数据：仅 6% 交易日</li>
+  <li>信号滞后于价格（前视偏差审计未通过）</li>
+</ul>
+
+<h3>在体系中的位置</h3>
+<blockquote>管道选池子，MW 定买点。管道从 5000 只筛到 273 只，MW 从中找出 8 只可操作的。MW 不替代管道，管道也不替代 MW。MW 最核心的价值是<strong>让你少亏钱</strong>——B1-only 不做、B2 日不追、低分放弃，这三条规则本身已值回成本。</blockquote>
+
+<h2>11. 信号改善分析 <span style="font-size:0.6rem;color:var(--muted);font-weight:400">（待 2016-2022 数据验证，暂不实施）</span></h2>
+
+<h3>涨得好的信号特征</h3>
+<table>
+<tr><th>特征</th><th class="r">涨得好</th><th class="r">涨得差</th><th class="r">差距</th></tr>
+<tr><td>调整深度</td><td class="r up">22.2%</td><td class="r">18.4%</td><td class="r">深回调更可靠</td></tr>
+<tr><td>前高 RS250</td><td class="r up">65.7</td><td class="r">52.0</td><td class="r">前高越强越好</td></tr>
+<tr><td>前高前涨幅</td><td class="r">63.8%</td><td class="r down">73.1%</td><td class="r">涨太猛反而不好</td></tr>
+<tr><td>B1 日涨幅</td><td class="r">7.3%</td><td class="r down">8.2%</td><td class="r">追涨 B1 是陷阱</td></tr>
+<tr><td>B1 日 RPS20</td><td class="r">69.9</td><td class="r down">77.7</td><td class="r">短期动量太强=陷阱</td></tr>
+<tr><td>B2 确认率</td><td class="r up">80.3%</td><td class="r">14.5%</td><td class="r">5.5 倍差距</td></tr>
+</table>
+
+<h3>评分因子预测力</h3>
+<table>
+<tr><th>分级</th><th>因子</th><th class="r">相关系数</th><th>建议</th></tr>
+<tr class="best"><td>有效</td><td>I2（个股 RS）</td><td class="r up">+0.155</td><td>提权</td></tr>
+<tr class="best"><td>有效</td><td>前高 RS250</td><td class="r up">+0.138</td><td>升级为门禁</td></tr>
+<tr><td>弱效</td><td>调整深度%</td><td class="r">+0.072</td><td>收紧区间</td></tr>
+<tr><td>无效</td><td>H（前高趋势）</td><td class="r">-0.014</td><td>降权</td></tr>
+<tr><td>无效</td><td>B1 量比</td><td class="r">-0.018</td><td>降权</td></tr>
+<tr class="best"><td>反向</td><td>C（横盘质量）</td><td class="r down">-0.042</td><td>建议删除</td></tr>
+<tr class="best"><td>反向</td><td>B1 涨幅%</td><td class="r down">-0.029</td><td>设上限</td></tr>
+</table>
+
+<h3>B1 定义改进建议</h3>
+<table>
+<tr><th>#</th><th>改进</th><th>数据支撑</th></tr>
+<tr><td>1</td><td><strong>前高 RS250 升级为门禁</strong>（≥60）</td><td>B2 确认率差异 +11.1%，最强预测因子</td></tr>
+<tr><td>2</td><td><strong>B1 涨幅设上限</strong>（3%~8% 最优，>10% 降权）</td><td>涨得差的 B1 涨幅 8.2% > 涨得好的 7.3%</td></tr>
+<tr><td>3</td><td><strong>调整深度收紧</strong>（满分区间 20%~35%）</td><td>涨得好的 22.2% > 涨得差的 18.4%</td></tr>
+<tr><td>4</td><td><strong>C 横盘质量降权或删除</strong></td><td>与收益负相关 r=-0.042</td></tr>
+</table>
+
+<h3>B2 定位改进建议</h3>
+<table>
+<tr><th>#</th><th>改进</th><th>数据支撑</th></tr>
+<tr><td>5</td><td><strong>B2 降级为持有确认</strong>，不作为独立买入信号</td><td>B2 日买入胜率比 B1 日低 15-31pp</td></tr>
+<tr><td>6</td><td><strong>PP_V1 共现纳入 B2 超越条件</strong></td><td>B2+PP_V1 将收益从 -2.0% 翻正到 +4.8%</td></tr>
+</table>
+
+<h3>评分权重改进建议</h3>
+<table>
+<tr><th>维度</th><th class="r">当前</th><th class="r">建议</th><th>理由</th></tr>
+<tr class="best"><td>I2（个股 RS）</td><td class="r">15</td><td class="r up">25</td><td>相关性最高</td></tr>
+<tr><td>I1（行业 RS）</td><td class="r">15</td><td class="r up">20</td><td>有预测力</td></tr>
+<tr><td>Sig（共振）</td><td class="r">10</td><td class="r up">20</td><td>PP_V1 共现加分</td></tr>
+<tr><td>D（调整深度）</td><td class="r">15</td><td class="r">15</td><td>维持</td></tr>
+<tr><td>H（前高趋势）</td><td class="r">15</td><td class="r down">10</td><td>相关性弱</td></tr>
+<tr><td>P（整理回撤）</td><td class="r">15</td><td class="r down">5</td><td>样本小</td></tr>
+<tr class="best"><td>C（横盘质量）</td><td class="r">5</td><td class="r down">0</td><td>负相关</td></tr>
+<tr><td>Gap（跳空）</td><td class="r">10</td><td class="r down">5</td><td>相关性近零</td></tr>
+</table>
+
+<blockquote><strong>底层认知</strong>：前视偏差审计未通过（p≈0）。MW 信号本质上是一个趋势确认工具，而非预测工具。改进能让它更精准地挑出「突破后继续涨的」，但不能让它变成「提前预测突破的」。这个定位认知比具体规则修改更重要。</blockquote>
+
+<h2>12. B1 技术面置信度评分（实验版）</h2>
+<blockquote>基于 15,044 条 B1 信号，9 项技术因子回测验证。待 2016-2022 数据确认后启用。</blockquote>
+
+<h3>评分表（满分 100）</h3>
+<table>
+<tr><th>#</th><th>因子</th><th>最优区间</th><th class="r">满分</th><th>评分规则</th></tr>
+<tr><td>1</td><td>价格距 MA20</td><td>≤ 5%</td><td class="r">15</td><td>≤5%(15), 5-10%(12), 10-15%(8), 15-25%(4), >25%(0)</td></tr>
+<tr><td>2</td><td>价格距 MA50</td><td>≤ 8%</td><td class="r">15</td><td>≤8%(15), 8-15%(10), 15-25%(5), >25%(0)</td></tr>
+<tr><td>3</td><td>价格距 MA250</td><td>≤ 15%</td><td class="r">15</td><td>≤15%(15), 15-25%(10), 25-35%(5), >35%(0)</td></tr>
+<tr><td>4</td><td>BIAS (vs MA60)</td><td>≤ 8%</td><td class="r">10</td><td>≤8%(10), 8-15%(7), 15-25%(3), >25%(0)</td></tr>
+<tr><td>5</td><td>RPS20</td><td>40-75</td><td class="r">10</td><td>40-75(10), 边缘(6), >85(2), <30(4)</td></tr>
+<tr><td>6</td><td>RPS60</td><td>40-70</td><td class="r">10</td><td>40-70(10), 边缘(6), >80(2), <30(4)</td></tr>
+<tr><td>7</td><td>RPS250</td><td>50-70</td><td class="r">5</td><td>50-70(5), >70(3), else(2)</td></tr>
+<tr><td>8</td><td>MACD DIF</td><td>DIF>0且<2%</td><td class="r">15</td><td>DIF>0且<2%(15), DIF>0(12), 近零轴(8), else(3), 金叉扣3</td></tr>
+<tr><td>9</td><td>KDJ K值</td><td>≤ 75</td><td class="r">5</td><td>≤75(5), 75-85(3), >85(0)</td></tr>
+</table>
+<p><strong>核心逻辑：B1 日股价别离均线太远、RS 别太高、MACD 在零轴上方但别金叉、KDJ 别超买。</strong></p>
+
+<h3>五级技术置信度</h3>
+<table>
+<tr><th>置信度</th><th>分数</th><th class="r">信号数</th><th class="r">占比</th><th class="r">胜率</th><th class="r">收益</th></tr>
+<tr class="best"><td>⭐⭐⭐ 极高</td><td>≥ 85</td><td class="r">1,885</td><td class="r">12.5%</td><td class="r up">56.9%</td><td class="r up">+4.01%</td></tr>
+<tr><td>⭐⭐ 很高</td><td>75-84</td><td class="r">2,469</td><td class="r">16.4%</td><td class="r up">52.3%</td><td class="r up">+2.98%</td></tr>
+<tr><td>⭐ 高</td><td>65-74</td><td class="r">2,311</td><td class="r">15.4%</td><td class="r">46.4%</td><td class="r up">+1.85%</td></tr>
+<tr><td>中</td><td>50-64</td><td class="r">3,035</td><td class="r">20.2%</td><td class="r">42.5%</td><td class="r up">+1.33%</td></tr>
+<tr><td>低</td><td>&lt; 50</td><td class="r">4,364</td><td class="r">29.0%</td><td class="r down">38.2%</td><td class="r down">-0.33%</td></tr>
+</table>
+
+<h3>技术 × 原始 MW 交叉</h3>
+<table>
+<tr><th>组合</th><th class="r">信号数</th><th class="r">胜率</th><th class="r">收益</th></tr>
+<tr class="best"><td>原始中 + 技术极高</td><td class="r">1,052</td><td class="r up">65.2%</td><td class="r up">+9.23%</td></tr>
+<tr><td>原始高 + 技术极高</td><td class="r">48</td><td class="r up">60.4%</td><td class="r up">+8.94%</td></tr>
+<tr><td>原始低 + 技术极高</td><td class="r">8,427</td><td class="r">47.8%</td><td class="r up">+1.76%</td></tr>
+<tr><td>原始低 + 技术低</td><td class="r">2,298</td><td class="r down">34.1%</td><td class="r down">-2.24%</td></tr>
+</table>
+
+<blockquote><strong>分工：</strong>原始 MW 评分识别回调-突破形态（「形态对」），技术面评分判断价格是否透支（「位置对」）。两者互补，B1 ≥ 40 关注 + 技术分 ≥ 75 入场。</blockquote>
+
+<h3>验证细节（5 分步长）</h3>
+<table>
+<tr><th>区间</th><th class="r">信号</th><th class="r">胜率</th><th class="r">收益</th></tr>
+<tr class="best"><td>90-94</td><td class="r">563</td><td class="r up">60.9%</td><td class="r up">+5.02%</td></tr>
+<tr><td>85-89</td><td class="r">1,203</td><td class="r up">55.5%</td><td class="r up">+3.76%</td></tr>
+<tr><td>80-84</td><td class="r">1,416</td><td class="r up">54.1%</td><td class="r up">+3.78%</td></tr>
+<tr><td>75-79</td><td class="r">1,309</td><td class="r up">51.3%</td><td class="r up">+2.42%</td></tr>
+<tr><td>70-74</td><td class="r">1,211</td><td class="r down">48.1%</td><td class="r up">+1.91%</td></tr>
+<tr><td>65-69</td><td class="r">1,360</td><td class="r">45.8%</td><td class="r up">+1.79%</td></tr>
+<tr><td>60-64</td><td class="r">1,272</td><td class="r">43.6%</td><td class="r up">+1.88%</td></tr>
+<tr><td>55-59</td><td class="r">1,179</td><td class="r">43.3%</td><td class="r up">+1.48%</td></tr>
+<tr><td>50-54</td><td class="r">859</td><td class="r">41.2%</td><td class="r up">+0.89%</td></tr>
+</table>
+<p>自然断裂点：75（胜率跨 50%）、85（跃升 55%+）、65（跌至 45%）。</p>
+
+<h2>13. 附录：PP_V1 核心回测</h2>
+<blockquote>基于 98.3 万条 PP_V1 回测记录。PP_V1 与 MW B1 互为确认关系——先触发者买入，后触发者加仓。</blockquote>
+
+<h3>基础表现（H20/T+1_O）</h3>
+<table>
+<tr><th>持有期</th><th class="r">样本</th><th class="r">胜率</th><th class="r">净收益</th><th class="r">凯利</th></tr>
+<tr><td>H5</td><td class="r">84,552</td><td class="r">46.5%</td><td class="r up">+0.67%</td><td class="r">10.5%</td></tr>
+<tr><td>H10</td><td class="r">83,539</td><td class="r">49.4%</td><td class="r up">+1.10%</td><td class="r">13.5%</td></tr>
+<tr class="best"><td>H20</td><td class="r">81,995</td><td class="r up">49.9%</td><td class="r up">+2.27%</td><td class="r up">17.8%</td></tr>
+<tr><td>H60</td><td class="r">77,517</td><td class="r up">53.4%</td><td class="r up">+7.21%</td><td class="r up">30.9%</td></tr>
+</table>
+<p>PP_V1 单独就是正收益，不需要等另一个信号确认。</p>
+
+<h3>与 MW B1 的相互确认</h3>
+<table>
+<tr><th>入场</th><th>另一个信号随后出现</th><th class="r">胜率</th><th class="r">收益</th></tr>
+<tr class="best"><td>B1 日买</td><td>PP_V1 在 B1 后 1-5 天</td><td class="r up">72.2%</td><td class="r up">+10.3%</td></tr>
+<tr><td>PP_V1 日买</td><td>B1 在 PP_V1 后 1-5 天</td><td class="r up">60.8%</td><td class="r up">+7.2%</td></tr>
+<tr><td>B1 日买</td><td>PP_V1 在 B1 前</td><td class="r down">46.2%</td><td class="r">+1.7%</td></tr>
+<tr><td>PP_V1 日买</td><td>B1 在 PP_V1 前</td><td class="r down">46.0%</td><td class="r">+2.0%</td></tr>
+</table>
+<p><strong>谁先出现谁是买点，谁后出现谁是确认。</strong>不要在第二个信号才进场。</p>
+
+<h3>PP_V1 最优组合</h3>
+<table>
+<tr><th>组合</th><th class="r">信号数</th><th class="r">胜率</th><th class="r">收益</th></tr>
+<tr><td>PP_V1 全量</td><td class="r">71,807</td><td class="r">52.0%</td><td class="r up">+3.17%</td></tr>
+<tr class="best"><td>PP_V1 + tech≥70 + vol≥1.5</td><td class="r">20,091</td><td class="r up">54.3%</td><td class="r up">+4.08%</td></tr>
+</table>
+
+<h3>PP_V1 vs MW B1</h3>
+<table>
+<tr><th></th><th>MW B1</th><th>PP_V1</th></tr>
+<tr><td>信号量</td><td class="r">1.9万</td><td class="r">8.2万</td></tr>
+<tr><td>单独胜率</td><td class="r down">亏损</td><td class="r up">+2.27%</td></tr>
+<tr><td>最优组合胜率</td><td class="r">65%</td><td class="r">61%</td></tr>
+<tr><td>需要确认</td><td>是（等B2）</td><td>否</td></tr>
+</table>
+<p>PP_V1 更适合作为独立买入信号。MW B1 的优势在于出信号后 PP_V1 再确认时的超高胜率（72%），两者配合效果最好。</p>
+
+<h2>14. 已知局限</h2>
+<ol>
+  <li>高置信仅 35 条，PLUS 仅 21 条，需 2016-2022 数据补完后重新验证</li>
+  <li>熊市样本极少（59 个交易日），结论不可靠</li>
+  <li>前视偏差审计未通过，信号滞后于价格</li>
+  <li>BO_V2 共现样本 29~66 条，结论不可靠</li>
+  <li>PLUS 盈亏比 27.35 是统计异常（亏损端几乎为零）</li>
+  <li>市值和成交额过滤未纳入</li>
+  <li>MA 止损和移动止盈未测试</li>
+</ol>
+
+<p style="margin-top:32px;padding-top:16px;border-top:1px solid var(--border);font-size:0.62rem;color:var(--muted);">数据来源：backtest_results (3,789万行) + mw_signal_daily (37,978条) + signal_events (356,502事件) · 生成时间：2026-07-01 · Project Hanako</p>
+
+</body>
+</html>

@@ -304,8 +304,8 @@
       if(h.groups&&h.groups.length){
         html+='<div class="section-hdr" style="margin-top:18px">🏭 行业分组健康分</div>';
         html+='<div class="sector-grid">';
-        var colorMap={'A':'#10b981','B':'#10b981','C':'#f59e0b','D':'#f59e0b','E':'#ef4444','F':'#ef4444'};
-        var bgMap={'A':{'bg':'rgba(16,185,129,.06)','bd':'rgba(16,185,129,.2)'},'B':{'bg':'rgba(16,185,129,.06)','bd':'rgba(16,185,129,.2)'},'C':{'bg':'rgba(245,158,11,.06)','bd':'rgba(245,158,11,.2)'},'D':{'bg':'rgba(245,158,11,.06)','bd':'rgba(245,158,11,.2)'},'E':{'bg':'rgba(239,68,68,.06)','bd':'rgba(239,68,68,.2)'},'F':{'bg':'rgba(239,68,68,.06)','bd':'rgba(239,68,68,.2)'}};
+        var colorMap={'A':'#ef4444','B':'#ef4444','C':'#f59e0b','D':'#f59e0b','E':'#10b981','F':'#10b981'};
+        var bgMap={'A':{'bg':'rgba(239,68,68,.06)','bd':'rgba(239,68,68,.2)'},'B':{'bg':'rgba(239,68,68,.06)','bd':'rgba(239,68,68,.2)'},'C':{'bg':'rgba(245,158,11,.06)','bd':'rgba(245,158,11,.2)'},'D':{'bg':'rgba(245,158,11,.06)','bd':'rgba(245,158,11,.2)'},'E':{'bg':'rgba(16,185,129,.06)','bd':'rgba(16,185,129,.2)'},'F':{'bg':'rgba(16,185,129,.06)','bd':'rgba(16,185,129,.2)'}};
         for(var gi=0;gi<h.groups.length;gi++){
           var g=h.groups[gi];
           var gColor=colorMap[g.rating]||'#8b8b90';
@@ -333,10 +333,88 @@
             var t=g.tech;
             html+='<div style="font-size:9px;color:var(--muted);margin-top:3px">MA50↑'+t.above_ma50+'/'+g.indices_count+' · RS_60均'+t.avg_rs_60+'</div>';
           }
+          // 资金流向标签
+          if(h.capital_flow&&h.capital_flow.groups&&h.capital_flow.groups[g.group_name]){
+            var fg=h.capital_flow.groups[g.group_name];
+            html+='<div style="font-size:9px;margin-top:2px;display:flex;gap:4px">';
+            var flowColor=function(v){return v>=65?'#ef4444':v>=45?'#f59e0b':'#8b8b90';};
+            html+='<span style="color:'+flowColor(fg.s10)+'">短'+fg.s10+'</span>';
+            html+='<span style="color:'+flowColor(fg.s65)+'">中'+fg.s65+'</span>';
+            html+='<span style="color:'+flowColor(fg.s250)+'">长'+fg.s250+'</span>';
+            html+='</div>';
+          }
           html+=vsMarket;
           html+='</div></div>';
         }
         html+='</div>';
+      }
+
+      // ═══ 指数资金活跃度 TOP 10 ═══
+      if(h.capital_flow){
+        var cf=h.capital_flow;
+        var flowSections=[{key:'top_10d',label:'短线(10日)'},{key:'top_65d',label:'中线(65日)'},{key:'top_250d',label:'长线(250日)'}];
+        flowSections.forEach(function(fs){
+          var items=cf[fs.key];
+          if(items&&items.length){
+            html+='<div class="section-hdr" style="margin-top:14px">💰 '+fs.label+' 资金活跃度 TOP 10</div>';
+            html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:5px;margin-bottom:12px">';
+            items.forEach(function(item,i){
+              var sc=item.score>=80?'#ef4444':item.score>=60?'#f59e0b':'#8b8b90';
+              var lbl=item.label||'000';
+              var nm=item.name||item.code;
+              html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 8px;font-size:10px">';
+              html+='<div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">';
+              html+='<span style="color:var(--muted);font-weight:600">#'+(i+1)+'</span>';
+              html+='<span style="color:'+sc+';font-weight:600;margin-left:auto">'+item.score+'</span>';
+              html+='<span style="color:'+(lbl[0]=='+'?'#ef4444':lbl[0]=='-'?'#10b981':'var(--muted)')+';font-size:9px">'+lbl+'</span>';
+              html+='</div>';
+              html+='<div style="color:var(--text-primary);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+nm+'">'+nm+'</div>';
+              html+='</div>';
+            });
+            html+='</div>';
+          }
+        });
+        
+        // ═══ 综合结论 ═══
+        if(h.capital_flow&&h.capital_flow.top_10d&&h.capital_flow.top_65d&&h.capital_flow.top_250d){
+          // 找到三线都进TOP 10的指数(三窗口重叠)
+          var top10dCodes={},top65dCodes={},top250dCodes={};
+          h.capital_flow.top_10d.forEach(function(it){top10dCodes[it.code]=it.name||it.code;});
+          h.capital_flow.top_65d.forEach(function(it){top65dCodes[it.code]=it.name||it.code;});
+          h.capital_flow.top_250d.forEach(function(it){top250dCodes[it.code]=it.name||it.code;});
+          var overlap=[];
+          for(var c in top10dCodes){
+            if(top65dCodes[c]&&top250dCodes[c]){
+              overlap.push(top10dCodes[c]);
+            }
+          }
+          // 最强板块：RS强势组中三线流入的
+          var strongFlow=[];
+          if(h.groups&&h.capital_flow.groups){
+            h.groups.forEach(function(g){
+              if((g.rating==='A'||g.rating==='B')&&h.capital_flow.groups[g.group_name]){
+                var fg=h.capital_flow.groups[g.group_name];
+                if(fg.s10>=60&&fg.s65>=60&&fg.s250>=60){
+                  strongFlow.push(g.group_label+'('+fg.s10+'/'+fg.s65+'/'+fg.s250+')');
+                }
+              }
+            });
+          }
+          var conclusion='';
+          if(overlap.length>=3){
+            conclusion='💰 三窗口资金共振: '+overlap.slice(0,5).join('、')+(overlap.length>5?'等'+overlap.length+'个指数':'')+'——短线、中线、长线资金持续流入';
+            if(strongFlow.length){
+              conclusion+=' · ⭐ 机构抱团确认: '+strongFlow.join('、');
+            }
+          } else if(strongFlow.length){
+            conclusion='⭐ 机构抱团确认: '+strongFlow.join('、');
+          }
+          if(conclusion){
+            html+='<div style="background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:11px;line-height:1.5">';
+            html+=conclusion;
+            html+='</div>';
+          }
+        }
       }
 
       // ═══ 卖出评分卡片 ═══
@@ -386,9 +464,9 @@
           const ic=hasVal?(m.s>0?'#ef4444':'#f59e0b'):'var(--muted)';
           const scoreColor=m.s>0?'#ef4444':'var(--muted)';
           html+='<div class="ind-card"><div class="ih"><span class="in">'+m.icon+' '+m.n+'</span><span class="it">'+m.t+'</span></div>';
-          html+='<div class="iv" style="color:'+scoreColor+'">+'+m.s+'<span class="iu"> /'+m.max+'分</span></div>';
+          html+='<div class="iv" style="color:'+scoreColor+'">'+(m.s>0?'+'+m.s+'<span class="iu"> /'+m.max+'分</span>':'<span class="iu">未触发</span>')+'</div>';
           html+='<div class="iu" style="font-size:0.62rem;color:'+ic+'">'+sv+'</div>';
-          html+='<div class="ibar"><div class="ibar-fill" style="width:'+Math.min(100,m.s/m.max*100)+'%;background:'+(m.s>0?'#ef4444':'#4CAF50')+'"></div></div>';
+          html+='<div class="ibar">'+(m.s>0?'<div class="ibar-fill" style="width:'+Math.min(100,m.s/m.max*100)+'%;background:#ef4444"></div>':'')+'</div>';
           html+='<div class="id">'+m.desc+'</div></div>';
         });
         html+='</div>';
@@ -596,7 +674,7 @@
           var ma50c=idx.above_ma50?'#10b981':'#ef4444';
           var ma200c=idx.above_ma200?'#10b981':'#ef4444';
           var ret20c=idx.ret_20>=0?'#ef4444':'#10b981';
-          tbl+='<tr><td>'+idx.code+'</td><td>'+idx.name+'</td><td style="color:'+(idx.rs_60>=75?'#10b981':idx.rs_60>=30?'#f59e0b':'#ef4444')+';font-weight:600">'+idx.rs_60+'</td>'
+          tbl+='<tr><td>'+idx.code+'</td><td>'+idx.name+'</td><td style="color:'+(idx.rs_60>=75?'#ef4444':idx.rs_60>=30?'#f59e0b':'#10b981')+';font-weight:600">'+idx.rs_60+'</td>'
             +'<td>'+idx.rs_20+'</td><td>'+idx.rs_250+'</td>'
             +'<td style="color:'+ma50c+'">'+(idx.ma50?idx.ma50.toFixed(0):'-')+'</td>'
             +'<td style="color:'+ma200c+'">'+(idx.ma200?idx.ma200.toFixed(0):'-')+'</td>'

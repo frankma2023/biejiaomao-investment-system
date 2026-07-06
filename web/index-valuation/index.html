@@ -54,7 +54,7 @@
 
   <div class="chart-card"><div class="chart-title">📊 PE-TTM 走势与十年分位</div><div id="chart-pe" style="height:380px"></div><div id="text-pe" class="analysis-text"></div></div>
   <div class="chart-card"><div class="chart-title">📊 PB 走势与十年分位</div><div id="chart-pb" style="height:380px"></div><div id="text-pb" class="analysis-text"></div></div>
-  <div class="chart-card"><div class="chart-title">📊 股息率 走势与十年分位</div><div id="chart-dyr" style="height:300px"></div></div>
+  <div class="chart-card"><div class="chart-title">📊 股息率 走势与十年分位</div><div id="chart-dyr" style="height:300px"></div><div id="text-dyr" class="analysis-text"></div></div>
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div class="chart-card"><div class="chart-title">📊 ROE（%）</div><div id="chart-roe" style="height:260px"></div><div id="text-roe" class="analysis-text"></div></div>
@@ -101,7 +101,7 @@ function renderSelect(list){
 async function loadData(){
   var code=document.getElementById('idx-select').value;
   var sy=document.getElementById('year-start').value,ey=document.getElementById('year-end').value;
-  var endDate=ey==='2026'?'2026-05-07':ey+'-12-31';
+  var endDate=ey+'-12-31';
   var resp=await fetch(API+'/api/valuation?code='+code+'&start='+sy+'-01-01&end='+endDate);
   var data=await resp.json();
   var hsResp=await fetch(API+'/api/valuation?code=000300&start='+sy+'-01-01&end='+endDate);
@@ -128,6 +128,12 @@ async function loadData(){
   buildChart('chart-dyr','股息率%',data.dates,data.dyr&&data.dyr.map(function(v){return v!=null?(v*100).toFixed(2):null}),data.dyr_pct,hs.dyr&&hs.dyr.map(function(v){return v!=null?(v*100).toFixed(2):null}),dyrColor);
   genText('text-pe','PE-TTM',data.pe,data.pe_pct,hs.pe,'倍',clr(pePct));
   genText('text-pb','PB',data.pb,data.pb_pct,hs.pb,'倍',clr(pbPct));
+  // 股息率：分位越低=股息率越低=价格越高，逻辑与PE/PB相反，需反转
+  var dyrPctInv = data.dyr_pct && data.dyr_pct.map(function(v){return v!=null?(1-v):null});
+  var dyrPctInvLast = dyrPctInv && dyrPctInv.length ? dyrPctInv[dyrPctInv.length-1] : null;
+  if(data.dyr&&data.dyr.length){
+    genText('text-dyr','股息率',data.dyr.map(function(v){return v!=null?v*100:null}),dyrPctInv,hs.dyr&&hs.dyr.map(function(v){return v!=null?v*100:null}),'%',clr(dyrPctInvLast));
+  }
   loadFS(code);
 }
 

@@ -1,0 +1,1 @@
+{"signals":["PP_V2"],"start_date":"2024-01-01","end_date":"2024-12-31","entry_method":"T+1_O","hold_days":10,"filters":{"rs_min":85,"vol_ratio_min":1.3}}

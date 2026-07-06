@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#0d0d12">
+<title>选股漏斗</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<style>
+*{box-sizing:border-box}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary);margin:0;min-height:100vh}
+.app-container{max-width:960px;margin:0 auto;padding:20px}
+
+/* 标题 */
+.hdr{display:flex;align-items:baseline;gap:12px;margin-bottom:20px}
+.hdr h1{font-family:var(--font-display);font-size:18px;font-weight:400;color:var(--text-primary);margin:0}
+.hdr .sub{font-size:10px;color:var(--muted)}
+
+/* 漏斗卡片 */
+.funnel{display:flex;gap:6px;align-items:stretch;margin-bottom:18px;flex-wrap:wrap}
+.f-step{flex:1;min-width:140px;background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column}
+.f-step .fn{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:500}
+.f-step .fl{font-family:var(--font-display);font-size:26px;font-weight:400;line-height:1;margin:6px 0 2px}
+.f-step .fl.pass{color:#10b981}
+.f-step .fl.warn{color:#f59e0b}
+.f-step .fl.fail{color:#ef4444}
+.f-step .fd{font-size:9px;color:var(--text-secondary);line-height:1.4}
+.f-step .fbar{height:4px;border-radius:2px;margin-top:8px;background:var(--border)}
+.f-step .fbar-fill{height:100%;border-radius:2px;transition:width .8s}
+
+/* 环境条 */
+.env-bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.env-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:10px;display:flex;align-items:center;gap:6px}
+.env-item .ev{font-weight:600;font-family:var(--font-mono)}
+
+/* 股票表格 */
+.stk-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}
+.stk-table th{text-align:left;padding:6px 8px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:9px;text-transform:uppercase;letter-spacing:.04em}
+.stk-table td{padding:5px 8px;border-bottom:1px solid var(--border)}
+.stk-table tr:hover td{background:rgba(245,158,11,.04)}
+
+/* 结果区域 */
+.result-card{background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;display:none}
+.result-card h3{font-family:var(--font-display);font-size:12px;font-weight:400;color:var(--accent);margin:0 0 10px}
+
+.btn-group{display:flex;gap:8px;margin-bottom:16px}
+.btn{font-family:var(--font-body);font-size:11px;font-weight:600;padding:8px 20px;border-radius:10px;cursor:pointer;border:none;transition:all .2s}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#d97706);color:#fff;box-shadow:0 2px 10px rgba(245,158,11,.2)}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+
+.empty-state{text-align:center;padding:40px;color:var(--muted);font-family:var(--font-display);font-size:13px}
+.loading{text-align:center;padding:30px;color:var(--muted)}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<script>
+(function(){var c=document.getElementById('bg-canvas'),w=c.width=window.innerWidth,h=c.height=window.innerHeight;var ctx=c.getContext('2d'),N=50;for(var i=0;i<N;i++)particles.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});var particles=[];function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var p=particles[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=w;if(p.x>w)p.x=0;if(p.y<0)p.y=h;if(p.y>h)p.y=0;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(245,158,11,'+p.o+')';ctx.fill()}for(var i=0;i<N;i++){for(var j=i+1;j<N;j++){var dx=particles[i].x-particles[j].x,dy=particles[i].y-particles[j].y,dist=Math.sqrt(dx*dx+dy*dy);if(dist<100){ctx.beginPath();ctx.moveTo(particles[i].x,particles[i].y);ctx.lineTo(particles[j].x,particles[j].y);ctx.strokeStyle='rgba(245,158,11,'+((100-dist)/100*.06)+')';ctx.stroke()}}}requestAnimationFrame(draw)}draw();window.addEventListener('resize',function(){w=c.width=window.innerWidth;h=c.height=window.innerHeight})})();
+</script>
+<nav id="top-nav"></nav>
+<div class="app-container">
+
+<div class="hdr">
+  <h1>📊 选股漏斗</h1>
+  <span class="sub">五步过滤 · 从全市场到候选股</span>
+</div>
+
+<div class="btn-group">
+  <button class="btn btn-primary" onclick="runPipeline()">▶ 运行选股</button>
+</div>
+
+<!-- 漏斗 -->
+<div class="funnel" id="funnel">
+  <div class="f-step">
+    <div class="fn">步骤一 · 大盘环境</div>
+    <div class="fl" id="s1v">—</div>
+    <div class="fd" id="s1d">当前市场状态</div>
+    <div class="fbar"><div class="fbar-fill" id="s1b" style="width:0%"></div></div>
+  </div>
+  <div class="f-step">
+    <div class="fn">步骤二 · 行业选择</div>
+    <div class="fl" id="s2v">—</div>
+    <div class="fd" id="s2d">强势板块数</div>
+    <div class="fbar"><div class="fbar-fill" id="s2b" style="width:0%"></div></div>
+  </div>
+  <div class="f-step">
+    <div class="fn">步骤三 · 个股基本面</div>
+    <div class="fl" id="s3v">—</div>
+    <div class="fd" id="s3d">RPS≥80候选</div>
+    <div class="fbar"><div class="fbar-fill" id="s3b" style="width:0%"></div></div>
+  </div>
+  <div class="f-step">
+    <div class="fn">步骤四 · 形态信号</div>
+    <div class="fl" id="s4v">—</div>
+    <div class="fd" id="s4d">有买入信号的</div>
+    <div class="fbar"><div class="fbar-fill" id="s4b" style="width:0%"></div></div>
+  </div>
+  <div class="f-step">
+    <div class="fn">步骤五 · 口袋支点</div>
+    <div class="fl" id="s5v">—</div>
+    <div class="fd" id="s5d">精确买入点</div>
+    <div class="fbar"><div class="fbar-fill" id="s5b" style="width:0%"></div></div>
+  </div>
+</div>
+
+<!-- 环境详情 -->
+<div class="env-bar" id="env-bar"></div>
+
+<!-- 候选结果 -->
+<div class="result-card" id="result-card">
+  <h3>🏆 最终候选</h3>
+  <div id="candidates"></div>
+</div>
+
+</div>
+
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'📊',brandText:'选股漏斗',currentPage:'funnel'})</script>
+
+<script>
+async function runPipeline(){
+  document.getElementById('funnel').querySelectorAll('.fl').forEach(function(e){e.textContent='⏳';});
+  document.getElementById('result-card').style.display='none';
+  
+  try{
+    /*** 步骤一：大盘环境 ***/
+    var dataDate='2026-06-26';
+    var mh=await(await fetch('/api/market-health?date='+dataDate)).json();
+    var ms=await(await fetch('/api/market-sell-score?date='+dataDate)).json();
+    var hl=mh.total_score||0;
+    var ss=ms.total_score||0;
+    var envOk=hl>=50&&ss<100;
+    setStep(1, hl+'分 评级'+mh.rating, envOk?'中性/偏强可操作':'偏弱防守为主', envOk?1:0.3, envOk?'pass':'warn');
+    
+    // 环境详情条
+    var envHtml='<div class="env-item">健康分 <span class="ev" style="color:'+(hl>=65?'#10b981':hl>=50?'#f59e0b':'#ef4444')+'">'+hl+'/'+mh.rating+'</span></div>'+
+      '<div class="env-item">卖出评分 <span class="ev" style="color:'+(ss>=100?'#ef4444':ss>=60?'#f59e0b':'#10b981')+'">'+ss+'</span></div>'+
+      '<div class="env-item">总仓位上限 <span class="ev" style="color:'+(ss<60?'#10b981':ss<100?'#f59e0b':'#ef4444')+'">'+(ss<60?'70%':ss<100?'50%':'25%')+'</span></div>'+
+      '<div class="env-item">追盘日 <span class="ev">'+(mh.ftd_30d||'0')+'</span></div>'+
+      '<div class="env-item">抛盘日 <span class="ev" style="color:'+((mh.dist_30d||0)>=5?'#ef4444':'var(--text-primary)')+'">'+(mh.dist_30d||'0')+'</span></div>';
+    document.getElementById('env-bar').innerHTML=envHtml;
+    
+    // 步骤二使用相同的日期
+    
+    /*** 步骤二：行业选择 ***/
+    var groups=mh.groups||[];
+    var strongGroups=groups.filter(function(g){return g.rating==='A'||g.rating==='B';});
+    var strongCount=strongGroups.length;
+    setStep(2, strongCount+'个强势板块('+strongGroups.map(function(g){return g.group_label;}).join(', ')+')', 'RS强势组数为选股范围', strongCount/6, strongCount>0?'pass':'fail');
+    
+    // 从强势组中获取所有指数代码
+    var strongIndices=[];
+    for(var gi=0;gi<groups.length;gi++){
+      var g=groups[gi];
+      if(g.rating!=='A'&&g.rating!=='B') continue;
+      var poolKey=g.group_name.split('_')[0];
+      // 查该组RS最高的指数
+      try{
+        var sr=await fetch('/api/market-health/sector-indices?group_name='+g.group_name+'&date='+dataDate);
+        var sd=await sr.json();
+        if(sd.indices) strongIndices=strongIndices.concat(sd.indices.map(function(i){return i.code;}));
+      }catch(e){}
+    }
+    var uniqueIndices=[...new Set(strongIndices)];
+    if(uniqueIndices.length===0){setStep(3,'无数据','跳过');setStep(4,'无数据','跳过');setStep(5,'无数据','跳过');return;}
+    
+    /*** 步骤三+四+五：用后端API过滤 ***/
+    var st=document.getElementById('result-card');
+    st.style.display='block';
+    document.getElementById('candidates').innerHTML='<div class="loading">⏳ 正在扫描候选股(RPS+形态+信号)...</div>';
+    
+    var pipeResp=await fetch('/api/pipeline/run?indices='+uniqueIndices.slice(0,30).join(',')+'&date='+dataDate);
+    var pipeData=await pipeResp.json();
+    
+    if(!pipeData||pipeData.error){
+      setStep(3,'暂不可用','需要后端支持');
+      document.getElementById('candidates').innerHTML='<div class="empty-state">需要新建后端API: /api/pipeline/run</div>';
+      return;
+    }
+    
+    setStep(3, pipeData.step3_count+'只','RPS_250≥80', Math.min(pipeData.step3_count/200,1), pipeData.step3_count>0?'pass':'fail');
+    setStep(4, pipeData.step4_count+'只','有基部/信号', Math.min(pipeData.step4_count/50,1), pipeData.step4_count>0?'pass':'warn');
+    setStep(5, pipeData.step5_count+'只','口袋支点/突破', Math.min(pipeData.step5_count/10,1), pipeData.step5_count>0?'pass':'warn');
+    
+    // 展示候选
+    if(pipeData.candidates&&pipeData.candidates.length){
+      var tbl='<table class="stk-table"><thead><tr><th>代码</th><th>名称</th><th>价格</th><th>RPS_250</th><th>RPS_20</th><th>信号</th><th>所属指数</th></tr></thead><tbody>';
+      pipeData.candidates.forEach(function(c){
+        tbl+='<tr><td>'+c.code+'</td><td>'+(c.name||'')+'</td><td>'+(c.close||'-')+'</td><td style="color:'+(c.rps250>=90?'#10b981':c.rps250>=80?'#f59e0b':'var(--text-primary)')+'">'+(c.rps250||'-')+'</td><td>'+(c.rps20||'-')+'</td><td>'+(c.signals||'')+'</td><td style="font-size:9px">'+(c.index||'')+'</td></tr>';
+      });
+      tbl+='</tbody></table>';
+      document.getElementById('candidates').innerHTML=tbl;
+    } else {
+      document.getElementById('candidates').innerHTML='<div class="empty-state">当前无候选股满足全部条件</div>';
+    }
+    
+  }catch(e){
+    document.getElementById('funnel').querySelectorAll('.fl').forEach(function(el){el.textContent='❌';});
+    document.getElementById('result-card').style.display='block';
+    document.getElementById('candidates').innerHTML='<div class="empty-state">请求失败: '+e.message+'</div>';
+  }
+}
+
+function setStep(n, val, desc, pct, cls){
+  document.getElementById('s'+n+'v').textContent=val;
+  document.getElementById('s'+n+'v').className='fl '+(cls||'');
+  document.getElementById('s'+n+'d').textContent=desc;
+  document.getElementById('s'+n+'b').style.width=(pct||0)*100+'%';
+  var color=cls==='pass'?'#10b981':cls==='warn'?'#f59e0b':'#ef4444';
+  document.getElementById('s'+n+'b').style.background=color;
+}
+</script>
+</body>
+</html>

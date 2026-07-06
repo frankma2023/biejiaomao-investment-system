@@ -59,6 +59,11 @@ def add_cors_headers(response):
 def get_db():
     if 'db' not in g:
         g.db = sqlite3.connect(DB_PATH)
+        g.db.execute("PRAGMA journal_mode=WAL")
+        g.db.execute("PRAGMA synchronous=NORMAL")
+        g.db.execute("PRAGMA cache_size=-64000")
+        g.db.execute("PRAGMA busy_timeout=5000")
+        g.db.execute("PRAGMA foreign_keys=ON")
         g.db.row_factory = sqlite3.Row
     return g.db
 
@@ -402,6 +407,74 @@ def api_config():
     config = load_config(signal_type)
     return jsonify(config)
 
+def get_capital_flow_data(target_date, db):
+    """获取指数资金活跃度 TOP 10 + 行业组均值"""
+    result = {'top_10d': [], 'top_65d': [], 'top_250d': [], 'groups': {}}
+    try:
+        rows = db.execute(
+            "SELECT * FROM index_capital_flow_daily WHERE date=? ORDER BY score_10d DESC", (target_date,)
+        ).fetchall()
+        if not rows:
+            return result
+        
+        # 构建名称映射
+        import yaml
+        yaml_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'index_style.yaml')
+        with open(yaml_path, encoding='utf-8') as f:
+            style = yaml.safe_load(f)
+        name_map = {}
+        for item in style['categories'].get('sector_l2', []): name_map[item['code']] = item['name']
+        for item in style['categories'].get('thematic', []): name_map[item['code']] = item['name']
+        for item in style['categories'].get('market', []): name_map[item['code']] = item['name']
+        for item in style['categories'].get('strategy', []): name_map[item['code']] = item['name']
+        
+        # 各窗口 TOP 10（含名称）
+        for wl, sk in [('top_10d', 'score_10d'), ('top_65d', 'score_65d'), ('top_250d', 'score_250d')]:
+            top = sorted(rows, key=lambda r: r[sk] or 0, reverse=True)[:10]
+            result[wl] = [{'code': r['stock_code'], 'name': name_map.get(r['stock_code'], r['stock_code']), 'score': r[sk], 'label': r['flow_label']} for r in top]
+        
+        l2_codes = {item['code'] for item in style['categories'].get('sector_l2', [])}
+        theme_codes = {item['code'] for item in style['categories'].get('thematic', [])}
+        
+        # 从 market_health_sector_daily 取组信息
+        groups = db.execute("SELECT * FROM market_health_sector_daily WHERE date=?", (target_date,)).fetchall()
+        for g in groups:
+            gn = g['group_name']
+            pool_key = gn.rsplit('_', 1)[0]
+            suffix = gn.rsplit('_', 1)[1]
+            pool_set = l2_codes if pool_key == 'l2' else theme_codes
+            
+            if suffix == 'strong':
+                cond = lambda rs: rs >= 75
+            elif suffix == 'weak':
+                cond = lambda rs: rs < 30
+            else:
+                cond = lambda rs: 30 <= rs < 75
+            
+            # 从 index_rs_daily 获取该组指数
+            idx_codes = list(pool_set)
+            if not idx_codes:
+                continue
+            ph = ','.join('?' * len(idx_codes))
+            rs_rows = db.execute(f"SELECT stock_code, rs_60 FROM index_rs_daily WHERE date=? AND stock_code IN ({ph})", (target_date, *idx_codes)).fetchall()
+            group_codes = [r['stock_code'] for r in rs_rows if cond(r['rs_60'])]
+            
+            if not group_codes:
+                continue
+            ph2 = ','.join('?' * len(group_codes))
+            flow_rows = db.execute(f"""SELECT AVG(score_10d) as s10, AVG(score_65d) as s65, AVG(score_250d) as s250
+                FROM index_capital_flow_daily WHERE date=? AND stock_code IN ({ph2})""", (target_date, *group_codes)).fetchone()
+            if flow_rows:
+                result['groups'][gn] = {
+                    's10': round(flow_rows['s10']) if flow_rows['s10'] else 0,
+                    's65': round(flow_rows['s65']) if flow_rows['s65'] else 0,
+                    's250': round(flow_rows['s250']) if flow_rows['s250'] else 0,
+                }
+    except Exception as e:
+        print(f"[capital_flow] error: {e}", flush=True)
+    return result
+
+
 # ═══════════════════════════════════════════════
 # API: GET /api/market-health
 # ═══════════════════════════════════════════════
@@ -521,6 +594,7 @@ def api_market_health():
         'indicators': indicators,
         'rotations': rotations,
         'groups': groups,
+        'capital_flow': get_capital_flow_data(row['date'], db),
     })
 
 # ═══════════════════════════════════════════════
@@ -846,6 +920,159 @@ def api_stock_sector_context():
         'primary_index': primary_result,
         'sector_group': sector_group,
         'all_indices': all_idx,
+    })
+
+
+# ═══════════════════════════════════════════════
+# API: GET /api/pipeline/run
+# ═══════════════════════════════════════════════
+
+@app.route('/api/pipeline/run')
+def api_pipeline_run():
+    """选股漏斗：按板块→RPS→形态→信号 四层过滤"""
+    indices_param = request.args.get('indices', '')
+    target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+    if not indices_param:
+        return jsonify({'error': '需要指定板块指数代码'})
+    
+    index_codes = [c.strip() for c in indices_param.split(',') if c.strip()]
+    if not index_codes:
+        return jsonify({'error': '板块指数为空'})
+    
+    db = get_db()
+    
+    # 从 index_constituents 获取成分股并集
+    placeholders = ','.join('?' * len(index_codes))
+    stocks = db.execute(f"""
+        SELECT DISTINCT ic.stock_code
+        FROM index_constituents ic
+        WHERE ic.index_code IN ({placeholders})
+          AND ic.date = (SELECT MAX(date) FROM index_constituents)
+    """, index_codes).fetchall()
+    
+    all_codes = [r['stock_code'] for r in stocks]
+    if not all_codes:
+        db.close()
+        return jsonify({'step3_count': 0, 'step4_count': 0, 'step5_count': 0, 'candidates': []})
+    
+    step3_info = f"{len(all_codes)} 只成分股"
+    
+    # 步骤三+四+五合并在一个批次处理
+    chunk_size = 200
+    results = []
+    
+    # 分批查 RPS 和基本数据，分开查询避免超复杂 SQL
+    for chunk_start in range(0, len(all_codes), chunk_size):
+        chunk = all_codes[chunk_start:chunk_start + chunk_size]
+        ph = ','.join('?' * len(chunk))
+        
+        # 查最新价格和名称
+        price_rows = db.execute(f"""
+            SELECT k.stock_code, b.name, k.close
+            FROM daily_kline k
+            JOIN stock_basic b ON k.stock_code = b.stock_code
+            WHERE k.stock_code IN ({ph}) AND k.date <= ?
+              AND b.listing_status = 'normally_listed' AND b.name NOT LIKE '%ST%'
+            ORDER BY k.date DESC
+        """, (*chunk, target_date)).fetchall()
+        
+        # 按 stock_code 去重取最新
+        seen = set()
+        stock_map = {}
+        for r in price_rows:
+            if r['stock_code'] not in seen:
+                seen.add(r['stock_code'])
+                stock_map[r['stock_code']] = {'name': r['name'], 'close': r['close']}
+        
+        codes_with_data = list(stock_map.keys())
+        if not codes_with_data:
+            continue
+        ph2 = ','.join('?' * len(codes_with_data))
+        
+        # 查 RPS
+        rps_rows = db.execute(f"""
+            SELECT stock_code, rps_20, rps_250
+            FROM stock_rs_daily
+            WHERE stock_code IN ({ph2}) AND date <= ?
+            ORDER BY date DESC
+        """, (*codes_with_data, target_date)).fetchall()
+        rps_map = {}
+        seen2 = set()
+        for r in rps_rows:
+            if r['stock_code'] not in seen2:
+                seen2.add(r['stock_code'])
+                rps_map[r['stock_code']] = {'rps20': r['rps_20'] or 0, 'rps250': r['rps_250'] or 0}
+        
+        # 查 MW 信号
+        mw_rows = db.execute(f"""
+            SELECT stock_code, b1_date, b2_date
+            FROM mw_signal_daily
+            WHERE stock_code IN ({ph2}) AND b2_date >= date(?, '-15 days')
+            GROUP BY stock_code
+        """, (*codes_with_data, target_date)).fetchall()
+        mw_set = {r['stock_code'] for r in mw_rows}
+        
+        # 查口袋支点
+        pp_rows = db.execute(f"""
+            SELECT DISTINCT stock_code FROM pocket_pivot_daily
+            WHERE stock_code IN ({ph2}) AND engine_version='V2' AND date >= date(?, '-10 days')
+        """, (*codes_with_data, target_date)).fetchall()
+        pp_set = {r['stock_code'] for r in pp_rows}
+        
+        # 查形态信号
+        sig_rows = db.execute(f"""
+            SELECT stock_code, signals_json FROM pattern_scan_signals
+            WHERE stock_code IN ({ph2}) AND date >= date(?, '-5 days')
+            GROUP BY stock_code
+        """, (*codes_with_data, target_date)).fetchall()
+        sig_map = {r['stock_code']: r['signals_json'] for r in sig_rows}
+        
+        for code, info in stock_map.items():
+            rps = rps_map.get(code, {'rps20': 0, 'rps250': 0})
+            if rps['rps250'] < 80:
+                continue
+            
+            signals = []
+            if code in mw_set:
+                signals.append('MW')
+            if code in pp_set:
+                signals.append('PP')
+            if code in sig_map:
+                try:
+                    sig_data = json.loads(sig_map[code])
+                    if isinstance(sig_data, list):
+                        for s in sig_data:
+                            if isinstance(s, dict) and s.get('signal_name'):
+                                signals.append(s['signal_name'][:4])
+                except:
+                    pass
+            
+            results.append({
+                'code': code,
+                'name': info['name'],
+                'close': round(info['close'], 2) if info['close'] else None,
+                'rps250': rps['rps250'],
+                'rps20': rps['rps20'],
+                'signals': ','.join(signals[:3]) if signals else '-',
+                'step4': code in mw_set or code in pp_set,
+                'step5': code in pp_set or code in mw_set,
+            })
+    
+    step3_count = len(results)
+    step4_list = [r for r in results if r['step4']]
+    step5_list = [r for r in results if r['step5']]
+    
+    db.close()
+    
+    # 取最终候选前 20
+    final = sorted(step5_list, key=lambda x: -x['rps250'])[:20]
+    
+    return jsonify({
+        'step3_count': step3_count,
+        'step3_info': step3_info,
+        'step4_count': len(step4_list),
+        'step5_count': len(step5_list),
+        'candidates': final,
     })
 
 
@@ -3457,6 +3684,24 @@ def api_pattern_scan():
 
     # ── 引擎列表 ──
     engine_list = get_engine_list()
+    
+    # ── 为 MW B1 信号补充技术置信度分 ──
+    mw_ts = {}
+    try:
+        ts_rows = db.execute(
+            "SELECT b1_date, tech_score FROM mw_signal_daily WHERE stock_code=? AND tech_score>0",
+            (code,)
+        ).fetchall()
+        for r in ts_rows:
+            mw_ts[r['b1_date']] = r['tech_score']
+    except:
+        pass
+    
+    for s in signals_out:
+        if s.get('source') == 'mw_signal' and s.get('type') == 'bullish':
+            ts = mw_ts.get(s['date'], 0)
+            if ts > 0:
+                s['details']['tech_score'] = ts
 
     return jsonify({
         'code': code,
@@ -3742,20 +3987,20 @@ def api_mw_signals():
     
     if start_date and end_date:
         rows = db.execute(
-            f"SELECT * FROM mw_signal_daily WHERE {date_col} >= ? AND {date_col} <= ? ORDER BY {date_col} DESC, score DESC",
+            f"SELECT * FROM mw_signal_daily WHERE {date_col} >= ? AND {date_col} <= ? AND stock_code != '_sentinel_' ORDER BY {date_col} DESC, score DESC",
             (start_date, end_date)
         ).fetchall()
     elif target_date:
         rows = db.execute(
-            f"SELECT * FROM mw_signal_daily WHERE {date_col}=? ORDER BY score DESC", (target_date,)
+            f"SELECT * FROM mw_signal_daily WHERE {date_col}=? AND stock_code != '_sentinel_' ORDER BY score DESC", (target_date,)
         ).fetchall()
     else:
-        row = db.execute(f"SELECT MAX({date_col}) FROM mw_signal_daily WHERE {date_col} IS NOT NULL").fetchone()
+        row = db.execute(f"SELECT MAX({date_col}) FROM mw_signal_daily WHERE {date_col} IS NOT NULL AND stock_code != '_sentinel_'").fetchone()
         if not row or not row[0]:
             return jsonify({'date': None, 'signals': [], 'count': 0, 'dates': [], 'type': signal_type})
         target_date = row[0]
         rows = db.execute(
-            f"SELECT * FROM mw_signal_daily WHERE {date_col}=? ORDER BY score DESC", (target_date,)
+            f"SELECT * FROM mw_signal_daily WHERE {date_col}=? AND stock_code != '_sentinel_' ORDER BY score DESC", (target_date,)
         ).fetchall()
     
     signals = [dict(r) for r in rows]
@@ -3780,7 +4025,7 @@ def api_mw_signals():
                 pass
     
     # 可用日期列表
-    avail = db.execute(f"SELECT DISTINCT {date_col} FROM mw_signal_daily WHERE {date_col} IS NOT NULL ORDER BY {date_col} DESC").fetchall()
+    avail = db.execute(f"SELECT DISTINCT {date_col} FROM mw_signal_daily WHERE {date_col} IS NOT NULL AND stock_code != '_sentinel_' ORDER BY {date_col} DESC").fetchall()
     dates = [r[0] for r in avail]
     
     return jsonify({
@@ -3975,10 +4220,18 @@ def api_start_vibe():
     except:
         pass
     try:
-        # 启动 vibe-trading 服务
-        vibe_exe = os.path.join(os.path.dirname(sys.executable), 'Scripts', 'vibe-trading.exe')
-        if not os.path.exists(vibe_exe):
-            vibe_exe = 'vibe-trading'
+        # vibe-trading.exe 可能的安装路径
+        vibe_paths = [
+            os.path.join(os.path.dirname(sys.executable), 'Scripts', 'vibe-trading.exe'),
+            os.path.join(os.environ.get('APPDATA', ''), '..', 'Local', 'Programs', 'Python', 'Python312', 'Scripts', 'vibe-trading.exe'),
+            os.path.join(os.environ.get('USERPROFILE', ''), 'AppData', 'Roaming', 'Python', 'Python312', 'Scripts', 'vibe-trading.exe'),
+            'vibe-trading',  # 最后尝试 PATH
+        ]
+        vibe_exe = 'vibe-trading'
+        for p in vibe_paths:
+            if os.path.exists(p):
+                vibe_exe = p
+                break
         subprocess.Popen(
             [vibe_exe, 'serve', '--port', '8781'],
             cwd=PROJECT_DIR,
@@ -4019,6 +4272,162 @@ def _run_vibe(tid, code, name, prompt):
         _research_tasks[tid].update({'status':'done','research':'（调研超时）','source':'timeout'})
     except Exception as e:
         _research_tasks[tid].update({'status':'done','research':f'（调研异常: {e}）','source':'error'})
+
+
+# ═══════════════════════════════════════════════
+# API: GET /api/four-masters/analyze
+# ═══════════════════════════════════════════════
+
+@app.route('/api/four-masters/prepare', methods=['GET'])
+def api_four_masters_prepare():
+    """四大师分析准备：提取数据 + 生成每位大师的调研问题"""
+    code = request.args.get('code', '').strip()
+    if not code:
+        return jsonify({'error': 'code required'}), 400
+    target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+    
+    db = None
+    try:
+        db = get_db()
+        name_row = db.execute("SELECT name FROM stock_basic WHERE stock_code=?", (code,)).fetchone()
+        if not name_row:
+            return jsonify({'error': '股票代码不存在'}), 404
+        stock_name = name_row['name']
+
+        rs_row = db.execute("""SELECT rps_20, rps_60, rps_120, rps_250 FROM stock_rs_daily
+            WHERE stock_code=? ORDER BY date DESC LIMIT 1""", (code,)).fetchone()
+        cs_row = db.execute("""SELECT score_c, score_a, score_l FROM cansim_scores
+            WHERE stock_code=? ORDER BY date DESC LIMIT 1""", (code,)).fetchone()
+        fs_rows = db.execute("""SELECT asset_liability_ratio FROM stock_financials_annual
+            WHERE stock_code=? ORDER BY report_date DESC LIMIT 1""", (code,)).fetchall()
+        pe_val = None; pb_val = None; roe_val = None; eps_val = None; revenue_val = None
+        net_profit_val = None; net_margin_val = None; op_margin_val = None
+        try:
+            for mc in ['pe_ttm','pb','roe_ttm','eps_ttm']:
+                row = db.execute('SELECT value FROM fundamental_indicator WHERE stock_code=? AND metric_code=? ORDER BY date DESC LIMIT 1', (code, mc)).fetchone()
+                v = round(row['value'], 2) if row else None
+                if mc == 'pe_ttm': pe_val = v
+                elif mc == 'pb': pb_val = v
+                elif mc == 'roe_ttm': roe_val = v
+                elif mc == 'eps_ttm': eps_val = v
+        except:
+            pass
+        # 从年报补充财务概览
+        try:
+            fa = db.execute("""SELECT revenue, net_profit, gross_margin, roe, operating_cash_flow
+                FROM stock_financials_annual WHERE stock_code=? ORDER BY report_date DESC LIMIT 1""", (code,)).fetchone()
+            if fa:
+                r = fa['revenue']
+                if r: revenue_val = round(r/1e8, 1)
+                np = fa['net_profit']
+                if np: net_profit_val = round(np/1e8, 1)
+                gm = fa['gross_margin']
+                if gm: net_margin_val = round(gm, 1)
+                roe_v = fa['roe']
+                if roe_v: roe_val = round(roe_v, 1)
+        except:
+            pass
+        has_buy = False; has_sell = False
+        try:
+            sig_rows = db.execute("""SELECT signals_json FROM pattern_scan_signals
+                WHERE stock_code=? AND date>=date(?, '-10 days') LIMIT 5""", (code, target_date)).fetchall()
+            for r in sig_rows:
+                import json as _j
+                try:
+                    sigs = _j.loads(r['signals_json'])
+                    if isinstance(sigs, list):
+                        for s in sigs:
+                            st = s.get('signal_type','') if isinstance(s, dict) else ''
+                            if st in ('buy','bullish','pp','bo','b1','b2'): has_buy = True
+                            if st in ('sell','bearish','top','rule'): has_sell = True
+                except: pass
+        except:
+            pass
+        ind_row = db.execute("SELECT industry_name FROM stock_industry WHERE stock_code=? LIMIT 1", (code,)).fetchone()
+        if not ind_row or not ind_row['industry_name']:
+            ind_row = db.execute("SELECT ind_name as industry_name FROM mw_signal_daily WHERE stock_code=? AND ind_name IS NOT NULL LIMIT 1", (code,)).fetchone()
+        debt_ratio = fs_rows[0]['asset_liability_ratio'] if fs_rows else None
+
+        rps250 = rs_row['rps_250'] if rs_row else 0
+        rps20 = rs_row['rps_20'] if rs_row else 0
+        c_score = cs_row['score_c'] if cs_row else 0
+        l_score = cs_row['score_l'] if cs_row else 0
+        # has_buy/has_sell 已在上方的 signals_json 解析中设置
+        masters = {
+            'duan': {'name':'段永平','focus':'生意本质+管理层','questions':[]},
+            'buffett': {'name':'巴菲特','focus':'护城河+估值','questions':[]},
+            'munger': {'name':'芒格','focus':'风险+逆向','questions':[]},
+            'li': {'name':'李录','focus':'长期趋势','questions':[]},
+        }
+        if c_score and c_score >= 50:
+            masters['duan']['questions'].append(f"{stock_name}的当季收益增长很好，核心驱动力是什么？")
+        masters['duan']['questions'] += [f"{stock_name}的管理层持股和创始人情况？", f"用一句话说清{stock_name}赚的是什么钱？"]
+        if pe_val and pb_val:
+            masters['buffett']['questions'].append(f"当前PE={pe_val} PB={pb_val}，估值合理吗？利润在周期底部？")
+        masters['buffett']['questions'] += [f"{stock_name}的经济护城河是什么？", f"{stock_name}的资本配置记录如何？"]
+        if debt_ratio and debt_ratio > 60:
+            masters['munger']['questions'].append(f"负债率{debt_ratio:.0f}%偏高，风险在哪？")
+        if has_sell:
+            masters['munger']['questions'].append("近期卖出信号的原因？")
+        masters['munger']['questions'] += [f"{stock_name}最可能的失败路径？", "管理层激励是否合理？"]
+        if rps250 >= 80:
+            masters['li']['questions'].append("行业RS很高，20年后还在吗？会被颠覆？")
+        masters['li']['questions'] += [f"{stock_name}所在行业处于什么发展阶段？", "技术路线风险如何？"]
+
+        all_q = []
+        for mk, mv in masters.items():
+            for q in mv['questions'][:3]:
+                all_q.append(f"[{mv['name']}] {q}")
+
+        # 财务表格数据（直接从数据库查询）
+        fin_tables = {'pe':[],'pb':[],'ps':[],'dyr':[],'financials':[],'rs':[]}
+        try:
+            for mc in ['pe_ttm','pb','ps_ttm','dyr']:
+                rows = db.execute('SELECT date, value FROM fundamental_indicator WHERE stock_code=? AND metric_code=? AND value IS NOT NULL ORDER BY date', (code, mc)).fetchall()
+                fin_tables[mc.replace('_ttm','').replace('dyr','dyr')] = [{'d':r['date'], 'v':round(r['value'],2)} for r in rows]
+            fa_rows = db.execute('SELECT * FROM stock_financials_quarterly WHERE stock_code=? AND report_date<="2026-06-30" ORDER BY report_date DESC LIMIT 10', (code,)).fetchall()
+            for r in fa_rows:
+                rev = r['revenue_single'] or 0
+                np = r['net_profit_single'] or 0
+                fin_tables['financials'].append({
+                    'year': r['report_date'][:4]+'Q'+str(int(r['report_date'][5:7])//3+1) if r['report_date'] else '',
+                    'revenue': round(rev/1e8,1),
+                    'rev_yoy': round(r['revenue_yoy'],1) if r['revenue_yoy'] else None,
+                    'net_profit': round(np/1e8,2),
+                    'np_yoy': round(r['net_profit_yoy'],1) if r['net_profit_yoy'] else None,
+                    'gross_margin': round(r['gross_margin_single'] or 0,1),
+                    'roe': round(r['roe_single'] or 0,1),
+                    'fcf': round((r['free_cash_flow'] or 0)/1e8,1),
+                    'debt_ratio': round(r['asset_liability_ratio'] or 0,1),
+                    'current_ratio': round(r['current_ratio'] or 0,2),
+                    'quick_ratio': round(r['quick_ratio'] or 0,2),
+                })
+            rs_rows = db.execute('SELECT date, rps_20, rps_250 FROM stock_rs_daily WHERE stock_code=? AND rps_250 IS NOT NULL ORDER BY date', (code,)).fetchall()
+            fin_tables['rs'] = [{'d':r['date'],'rps20':r['rps_20'] or 0,'rps250':r['rps_250'] or 0} for r in rs_rows][-500:]
+        except:
+            pass
+
+        return jsonify({
+            'code': code, 'name': stock_name, 'date': target_date,
+            'data_snapshot': {
+                'rps250': rps250, 'rps20': rps20, 'c_score': c_score, 'l_score': l_score,
+                'pe': pe_val, 'pb': pb_val, 'roe': roe_val, 'eps': eps_val,
+                'revenue': revenue_val, 'net_profit': net_profit_val, 'gross_margin': net_margin_val,
+                'has_buy': has_buy, 'has_sell': has_sell,
+                'industry': ind_row['industry_name'] if ind_row else '',
+                'debt_ratio': debt_ratio,
+            },
+            'masters': masters,
+            'all_questions': all_q,
+            'fin_tables': fin_tables,
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+    finally:
+        if db:
+            try: db.close()
+            except: pass
 
 
 @app.route('/api/research/status', methods=['GET'])
@@ -4066,21 +4475,20 @@ def api_research():
     rs250 = rs_row['rps_250'] if rs_row else 0
     c_score = cs_row['score_c'] if cs_row else 0
     
-    # 生成调研问题
-    if custom_queries:
-        questions = custom_queries
-    else:
-        questions = []
-        questions.append(f"{stock_name}({code})近期有什么重大新闻、公告或管理层变动？")
-        questions.append(f"{stock_name}最近一期财报的关键数据如何？营收和利润增长趋势？")
+    # 生成调研问题：合并自定义问题 + 自动生成问题
+    questions = list(custom_queries) if custom_queries else []
+    # 自动生成问题
+    if not custom_queries or True:  # 始终补充自动问题
+        auto_qs = []
+        auto_qs.append(f"{stock_name}({code})近期有什么重大新闻、公告或管理层变动？")
+        auto_qs.append(f"{stock_name}最近一期财报的关键数据如何？营收和利润增长趋势？")
         if rs250 >= 90:
-            questions.append(f"{stock_name}(RS_250={rs250})长期强势的驱动力是什么？是否可持续？")
+            auto_qs.append(f"{stock_name}(RS_250={rs250})长期强势的驱动力是什么？是否可持续？")
         if has_buy:
-            questions.append(f"{stock_name}近期出现买入信号，是否有业绩或事件催化剂支撑？")
-        if has_sell:
-            questions.append(f"{stock_name}近期出现卖出信号，触发原因是什么？")
+            auto_qs.append(f"{stock_name}近期出现买入信号，是否有业绩或事件催化剂支撑？")
         if c_score >= 50:
-            questions.append(f"{stock_name}当季收益增长的主要来源是什么？")
+            auto_qs.append(f"{stock_name}当季收益增长的主要来源是什么？")
+        questions.extend(auto_qs)
     
     # 异步启动 vibe-trading 调研（后台线程，不阻塞）
     combined = '请调研以下问题，逐一回答并标注来源：\n' + '\n'.join(f'{i+1}. {q}' for i, q in enumerate(questions[:8]))
@@ -4109,7 +4517,35 @@ def api_prompt_generator():
         else: date = datetime.now().strftime('%Y-%m-%d')
     info = a._build_rich_profile(code, {'stock_name': stock_name, 'signal_date': date})
     prompt = a._build_rich_prompt(code, info)
-    return jsonify({'code': code, 'name': stock_name, 'date': date, 'prompt': prompt, 'length': len(prompt)})
+    # 财务表格数据
+    fin_tables = {'pe':[],'pb':[],'ps':[],'financials':[],'rs':[]}
+    try:
+        for mc in ['pe_ttm','pb','ps_ttm']:
+            rows = db.execute('SELECT date, value FROM fundamental_indicator WHERE stock_code=? AND metric_code=? AND value IS NOT NULL ORDER BY date', (code, mc)).fetchall()
+            fin_tables[mc.replace('_ttm','')] = [{'d':r['date'], 'v':round(r['value'],2)} for r in rows]
+        # 从季度财报补充财务概览（近10个季度）
+        fa_rows = db.execute('SELECT * FROM stock_financials_quarterly WHERE stock_code=? AND report_date<="2026-06-30" ORDER BY report_date DESC LIMIT 10', (code,)).fetchall()
+        for r in fa_rows:
+            rev = r['revenue_single'] or 0
+            np = r['net_profit_single'] or 0
+            fin_tables['financials'].append({
+                'year': r['report_date'][:4]+'Q'+str(int(r['report_date'][5:7])//3+1) if r['report_date'] else '',
+                'revenue': round(rev/1e8,1),
+                'rev_yoy': round(r['revenue_yoy'],1) if r['revenue_yoy'] else None,
+                'net_profit': round(np/1e8,2),
+                'np_yoy': round(r['net_profit_yoy'],1) if r['net_profit_yoy'] else None,
+                'gross_margin': round(r['gross_margin_single'] or 0,1),
+                'roe': round(r['roe_single'] or 0,1),
+                'fcf': round((r['free_cash_flow'] or 0)/1e8,1),
+                'debt_ratio': round(r['asset_liability_ratio'] or 0,1),
+                'current_ratio': round(r['current_ratio'] or 0,2),
+                'quick_ratio': round(r['quick_ratio'] or 0,2),
+            })
+        rs_rows = db.execute('SELECT date, rps_20, rps_250 FROM stock_rs_daily WHERE stock_code=? AND rps_250 IS NOT NULL ORDER BY date', (code,)).fetchall()
+        fin_tables['rs'] = [{'d':r['date'],'rps20':r['rps_20'] or 0,'rps250':r['rps_250'] or 0} for r in rs_rows][-500:]
+    except:
+        pass
+    return jsonify({'code': code, 'name': stock_name, 'date': date, 'prompt': prompt, 'fin_tables': fin_tables, 'length': len(prompt)})
 
 
 @app.route('/api/prompt-generator/analyze', methods=['POST', 'OPTIONS'])
@@ -4130,7 +4566,63 @@ def api_prompt_generator_analyze():
         output = 'AI 分析超时（180秒）'
     except Exception as e:
         output = f'调用失败: {str(e)}'
-    return jsonify({'result': output})
+    # Markdown → HTML
+    import re
+    html = ''
+    in_code = False
+    in_ul = False
+    in_ol = False
+    for line in output.split('\n'):
+        line_raw = line
+        # 先替换行内格式
+        line = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', line)
+        line = re.sub(r'`(.+?)`', r'<code>\1</code>', line)
+        if line.startswith('```'):
+            if in_code: html += '</code></pre>'
+            else: html += '<pre class="md-code"><code>'
+            in_code = not in_code
+            in_ul = False; in_ol = False
+            continue
+        if in_code:
+            html += line + '\n'
+            continue
+        if not line.strip():
+            if in_ul: html += '</ul>'; in_ul = False
+            if in_ol: html += '</ol>'; in_ol = False
+            html += '<br>'
+            continue
+        m = re.match(r'^(#{1,6})\s+(.+)$', line)
+        if m:
+            if in_ul: html += '</ul>'; in_ul = False
+            if in_ol: html += '</ol>'; in_ol = False
+            lvl = len(m.group(1))
+            html += f'<h{lvl}>{m.group(2)}</h{lvl}>'
+            continue
+        m = re.match(r'^[-*]\s+(.+)$', line)
+        if m:
+            if in_ol: html += '</ol>'; in_ol = False
+            if not in_ul: html += '<ul>'; in_ul = True
+            html += f'<li>{m.group(1)}</li>'
+            continue
+        m = re.match(r'^\d+\.\s+(.+)$', line)
+        if m:
+            if in_ul: html += '</ul>'; in_ul = False
+            if not in_ol: html += '<ol>'; in_ol = True
+            html += f'<li>{m.group(1)}</li>'
+            continue
+        m = re.match(r'^>\s+(.+)$', line)
+        if m:
+            if in_ul: html += '</ul>'; in_ul = False
+            if in_ol: html += '</ol>'; in_ol = False
+            html += f'<blockquote>{m.group(1)}</blockquote>'
+            continue
+        if in_ul: html += '</ul>'; in_ul = False
+        if in_ol: html += '</ol>'; in_ol = False
+        html += f'<p>{line}</p>'
+    if in_ul: html += '</ul>'
+    if in_ol: html += '</ol>'
+    if in_code: html += '</code></pre>'
+    return jsonify({'result': html})
 
 @app.route('/api/cockpit/oneil-deep', methods=['GET', 'OPTIONS'])
 def api_cockpit_oneil_deep():
@@ -4276,6 +4768,284 @@ def api_trade_stats():
             'consecutive_losses': 0, 'last_trade_date': None,
             'note': '暂无交易记录'
         })
+
+
+# ═══════════════════════════════════════════════
+# 回测实验室 API
+# ═══════════════════════════════════════════════
+
+SIGNAL_BITS_LAB = {
+    'MW_B1': 0, 'MW_B2': 1, 'MW_PLUS': 2,
+    'PP_V1': 3, 'PP_V2': 4, 'BO_V2': 5,
+}
+
+# 各信号的因子列映射
+SIGNAL_FACTORS = {
+    'MW_B1':  {'rs_col': 'mw_b1_h_rs250',     'vr_col': 'mw_b1_vol_ratio', 'ind_rs_col': None},
+    'MW_B2':  {'rs_col': None,                 'vr_col': None,              'ind_rs_col': None},
+    'MW_PLUS':{'rs_col': None,                 'vr_col': None,              'ind_rs_col': None},
+    'PP_V1':  {'rs_col': 'pp_v1_rps_250',     'vr_col': 'pp_v1_vol_ratio', 'ind_rs_col': None},
+    'PP_V2':  {'rs_col': 'pp_v2_rps_250',     'vr_col': 'pp_v2_vol_ratio', 'ind_rs_col': None},
+    'BO_V2':  {'rs_col': None,                 'vr_col': 'bo_v2_vol_ratio', 'ind_rs_col': 'bo_v2_ind_rs250'},
+}
+
+@app.route('/api/backtest-lab/query', methods=['POST', 'OPTIONS'])
+def api_backtest_lab_query():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    params = request.get_json() or {}
+    signals = params.get('signals', ['PP_V2'])
+    start_date = params.get('start_date', '2024-01-01')
+    end_date = params.get('end_date', '2026-06-22')
+    entry_method = params.get('entry_method', 'T+1_O')
+    hold_days = int(params.get('hold_days', 10))
+    market_regime = params.get('market_regime', 'all')
+    filters = params.get('filters', {})
+    
+    db = get_db()
+    
+    # ── 计算信号mask ──
+    mask = 0
+    for s in signals:
+        if s in SIGNAL_BITS_LAB:
+            mask |= (1 << SIGNAL_BITS_LAB[s])
+    
+    # ── 构建质量过滤条件 ──
+    filter_clauses = []
+    filter_params = []
+    
+    rs_min = filters.get('rs_min')
+    rs_max = filters.get('rs_max')
+    vr_min = filters.get('vol_ratio_min')
+    vr_max = filters.get('vol_ratio_max')
+    ind_rs_min = filters.get('ind_rs_min')
+    ind_rs_max = filters.get('ind_rs_max')
+    turnover_min = filters.get('turnover_min')
+    
+    for s in signals:
+        if s not in SIGNAL_BITS_LAB:
+            continue
+        bit = 1 << SIGNAL_BITS_LAB[s]
+        fac = SIGNAL_FACTORS.get(s, {})
+        
+        conditions = []
+        if rs_min is not None and fac.get('rs_col'):
+            conditions.append(f"(e.{fac['rs_col']} IS NULL OR e.{fac['rs_col']} >= ?)")
+            filter_params.append(rs_min)
+        if rs_max is not None and fac.get('rs_col'):
+            conditions.append(f"(e.{fac['rs_col']} IS NULL OR e.{fac['rs_col']} <= ?)")
+            filter_params.append(rs_max)
+        if vr_min is not None and fac.get('vr_col'):
+            conditions.append(f"(e.{fac['vr_col']} IS NULL OR e.{fac['vr_col']} >= ?)")
+            filter_params.append(vr_min)
+        if vr_max is not None and fac.get('vr_col'):
+            conditions.append(f"(e.{fac['vr_col']} IS NULL OR e.{fac['vr_col']} <= ?)")
+            filter_params.append(vr_max)
+        if ind_rs_min is not None and fac.get('ind_rs_col'):
+            conditions.append(f"(e.{fac['ind_rs_col']} IS NULL OR e.{fac['ind_rs_col']} >= ?)")
+            filter_params.append(ind_rs_min)
+        if ind_rs_max is not None and fac.get('ind_rs_col'):
+            conditions.append(f"(e.{fac['ind_rs_col']} IS NULL OR e.{fac['ind_rs_col']} <= ?)")
+            filter_params.append(ind_rs_max)
+        
+        if conditions:
+            filter_clauses.append(
+                f"((br.signal_mask & {bit}) = 0 OR ((br.signal_mask & {bit}) > 0 AND {' AND '.join(conditions)}))"
+            )
+    
+    # 成交额过滤
+    if turnover_min is not None:
+        filter_clauses.append(
+            f"""(
+                NOT EXISTS (
+                    SELECT 1 FROM daily_kline dk 
+                    WHERE dk.stock_code=br.stock_code AND dk.date=br.signal_date
+                )
+                OR EXISTS (
+                    SELECT 1 FROM daily_kline dk 
+                    WHERE dk.stock_code=br.stock_code AND dk.date=br.signal_date
+                      AND dk.amount >= ?
+                )
+            )"""
+        )
+        filter_params.append(turnover_min)
+    
+    filter_sql = ' AND '.join(filter_clauses) if filter_clauses else '1=1'
+    
+    # ── 基础WHERE ──
+    base_params = [entry_method, hold_days, start_date, end_date]
+    regime_sql = ''
+    if market_regime != 'all':
+        regime_sql = ' AND br.market_regime = ?'
+        base_params.append(market_regime)
+    
+    # ── 查询1: 汇总 ──
+    sql_summary = f"""
+        SELECT COUNT(*) as samples,
+               ROUND(AVG(is_win), 4) as win_rate,
+               ROUND(AVG(net_ret_pct), 2) as mean_ret,
+               ROUND(AVG(ret_pct), 2) as mean_gross
+        FROM backtest_results br
+        JOIN signal_events e ON br.stock_code=e.stock_code AND br.signal_date=e.date
+        WHERE br.pool_mode='full'
+          AND br.entry_method=? AND br.hold_days=?
+          AND br.signal_date BETWEEN ? AND ?
+          AND br.signal_mask & {mask} > 0
+          {regime_sql}
+          AND {filter_sql}
+    """
+    row = db.execute(sql_summary, base_params + filter_params).fetchone()
+    
+    # 计算其他指标
+    sql_extra = f"""
+        SELECT net_ret_pct, is_win,
+               ROUND(AVG(CASE WHEN net_ret_pct>0 THEN net_ret_pct END),2) as avg_win,
+               ROUND(AVG(CASE WHEN net_ret_pct<0 THEN ABS(net_ret_pct) END),2) as avg_loss
+        FROM backtest_results br
+        JOIN signal_events e ON br.stock_code=e.stock_code AND br.signal_date=e.date
+        WHERE br.pool_mode='full'
+          AND br.entry_method=? AND br.hold_days=?
+          AND br.signal_date BETWEEN ? AND ?
+          AND br.signal_mask & {mask} > 0
+          {regime_sql}
+          AND {filter_sql}
+    """
+    extra_row = db.execute(sql_extra, base_params + filter_params).fetchone()
+    
+    samples = row['samples']
+    wr = row['win_rate'] or 0
+    avg_win = extra_row['avg_win'] or 0.01
+    avg_loss = extra_row['avg_loss'] or 0.01
+    plr = avg_win / avg_loss if avg_loss > 0 else 1.0
+    kelly = max(0, min(0.5, wr - (1-wr)/plr)) if plr > 0 else 0
+    
+    # ── 查询2: 按信号分 ──
+    by_signal = []
+    for s in signals:
+        if s not in SIGNAL_BITS_LAB:
+            continue
+        bit = 1 << SIGNAL_BITS_LAB[s]
+        
+        # 该信号的过滤条件
+        s_filter_sql = filter_sql  # 复用全局过滤
+        
+        sql_sig = f"""
+            SELECT COUNT(*) as samples,
+                   ROUND(AVG(is_win),4) as win_rate,
+                   ROUND(AVG(net_ret_pct),2) as mean_ret,
+                   ROUND(AVG(CASE WHEN net_ret_pct>0 THEN net_ret_pct END),2) as avg_win,
+                   ROUND(AVG(CASE WHEN net_ret_pct<0 THEN ABS(net_ret_pct) END),2) as avg_loss
+            FROM backtest_results br
+            JOIN signal_events e ON br.stock_code=e.stock_code AND br.signal_date=e.date
+            WHERE br.pool_mode='full'
+              AND br.entry_method=? AND br.hold_days=?
+              AND br.signal_date BETWEEN ? AND ?
+              AND br.signal_mask & {bit} > 0
+              {regime_sql}
+              AND {s_filter_sql}
+        """
+        r = db.execute(sql_sig, base_params + filter_params).fetchone()
+        if r['samples'] > 0:
+            aw = r['avg_win'] or 0.01
+            al = r['avg_loss'] or 0.01
+            p = aw / al if al > 0 else 1
+            k = max(0, min(0.5, r['win_rate'] - (1-r['win_rate'])/p)) if p > 0 else 0
+            by_signal.append({
+                'signal': s, 'samples': r['samples'],
+                'win_rate': round(r['win_rate'], 4),
+                'mean_ret': r['mean_ret'],
+                'profit_loss_ratio': round(p, 2),
+                'kelly': round(k, 4),
+            })
+    
+    # ── 查询3: 按组合分（含共震）──
+    by_combo = []
+    sql_combo = f"""
+        SELECT br.combo_label, br.signal_count, COUNT(*) as samples,
+               ROUND(AVG(br.is_win),4) as win_rate,
+               ROUND(AVG(br.net_ret_pct),2) as mean_ret
+        FROM backtest_results br
+        JOIN signal_events e ON br.stock_code=e.stock_code AND br.signal_date=e.date
+        WHERE br.pool_mode='full'
+          AND br.entry_method=? AND br.hold_days=?
+          AND br.signal_date BETWEEN ? AND ?
+          AND br.signal_mask & {mask} > 0
+          {regime_sql}
+          AND {filter_sql}
+        GROUP BY br.combo_label
+        ORDER BY COUNT(*) DESC
+    """
+    for r in db.execute(sql_combo, base_params + filter_params):
+        by_combo.append({
+            'combo_label': r['combo_label'],
+            'signal_count': r['signal_count'],
+            'samples': r['samples'],
+            'win_rate': round(r['win_rate'], 4),
+            'mean_ret': r['mean_ret'],
+        })
+    
+    # ── 查询4: 月度 ──
+    monthly = []
+    sql_monthly = f"""
+        SELECT substr(br.signal_date,1,7) as month,
+               COUNT(*) as samples,
+               ROUND(AVG(is_win),4) as win_rate,
+               ROUND(AVG(net_ret_pct),2) as mean_ret
+        FROM backtest_results br
+        JOIN signal_events e ON br.stock_code=e.stock_code AND br.signal_date=e.date
+        WHERE br.pool_mode='full'
+          AND br.entry_method=? AND br.hold_days=?
+          AND br.signal_date BETWEEN ? AND ?
+          AND br.signal_mask & {mask} > 0
+          {regime_sql}
+          AND {filter_sql}
+        GROUP BY month ORDER BY month
+    """
+    for r in db.execute(sql_monthly, base_params + filter_params):
+        monthly.append({
+            'month': r['month'], 'samples': r['samples'],
+            'win_rate': round(r['win_rate'], 4), 'mean_ret': r['mean_ret'],
+        })
+    
+    # ── 查询5: 收益分布 ──
+    distribution = []
+    buckets = [(-100, -15), (-15, -10), (-10, -7), (-7, -5), (-5, -3), (-3, -1),
+               (-1, 1), (1, 3), (3, 5), (5, 7), (7, 10), (10, 15), (15, 100)]
+    for lo, hi in buckets:
+        cnt = db.execute(f"""
+            SELECT COUNT(*) FROM backtest_results br
+            JOIN signal_events e ON br.stock_code=e.stock_code AND br.signal_date=e.date
+            WHERE br.pool_mode='full'
+              AND br.entry_method=? AND br.hold_days=?
+              AND br.signal_date BETWEEN ? AND ?
+              AND br.signal_mask & {mask} > 0
+              {regime_sql}
+              AND {filter_sql}
+              AND br.net_ret_pct >= ? AND br.net_ret_pct < ?
+        """, base_params + filter_params + [lo, hi]).fetchone()[0]
+        label = f'{lo}~{hi}%' if lo > -100 and hi < 100 else (f'<{hi}%' if lo == -100 else f'>{lo}%')
+        distribution.append({'bucket': label, 'range': [lo, hi], 'count': cnt})
+    
+    return jsonify({
+        'summary': {
+            'samples': samples,
+            'win_rate': round(wr, 4),
+            'mean_ret': row['mean_ret'],
+            'mean_gross': row['mean_gross'],
+            'profit_loss_ratio': round(plr, 2),
+            'kelly': round(kelly, 4),
+            'params': {
+                'signals': signals, 'entry_method': entry_method,
+                'hold_days': hold_days, 'market_regime': market_regime,
+                'start_date': start_date, 'end_date': end_date,
+            }
+        },
+        'by_signal': by_signal,
+        'by_combo': by_combo,
+        'monthly': monthly,
+        'distribution': distribution,
+    })
 
 
 # ═══════════════════════════════════════════════

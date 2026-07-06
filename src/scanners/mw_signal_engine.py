@@ -67,15 +67,19 @@ def detect(klines, indicators=None):
 
     try:
         # 查询该股票在日期范围内的所有 MW 信号
+        # 查 B2 或 B1 在日期范围内的信号
         rows = conn.execute("""
             SELECT b2_date, b1_date, h_date, l_date, score, score_v2,
                    is_plus, confidence, confidence_v2, decline_pct,
                    b1_return_pct, b2_return_pct, h_price, l_price
             FROM mw_signal_daily
             WHERE stock_code = ?
-              AND b2_date BETWEEN ? AND ?
-            ORDER BY b2_date
-        """, (stock_code, date_start, date_end)).fetchall()
+              AND (
+                  (b2_date IS NOT NULL AND b2_date BETWEEN ? AND ?)
+                  OR (b2_date IS NULL AND b1_date BETWEEN ? AND ?)
+              )
+            ORDER BY COALESCE(b2_date, b1_date)
+        """, (stock_code, date_start, date_end, date_start, date_end)).fetchall()
 
         for row in rows:
             row_dict = dict(row)

@@ -489,9 +489,17 @@ def scan_stock(klines, scan_date, code=None, conn=None):
     else:
         total = score['H'] + score['D'] + score['C'] + score_i1 + score_i2 + score_sig
     
-    if total >= 80: conf = '高'
-    elif total >= 55: conf = '中'
-    else: conf = '低'
+    if b2_idx is not None:
+        # 完整 B1+B2：满分100，沿用原阈值
+        if total >= 80: conf = '高'
+        elif total >= 55: conf = '中'
+        else: conf = '低'
+    else:
+        # B1-only：满分75，v3.4 实证重建阈值
+        # 基于 37,978 条 B1 信号 H20 回测：40分是质变点
+        if total >= 55: conf = '高'
+        elif total >= 40: conf = '中'
+        else: conf = '低'
 
     # 体系2（仅 B2 存在时有意义）
     if b2_idx is not None:
@@ -506,7 +514,7 @@ def scan_stock(klines, scan_date, code=None, conn=None):
     # ── MW PLUS 标志（仅 B2 完整时）──
     is_plus = 0
     if b2_idx is not None:
-        is_plus = 1 if (total >= 80 and score['D'] == 5 and score_i1 == 15) else 0
+        is_plus = 1 if (total >= 80 and score['D'] == 15 and score_i1 >= 10) else 0
 
     # ── 10. 组装结果 ──
     b1k = klines[b1_idx]
@@ -589,6 +597,17 @@ def save_signals(conn, scan_date, signals):
         conn.commit()
         return
     for s in signals:
+        # 计算技术面置信度（B1信号）
+        ts = 0
+        try:
+            import scanners.mw_signal as mw_mod
+            kls = getattr(mw_mod, '_kline_cache', {}).get(s['code'], [])
+            if kls:
+                rs_cache = getattr(mw_mod, '_rs_cache', {})
+                ts = compute_tech_score(s['code'], s['b1_date'], kls, rs_cache)
+        except:
+            pass
+        
         # 检查是否已存在 (stock_code, b1_date)，有则 UPDATE，无则 INSERT
         existing = conn.execute(
             "SELECT id FROM mw_signal_daily WHERE stock_code=? AND b1_date=?",
@@ -623,8 +642,9 @@ def save_signals(conn, scan_date, signals):
                  score_h,score_d,score_c,score_p,
                  score_i1,score_i2,score_o1,score_o2,
                  score_ma,score_sig,score_gap,score_m1,score_m2,score_m3,is_plus,
+                 tech_score,
                  ind_rs20,ind_rs250,ind_code,ind_name,scan_date)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (
                 s['b2_date'],s['code'],s.get('name',''),s['confidence'],s['score'],s.get('confidence_v2',''),s.get('score_v2',0),
                 s['h_date'],s['h_price'],s['l_date'],s['l_price'],s['c_start'],s['c_end'],
@@ -635,10 +655,97 @@ def save_signals(conn, scan_date, signals):
                 s.get('h_pre_rise_pct'),s.get('p_max_dd_pct'),s.get('p_vol_ratio'),
                 s['score_h'],s['score_d'],s['score_c'],s['score_p'],
                 s.get('score_i1',0),s.get('score_i2',0),s.get('score_o1',0),s.get('score_o2',0),
-                s.get('score_ma',0),s.get('score_sig',0),s.get('score_gap',0),s.get('score_m1',0),s.get('score_m2',0),s.get('score_m3',0),s.get('is_plus',0),
+                s.get('score_ma',0),s.get('score_sig',0),s.get('score_gap',0),s.get('score_m1',0),s.get('score_m2',0),s.get('score_m3',0),s.get('is_plus',0),ts,
                 s.get('ind_rs20'),s.get('ind_rs250'),s.get('ind_code'),s.get('ind_name'),scan_date
             ))
     conn.commit()
+
+
+# ══════════════════ B1 技术面置信度评分 ══════════════════
+
+def compute_tech_score(code, b1_date, klines, rs_cache=None):
+    """
+    基于9项技术因子计算B1信号的技术置信度（满分100）。
+    需要至少250个交易日的K线数据。
+    rs_cache: {(stock_code): (rps20, rps250)} 或 None
+    详见 docs/product/MW信号全维度回测报告.md §12
+    """
+    if len(klines) < 250:
+        return 0
+    
+    import numpy as np
+    
+    closes = np.array([k['adj_close'] if 'adj_close' in k else k['close'] 
+                        for k in klines], dtype=np.float64)
+    cn = closes[-1]
+    sc = 0
+    
+    def ma(arr, p):
+        return np.mean(arr[-p:]) if len(arr) >= p else None
+    
+    # 1. 距MA20 (15分)
+    m20 = ma(closes, 20)
+    if m20 and m20 > 0:
+        p = (cn - m20) / m20 * 100
+        sc += 15 if p <= 5 else (12 if p <= 10 else (8 if p <= 15 else (4 if p <= 25 else 0)))
+    
+    # 2. 距MA50 (15分)
+    m50 = ma(closes, 50)
+    if m50 and m50 > 0:
+        p = (cn - m50) / m50 * 100
+        sc += 15 if p <= 8 else (10 if p <= 15 else (5 if p <= 25 else 0))
+    
+    # 3. 距MA250 (15分)
+    m250 = ma(closes, 250)
+    if m250 and m250 > 0:
+        p = (cn - m250) / m250 * 100
+        sc += 15 if p <= 15 else (10 if p <= 25 else (5 if p <= 35 else 0))
+    
+    # 4. BIAS vs MA60 (10分)
+    m60 = ma(closes, 60)
+    if m60 and m60 > 0:
+        b = (cn - m60) / m60 * 100
+        sc += 10 if b <= 8 else (7 if b <= 15 else (3 if b <= 25 else 0))
+    
+    # 5-7. RS（从缓存获取）
+    r20 = r60 = r250 = 0
+    if rs_cache:
+        rs_vals = rs_cache.get(code)
+        if rs_vals:
+            r20, r250 = rs_vals
+            r60 = r20  # 近似，RPS60≈RPS20在多数情况下
+    
+    sc += 10 if 40 <= r20 <= 75 else (6 if 30 <= r20 < 40 or 75 < r20 <= 85 else (2 if r20 > 85 else 4))
+    sc += 10 if 40 <= r60 <= 70 else (6 if 30 <= r60 < 40 or 70 < r60 <= 80 else (2 if r60 > 80 else 4))
+    sc += 5 if 50 <= r250 <= 70 else (3 if r250 > 70 else 2)
+    
+    # 8. MACD DIF (15分)
+    if len(closes) >= 26:
+        e12 = e26 = cn
+        k12, k26 = 2/13, 2/27
+        for i in range(len(closes)-2, max(0, len(closes)-27), -1):
+            e12 = closes[i] * k12 + e12 * (1 - k12)
+            e26 = closes[i] * k26 + e26 * (1 - k26)
+        dif = e12 - e26
+        if dif > 0 and dif < cn * 0.02:
+            sc += 15
+        elif dif > 0:
+            sc += 12
+        elif dif > cn * -0.01:
+            sc += 8
+        else:
+            sc += 3
+    
+    # 9. KDJ K值 (5分)
+    if len(closes) >= 9:
+        highs = np.array([k['high'] for k in klines[-9:]], dtype=np.float64)
+        lows = np.array([k['low'] for k in klines[-9:]], dtype=np.float64)
+        h9, l9 = highs.max(), lows.min()
+        if h9 > l9:
+            kv = (cn - l9) / (h9 - l9) * 100 * 2/3 + 50/3
+            sc += 5 if kv <= 75 else (3 if kv <= 85 else 0)
+    
+    return sc
 
 
 def run_scan(scan_date, fast=False, silent=False):
@@ -681,6 +788,7 @@ def run_scan(scan_date, fast=False, silent=False):
             score_ma INTEGER, score_sig INTEGER, score_gap INTEGER,
             score_m1 INTEGER, score_m2 INTEGER, score_m3 INTEGER,
             is_plus INTEGER DEFAULT 0,
+            tech_score INTEGER DEFAULT 0,
             ind_rs20 INTEGER, ind_rs250 INTEGER,
             ind_code TEXT, ind_name TEXT,
             scan_date TEXT,
@@ -690,6 +798,11 @@ def run_scan(scan_date, fast=False, silent=False):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_mw_b1date ON mw_signal_daily(b1_date)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_mw_code ON mw_signal_daily(stock_code)")
+    # 确保 tech_score 列存在（兼容旧表）
+    try:
+        conn.execute("ALTER TABLE mw_signal_daily ADD COLUMN tech_score INTEGER DEFAULT 0")
+    except:
+        pass
 
     # ── 批量预加载：缠论笔（外部已加载则跳过）──
     global _chanlun_cache, _kline_cache, _rs_cache, _idx_comp_cache, _idx_rs_cache, _reso_cache, _names_cache
@@ -716,11 +829,10 @@ def run_scan(scan_date, fast=False, silent=False):
     if _rs_cache is None:
         _rs_cache = {}
         for r in conn.execute(
-            "SELECT stock_code, rps_20, rps_250, date FROM stock_rs_daily WHERE date<=? ORDER BY date DESC",
+            "SELECT stock_code, rps_20, rps_250 FROM stock_rs_daily WHERE date=?",
             (scan_date,)
         ).fetchall():
-            if r['stock_code'] not in _rs_cache:
-                _rs_cache[r['stock_code']] = (r['rps_20'], r['rps_250'])
+            _rs_cache[r['stock_code']] = (r['rps_20'], r['rps_250'])
 
     if _idx_comp_cache is None:
         from collections import defaultdict
@@ -731,11 +843,10 @@ def run_scan(scan_date, fast=False, silent=False):
     if _idx_rs_cache is None:
         _idx_rs_cache = {}
         for r in conn.execute(
-            "SELECT stock_code, rs_20, rs_250 FROM index_rs_daily WHERE date<=? ORDER BY date DESC",
+            "SELECT stock_code, rs_20, rs_250 FROM index_rs_daily WHERE date=?",
             (scan_date,)
         ).fetchall():
-            if r['stock_code'] not in _idx_rs_cache:
-                _idx_rs_cache[r['stock_code']] = (r['rs_20'], r['rs_250'])
+            _idx_rs_cache[r['stock_code']] = (r['rs_20'], r['rs_250'])
 
     if _reso_cache is None:
         _reso_cache = {}

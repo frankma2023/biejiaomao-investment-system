@@ -1,0 +1,49 @@
+signal: MW_B1
+period: 2023-01-01~2026-06-22
+total_trades: 290020
+by_hold_days:
+  H5:
+    win_rate: 0.4309
+    win_rate_js: 0.4309
+    mean_ret: 0.19
+    median_ret: -1.04
+    profit_loss_ratio: 1.4
+    kelly: 0.0253
+    samples: 13213
+  H10:
+    win_rate: 0.4401
+    win_rate_js: 0.4401
+    mean_ret: 0.19
+    median_ret: -1.26
+    profit_loss_ratio: 1.33
+    kelly: 0.0187
+    samples: 13217
+  H20:
+    win_rate: 0.456
+    win_rate_js: 0.456
+    mean_ret: 1.44
+    median_ret: -1.41
+    profit_loss_ratio: 1.49
+    kelly: 0.092
+    samples: 12880
+  H60:
+    win_rate: 0.4299
+    win_rate_js: 0.4299
+    mean_ret: 2.3
+    median_ret: -3.53
+    profit_loss_ratio: 1.66
+    kelly: 0.0865
+    samples: 12487
+by_entry_method:
+  T+0_C:
+    win_rate: 0.4401
+    mean_ret: 0.19
+    samples: 13217
+  T+1_O:
+    win_rate: 0.4573
+    mean_ret: 0.55
+    samples: 13210
+  T+2_O:
+    win_rate: 0.424
+    mean_ret: -0.28
+    samples: 13204

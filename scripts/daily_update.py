@@ -10,31 +10,33 @@
 执行顺序（按依赖关系排列）：
   1. 股票状态更新       (fetch_stock_basic)
   2. 指数日K线          (fetch_index_daily_kline)
-  3. 个股日K线          (fetch_stock_daily_kline)
-  4. 个股基本面         (fetch_fundamental_nonfinancial — 周一)
-  5. 指数拥挤度         (index_crowding)
-  6. 融资融券           (fetch_margin_daily)
-  7. 大盘健康度         (market_health)
-  8. 大盘卖出评分       (market_sell_score)
-  9. 大盘扫描快照       (compute_market_snapshot)
-  10. 个股RS+指数RS     (stock_rs + index_rs)
-  11. 全A股形态扫描     (daily_pattern_scan — 每日)
-  11.5 口袋支点V2扫描    (pocket_pivot_v2 — 每日)
-  12. 机构持股拉取      (fetch_institutional_holdings — 周一)
-  13. 研报拉取          (fetch_stock_reports — 周一)
-  14. 回购数据          (fetch_buyback — 周一)
-  15. CAN SLIM评分      (batch_canslim_score — 每日)
-  16. 观察池日更        (observation — 每日)
-  17. 持仓监控扫描      (monitoring — 每日)
-  18. 欧奈尔每日精选·股票 (screener — 每日)
-  19. 欧奈尔每日精选·指数 (index_screener — 每日)
-  20. 缠论分钟数据预下载 (download_minute_kline — 每日)
-  21. 缠论批量扫描      (chanlun_scan — 每日)
-  22. 缠论vs欧奈尔回测  (chanlun_backtest_compare — 每日)
-  23. MW信号扫描        (mw_signal — 每日，依赖RS/CANSLIM/观察池/缠论缓存)
-  24. 投资决策驾驶舱    (cockpit — 每日，依赖前序全部步骤)
+  3. 指数估值PE/PB      (fetch_index_fundamental — 每日增量)
+  4. 个股日K线          (fetch_stock_daily_kline)
+  5. 个股基本面         (fetch_fundamental_nonfinancial — 每日增量)
+  6. 指数拥挤度         (index_crowding)
+  7. 融资融券           (fetch_margin_daily)
+  8. 大盘健康度         (market_health)
+  9. 大盘卖出评分       (market_sell_score)
+  10. 大盘扫描快照      (compute_market_snapshot)
+  11. 个股RS+指数RS     (stock_rs + index_rs)
+  12. 全A股形态扫描     (daily_pattern_scan — 每日)
+  13. 口袋支点V2扫描    (pocket_pivot_v2 — 每日)
+  14. 机构持股拉取      (fetch_institutional_holdings — 周一)
+  15. 研报拉取          (fetch_stock_reports — 周一)
+  16. 回购数据          (fetch_buyback — 周一)
+  17. CAN SLIM评分      (batch_canslim_score — 每日)
+  18. 观察池日更        (observation — 每日)
+  19. 持仓监控扫描      (monitoring — 每日)
+  20. 欧奈尔每日精选·股票 (screener — 每日)
+  21. 欧奈尔每日精选·指数 (index_screener — 每日)
+  22. 缠论分钟数据预下载 (download_minute_kline — 每日)
+  23. 缠论批量扫描      (chanlun_scan — 每日)
+  24. 缠论vs欧奈尔回测  (chanlun_backtest_compare — 每日)
+  25. MW信号扫描        (mw_signal — 每日，依赖RS/CANSLIM/观察池/缠论缓存)
+  26. 市值快照          (market_cap_snapshot — 每日)
+  27. 投资决策驾驶舱    (cockpit — 每日，依赖前序全部步骤)
 
-步骤 1~3 可并行，但为简单起见串行执行，出错时终止。
+步骤 1~4 可并行，但为简单起见串行执行，出错时终止。
 """
 
 import subprocess
@@ -128,18 +130,18 @@ log(f"━━━━━━━━━━━━━━━━━━━━━━━━�
 TASKS = [
     ("📋 股票状态",         [PYTHON_EXE, "scripts/fetch_stock_basic.py"]),
     ("📊 指数日K线",       [PYTHON_EXE, "scripts/fetch_index_daily_kline.py", "--all", "--end", today_str]),
+    ("💹 指数估值(PE/PB)",  [PYTHON_EXE, "scripts/fetch_index_fundamental.py", "--incremental", "--end", today_str]),
     ("📈 个股日K线",       [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py"]),
     ("📐 指数拥挤度",      [PYTHON_EXE, "src/scanners/index_crowding.py", "--date", today_str]),
     ("🔄 融资融券(新API)", [PYTHON_EXE, "scripts/fetch_margin_daily.py"]),
     ("💊 大盘健康度",      [PYTHON_EXE, "src/scanners/market_health.py", "--date", today_str]),
+    ("💪 个股RS强度",      [PYTHON_EXE, "src/scanners/stock_rs.py", "--date", today_str]),
+    ("📊 指数RS强度",      [PYTHON_EXE, "src/scanners/index_rs.py", "--date", today_str]),
     ("🔬 行业分组健康分",  [PYTHON_EXE, "src/scanners/market_health.py", "--date", today_str, "--sector"]),
+    ("💰 指数资金活跃度",  [PYTHON_EXE, "src/scanners/index_capital_flow.py", "--date", today_str]),
     ("📉 大盘卖出评分",    [PYTHON_EXE, "src/scanners/market_sell_score.py", "--date", today_str]),
     ("📸 大盘扫描快照",    [PYTHON_EXE, "scripts/compute_market_snapshot.py", "--date", today_str]),
 ]
-
-if not SKIP_RS:
-    TASKS.append(("💪 个股RS强度", [PYTHON_EXE, "src/scanners/stock_rs.py", "--date", today_str]))
-    TASKS.append(("📊 指数RS强度", [PYTHON_EXE, "src/scanners/index_rs.py", "--date", today_str]))
 
 # 步骤7：全A股形态扫描（依赖个股RS完成，每日执行）
 TASKS.append(("🔎 全A股形态扫描", [PYTHON_EXE, "scripts/daily_pattern_scan.py", "--date", today_str, "--all"]))
@@ -147,11 +149,8 @@ TASKS.append(("🔎 全A股形态扫描", [PYTHON_EXE, "scripts/daily_pattern_sc
 # 步骤7.5：口袋支点V2扫描（依赖MW结构的H/L/C，每日执行）
 TASKS.append(("🟠 口袋支点V2", [PYTHON_EXE, "src/scanners/pocket_pivot_v2.py", "--date", today_str, "--save"]))
 
-# 步骤4.5：个股基本面拉取（每周一执行）
-if date.today().weekday() == 0:
-    TASKS.append(("💰 个股基本面", [PYTHON_EXE, "scripts/fetch_fundamental_nonfinancial.py", "--incremental", "--workers", "4"]))
-else:
-    log(f"⏭️  跳过个股基本面（非周一）")
+# 步骤4.5：个股基本面拉取（每日增量）
+TASKS.append(("💰 个股基本面", [PYTHON_EXE, "scripts/fetch_fundamental_nonfinancial.py", "--incremental", "--workers", "4"]))
 if date.today().weekday() == 0:
     TASKS.append(("🏦 机构持股拉取", [PYTHON_EXE, "scripts/fetch_institutional_holdings.py"]))
 else:

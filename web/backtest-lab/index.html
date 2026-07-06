@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>回测实验室 · Project Hanako</title>
+<link rel="icon" href="../images/favicon.svg">
+<link href="../shared/css/hanako-glass.css" rel="stylesheet">
+<style>
+:root { --rise: #ef4444; --fall: #10b981; --warn: #f59e0b; --panel-w: 350px; }
+.app-container { max-width: 100%; padding: 16px 24px 24px; }
+.page-header { margin-bottom: 8px; }
+.page-header h1 { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); }
+
+.lab-layout { display: flex; gap: 16px; align-items: flex-start; }
+.lab-layout.compare .panel-left { width: 48%; }
+.lab-layout.compare .panel-right { width: 48%; }
+.panel-left { width: var(--panel-w); flex-shrink: 0; }
+.panel-right { flex: 1; min-width: 0; }
+
+.card { background: var(--card-bg); border: 1px solid var(--divider); border-radius: 14px; padding: 14px 16px; margin-bottom: 8px; }
+.card-title { font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+
+.chip-group { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { padding: 4px 10px; border-radius: 16px; font-size: 0.68rem; cursor: pointer; border: 1px solid var(--divider); background: var(--bg-subtle); color: var(--text-secondary); transition: all 0.15s; user-select: none; }
+.chip:hover { border-color: var(--color-accent); color: var(--text-primary); }
+.chip.active { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+.chip.mw-high.active { background: #ef4444; border-color: #ef4444; }
+.chip.mw-mid.active { background: #f59e0b; border-color: #f59e0b; }
+.chip.mw-low.active { background: #8b8b90; border-color: #8b8b90; }
+.chip.mw-plus.active { background: #10b981; border-color: #10b981; }
+
+.ctrl-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.ctrl-row label { font-size: 0.65rem; color: var(--text-secondary); margin-bottom: 2px; display: block; }
+.ctrl-row .field { flex: 1; }
+select, input[type="date"], input[type="number"] { width: 100%; padding: 5px 7px; border-radius: 8px; border: 1px solid var(--divider); background: var(--bg-subtle); color: var(--text-primary); font-size: 0.7rem; font-family: inherit; }
+select:focus, input:focus { outline: none; border-color: var(--color-accent); }
+
+.slider-group { margin-bottom: 8px; }
+.slider-label { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-secondary); margin-bottom: 1px; }
+.slider-label span { color: var(--color-accent); font-weight: 600; }
+.slider-row { display: flex; gap: 5px; align-items: center; }
+.slider-row input[type="range"] { flex: 1; accent-color: var(--color-accent); }
+.slider-row input[type="number"] { width: 45px; text-align: center; padding: 2px 3px; font-size: 0.65rem; }
+
+.btn-row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.btn { padding: 6px 14px; border-radius: 10px; border: none; cursor: pointer; font-size: 0.72rem; font-weight: 600; transition: all 0.15s; }
+.btn-primary { background: var(--color-accent); color: #fff; }
+.btn-primary:hover { opacity: 0.85; }
+.btn-ghost { background: var(--bg-subtle); color: var(--text-secondary); border: 1px solid var(--divider); }
+.btn-ghost:hover { border-color: var(--color-accent); color: var(--text-primary); }
+.btn-sm { padding: 4px 10px; font-size: 0.65rem; border-radius: 8px; }
+.btn-toggle { width: 100%; margin-bottom: 8px; font-size: 0.68rem; }
+.btn-toggle.on { background: var(--color-accent); color: #fff; }
+
+.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 10px; }
+.kpi-card { background: var(--card-bg); border: 1px solid var(--divider); border-radius: 10px; padding: 8px 10px; text-align: center; }
+.kpi-value { font-size: 1.2rem; font-weight: 700; color: var(--text-primary); }
+.kpi-label { font-size: 0.58rem; color: var(--text-tertiary); margin-top: 1px; }
+
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.68rem; }
+.data-table th { text-align: left; padding: 5px 7px; color: var(--text-tertiary); font-weight: 500; font-size: 0.6rem; text-transform: uppercase; border-bottom: 1px solid var(--divider); }
+.data-table th.r { text-align: right; }
+.data-table td { padding: 4px 7px; border-bottom: 1px solid var(--bg-subtle); color: var(--text-primary); }
+.data-table td.r { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table .win { color: var(--rise); }
+.data-table .loss { color: var(--fall); }
+.data-table .best { background: rgba(239,68,68,0.05); }
+.data-table tr:hover td { background: var(--bg-subtle); }
+.data-table .sub td { font-size: 0.63rem; color: var(--text-secondary); }
+
+.chart-box { background: var(--card-bg); border: 1px solid var(--divider); border-radius: 14px; padding: 10px; margin-bottom: 8px; height: 250px; }
+.chart-box.wide { height: 300px; }
+
+.loading { text-align: center; padding: 30px; color: var(--text-tertiary); font-size: 0.75rem; }
+
+.insight { background: var(--bg-subtle); border-left: 3px solid var(--color-accent); padding: 6px 10px; margin: 6px 0; font-size: 0.65rem; color: var(--text-secondary); border-radius: 0 6px 6px 0; }
+
+@media (max-width: 900px) {
+  .lab-layout { flex-direction: column; }
+  .panel-left { width: 100%; }
+  .kpi-row { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="app-container">
+  <div class="page-header"><h1>🔬 回测实验室</h1></div>
+  <button class="btn btn-toggle btn-ghost" id="btn-compare" onclick="toggleCompare()">📊 开启对比模式</button>
+
+  <div class="lab-layout" id="lab-layout">
+    <!-- Panel A -->
+    <div class="panel-left" id="panel-a">
+      <div class="card"><div class="card-title">信号</div><div class="chip-group" id="chips-a"></div></div>
+      <div class="card">
+        <div class="card-title">MW 过滤</div>
+        <div class="chip-group" id="mw-chips-a"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">参数</div>
+        <div class="ctrl-row">
+          <div class="field"><label>起始</label><input type="date" id="start-a" value="2024-01-01"></div>
+          <div class="field"><label>结束</label><input type="date" id="end-a" value="2026-06-22"></div>
+        </div>
+        <div class="ctrl-row">
+          <div class="field"><label>入场</label><select id="entry-a"><option value="T+0_C">T+0收盘</option><option value="T+1_O" selected>T+1开盘</option><option value="T+2_O">T+2开盘</option></select></div>
+          <div class="field"><label>持有</label><select id="hold-a"><option value="5">H5</option><option value="10" selected>H10</option><option value="20">H20</option><option value="60">H60</option></select></div>
+        </div>
+        <div class="ctrl-row"><div class="field"><label>环境</label><select id="regime-a"><option value="all" selected>全部</option><option value="bull">牛市</option><option value="bear">熊市</option><option value="ranging">震荡</option></select></div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">质量过滤</div>
+        <div class="slider-group">
+          <div class="slider-label"><span>个股RS</span><span id="rs-val-a">>=50</span></div>
+          <div class="slider-row"><input type="range" id="rs-min-a" min="50" max="99" value="50" oninput="syncSlider('rs','a')"><input type="number" id="rs-num-a" min="50" max="99" value="50" onchange="syncNum('rs','a')"></div>
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span>量比</span><span id="vr-val-a">>=0.5</span></div>
+          <div class="slider-row"><input type="range" id="vr-min-a" min="0.5" max="3.0" step="0.1" value="0.5" oninput="syncSlider('vr','a')"><input type="number" id="vr-num-a" min="0.5" max="3.0" step="0.1" value="0.5" onchange="syncNum('vr','a')"></div>
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span>行业RS</span><span id="irs-val-a">>=50</span></div>
+          <div class="slider-row"><input type="range" id="irs-min-a" min="50" max="99" value="50" oninput="syncSlider('irs','a')"><input type="number" id="irs-num-a" min="50" max="99" value="50" onchange="syncNum('irs','a')"></div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="query('a')">查询</button>
+        <button class="btn btn-ghost btn-sm" onclick="queryEntryCompare('a')">入场对比</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetFilters('a')">重置</button>
+      </div>
+    </div>
+    <div class="panel-right" id="results-a"><div class="loading">选择信号并点击查询</div></div>
+
+    <!-- Panel B (hidden) -->
+    <div class="panel-left" id="panel-b" style="display:none">
+      <div class="card"><div class="card-title">信号</div><div class="chip-group" id="chips-b"></div></div>
+      <div class="card"><div class="card-title">MW 过滤</div><div class="chip-group" id="mw-chips-b"></div></div>
+      <div class="card"><div class="card-title">参数</div>
+        <div class="ctrl-row"><div class="field"><label>起始</label><input type="date" id="start-b" value="2024-01-01"></div><div class="field"><label>结束</label><input type="date" id="end-b" value="2026-06-22"></div></div>
+        <div class="ctrl-row"><div class="field"><label>入场</label><select id="entry-b"><option value="T+0_C">T+0收盘</option><option value="T+1_O" selected>T+1开盘</option><option value="T+2_O">T+2开盘</option></select></div><div class="field"><label>持有</label><select id="hold-b"><option value="5">H5</option><option value="10" selected>H10</option><option value="20">H20</option><option value="60">H60</option></select></div></div>
+        <div class="ctrl-row"><div class="field"><label>环境</label><select id="regime-b"><option value="all" selected>全部</option><option value="bull">牛市</option><option value="bear">熊市</option><option value="ranging">震荡</option></select></div></div>
+      </div>
+      <div class="card"><div class="card-title">质量过滤</div>
+        <div class="slider-group"><div class="slider-label"><span>个股RS</span><span id="rs-val-b">>=50</span></div><div class="slider-row"><input type="range" id="rs-min-b" min="50" max="99" value="50" oninput="syncSlider('rs','b')"><input type="number" id="rs-num-b" min="50" max="99" value="50" onchange="syncNum('rs','b')"></div></div>
+        <div class="slider-group"><div class="slider-label"><span>量比</span><span id="vr-val-b">>=0.5</span></div><div class="slider-row"><input type="range" id="vr-min-b" min="0.5" max="3.0" step="0.1" value="0.5" oninput="syncSlider('vr','b')"><input type="number" id="vr-num-b" min="0.5" max="3.0" step="0.1" value="0.5" onchange="syncNum('vr','b')"></div></div>
+        <div class="slider-group"><div class="slider-label"><span>行业RS</span><span id="irs-val-b">>=50</span></div><div class="slider-row"><input type="range" id="irs-min-b" min="50" max="99" value="50" oninput="syncSlider('irs','b')"><input type="number" id="irs-num-b" min="50" max="99" value="50" onchange="syncNum('irs','b')"></div></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="query('b')">查询</button>
+        <button class="btn btn-ghost btn-sm" onclick="queryEntryCompare('b')">入场对比</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetFilters('b')">重置</button>
+        <button class="btn btn-ghost btn-sm" onclick="copyFromA()">复制A</button>
+      </div>
+    </div>
+    <div class="panel-right" id="results-b" style="display:none"><div class="loading">选择信号并点击查询</div></div>
+  </div>
+</div>
+
+<script src="../shared/js/nav.js"></script>
+<script src="../shared/js/echarts.min.js"></script>
+<script>
+// Theme
+function toggleTheme() {
+  const h = document.documentElement;
+  const t = h.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  h.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+  Object.values(charts).forEach(c => c?.dispose());
+  Object.keys(charts).forEach(k => delete charts[k]);
+  if (lastData.a) renderResults('a', lastData.a);
+  if (lastData.b) renderResults('b', lastData.b);
+}
+(function(){const t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
+
+const SIGNALS = ['MW_B1','MW_B2','MW_PLUS','PP_V1','PP_V2','BO_V2'];
+const SLABELS = {MW_B1:'MW B1',MW_B2:'MW B2',MW_PLUS:'MW+',PP_V1:'PP V1',PP_V2:'PP V2',BO_V2:'BO V2'};
+const MW_CONFS = [{v:'高',l:'高',c:'mw-high'},{v:'中',l:'中',c:'mw-mid'},{v:'低',l:'低',c:'mw-low'},{v:'PLUS',l:'✦PLUS',c:'mw-plus'}];
+let compareMode = false, lastData = {a:null,b:null}, charts = {};
+
+function getSignals(panel) { return [...document.querySelectorAll('#chips-'+panel+' .chip.active')].map(c=>c.dataset.signal); }
+function getMwConf(panel) { return [...document.querySelectorAll('#mw-chips-'+panel+' .chip.active')].map(c=>c.dataset.mwconf); }
+
+function buildChips(panel) {
+  document.getElementById('chips-'+panel).innerHTML = SIGNALS.map(s => `<span class="chip${s==='PP_V2'?' active':''}" data-signal="${s}" onclick="this.classList.toggle('active')">${SLABELS[s]}</span>`).join('');
+  document.getElementById('mw-chips-'+panel).innerHTML = MW_CONFS.map(c => `<span class="chip ${c.c}" data-mwconf="${c.v}" onclick="this.classList.toggle('active')">${c.l}</span>`).join('');
+}
+
+function syncSlider(t,p){document.getElementById(t+'-num-'+p).value=document.getElementById(t+'-min-'+p).value;document.getElementById(t+'-val-'+p).textContent='>='+document.getElementById(t+'-min-'+p).value}
+function syncNum(t,p){document.getElementById(t+'-min-'+p).value=document.getElementById(t+'-num-'+p).value;document.getElementById(t+'-val-'+p).textContent='>='+document.getElementById(t+'-num-'+p).value}
+
+function toggleCompare() {
+  compareMode = !compareMode;
+  const btn = document.getElementById('btn-compare'), layout = document.getElementById('lab-layout');
+  document.getElementById('panel-b').style.display = document.getElementById('results-b').style.display = compareMode ? '' : 'none';
+  btn.textContent = compareMode ? '📊 关闭对比' : '📊 开启对比模式';
+  btn.classList.toggle('on', compareMode);
+  layout.classList.toggle('compare', compareMode);
+  if (compareMode) { buildChips('b'); copyFromA(); }
+  else { Object.entries(charts).forEach(([k,c])=>{if(k.endsWith('_b'))c?.dispose()}); }
+}
+
+function copyFromA() {
+  ['start','end','entry','hold','regime','rs-min','rs-num','vr-min','vr-num','irs-min','irs-num'].forEach(id => {
+    document.getElementById(id+'-b').value = document.getElementById(id+'-a').value;
+  });
+  [['chips-a','chips-b'],['mw-chips-a','mw-chips-b']].forEach(([a,b]) => {
+    [...document.querySelectorAll('#'+a+' .chip')].forEach((c,i) => {
+      const t = document.querySelectorAll('#'+b+' .chip')[i];
+      if(t) t.className = c.className;
+    });
+  });
+  ['rs','vr','irs'].forEach(t => syncSlider(t,'b'));
+}
+
+function resetFilters(panel) {
+  ['rs-min','rs-num','vr-min','vr-num','irs-min','irs-num'].forEach(id => {
+    document.getElementById(id+'-'+panel).value = id.includes('vr') ? '0.5' : '50';
+  });
+  ['rs','vr','irs'].forEach(t => syncSlider(t, panel));
+  document.querySelectorAll('#mw-chips-'+panel+' .chip').forEach(c => c.classList.remove('active'));
+}
+
+function buildParams(panel, entryOverride) {
+  const rs = parseInt(document.getElementById('rs-num-'+panel).value)||50;
+  const vr = parseFloat(document.getElementById('vr-num-'+panel).value)||0.5;
+  const irs = parseInt(document.getElementById('irs-num-'+panel).value)||50;
+  const mwConf = getMwConf(panel);
+  return {
+    signals: getSignals(panel),
+    start_date: document.getElementById('start-'+panel).value,
+    end_date: document.getElementById('end-'+panel).value,
+    entry_method: entryOverride || document.getElementById('entry-'+panel).value,
+    hold_days: parseInt(document.getElementById('hold-'+panel).value),
+    market_regime: document.getElementById('regime-'+panel).value,
+    filters: {
+      rs_min: rs>50?rs:null, vol_ratio_min: vr>0.5?vr:null, ind_rs_min: irs>50?irs:null,
+    },
+    mw_conf: mwConf.length===1 ? mwConf[0] : null,
+  };
+}
+
+async function doQuery(params) {
+  const resp = await fetch('/api/backtest-lab/query', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(params)});
+  return resp.json();
+}
+
+async function query(panel) {
+  if (getSignals(panel).length===0) { alert('请选择信号'); return; }
+  document.getElementById('results-'+panel).innerHTML = '<div class="loading">查询中</div>';
+  try {
+    const data = await doQuery(buildParams(panel));
+    lastData[panel] = data;
+    renderResults(panel, data);
+  } catch(e) {
+    document.getElementById('results-'+panel).innerHTML = '<div class="loading" style="color:var(--fall)">失败: '+e.message+'</div>';
+  }
+}
+
+async function queryEntryCompare(panel) {
+  if (getSignals(panel).length===0) { alert('请选择信号'); return; }
+  document.getElementById('results-'+panel).innerHTML = '<div class="loading">对比查询中 (1/3)...</div>';
+  try {
+    const d0 = await doQuery(buildParams(panel, 'T+0_C'));
+    document.getElementById('results-'+panel).innerHTML = '<div class="loading">对比查询中 (2/3)...</div>';
+    const d1 = await doQuery(buildParams(panel, 'T+1_O'));
+    document.getElementById('results-'+panel).innerHTML = '<div class="loading">对比查询中 (3/3)...</div>';
+    const d2 = await doQuery(buildParams(panel, 'T+2_O'));
+    lastData[panel] = d1;
+    renderEntryCompare(panel, d0, d1, d2);
+  } catch(e) {
+    document.getElementById('results-'+panel).innerHTML = '<div class="loading" style="color:var(--fall)">失败: '+e.message+'</div>';
+  }
+}
+
+function renderResults(panel, data) {
+  const s = data.summary, wr = (s.win_rate*100).toFixed(1);
+  document.getElementById('results-'+panel).innerHTML = `
+    <div class="kpi-row">
+      <div class="kpi-card"><div class="kpi-value">${s.samples.toLocaleString()}</div><div class="kpi-label">样本</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:${s.win_rate>=0.45?'var(--rise)':s.win_rate<0.4?'var(--fall)':'var(--text-primary)'}">${wr}%</div><div class="kpi-label">胜率</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:${s.mean_ret>0?'var(--rise)':'var(--fall)'}">${s.mean_ret>0?'+':''}${s.mean_ret}%</div><div class="kpi-label">净收益</div></div>
+      <div class="kpi-card"><div class="kpi-value">${s.profit_loss_ratio}</div><div class="kpi-label">盈亏比</div></div>
+      <div class="kpi-card"><div class="kpi-value">${(s.kelly*100).toFixed(1)}%</div><div class="kpi-label">凯利</div></div>
+    </div>
+    <div class="card" style="margin-bottom:8px">
+      <div class="card-title">信号对比</div>
+      ${renderTable(data)}
+    </div>
+    <div style="display:flex;gap:8px">
+      <div class="chart-box wide" id="chart-monthly-${panel}" style="flex:1"></div>
+      <div class="chart-box wide" id="chart-dist-${panel}" style="flex:1"></div>
+    </div>
+  `;
+  setTimeout(() => {
+    renderMonthlyChart(panel, data.monthly);
+    renderDistChart(panel, data.distribution, s.mean_ret);
+  }, 100);
+}
+
+function renderEntryCompare(panel, d0, d1, d2) {
+  const hd = document.getElementById('hold-'+panel).value;
+  let html = `<div class="kpi-row">`;
+  [d0,d1,d2].forEach((d,i) => {
+    const s = d.summary, wr = (s.win_rate*100).toFixed(1);
+    html += `<div class="kpi-card" style="border:1px solid var(--color-accent)"><div style="font-size:0.6rem;color:var(--color-accent);margin-bottom:2px">T+${i}_${i===0?'C':'O'}</div><div class="kpi-value">${s.samples.toLocaleString()}</div><div class="kpi-value" style="font-size:0.8rem;color:${s.win_rate>=0.45?'var(--rise)':'var(--fall)'}">${wr}%</div><div class="kpi-value" style="font-size:0.7rem">${s.mean_ret>0?'+':''}${s.mean_ret}%</div></div>`;
+  });
+  html += `</div>`;
+
+  html += `<div class="card"><div class="card-title">信号 × 入场方式对比 (H${hd})</div><table class="data-table"><thead><tr><th>信号</th><th class="r">T+0_C 胜率</th><th class="r">收益</th><th class="r">T+1_O 胜率</th><th class="r">收益</th><th class="r">T+2_O 胜率</th><th class="r">收益</th></tr></thead><tbody>`;
+
+  const allSignals = [...new Set([...d0.by_signal.map(s=>s.signal),...d1.by_signal.map(s=>s.signal),...d2.by_signal.map(s=>s.signal)])];
+  for (const sig of allSignals) {
+    const s0 = d0.by_signal.find(s=>s.signal===sig);
+    const s1 = d1.by_signal.find(s=>s.signal===sig);
+    const s2 = d2.by_signal.find(s=>s.signal===sig);
+    html += '<tr>';
+    html += `<td>${sig}</td>`;
+    [s0,s1,s2].forEach(s => {
+      if (s) {
+        const wc = s.win_rate>=0.45?'win':'loss';
+        const mc = s.mean_ret>0?'win':'loss';
+        html += `<td class="r ${wc}">${(s.win_rate*100).toFixed(1)}%</td><td class="r ${mc}">${s.mean_ret>0?'+':''}${s.mean_ret}%</td>`;
+      } else { html += '<td class="r">-</td><td class="r">-</td>'; }
+    });
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+
+  html += `<div class="insight">💡 入场方式差异越小越可靠。差异>3pp时优先选择胜率最高的方式。当前默认:T+1_O</div>`;
+
+  html += `<div style="display:flex;gap:8px"><div class="chart-box" id="chart-monthly-${panel}" style="flex:1"></div><div class="chart-box" id="chart-dist-${panel}" style="flex:1"></div></div>`;
+  document.getElementById('results-'+panel).innerHTML = html;
+
+  setTimeout(() => {
+    renderMonthlyChart(panel, d1.monthly);
+    renderDistChart(panel, d1.distribution, d1.summary.mean_ret);
+  }, 100);
+}
+
+function renderTable(data) {
+  let html = '<table class="data-table"><thead><tr><th>信号/组合</th><th class="r">样本</th><th class="r">胜率</th><th class="r">净收益</th><th class="r">盈亏比</th><th class="r">凯利</th></tr></thead><tbody>';
+  for (const r of data.by_signal) {
+    const wc = r.win_rate>=0.45?'win':(r.win_rate<0.4?'loss':'');
+    const mc = r.mean_ret>0?'win':'loss';
+    html += `<tr${r.win_rate>=0.5?' class="best"':''}><td>${r.signal}</td><td class="r">${r.samples.toLocaleString()}</td><td class="r ${wc}">${(r.win_rate*100).toFixed(1)}%</td><td class="r ${mc}">${r.mean_ret>0?'+':''}${r.mean_ret}%</td><td class="r">${r.profit_loss_ratio}</td><td class="r">${(r.kelly*100).toFixed(1)}%</td></tr>`;
+  }
+  for (const r of data.by_combo) {
+    if (r.signal_count<2 || r.samples<10) continue;
+    const wc = r.win_rate>=0.45?'win':(r.win_rate<0.4?'loss':'');
+    const mc = r.mean_ret>0?'win':'loss';
+    html += `<tr class="sub"><td>+ ${r.combo_label}</td><td class="r">${r.samples}</td><td class="r ${wc}">${(r.win_rate*100).toFixed(1)}%</td><td class="r ${mc}">${r.mean_ret>0?'+':''}${r.mean_ret}%</td><td class="r">-</td><td class="r">-</td></tr>`;
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderMonthlyChart(panel, monthly) {
+  const dom = document.getElementById('chart-monthly-'+panel);
+  if (!dom) return;
+  const c = echarts.init(dom); charts['monthly_'+panel]?.dispose(); charts['monthly_'+panel] = c;
+  c.setOption({
+    title: { text: '月度胜率 & 样本', left: 'center', textStyle: { fontSize: 11, color: '#8b8b90' }},
+    tooltip: { trigger: 'axis' },
+    grid: { left: 50, right: 50, top: 30, bottom: 40 },
+    xAxis: { type: 'category', data: monthly.map(m=>m.month), axisLabel: { fontSize: 8, rotate: 45 }},
+    yAxis: [{ type: 'value', name: '胜率%', min: 0, max: 100, axisLabel: { fontSize: 8 }},{ type: 'value', name: '样本', axisLabel: { fontSize: 8 }}],
+    series: [
+      { name: '胜率', type: 'bar', data: monthly.map(m=>(m.win_rate*100).toFixed(1)), itemStyle: { color: '#ef4444', borderRadius: [3,3,0,0] }},
+      { name: '样本', type: 'line', yAxisIndex: 1, data: monthly.map(m=>m.samples), lineStyle: { color: '#888' }, symbol: 'none' }
+    ]
+  });
+}
+
+function renderDistChart(panel, dist, meanRet) {
+  const dom = document.getElementById('chart-dist-'+panel);
+  if (!dom) return;
+  const c = echarts.init(dom); charts['dist_'+panel]?.dispose(); charts['dist_'+panel] = c;
+  c.setOption({
+    title: { text: '收益分布', left: 'center', textStyle: { fontSize: 11, color: '#8b8b90' }},
+    tooltip: { trigger: 'axis' },
+    grid: { left: 50, right: 20, top: 30, bottom: 50 },
+    xAxis: { type: 'category', data: dist.map(d=>d.bucket), axisLabel: { fontSize: 7, rotate: 45 }},
+    yAxis: { type: 'value', name: '频次', axisLabel: { fontSize: 8 }},
+    series: [{ type: 'bar', data: dist.map((d,i) => ({ value: d.count, itemStyle: { color: (dist[i].range[0]+dist[i].range[1])/2>=0?'#ef4444':'#10b981', borderRadius: [3,3,0,0] }})) }]
+  });
+}
+
+buildChips('a'); buildChips('b');
+</script>
+</body>
+</html>

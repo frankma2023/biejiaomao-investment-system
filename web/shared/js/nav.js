@@ -36,6 +36,8 @@
     { href: '../discipline/screening-backtest.html', label: '股票精选回测', page: 'screening-backtest' },
     { href: '../discipline/screening-backtest-index.html', label: '指数精选回测', page: 'screening-backtest-index' },
     { href: '../chanlun-backtest-compare/', label: '缠论vs欧奈尔', page: 'chanlun-backtest-compare' },
+    { href: '../backtest-lab/',          label: '🔬 回测实验室',    page: 'backtest-lab' },
+    { href: '../mw-report/',             label: '📊 MW回测报告',    page: 'mw-report' },
       { href: '../progress.html',         label: '进展',             page: 'progress' },
 ];
 

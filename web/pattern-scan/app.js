@@ -551,6 +551,11 @@ function renderChart() {
             html += '<span style="color:' + s.color + ';font-weight:700">●</span> ';
             html += '<b>' + escHtml(displayName) + '</b> · ' + typeLabel;
             if (desc) html += ' <span style="font-size:9px;color:#888">(' + escHtml(desc) + ')</span>';
+            if (sig.details && sig.details.tech_score) {
+              var ts = sig.details.tech_score;
+              var tsTier = ts>=85?'极高':ts>=75?'很高':ts>=65?'高':ts>=50?'中':'低';
+              html += ' <span style="font-size:9px;color:#f59e0b">[TS:' + ts + '/' + tsTier + ']</span>';
+            }
             html += '<br/>';
           });
         }
@@ -743,7 +748,9 @@ function renderTimeline(signals) {
         '<span class="tl-dot" style="background:' + style.color + '"></span>' +
         '<div class="tl-info">' +
           '<div class="tl-date">' + sig.date + '</div>' +
-          '<div class="tl-name">' + escHtml(displayName) + ' · ' + typeLabel + '</div>' +
+          '<div class="tl-name">' + escHtml(displayName) + ' · ' + typeLabel +
+            (sig.details && sig.details.tech_score ? ' <span style="font-size:9px;color:#f59e0b">TS:' + sig.details.tech_score + '</span>' : '') +
+          '</div>' +
           (desc ? '<div class="tl-desc">' + escHtml(desc) + '</div>' : '') +
         '</div>' +
       '</div>';

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MW 信号全维度回测报告 · Project Hanako</title>
+<link rel="icon" href="../images/favicon.svg">
+<link href="../shared/css/hanako-glass.css" rel="stylesheet">
+<style>
+:root { --rise: #ef4444; --fall: #10b981; --warn: #f59e0b; }
+.app-container { max-width: 1100px; padding: 16px 24px 24px; }
+.page-header { margin-bottom: 8px; }
+.page-header h1 { font-size: 1.15rem; font-weight: 600; color: var(--text-primary); }
+.page-header .meta { font-size: 0.65rem; color: var(--text-tertiary); margin-top: 2px; }
+
+/* Section */
+.section { margin-bottom: 24px; }
+.section-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--divider); }
+.section-title .num { color: var(--color-accent); margin-right: 6px; }
+
+/* KPI Row */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.kpi-card { background: var(--card-bg); border: 1px solid var(--divider); border-radius: 12px; padding: 12px 16px; text-align: center; }
+.kpi-card .val { font-size: 1.5rem; font-weight: 700; }
+.kpi-card .val.up { color: var(--rise); }
+.kpi-card .val.down { color: var(--fall); }
+.kpi-card .val.warn { color: var(--warn); }
+.kpi-card .lbl { font-size: 0.62rem; color: var(--text-tertiary); margin-top: 2px; }
+
+/* Tables */
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.73rem; margin-bottom: 8px; }
+.data-table th { text-align: left; padding: 7px 10px; color: var(--text-tertiary); font-weight: 500; font-size: 0.65rem; text-transform: uppercase; border-bottom: 1px solid var(--divider); background: var(--bg-subtle); }
+.data-table th.r { text-align: right; }
+.data-table td { padding: 6px 10px; border-bottom: 1px solid var(--bg-subtle); color: var(--text-secondary); }
+.data-table td.r { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table td.up { color: var(--rise); font-weight: 600; }
+.data-table td.down { color: var(--fall); }
+.data-table td.best { background: rgba(239,68,68,0.06); color: var(--rise); font-weight: 700; }
+.data-table tr:hover td { background: var(--bg-subtle); }
+.data-table .highlight td { background: rgba(245,158,11,0.06); }
+.data-table .sub td { font-size: 0.68rem; color: var(--text-tertiary); }
+
+/* Charts */
+.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.chart-box { background: var(--card-bg); border: 1px solid var(--divider); border-radius: 14px; padding: 12px; height: 320px; }
+.chart-box.wide { grid-column: 1 / -1; height: 360px; }
+
+/* Rule box */
+.rule-box { background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 14px; padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; line-height: 1.7; color: var(--text-primary); white-space: pre-wrap; }
+
+/* Badge */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.6rem; font-weight: 600; }
+.badge-h { background: rgba(239,68,68,0.1); color: #ef4444; }
+.badge-m { background: rgba(245,158,11,0.1); color: var(--warn); }
+.badge-l { background: rgba(139,139,144,0.1); color: var(--text-tertiary); }
+.badge-p { background: rgba(16,185,129,0.1); color: #10b981; }
+
+/* Insight */
+.insight { background: var(--bg-subtle); border-left: 3px solid var(--color-accent); padding: 8px 12px; margin: 8px 0; font-size: 0.7rem; color: var(--text-secondary); border-radius: 0 8px 8px 0; }
+
+@media (max-width: 700px) {
+  .chart-row { grid-template-columns: 1fr; }
+  .kpi-row { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="app-container">
+  <div class="page-header">
+    <h1>MW 信号全维度回测报告</h1>
+    <div class="meta">2024-01-01 ~ 2026-06-22 · 3,789 万笔交易 · 成本 0.3% · 前复权价 · v1.0</div>
+  </div>
+
+  <!-- Overview KPIs -->
+  <div class="section">
+    <div class="section-title"><span class="num">0.</span>总览</div>
+    <div class="kpi-row">
+      <div class="kpi-card"><div class="val">37,978</div><div class="lbl">MW B1 信号总数</div></div>
+      <div class="kpi-card"><div class="val">15,787</div><div class="lbl">出现 B2 确认 (41.6%)</div></div>
+      <div class="kpi-card"><div class="val up">83%</div><div class="lbl">高置信 B1+B2 胜率</div></div>
+      <div class="kpi-card"><div class="val up">+22.1%</div><div class="lbl">高置信 H20 净收益</div></div>
+      <div class="kpi-card"><div class="val warn">91%</div><div class="lbl">PLUS 胜率 (21条)</div></div>
+      <div class="kpi-card"><div class="val up">+27.7%</div><div class="lbl">PLUS H20 净收益</div></div>
+    </div>
+  </div>
+
+  <!-- 1. Confidence System -->
+  <div class="section">
+    <div class="section-title"><span class="num">1.</span>置信度体系</div>
+    <table class="data-table">
+      <tr><th colspan="5">B1-only（无 B2，满分 75）— v3.4 实证重建</th></tr>
+      <tr><th>置信度</th><th>分数区间</th><th class="r">B2 确认率</th><th class="r">H20 预期</th><th class="r">占比</th></tr>
+      <tr><td><span class="badge badge-h">高</span></td><td>≥ 55</td><td class="r">62%</td><td class="r up">+10.6%</td><td class="r">1.1%</td></tr>
+      <tr><td><span class="badge badge-m">中</span></td><td>40 ~ 54</td><td class="r">48%</td><td class="r up">+5.0%</td><td class="r">12.8%</td></tr>
+      <tr><td><span class="badge badge-l">低</span></td><td>&lt; 40</td><td class="r">40%</td><td class="r">~0%</td><td class="r">86.1%</td></tr>
+    </table>
+    <table class="data-table" style="margin-top:8px">
+      <tr><th colspan="3">B1+B2（有 B2，满分 100）</th></tr>
+      <tr><th>置信度</th><th>分数区间</th><th>说明</th></tr>
+      <tr><td><span class="badge badge-h">高</span></td><td>≥ 80</td><td>沿用原阈值</td></tr>
+      <tr><td><span class="badge badge-m">中</span></td><td>55 ~ 79</td><td></td></tr>
+      <tr><td><span class="badge badge-l">低</span></td><td>&lt; 55</td><td></td></tr>
+    </table>
+    <div class="insight">PLUS = <span class="badge badge-p">✦</span> 总分≥80 + D满分 + I1满分（行业RS250≥80）</div>
+  </div>
+
+  <!-- 2. B1+B2 Performance -->
+  <div class="section">
+    <div class="section-title"><span class="num">2.</span>B1+B2 组合表现（H20 / T+1_O 买入）</div>
+    <table class="data-table">
+      <tr><th>置信度</th><th class="r">样本</th><th class="r">胜率</th><th class="r">平均净收益</th><th class="r">中位净收益</th><th class="r">盈亏比</th><th class="r">凯利比例</th><th class="r">超额收益</th></tr>
+      <tr><td><span class="badge badge-h">高</span></td><td class="r">35 ⚠</td><td class="r best">82.9%</td><td class="r best">+22.08%</td><td class="r up">+19.85%</td><td class="r">2.35</td><td class="r up">75.6%</td><td class="r up">+20.24%</td></tr>
+      <tr><td><span class="badge badge-m">中</span></td><td class="r">1,062</td><td class="r best">78.7%</td><td class="r best">+17.23%</td><td class="r up">+10.56%</td><td class="r">3.05</td><td class="r up">71.7%</td><td class="r up">+14.63%</td></tr>
+      <tr><td><span class="badge badge-l">低</span></td><td class="r">6,363</td><td class="r up">65.7%</td><td class="r up">+8.99%</td><td class="r up">+5.05%</td><td class="r">2.06</td><td class="r">49.1%</td><td class="r up">+7.34%</td></tr>
+      <tr class="highlight"><td><span class="badge badge-p">✦ PLUS</span></td><td class="r">21 ⚠</td><td class="r best">90.5%</td><td class="r best">+27.73%</td><td class="r up">+25.90%</td><td class="r">27.35</td><td class="r up">90.1%</td><td class="r up">+23.83%</td></tr>
+    </table>
+    <div class="insight">⚠ 高置信和 PLUS 样本极少（35/21），结论需等 2016-2022 数据补完后验证。PLUS 盈亏比 27.35 是统计异常（亏损端几乎为零），实际凯利应上限截断。</div>
+
+    <!-- Chart: By hold period -->
+    <div class="chart-row">
+      <div class="chart-box" id="chart-hold-b1b2"></div>
+      <div class="chart-box" id="chart-hold-b1only"></div>
+    </div>
+  </div>
+
+  <!-- 3. B1 vs B2 entry -->
+  <div class="section">
+    <div class="section-title"><span class="num">3.</span>B1 入场 vs B2 入场（同一信号，不同买入日）</div>
+    <table class="data-table">
+      <tr><th></th><th colspan="3">B1 日为 T（B1 日买入）</th><th colspan="3">B2 日为 T（B2 日买入）</th></tr>
+      <tr><th>置信度</th><th class="r">样本</th><th class="r">胜率</th><th class="r">净收益</th><th class="r">样本</th><th class="r">胜率</th><th class="r">净收益</th></tr>
+      <tr class="highlight"><td><span class="badge badge-h">高</span></td><td class="r">35</td><td class="r best">83%</td><td class="r best">+22.1%</td><td class="r">17</td><td class="r down">65%</td><td class="r down">+13.4%</td></tr>
+      <tr class="highlight"><td><span class="badge badge-m">中</span></td><td class="r">1,062</td><td class="r best">79%</td><td class="r best">+17.2%</td><td class="r">1,026</td><td class="r down">48%</td><td class="r down">+5.0%</td></tr>
+      <tr class="highlight"><td><span class="badge badge-l">低</span></td><td class="r">6,363</td><td class="r up">66%</td><td class="r up">+9.0%</td><td class="r">6,242</td><td class="r down">36%</td><td class="r down">-1.5%</td></tr>
+    </table>
+    <div class="insight"><strong>核心结论：B1 日买入远优于 B2 日买入。</strong>中置信胜率差 31pp，净收益差 12pp。B2 要求涨幅≥3%，等确认时股价已拉升，追进去性价比低。B2 是持有信号，不是加仓信号。</div>
+
+    <div class="chart-box wide" id="chart-b1-vs-b2"></div>
+  </div>
+
+  <!-- 4. Delay entry -->
+  <div class="section">
+    <div class="section-title"><span class="num">4.</span>延时买入的影响（T+1 / T+2 / T+3）</div>
+    <table class="data-table">
+      <tr><th colspan="7">B1 日出场，按延时（H20）</th></tr>
+      <tr><th>置信度</th><th class="r">T+1 胜率</th><th class="r">T+1 收益</th><th class="r">T+2 胜率</th><th class="r">T+2 收益</th><th class="r">T+3 胜率</th><th class="r">T+3 收益</th></tr>
+      <tr><td><span class="badge badge-h">高</span></td><td class="r best">83%</td><td class="r up">+22.1%</td><td class="r">82%</td><td class="r up">+22.4%</td><td class="r down">76%</td><td class="r down">+19.6%</td></tr>
+      <tr><td><span class="badge badge-m">中</span></td><td class="r best">79%</td><td class="r up">+17.2%</td><td class="r">78%</td><td class="r up">+16.7%</td><td class="r down">72%</td><td class="r down">+13.6%</td></tr>
+      <tr><td><span class="badge badge-l">低</span></td><td class="r best">66%</td><td class="r up">+9.0%</td><td class="r">61%</td><td class="r up">+6.8%</td><td class="r down">58%</td><td class="r down">+5.9%</td></tr>
+    </table>
+    <div class="insight">每多等一天，胜率掉 3~7pp，净收益掉 1~3pp。<strong>T+1 开盘买入是最优选择。</strong></div>
+  </div>
+
+  <!-- 5. Co-occurrence -->
+  <div class="section">
+    <div class="section-title"><span class="num">5.</span>共现信号分析</div>
+    <div class="chart-row">
+      <div class="chart-box" id="chart-co-b1"></div>
+      <div class="chart-box" id="chart-co-b2"></div>
+    </div>
+    <table class="data-table">
+      <tr><th colspan="6">B1=T日，前后窗口共现买入信号（B1日买入，H20/T+1_O）</th></tr>
+      <tr><th>窗口</th><th class="r">基准(无共现)</th><th class="r">+PP_V1</th><th class="r">+PP_V2</th><th class="r">+BO_V2</th></tr>
+      <tr><td>±3天</td><td class="r">67%/+9.8% (5,398)</td><td class="r best">70%/+11.8% (1,730)</td><td class="r">60%/+8.9% (426)</td><td class="r">59%/+6.1% (29)</td></tr>
+      <tr><td>±5天</td><td class="r">67%/+10.0% (4,723)</td><td class="r best">71%/+11.4% (2,293)</td><td class="r">58%/+7.7% (609)</td><td class="r">58%/+6.6% (45)</td></tr>
+      <tr><td>±10天</td><td class="r">66%/+10.0% (3,864)</td><td class="r best">71%/+11.0% (3,014)</td><td class="r">61%/+8.3% (954)</td><td class="r">62%/+6.9% (66)</td></tr>
+    </table>
+    <table class="data-table" style="margin-top:8px">
+      <tr><th colspan="6">B2=T日，前后窗口共现买入信号（B2日买入，H20/T+1_O）</th></tr>
+      <tr><th>窗口</th><th class="r">B2 单独</th><th class="r">+PP_V1</th><th class="r">+PP_V2</th><th class="r">+BO_V2</th></tr>
+      <tr><td>±3天</td><td class="r down">35%/-2.0% (5,298)</td><td class="r best">48%/+4.8% (1,521)</td><td class="r">37%/+0.1% (556)</td><td class="r">53%/+3.4% (34)</td></tr>
+      <tr><td>±5天</td><td class="r down">34%/-2.4% (4,622)</td><td class="r best">46%/+3.7% (2,050)</td><td class="r">39%/+0.7% (785)</td><td class="r">52%/+3.9% (46)</td></tr>
+      <tr><td>±10天</td><td class="r down">34%/-2.9% (3,504)</td><td class="r best">43%/+2.3% (3,030)</td><td class="r">40%/+0.6% (1,177)</td><td class="r">43%/+1.7% (60)</td></tr>
+    </table>
+    <div class="insight"><strong>只有 PP_V1 是有效的共现加分项。</strong>PP_V2 和 BO_V2 共现不产生正向贡献。对 B2 入场而言，PP_V1 共现将收益从 -2% 翻正到 +4.8%。</div>
+  </div>
+
+  <!-- 6. Market Regime -->
+  <div class="section">
+    <div class="section-title"><span class="num">6.</span>市场环境分层（B1日买入，H20/T+1_O）</div>
+
+    <div class="insight" style="margin-bottom:12px">
+      <strong>判定标准</strong>：基于中证全指（000985）每日收盘价计算。<br>
+      <span class="badge badge-h">牛市</span> = MA50 斜率 &gt; +0.5%（20日）<strong>且</strong> 价格在 MA200 上方<br>
+      <span class="badge badge-l">熊市</span> = MA50 斜率 &lt; -0.5%（20日）<strong>且</strong> 价格在 MA200 下方<br>
+      <span class="badge badge-m">震荡市</span> = 其余一切情况<br>
+      2024-2026 期间分布：牛市 36% · 熊市 6% · 震荡市 58%
+    </div>
+    <table class="data-table">
+      <tr><th>环境</th><th class="r"><span class="badge badge-h">高置信</span></th><th class="r"><span class="badge badge-m">中置信</span></th><th class="r"><span class="badge badge-l">低置信</span></th><th class="r"><span class="badge badge-p">PLUS</span></th></tr>
+      <tr class="highlight"><td>震荡市</td><td class="r best">90%/+25.8% (20)</td><td class="r best">86%/+20.5% (539)</td><td class="r best">71%/+11.2% (3,181)</td><td class="r best">92%/+26.2% (13)</td></tr>
+      <tr><td>牛市</td><td class="r">71%/+17.1% (14)</td><td class="r">71%/+13.6% (512)</td><td class="r">60%/+6.7% (3,152)</td><td class="r">88%/+30.2% (8)</td></tr>
+      <tr><td>熊市</td><td class="r">—</td><td class="r">100%/+26.3% (11)</td><td class="r">83%/+16.3% (30)</td><td class="r">—</td></tr>
+    </table>
+    <div class="insight">震荡市 > 牛市。牛市信号泛滥假突破多，震荡市 MW 信号最干净。</div>
+    <div class="chart-box wide" id="chart-regime"></div>
+  </div>
+
+  <!-- 7. Industry RS -->
+  <div class="section">
+    <div class="section-title"><span class="num">7.</span>行业 RS 分层（B1日买入，H20/T+1_O，B2日行业RS250）</div>
+    <table class="data-table">
+      <tr><th>行业RS250</th><th class="r"><span class="badge badge-h">高置信</span></th><th class="r"><span class="badge badge-m">中置信</span></th><th class="r"><span class="badge badge-l">低置信</span></th><th class="r"><span class="badge badge-p">PLUS</span></th></tr>
+      <tr class="highlight"><td><strong>75~85</strong></td><td class="r best">88%/+32.9% (8)</td><td class="r best">85%/+16.8% (65)</td><td class="r">69%/+7.8% (136)</td><td class="r best">100%/+43.2% (3)</td></tr>
+      <tr><td>≥85</td><td class="r">78%/+18.0% (23)</td><td class="r">72%/+12.1% (189)</td><td class="r">64%/+8.6% (248)</td><td class="r">89%/+25.2% (18)</td></tr>
+      <tr><td>60~75</td><td class="r">100%/+24.1% (4)</td><td class="r">75%/+16.5% (80)</td><td class="r">69%/+9.6% (308)</td><td class="r">—</td></tr>
+      <tr><td>&lt;60</td><td class="r">—</td><td class="r">79%/+16.6% (149)</td><td class="r">62%/+8.5% (1,018)</td><td class="r">—</td></tr>
+    </table>
+    <div class="insight"><strong>行业 RS 75~85 是最优区间</strong>，优于 ≥85。行业过强时竞争激烈，MW 买点的独占性降低。</div>
+  </div>
+
+  <!-- 8. Decision Rules -->
+  <div class="section">
+    <div class="section-title"><span class="num">8.</span>投资决策规则</div>
+    <div class="rule-box">B1 信号出现
+│
+├─ B1-only 分数 &lt; 40 → 放弃
+│   （B2 确认率仅 40%，H20 净收益≈0）
+│
+├─ B1-only 分数 ≥ 40 → 关注
+│   │
+│   ├─ 次日开盘（T+1_O）买入
+│   │   （T+2/T+3 延迟会侵蚀 3-7pp 胜率）
+│   │
+│   ├─ 等待 B2 确认
+│   │   ├─ B2 出现 → 继续持有至 H20~H60
+│   │   │   ├─ 高/中置信度 → 目标 H20（+17%~+22%）
+│   │   │   ├─ 窗口内有 PP_V1 共现 → 加分
+│   │   │   └─ 震荡市中持有信心更高
+│   │   └─ B2 未出现 → H60 止损/减仓
+│   │
+│   ├─ 不在 B2 日追买
+│   │   （B2 日买入胜率比 B1 日低 15-31pp）
+│   │
+│   └─ PLUS 信号 → 满仓持有
+│       （胜率 91%，收益 28%，下行风险极低）
+│
+└─ 环境偏好：震荡市 &gt; 牛市
+    行业偏好：RS 75~85 &gt; RS ≥85</div>
+  </div>
+
+  <!-- 9. Limitations -->
+  <div class="section">
+    <div class="section-title"><span class="num">9.</span>已知局限</div>
+    <table class="data-table">
+      <tr><td>1</td><td>高置信仅 35 条，PLUS 仅 21 条，需 2016-2022 数据补完后重新验证</td></tr>
+      <tr><td>2</td><td>熊市样本极少（59 个交易日），结论不可靠</td></tr>
+      <tr><td>3</td><td>BO_V2 共现样本 29~66 条，结论不可靠</td></tr>
+      <tr><td>4</td><td>PLUS 盈亏比 27.35 是统计异常（亏损端几乎为零）</td></tr>
+      <tr><td>5</td><td>市值和成交额过滤未纳入（依赖快照表，待建）</td></tr>
+      <tr><td>6</td><td>MA 止损和移动止盈未测试（属 M1 工程范围）</td></tr>
+    </table>
+  </div>
+</div>
+
+<script src="../shared/js/nav.js"></script>
+<script src="../shared/js/echarts.min.js"></script>
+<script>
+function toggleTheme() {
+  const h = document.documentElement;
+  const t = h.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  h.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+  Object.values(charts).forEach(c => c.dispose());
+  Object.keys(charts).forEach(k => { delete charts[k]; });
+  renderAll();
+}
+(function(){
+  const t = localStorage.getItem('theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+})();
+
+const R = '#ef4444', G = '#10b981', Y = '#f59e0b', M = '#8b8b90';
+let charts = {};
+
+function makeChart(domId, option) {
+  const dom = document.getElementById(domId);
+  if (!dom) return;
+  const c = echarts.init(dom);
+  charts[domId] = c;
+  c.setOption(option);
+}
+
+function renderAll() {
+  // Chart: B1+B2 by hold period
+  makeChart('chart-hold-b1b2', {
+    title: { text: 'B1+B2 各持有期表现', left: 'center', textStyle: { fontSize: 12, color: M }},
+    tooltip: { trigger: 'axis' },
+    legend: { bottom: 0, textStyle: { fontSize: 10 }},
+    grid: { left: 60, right: 20, top: 35, bottom: 40 },
+    xAxis: { type: 'category', data: ['H5','H10','H20','H60'] },
+    yAxis: [
+      { type: 'value', name: '胜率%', min: 50, max: 95, axisLabel: { fontSize: 9 }},
+      { type: 'value', name: '净收益%', min: 0, max: 40, axisLabel: { fontSize: 9 }}
+    ],
+    series: [
+      { name: '高置信胜率', type: 'bar', data: [78.2, 76.9, 82.9, 85.2], itemStyle: { color: R, borderRadius: [4,4,0,0] }, barWidth: '15%' },
+      { name: '中置信胜率', type: 'bar', data: [69.9, 77.2, 78.7, 64.0], itemStyle: { color: Y, borderRadius: [4,4,0,0] }, barWidth: '15%' },
+      { name: '低置信胜率', type: 'bar', data: [63.4, 67.4, 65.7, 55.6], itemStyle: { color: M, borderRadius: [4,4,0,0] }, barWidth: '15%' },
+      { name: '高置信收益', type: 'line', yAxisIndex: 1, data: [6.6, 14.9, 22.1, 36.3], lineStyle: { color: R, width: 2 }, symbol: 'circle', symbolSize: 6 },
+      { name: '中置信收益', type: 'line', yAxisIndex: 1, data: [6.5, 10.9, 17.2, 18.9], lineStyle: { color: Y, width: 2 }, symbol: 'circle', symbolSize: 6 },
+      { name: '低置信收益', type: 'line', yAxisIndex: 1, data: [4.7, 7.0, 9.0, 10.5], lineStyle: { color: M, width: 2 }, symbol: 'circle', symbolSize: 6 },
+    ]
+  });
+
+  // Chart: B1-only by hold period
+  makeChart('chart-hold-b1only', {
+    title: { text: 'B1-only 各持有期表现（无 B2）', left: 'center', textStyle: { fontSize: 12, color: M }},
+    tooltip: { trigger: 'axis' },
+    legend: { bottom: 0, textStyle: { fontSize: 10 }},
+    grid: { left: 60, right: 20, top: 35, bottom: 40 },
+    xAxis: { type: 'category', data: ['H5','H10','H20','H60'] },
+    yAxis: { type: 'value', name: '净收益%', axisLabel: { fontSize: 9 }},
+    series: [
+      { name: '高置信', type: 'bar', data: [-3.0, -3.5, -0.7, 1.5], itemStyle: { color: v => v >= 0 ? R : G, borderRadius: [4,4,0,0] }, barWidth: '20%' },
+      { name: '中置信', type: 'bar', data: [-2.6, -3.3, -3.0, 1.9], itemStyle: { color: v => v >= 0 ? Y : G, borderRadius: [4,4,0,0] }, barWidth: '20%' },
+      { name: '低置信', type: 'bar', data: [-3.9, -5.0, -6.2, -2.8], itemStyle: { color: G, borderRadius: [4,4,0,0] }, barWidth: '20%' },
+    ]
+  });
+
+  // Chart: B1 vs B2 entry
+  makeChart('chart-b1-vs-b2', {
+    title: { text: 'B1入场 vs B2入场（胜率对比）', left: 'center', textStyle: { fontSize: 12, color: M }},
+    tooltip: { trigger: 'axis' },
+    legend: { bottom: 0, textStyle: { fontSize: 10 }},
+    grid: { left: 60, right: 20, top: 35, bottom: 50 },
+    xAxis: { type: 'category', data: ['高置信','中置信','低置信'] },
+    yAxis: { type: 'value', name: '胜率%', min: 20, max: 100, axisLabel: { fontSize: 9 }},
+    series: [
+      { name: 'B1日买入', type: 'bar', data: [83, 79, 66], itemStyle: { color: R, borderRadius: [4,4,0,0] }, barWidth: '25%', label: { show: true, position: 'top', fontSize: 10, formatter: '{c}%' }},
+      { name: 'B2日买入', type: 'bar', data: [65, 48, 36], itemStyle: { color: M, borderRadius: [4,4,0,0] }, barWidth: '25%', label: { show: true, position: 'top', fontSize: 10, formatter: '{c}%' }},
+    ]
+  });
+
+  // Chart: Co-occurrence B1
+  makeChart('chart-co-b1', {
+    title: { text: 'B1共现信号对胜率的影响（±5天）', left: 'center', textStyle: { fontSize: 12, color: M }},
+    tooltip: { trigger: 'axis' },
+    legend: { bottom: 0, textStyle: { fontSize: 10 }},
+    grid: { left: 60, right: 20, top: 35, bottom: 40 },
+    xAxis: { type: 'category', data: ['无共现','+PP_V1','+PP_V2','+BO_V2'] },
+    yAxis: [
+      { type: 'value', name: '胜率%', min: 50, max: 80, axisLabel: { fontSize: 9 }},
+      { type: 'value', name: '净收益%', min: 0, max: 15, axisLabel: { fontSize: 9 }}
+    ],
+    series: [
+      { name: '胜率', type: 'bar', data: [67, 71, 58, 58], itemStyle: { color: v => v >= 70 ? R : M, borderRadius: [4,4,0,0] }, barWidth: '30%', label: { show: true, position: 'top', fontSize: 9, formatter: '{c}%' }},
+      { name: '净收益', type: 'line', yAxisIndex: 1, data: [10.0, 11.4, 7.7, 6.6], lineStyle: { color: Y, width: 2 }, symbol: 'diamond', symbolSize: 8 },
+    ]
+  });
+
+  // Chart: Co-occurrence B2
+  makeChart('chart-co-b2', {
+    title: { text: 'B2共现信号对胜率的影响（±5天）', left: 'center', textStyle: { fontSize: 12, color: M }},
+    tooltip: { trigger: 'axis' },
+    legend: { bottom: 0, textStyle: { fontSize: 10 }},
+    grid: { left: 60, right: 20, top: 35, bottom: 40 },
+    xAxis: { type: 'category', data: ['B2单独','+PP_V1','+PP_V2','+BO_V2'] },
+    yAxis: [
+      { type: 'value', name: '胜率%', min: 20, max: 60, axisLabel: { fontSize: 9 }},
+      { type: 'value', name: '净收益%', axisLabel: { fontSize: 9 }}
+    ],
+    series: [
+      { name: '胜率', type: 'bar', data: [34, 46, 39, 52], itemStyle: { color: v => v >= 45 ? R : M, borderRadius: [4,4,0,0] }, barWidth: '30%', label: { show: true, position: 'top', fontSize: 9, formatter: '{c}%' }},
+      { name: '净收益', type: 'line', yAxisIndex: 1, data: [-2.4, 3.7, 0.7, 3.9], lineStyle: { color: Y, width: 2 }, symbol: 'diamond', symbolSize: 8, areaStyle: { color: 'rgba(245,158,11,0.08)' }},
+    ]
+  });
+
+  // Chart: Market regime
+  makeChart('chart-regime', {
+    title: { text: '市场环境 × 置信度（胜率热力）', left: 'center', textStyle: { fontSize: 12, color: M }},
+    tooltip: { trigger: 'axis' },
+    legend: { bottom: 0, textStyle: { fontSize: 10 }},
+    grid: { left: 60, right: 20, top: 35, bottom: 50 },
+    xAxis: { type: 'category', data: ['牛市','震荡市','熊市'] },
+    yAxis: { type: 'value', name: '胜率%', min: 50, max: 110, axisLabel: { fontSize: 9 }},
+    series: [
+      { name: '高置信', type: 'bar', data: [71, 90, null], itemStyle: { color: R, borderRadius: [4,4,0,0] }, barWidth: '18%', label: { show: true, position: 'top', fontSize: 9, formatter: '{c}%' }},
+      { name: '中置信', type: 'bar', data: [71, 86, 100], itemStyle: { color: Y, borderRadius: [4,4,0,0] }, barWidth: '18%', label: { show: true, position: 'top', fontSize: 9, formatter: '{c}%' }},
+      { name: '低置信', type: 'bar', data: [60, 71, 83], itemStyle: { color: M, borderRadius: [4,4,0,0] }, barWidth: '18%', label: { show: true, position: 'top', fontSize: 9, formatter: '{c}%' }},
+      { name: 'PLUS', type: 'bar', data: [88, 92, null], itemStyle: { color: G, borderRadius: [4,4,0,0] }, barWidth: '18%', label: { show: true, position: 'top', fontSize: 9, formatter: '{c}%' }},
+    ]
+  });
+}
+
+renderAll();
+</script>
+</body>
+</html>

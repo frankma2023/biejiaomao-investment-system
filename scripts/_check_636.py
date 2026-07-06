@@ -1,0 +1,17 @@
+import sqlite3
+db=sqlite3.connect('D:/hanako/investment-system/data/lixinger.db')
+c=db.cursor()
+c.execute("SELECT b1_date,b2_date,score,score_h,score_d,score_c,score_p,score_i1,score_i2,score_sig,score_gap,is_plus,confidence,tech_score,decline_pct,ind_rs250,h_rs250 FROM mw_signal_daily WHERE stock_code='000636' AND b1_date='2026-04-16'")
+cols=[d[0] for d in c.description]
+r=c.fetchone()
+d=dict(zip(cols,r))
+print(f'b1={d["b1_date"]}  b2={d["b2_date"]}')
+print(f'score={d["score"]} (H={d["score_h"]}+D={d["score_d"]}+C={d["score_c"]}+P={d["score_p"]}+I1={d["score_i1"]}+I2={d["score_i2"]}+Sig={d["score_sig"]}+Gap={d["score_gap"]})')
+print(f'is_plus={d["is_plus"]}  confidence={d["confidence"]}  tech_score={d["tech_score"]}')
+print(f'decline={d["decline_pct"]}%  ind_rs250={d["ind_rs250"]}  h_rs250={d["h_rs250"]}')
+print()
+print('PLUS条件: score>=80 AND score_d=15 AND score_i1>=10')
+print(f'  score={d["score"]}>=80: {d["score"]>=80}')
+print(f'  score_d={d["score_d"]}==15: {d["score_d"]==15}')
+print(f'  score_i1={d["score_i1"]}>=10: {(d["score_i1"] or 0)>=10}')
+db.close()

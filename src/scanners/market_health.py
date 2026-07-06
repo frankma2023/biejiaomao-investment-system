@@ -861,6 +861,15 @@ def _compute_sector_vol_breakout(conn, target_date, stock_weights):
 def compute_sector_health_groups(target_date):
     """计算行业分组健康分，写入 market_health_sector_daily"""
     conn = get_db()
+    
+    # 如果目标日期没有 RS 数据，自动回退到最近有 RS 数据的日期
+    has_rs = conn.execute("SELECT COUNT(*) FROM index_rs_daily WHERE date=?", (target_date,)).fetchone()[0]
+    if not has_rs:
+        fallback = conn.execute("SELECT MAX(date) FROM index_rs_daily").fetchone()[0]
+        if fallback:
+            logger.warning(f"  ⚠️ {target_date} 无RS数据，回退到 {fallback}")
+            target_date = fallback
+    
     logger.info(f"📊 行业分组健康分 — {target_date}")
     
     # 先算全市场的共享值（融资余额、板块轮动、恐慌指数）

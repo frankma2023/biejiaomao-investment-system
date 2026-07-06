@@ -97,10 +97,12 @@ def validate(start, end):
     sell_total = db.execute(f"SELECT COUNT(*) FROM pattern_scan_signals WHERE date BETWEEN '{start}' AND '{end}'").fetchone()[0]
     bo_total = db.execute(f"SELECT COUNT(*) FROM market_breakout_v2_daily WHERE date BETWEEN '{start}' AND '{end}'").fetchone()[0]
     ppv2_total = db.execute(f"SELECT COUNT(*) FROM pocket_pivot_daily WHERE date BETWEEN '{start}' AND '{end}' AND engine_version='V2'").fetchone()[0]
+    ppv1_total = db.execute(f"SELECT COUNT(*) FROM pocket_pivot_daily WHERE date BETWEEN '{start}' AND '{end}' AND engine_version='V1'").fetchone()[0]
     
     b1_avg = b1_total / TD if TD else 0
     sell_avg = sell_total / TD if TD else 0
     print(f'  MW B1: {b1_total:,}条 ({b1_avg:.0f}/天)')
+    print(f'  PP V1: {ppv1_total:,}条')
     print(f'  PP V2: {ppv2_total:,}条')
     print(f'  BO V2: {bo_total:,}条')
     print(f'  Sell: {sell_total:,}条 ({sell_avg:.0f}/天)')
@@ -123,6 +125,7 @@ def validate(start, end):
         SELECT d.date,
             (SELECT COUNT(*) FROM mw_signal_daily WHERE b1_date=d.date) as b1,
             (SELECT COUNT(*) FROM mw_signal_daily WHERE b2_date=d.date) as b2,
+            (SELECT COUNT(*) FROM pocket_pivot_daily WHERE date=d.date AND engine_version='V1') as ppv1,
             (SELECT COUNT(*) FROM pocket_pivot_daily WHERE date=d.date AND engine_version='V2') as ppv2,
             (SELECT COUNT(*) FROM pattern_scan_signals WHERE date=d.date) as sell
         FROM daily_kline d
@@ -131,9 +134,9 @@ def validate(start, end):
     """).fetchall()
     for r in rows:
         flags = ''
-        if r[1] == 0 and r[3] == 0 and r[4] == 0:
+        if r[1] == 0 and r[3] == 0 and r[4] == 0 and r[5] == 0:
             flags = ' ← 全零'
-        print(f'  {r[0]}  B1={r[1]:>4}  B2={r[2]:>4}  PPV2={r[3]:>3}  Sell={r[4]:>4}{flags}')
+        print(f'  {r[0]}  B1={r[1]:>4}  B2={r[2]:>4}  PPV1={r[3]:>4}  PPV2={r[4]:>3}  Sell={r[5]:>4}{flags}')
 
     # ── 总结 ──
     print(f'\n{"="*60}')

@@ -152,7 +152,7 @@ async function loadAll(){
   var code=document.getElementById('stock-input').value||'600519';
   var sy=document.getElementById('year-start').value;
   var ey=document.getElementById('year-end').value;
-  var endDate=ey==='2026'?'2026-05-07':ey+'-12-31';
+  var endDate=ey+'-12-31';
   var startDate=sy+'-01-01';
   await loadValuation(code,startDate,endDate);
   await loadFinancials(code);
@@ -349,7 +349,8 @@ loadAll();
 async function loadStrength(code){
   var d1=new Date();d1.setFullYear(d1.getFullYear()-3);
   var start=d1.toISOString().slice(0,10);
-  var resp=await fetch(API+'/api/stock-rs/rs-line?code='+code+'&start='+start+'&end=2026-05-10');
+  var today=new Date().toISOString().slice(0,10);
+  var resp=await fetch(API+'/api/stock-rs/rs-line?code='+code+'&start='+start+'&end='+today);
   var d=await resp.json();
   if(!d.dates||!d.dates.length)return;
   var dom=document.getElementById('chart-strength');
@@ -421,8 +422,9 @@ async function loadCompare(){
   var key1=code1+'_compare',key2=code2+'_compare';
   var d1_=new Date();d1_.setFullYear(d1_.getFullYear()-3);
   var cStart=d1_.toISOString().slice(0,10);
-  if(!_compareCache[key1])_compareCache[key1]=fetch(API+'/api/stock-rs/rs-line?code='+code1+'&start='+cStart+'&end=2026-05-10').then(function(r){return r.json()});
-  if(!_compareCache[key2])_compareCache[key2]=fetch(API+'/api/stock-rs/rs-line?code='+code2+'&start='+cStart+'&end=2026-05-10').then(function(r){return r.json()});
+  var today2=new Date().toISOString().slice(0,10);
+  if(!_compareCache[key1])_compareCache[key1]=fetch(API+'/api/stock-rs/rs-line?code='+code1+'&start='+cStart+'&end='+today2).then(function(r){return r.json()});
+  if(!_compareCache[key2])_compareCache[key2]=fetch(API+'/api/stock-rs/rs-line?code='+code2+'&start='+cStart+'&end='+today2).then(function(r){return r.json()});
   var d1=await _compareCache[key1],d2=await _compareCache[key2];
   ch.setOption({
     backgroundColor:'transparent',tooltip:{trigger:'axis'},

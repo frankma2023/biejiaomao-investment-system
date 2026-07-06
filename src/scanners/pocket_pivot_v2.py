@@ -328,33 +328,25 @@ def scan_date(scan_date):
         SELECT DISTINCT k.stock_code, b.name
         FROM daily_kline k JOIN stock_basic b ON k.stock_code=b.stock_code
         WHERE b.listing_status='normally_listed' AND b.name NOT LIKE '%ST%'
-        AND k.date >= date(?, '-20 days')
-        GROUP BY k.stock_code HAVING AVG(k.amount) >= ?
-    """, (scan_date, CFG['min_amount'])).fetchall()
+        AND k.date <= ? AND k.date >= date(?, '-20 days')
+        AND k.amount >= ?
+    """, (scan_date, scan_date, CFG['min_amount'])).fetchall()
     
     stock_list = [(r['stock_code'], r['name']) for r in stocks]
     codes = [s[0] for s in stock_list]
     print(f"[1/3] {len(codes)} stocks")
     
     # ── K线 + RS：回填已预加载到 mw 模块缓存，命中则跳过 SQL ──
-    kline_min = (datetime.strptime(scan_date, '%Y-%m-%d') - timedelta(days=150)).strftime('%Y-%m-%d')
     kline_cache = {}
     rs_cache = {}
     try:
         import scanners.mw_signal as mw
         if mw._kline_cache and len(mw._kline_cache) > 100:
-            # 从回填缓存取 K 线，截取最近 150 天
-            code_set = set(codes)
-            for code in code_set:
-                rows = mw._kline_cache.get(code, [])
-                if rows:
-                    sliced = [r for r in rows if r['date'] >= kline_min]
-                    if sliced:
-                        kline_cache[code] = sliced
-            if mw._rs_cache and len(mw._rs_cache) > 100:
-                rs_cache = {code: mw._rs_cache[code] for code in code_set if code in mw._rs_cache}
-            if kline_cache and rs_cache:
-                print(f"[2/3] K-line + RS from cache ({len(kline_cache)}/{len(rs_cache)} stocks, {time.time()-t0:.1f}s)")
+            kline_cache = mw._kline_cache
+        if mw._rs_cache and len(mw._rs_cache) > 100:
+            rs_cache = mw._rs_cache
+        if kline_cache and rs_cache:
+            print(f"[2/3] K-line + RS from cache ({len(kline_cache)}/{len(rs_cache)} stocks, {time.time()-t0:.1f}s)")
     except Exception:
         pass
     

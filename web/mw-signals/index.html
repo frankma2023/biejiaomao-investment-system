@@ -236,8 +236,8 @@ function render(){
         '<span class="stock-info"><a href="http://'+window.location.hostname+':8772/pattern-scan/?code='+s.stock_code+'" target="_blank">'+(s.stock_name||s.stock_code)+'</a><span class="code">'+s.stock_code+'</span></span>'+
         '<span style="font-size:10px;color:var(--muted)">'+(isB1?'B1 ':'B2 ')+s[dateCol]+'</span>'+
         '<span style="font-size:10px;color:var(--muted)">RS'+(s.h_rs250||'—')+' | '+(s.c_amount_avg?(s.c_amount_avg/10000).toFixed(0)+'万':'—')+'</span>'+
-        '<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+' ('+s.score+'分)</span>'+
-        (s.is_plus ? '<span class="badge" style="background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.2);margin-left:4px">✦ PLUS</span>' : '') +
+        (isB1?(s.tech_score?'<span class="badge" style="'+(s.tech_score>=75?'background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)':'background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.25)')+'">技术置信度:'+s.tech_score+'/'+(s.tech_score>=85?'极高':s.tech_score>=75?'很高':s.tech_score>=65?'高':s.tech_score>=50?'中':'低')+'</span>':'<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+'</span>'):'<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+' ('+s.score+'分)</span>')+
+        (!isB1&&s.is_plus ? '<span class="badge" style="background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.2);margin-left:4px">✦ PLUS</span>' : '') +
       '</div>'+
       '<div class="node-line">'+
         '<span class="node-dot nd-H"></span> H '+s.h_date+' ¥'+(s.h_price||'—')+
@@ -283,10 +283,10 @@ function render(){
           // 共振信号详情
           (s.sig_details&&s.sig_details.length?'<tr><td class="lbl" style="font-size:.55rem;color:var(--muted)">共振信号</td><td class="val" colspan="3" style="font-size:.55rem;text-align:left">'+s.sig_details.map(function(d){return '<span style="display:inline-block;background:rgba(245,158,11,.1);padding:1px 6px;border-radius:4px;margin:1px">'+d.source+' '+(d.desc||d.type||'')+'</span>'}).join('')+'</td></tr>':'')+
           // 总分
-          '<tr style="border-top:1px solid var(--border)"><td class="lbl" colspan="4" style="color:var(--accent);font-weight:600">总分: '+s.score+'/100 = 形态'+(s.score_h+s.score_d+s.score_c+(isB1?0:s.score_p))+' + 行业'+(s.score_i1||0+s.score_i2||0)+' + 共振'+(s.score_sig||0)+(isB1?'':' + 跳空'+(s.score_gap||0))+'</td></tr>'+
+          '<tr style="border-top:1px solid var(--border)"><td class="lbl" colspan="4" style="color:var(--accent);font-weight:600">总分: '+s.score+'/'+(isB1?'75':'100')+' = 形态'+(s.score_h+s.score_d+s.score_c+(isB1?0:s.score_p))+' + 行业'+((s.score_i1||0)+(s.score_i2||0))+' + 共振'+(s.score_sig||0)+(isB1?'':' + 跳空'+(s.score_gap||0))+'</td></tr>'+
         '</table>'+
         '<div style="margin-top:8px;display:flex;gap:12px">'+
-          '<a href="http://'+window.location.hostname+':8772/pattern-scan/?code='+s.stock_code+'" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🔍 形态复核 →</a>'++
+          '<a href="http://'+window.location.hostname+':8772/pattern-scan/?code='+s.stock_code+'" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🔍 形态复核 →</a>'+
           '<a href="http://'+window.location.hostname+':8772/chanlun-backtest/?code='+s.stock_code+'&mode=stock" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🎋 缠论分析 →</a>'+
         '</div>'+
       '</div>'+

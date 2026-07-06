@@ -1,0 +1,49 @@
+signal: PP_V1
+period: 2023-01-01~2026-06-22
+total_trades: 1376270
+by_hold_days:
+  H5:
+    win_rate: 0.4402
+    win_rate_js: 0.4402
+    mean_ret: -0.1
+    median_ret: -0.55
+    profit_loss_ratio: 1.21
+    kelly: 0.0
+    samples: 57737
+  H10:
+    win_rate: 0.4703
+    win_rate_js: 0.4703
+    mean_ret: 0.32
+    median_ret: -0.41
+    profit_loss_ratio: 1.26
+    kelly: 0.0483
+    samples: 57731
+  H20:
+    win_rate: 0.4457
+    win_rate_js: 0.4457
+    mean_ret: 0.04
+    median_ret: -1.13
+    profit_loss_ratio: 1.26
+    kelly: 0.0045
+    samples: 57742
+  H60:
+    win_rate: 0.4394
+    win_rate_js: 0.4394
+    mean_ret: 2.11
+    median_ret: -2.22
+    profit_loss_ratio: 1.69
+    kelly: 0.1085
+    samples: 55228
+by_entry_method:
+  T+0_C:
+    win_rate: 0.4457
+    mean_ret: 0.04
+    samples: 57742
+  T+1_O:
+    win_rate: 0.4484
+    mean_ret: 0.12
+    samples: 57712
+  T+2_O:
+    win_rate: 0.4501
+    mean_ret: 0.15
+    samples: 57699

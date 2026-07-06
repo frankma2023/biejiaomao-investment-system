@@ -1,0 +1,49 @@
+signal: BO_V2
+period: 2023-01-01~2026-06-22
+total_trades: 1478013
+by_hold_days:
+  H5:
+    win_rate: 0.4245
+    win_rate_js: 0.4245
+    mean_ret: -0.43
+    median_ret: -0.6
+    profit_loss_ratio: 1.06
+    kelly: 0.0
+    samples: 65613
+  H10:
+    win_rate: 0.4368
+    win_rate_js: 0.4368
+    mean_ret: -0.38
+    median_ret: -0.78
+    profit_loss_ratio: 1.12
+    kelly: 0.0
+    samples: 65612
+  H20:
+    win_rate: 0.449
+    win_rate_js: 0.449
+    mean_ret: 0.16
+    median_ret: -0.97
+    profit_loss_ratio: 1.28
+    kelly: 0.0174
+    samples: 63781
+  H60:
+    win_rate: 0.4603
+    win_rate_js: 0.4603
+    mean_ret: 1.79
+    median_ret: -1.28
+    profit_loss_ratio: 1.52
+    kelly: 0.1053
+    samples: 55958
+by_entry_method:
+  T+0_C:
+    win_rate: 0.4245
+    mean_ret: -0.43
+    samples: 65613
+  T+1_O:
+    win_rate: 0.4286
+    mean_ret: -0.38
+    samples: 65602
+  T+2_O:
+    win_rate: 0.4298
+    mean_ret: -0.37
+    samples: 65600
