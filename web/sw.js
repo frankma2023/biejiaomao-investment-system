@@ -27,6 +27,11 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // API 请求：网络优先（不缓存）
+  if (e.request.url.indexOf('/api/') >= 0) {
+    e.respondWith(fetch(e.request));
+    return;
+  }
   // HTML 文件：网络优先（先问服务器，更新缓存）
   if (e.request.mode === 'navigate' || e.request.headers.get('Accept').includes('text/html')) {
     e.respondWith(

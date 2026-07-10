@@ -1,0 +1,1090 @@
+meta:
+  version: '2.0'
+  date: '2026-07-07'
+  data_range: 2016-01-01 ~ 2026-07-03
+  signal_source: mw_signal_daily
+  backtest_source: backtest_results (H20/T+1_O)
+  total_signals: 82687
+overview:
+  all:
+    count: 82687
+    win_rate: 41.6
+    median_ret: -2.73
+    mean_ret: -0.76
+    std: 18.18
+    avg_win: 13.86
+    avg_loss: -11.15
+    kelly: 0
+    worst_1pct: -34.59
+    var_95: -23.18
+  b1_b2_confirmed:
+    count: 33216
+    win_rate: 66.3
+    median_ret: 5.35
+    mean_ret: 7.99
+    std: 21.24
+    avg_win: 16.84
+    avg_loss: -9.43
+    kelly: 0.4739
+    worst_1pct: -29.79
+    var_95: -17.1
+  b1_only:
+    count: 49471
+    win_rate: 24.9
+    median_ret: -6.94
+    mean_ret: -6.63
+    std: 12.79
+    avg_win: 8.53
+    avg_loss: -11.67
+    kelly: 0
+    worst_1pct: -36.36
+    var_95: -25.15
+  plus:
+    count: 248
+    win_rate: 79.8
+    median_ret: 10.6
+    mean_ret: 15.14
+    std: 20.06
+    avg_win: 20.64
+    avg_loss: -6.65
+    kelly: 0.5
+    worst_1pct: -16.73
+    var_95: -10.39
+tech_score_tiers:
+  极高:
+    range: 85-100
+    count: 10297
+    b2_rate: 19.7
+    all:
+      count: 10297
+      win_rate: 33.4
+      median_ret: -4.18
+      mean_ret: -3.21
+      std: 14.2
+      avg_win: 10.11
+      avg_loss: -9.88
+      kelly: 0
+      worst_1pct: -30.55
+      var_95: -21.11
+    b2_confirmed:
+      count: 2032
+      win_rate: 72.5
+      median_ret: 5.22
+      mean_ret: 9.16
+      std: 19.77
+      avg_win: 15.19
+      avg_loss: -6.77
+      kelly: 0.5
+      worst_1pct: -21.95
+      var_95: -10.85
+  很高:
+    range: 75-84
+    count: 8812
+    b2_rate: 28.1
+    all:
+      count: 8812
+      win_rate: 38.0
+      median_ret: -3.88
+      mean_ret: -2.57
+      std: 18.98
+      avg_win: 12.37
+      avg_loss: -11.72
+      kelly: 0
+      worst_1pct: -36.66
+      var_95: -24.49
+    b2_confirmed:
+      count: 2472
+      win_rate: 73.6
+      median_ret: 5.76
+      mean_ret: 10.26
+      std: 25.85
+      avg_win: 16.63
+      avg_loss: -7.51
+      kelly: 0.5
+      worst_1pct: -26.06
+      var_95: -12.04
+  高:
+    range: 65-74
+    count: 5600
+    b2_rate: 46.9
+    all:
+      count: 5600
+      win_rate: 52.0
+      median_ret: 0.65
+      mean_ret: 2.7
+      std: 17.54
+      avg_win: 13.77
+      avg_loss: -9.32
+      kelly: 0.1959
+      worst_1pct: -30.37
+      var_95: -19.34
+    b2_confirmed:
+      count: 2629
+      win_rate: 73.8
+      median_ret: 6.63
+      mean_ret: 9.75
+      std: 19.39
+      avg_win: 15.94
+      avg_loss: -7.72
+      kelly: 0.5
+      worst_1pct: -25.64
+      var_95: -11.95
+  中:
+    range: 50-64
+    count: 4358
+    b2_rate: 62.3
+    all:
+      count: 4358
+      win_rate: 60.2
+      median_ret: 3.53
+      mean_ret: 6.25
+      std: 22.24
+      avg_win: 16.47
+      avg_loss: -9.22
+      kelly: 0.3789
+      worst_1pct: -27.52
+      var_95: -17.41
+    b2_confirmed:
+      count: 2713
+      win_rate: 72.2
+      median_ret: 7.43
+      mean_ret: 10.73
+      std: 23.59
+      avg_win: 17.94
+      avg_loss: -8.06
+      kelly: 0.5
+      worst_1pct: -24.09
+      var_95: -12.87
+  低:
+    range: 0-49
+    count: 53620
+    b2_rate: 43.6
+    all:
+      count: 53620
+      win_rate: 41.1
+      median_ret: -3.07
+      mean_ret: -0.92
+      std: 18.23
+      avg_win: 14.37
+      avg_loss: -11.59
+      kelly: 0
+      worst_1pct: -35.76
+      var_95: -23.92
+    b2_confirmed:
+      count: 23370
+      win_rate: 63.4
+      median_ret: 4.85
+      mean_ret: 7.13
+      std: 20.66
+      avg_win: 17.01
+      avg_loss: -10.01
+      kelly: 0.4189
+      worst_1pct: -31.23
+      var_95: -18.71
+market_regime:
+  bull:
+    极高:
+      count: 4791
+      win_rate: 26.0
+      median_ret: -5.76
+      mean_ret: -5.6
+      std: 11.32
+      avg_win: 7.64
+      avg_loss: -10.25
+      kelly: 0
+      worst_1pct: -30.39
+      var_95: -22.59
+    很高:
+      count: 3893
+      win_rate: 29.9
+      median_ret: -6.06
+      mean_ret: -5.65
+      std: 13.87
+      avg_win: 9.3
+      avg_loss: -12.03
+      kelly: 0
+      worst_1pct: -37.83
+      var_95: -26.08
+    高:
+      count: 2357
+      win_rate: 45.2
+      median_ret: -1.12
+      mean_ret: -0.31
+      std: 14.35
+      avg_win: 10.86
+      avg_loss: -9.53
+      kelly: 0
+      worst_1pct: -31.23
+      var_95: -21.01
+    中:
+      count: 2108
+      win_rate: 55.6
+      median_ret: 1.81
+      mean_ret: 4.03
+      std: 20.67
+      avg_win: 14.56
+      avg_loss: -9.13
+      kelly: 0.2767
+      worst_1pct: -27.17
+      var_95: -18.19
+    低:
+      count: 20837
+      win_rate: 44.5
+      median_ret: -2.13
+      mean_ret: 0.58
+      std: 18.93
+      avg_win: 15.77
+      avg_loss: -11.6
+      kelly: 0.0368
+      worst_1pct: -32.38
+      var_95: -23.05
+  bear:
+    极高:
+      count: 69
+      win_rate: 65.2
+      median_ret: 2.42
+      mean_ret: 3.83
+      std: 11.48
+      avg_win: 8.95
+      avg_loss: -5.77
+      kelly: 0.4279
+      worst_1pct: -16.61
+      var_95: -8.04
+    很高:
+      count: 33
+      win_rate: 51.5
+      median_ret: 0.9
+      mean_ret: 0.63
+      std: 11.65
+      avg_win: 9.61
+      avg_loss: -8.91
+      kelly: 0.0655
+      worst_1pct: -27.87
+      var_95: -12.68
+    高:
+      count: 40
+      win_rate: 72.5
+      median_ret: 4.56
+      mean_ret: 6.29
+      std: 10.97
+      avg_win: 11.08
+      avg_loss: -6.33
+      kelly: 0.5
+      worst_1pct: -16.15
+      var_95: -8.46
+    中:
+      count: 16
+      win_rate: 62.5
+      median_ret: 8.92
+      mean_ret: 6.88
+      std: 9.97
+      avg_win: 13.76
+      avg_loss: -4.59
+      kelly: 0.4999
+      worst_1pct: -7.64
+      var_95: -6.56
+    低:
+      count: 2567
+      win_rate: 36.7
+      median_ret: -4.63
+      mean_ret: -3.71
+      std: 16.7
+      avg_win: 11.83
+      avg_loss: -12.73
+      kelly: 0
+      worst_1pct: -39.87
+      var_95: -27.07
+  ranging:
+    极高:
+      count: 5437
+      win_rate: 39.5
+      median_ret: -2.72
+      mean_ret: -1.18
+      std: 16.04
+      avg_win: 11.57
+      avg_loss: -9.51
+      kelly: 0
+      worst_1pct: -30.79
+      var_95: -19.62
+    很高:
+      count: 4886
+      win_rate: 44.4
+      median_ret: -1.91
+      mean_ret: -0.13
+      std: 21.95
+      avg_win: 14.04
+      avg_loss: -11.43
+      kelly: 0
+      worst_1pct: -36.4
+      var_95: -23.29
+    高:
+      count: 3203
+      win_rate: 56.8
+      median_ret: 2.36
+      mean_ret: 4.88
+      std: 19.32
+      avg_win: 15.52
+      avg_loss: -9.14
+      kelly: 0.3139
+      worst_1pct: -29.1
+      var_95: -17.99
+    中:
+      count: 2234
+      win_rate: 64.5
+      median_ret: 5.81
+      mean_ret: 8.34
+      std: 23.48
+      avg_win: 18.04
+      avg_loss: -9.37
+      kelly: 0.4614
+      worst_1pct: -27.95
+      var_95: -16.73
+    低:
+      count: 30216
+      win_rate: 39.1
+      median_ret: -3.5
+      mean_ret: -1.72
+      std: 17.77
+      avg_win: 13.47
+      avg_loss: -11.48
+      kelly: 0
+      worst_1pct: -37.6
+      var_95: -24.27
+sub_periods:
+  2016H1:
+    all:
+      count: 4052
+      win_rate: 55.8
+      median_ret: 1.73
+      mean_ret: 0.81
+      std: 16.52
+      avg_win: 11.13
+      avg_loss: -12.26
+      kelly: 0.0717
+      worst_1pct: -56.29
+      var_95: -24.6
+    ts_high:
+      count: 1557
+      win_rate: 48.1
+      median_ret: -0.43
+      mean_ret: -2.2
+      std: 14.96
+      avg_win: 8.33
+      avg_loss: -11.98
+      kelly: 0
+      worst_1pct: -53.81
+      var_95: -27.94
+    b2:
+      count: 1567
+      win_rate: 78.6
+      median_ret: 8.48
+      mean_ret: 7.53
+      std: 18.23
+      avg_win: 14.05
+      avg_loss: -16.38
+      kelly: 0.5
+      worst_1pct: -58.34
+      var_95: -24.96
+  2016H2:
+    all:
+      count: 2005
+      win_rate: 32.9
+      median_ret: -3.91
+      mean_ret: -2.98
+      std: 11.76
+      avg_win: 8.69
+      avg_loss: -8.7
+      kelly: 0
+      worst_1pct: -28.06
+      var_95: -17.43
+    ts_high:
+      count: 966
+      win_rate: 25.3
+      median_ret: -4.85
+      mean_ret: -4.28
+      std: 9.16
+      avg_win: 6.76
+      avg_loss: -8.0
+      kelly: 0
+      worst_1pct: -22.97
+      var_95: -16.64
+    b2:
+      count: 496
+      win_rate: 61.5
+      median_ret: 3.09
+      mean_ret: 3.99
+      std: 14.32
+      avg_win: 11.21
+      avg_loss: -7.54
+      kelly: 0.3557
+      worst_1pct: -21.98
+      var_95: -13.23
+  2017H1:
+    all:
+      count: 1223
+      win_rate: 31.6
+      median_ret: -4.87
+      mean_ret: -6.09
+      std: 15.72
+      avg_win: 8.86
+      avg_loss: -13.0
+      kelly: 0
+      worst_1pct: -62.87
+      var_95: -31.31
+    ts_high:
+      count: 527
+      win_rate: 22.2
+      median_ret: -6.57
+      mean_ret: -8.49
+      std: 13.8
+      avg_win: 6.31
+      avg_loss: -12.72
+      kelly: 0
+      worst_1pct: -60.15
+      var_95: -30.71
+    b2:
+      count: 344
+      win_rate: 56.7
+      median_ret: 1.9
+      mean_ret: -0.29
+      std: 19.28
+      avg_win: 11.26
+      avg_loss: -15.4
+      kelly: 0
+      worst_1pct: -67.06
+      var_95: -32.29
+  2017H2:
+    all:
+      count: 1793
+      win_rate: 37.5
+      median_ret: -3.24
+      mean_ret: -2.64
+      std: 12.16
+      avg_win: 9.3
+      avg_loss: -9.8
+      kelly: 0
+      worst_1pct: -29.18
+      var_95: -20.44
+    ts_high:
+      count: 765
+      win_rate: 25.0
+      median_ret: -5.99
+      mean_ret: -5.69
+      std: 9.61
+      avg_win: 6.35
+      avg_loss: -9.69
+      kelly: 0
+      worst_1pct: -26.86
+      var_95: -20.17
+    b2:
+      count: 665
+      win_rate: 64.7
+      median_ret: 3.76
+      mean_ret: 4.29
+      std: 12.77
+      avg_win: 11.09
+      avg_loss: -8.16
+      kelly: 0.3866
+      worst_1pct: -26.53
+      var_95: -15.35
+  2018H1:
+    all:
+      count: 2484
+      win_rate: 28.7
+      median_ret: -6.54
+      mean_ret: -6.64
+      std: 14.84
+      avg_win: 9.54
+      avg_loss: -13.18
+      kelly: 0
+      worst_1pct: -50.12
+      var_95: -29.74
+    ts_high:
+      count: 0
+    b2:
+      count: 859
+      win_rate: 50.6
+      median_ret: 0.13
+      mean_ret: -0.2
+      std: 16.33
+      avg_win: 11.08
+      avg_loss: -11.82
+      kelly: 0
+      worst_1pct: -49.57
+      var_95: -27.16
+  2018H2:
+    all:
+      count: 2172
+      win_rate: 26.2
+      median_ret: -6.6
+      mean_ret: -5.83
+      std: 11.7
+      avg_win: 8.48
+      avg_loss: -10.92
+      kelly: 0
+      worst_1pct: -32.59
+      var_95: -23.04
+    ts_high:
+      count: 0
+    b2:
+      count: 567
+      win_rate: 54.3
+      median_ret: 1.17
+      mean_ret: 1.74
+      std: 12.88
+      avg_win: 10.22
+      avg_loss: -8.36
+      kelly: 0.1697
+      worst_1pct: -26.91
+      var_95: -18.03
+  2019H1:
+    all:
+      count: 6098
+      win_rate: 49.7
+      median_ret: -0.13
+      mean_ret: 0.99
+      std: 18.18
+      avg_win: 14.74
+      avg_loss: -12.56
+      kelly: 0.0674
+      worst_1pct: -36.53
+      var_95: -24.91
+    ts_high:
+      count: 0
+    b2:
+      count: 3085
+      win_rate: 74.5
+      median_ret: 9.74
+      mean_ret: 9.99
+      std: 18.23
+      avg_win: 17.03
+      avg_loss: -10.58
+      kelly: 0.5
+      worst_1pct: -30.44
+      var_95: -18.05
+  2019H2:
+    all:
+      count: 3161
+      win_rate: 45.5
+      median_ret: -1.34
+      mean_ret: 0.29
+      std: 14.31
+      avg_win: 11.56
+      avg_loss: -9.14
+      kelly: 0.0245
+      worst_1pct: -26.87
+      var_95: -18.39
+    ts_high:
+      count: 0
+    b2:
+      count: 1254
+      win_rate: 70.4
+      median_ret: 5.98
+      mean_ret: 7.75
+      std: 15.9
+      avg_win: 13.95
+      avg_loss: -7.01
+      kelly: 0.5
+      worst_1pct: -21.29
+      var_95: -12.54
+  2020H1:
+    all:
+      count: 4931
+      win_rate: 41.6
+      median_ret: -3.27
+      mean_ret: -0.61
+      std: 17.91
+      avg_win: 14.87
+      avg_loss: -11.63
+      kelly: 0
+      worst_1pct: -32.31
+      var_95: -22.69
+    ts_high:
+      count: 21
+      win_rate: 4.8
+      median_ret: -5.53
+      mean_ret: -6.96
+      std: 5.19
+      avg_win: 0.73
+      avg_loss: -7.34
+      kelly: 0
+      worst_1pct: -23.2
+      var_95: -13.35
+    b2:
+      count: 2306
+      win_rate: 59.7
+      median_ret: 3.6
+      mean_ret: 6.25
+      std: 19.9
+      avg_win: 17.13
+      avg_loss: -9.89
+      kelly: 0.3644
+      worst_1pct: -29.62
+      var_95: -19.33
+  2020H2:
+    all:
+      count: 5489
+      win_rate: 38.9
+      median_ret: -3.66
+      mean_ret: -0.81
+      std: 16.56
+      avg_win: 13.94
+      avg_loss: -10.22
+      kelly: 0
+      worst_1pct: -29.06
+      var_95: -20.71
+    ts_high:
+      count: 646
+      win_rate: 10.1
+      median_ret: -9.54
+      mean_ret: -10.03
+      std: 9.11
+      avg_win: 5.35
+      avg_loss: -11.75
+      kelly: 0
+      worst_1pct: -32.8
+      var_95: -25.07
+    b2:
+      count: 2379
+      win_rate: 62.8
+      median_ret: 4.21
+      mean_ret: 7.22
+      std: 18.58
+      avg_win: 16.18
+      avg_loss: -7.88
+      kelly: 0.4461
+      worst_1pct: -23.56
+      var_95: -14.57
+  2021H1:
+    all:
+      count: 4371
+      win_rate: 44.8
+      median_ret: -1.53
+      mean_ret: 0.82
+      std: 18.03
+      avg_win: 14.6
+      avg_loss: -10.38
+      kelly: 0.0557
+      worst_1pct: -33.81
+      var_95: -21.65
+    ts_high:
+      count: 2250
+      win_rate: 32.2
+      median_ret: -4.94
+      mean_ret: -3.59
+      std: 14.34
+      avg_win: 10.94
+      avg_loss: -10.51
+      kelly: 0
+      worst_1pct: -34.98
+      var_95: -23.27
+    b2:
+      count: 1767
+      win_rate: 68.9
+      median_ret: 6.21
+      mean_ret: 9.52
+      std: 20.49
+      avg_win: 17.74
+      avg_loss: -8.67
+      kelly: 0.5
+      worst_1pct: -28.08
+      var_95: -15.78
+  2021H2:
+    all:
+      count: 6158
+      win_rate: 45.9
+      median_ret: -1.35
+      mean_ret: 1.0
+      std: 18.68
+      avg_win: 14.89
+      avg_loss: -10.78
+      kelly: 0.0668
+      worst_1pct: -29.38
+      var_95: -21.81
+    ts_high:
+      count: 2947
+      win_rate: 36.3
+      median_ret: -3.82
+      mean_ret: -3.16
+      std: 14.07
+      avg_win: 9.97
+      avg_loss: -10.65
+      kelly: 0
+      worst_1pct: -29.73
+      var_95: -22.15
+    b2:
+      count: 2536
+      win_rate: 69.8
+      median_ret: 6.77
+      mean_ret: 9.87
+      std: 21.21
+      avg_win: 17.86
+      avg_loss: -8.56
+      kelly: 0.5
+      worst_1pct: -24.61
+      var_95: -15.64
+  2022H1:
+    all:
+      count: 5039
+      win_rate: 32.6
+      median_ret: -6.36
+      mean_ret: -4.65
+      std: 17.08
+      avg_win: 12.85
+      avg_loss: -13.13
+      kelly: 0
+      worst_1pct: -38.2
+      var_95: -27.2
+    ts_high:
+      count: 37
+      win_rate: 10.8
+      median_ret: -6.48
+      mean_ret: -8.31
+      std: 8.57
+      avg_win: 3.23
+      avg_loss: -9.71
+      kelly: 0
+      worst_1pct: -31.92
+      var_95: -25.83
+    b2:
+      count: 1806
+      win_rate: 53.6
+      median_ret: 1.44
+      mean_ret: 3.05
+      std: 20.06
+      avg_win: 15.6
+      avg_loss: -11.45
+      kelly: 0.1953
+      worst_1pct: -33.49
+      var_95: -22.04
+  2022H2:
+    all:
+      count: 5752
+      win_rate: 38.4
+      median_ret: -3.68
+      mean_ret: -2.05
+      std: 14.92
+      avg_win: 11.67
+      avg_loss: -10.6
+      kelly: 0
+      worst_1pct: -29.51
+      var_95: -22.03
+    ts_high:
+      count: 437
+      win_rate: 17.2
+      median_ret: -6.75
+      mean_ret: -7.21
+      std: 7.66
+      avg_win: 3.79
+      avg_loss: -9.49
+      kelly: 0
+      worst_1pct: -26.52
+      var_95: -19.47
+    b2:
+      count: 2144
+      win_rate: 63.0
+      median_ret: 4.1
+      mean_ret: 5.68
+      std: 17.39
+      avg_win: 14.35
+      avg_loss: -9.07
+      kelly: 0.3956
+      worst_1pct: -27.01
+      var_95: -17.42
+  2023H1:
+    all:
+      count: 5390
+      win_rate: 43.2
+      median_ret: -1.94
+      mean_ret: -0.52
+      std: 15.89
+      avg_win: 12.09
+      avg_loss: -10.1
+      kelly: 0
+      worst_1pct: -32.2
+      var_95: -21.45
+    ts_high:
+      count: 2248
+      win_rate: 38.7
+      median_ret: -3.29
+      mean_ret: -3.14
+      std: 13.05
+      avg_win: 8.63
+      avg_loss: -10.56
+      kelly: 0
+      worst_1pct: -32.13
+      var_95: -21.91
+    b2:
+      count: 2196
+      win_rate: 68.7
+      median_ret: 4.95
+      mean_ret: 7.51
+      std: 17.91
+      avg_win: 14.64
+      avg_loss: -8.14
+      kelly: 0.5
+      worst_1pct: -27.33
+      var_95: -14.95
+  2023H2:
+    all:
+      count: 3659
+      win_rate: 32.6
+      median_ret: -5.19
+      mean_ret: -2.91
+      std: 19.15
+      avg_win: 13.72
+      avg_loss: -10.97
+      kelly: 0
+      worst_1pct: -29.99
+      var_95: -23.55
+    ts_high:
+      count: 2
+      win_rate: 0.0
+      median_ret: -21.18
+      mean_ret: -21.18
+      std: 2.59
+      avg_win: 0
+      avg_loss: -21.18
+      kelly: 0
+      worst_1pct: -23.72
+      var_95: -23.51
+    b2:
+      count: 1161
+      win_rate: 60.1
+      median_ret: 2.69
+      mean_ret: 7.7
+      std: 27.33
+      avg_win: 18.67
+      avg_loss: -8.84
+      kelly: 0.4124
+      worst_1pct: -24.77
+      var_95: -16.92
+  2024H1:
+    all:
+      count: 5449
+      win_rate: 30.7
+      median_ret: -6.7
+      mean_ret: -5.15
+      std: 16.02
+      avg_win: 12.5
+      avg_loss: -12.99
+      kelly: 0
+      worst_1pct: -39.07
+      var_95: -28.01
+    ts_high:
+      count: 327
+      win_rate: 15.3
+      median_ret: -10.41
+      mean_ret: -10.26
+      std: 10.06
+      avg_win: 5.16
+      avg_loss: -13.04
+      kelly: 0
+      worst_1pct: -37.11
+      var_95: -26.93
+    b2:
+      count: 1826
+      win_rate: 55.2
+      median_ret: 1.75
+      mean_ret: 3.56
+      std: 18.44
+      avg_win: 14.99
+      avg_loss: -10.52
+      kelly: 0.2376
+      worst_1pct: -35.75
+      var_95: -21.75
+  2024H2:
+    all:
+      count: 9832
+      win_rate: 43.0
+      median_ret: -2.54
+      mean_ret: 2.3
+      std: 25.68
+      avg_win: 20.13
+      avg_loss: -11.13
+      kelly: 0.114
+      worst_1pct: -30.51
+      var_95: -22.81
+    ts_high:
+      count: 4236
+      win_rate: 30.7
+      median_ret: -6.45
+      mean_ret: -2.61
+      std: 24.25
+      avg_win: 18.94
+      avg_loss: -12.17
+      kelly: 0
+      worst_1pct: -32.05
+      var_95: -24.78
+    b2:
+      count: 4377
+      win_rate: 68.0
+      median_ret: 6.48
+      mean_ret: 13.37
+      std: 30.77
+      avg_win: 23.74
+      avg_loss: -8.67
+      kelly: 0.5
+      worst_1pct: -25.24
+      var_95: -15.67
+  2025H1:
+    all:
+      count: 3629
+      win_rate: 65.6
+      median_ret: 3.86
+      mean_ret: 7.27
+      std: 17.2
+      avg_win: 14.45
+      avg_loss: -6.42
+      kelly: 0.5
+      worst_1pct: -19.9
+      var_95: -12.5
+    ts_high:
+      count: 2143
+      win_rate: 61.7
+      median_ret: 2.51
+      mean_ret: 4.54
+      std: 13.82
+      avg_win: 11.07
+      avg_loss: -6.01
+      kelly: 0.4097
+      worst_1pct: -18.32
+      var_95: -12.15
+    b2:
+      count: 1881
+      win_rate: 83.2
+      median_ret: 9.41
+      mean_ret: 13.74
+      std: 19.22
+      avg_win: 17.56
+      avg_loss: -5.17
+      kelly: 0.5
+      worst_1pct: -14.48
+      var_95: -6.72
+pp_v1_cooccurrence:
+  none:
+    count: 51856
+    win_rate: 38.5
+    median_ret: -3.83
+    mean_ret: -1.78
+    std: 18.01
+    avg_win: 13.92
+    avg_loss: -11.59
+    kelly: 0
+    worst_1pct: -35.19
+    var_95: -24.25
+  after_1d:
+    count: 6689
+    win_rate: 52.5
+    median_ret: 0.76
+    mean_ret: 3.16
+    std: 20.19
+    avg_win: 14.61
+    avg_loss: -9.51
+    kelly: 0.2161
+    worst_1pct: -32.63
+    var_95: -18.52
+  after_2d:
+    count: 2470
+    win_rate: 51.7
+    median_ret: 0.45
+    mean_ret: 2.88
+    std: 17.2
+    avg_win: 13.63
+    avg_loss: -8.67
+    kelly: 0.2104
+    worst_1pct: -29.12
+    var_95: -17.21
+  after_3d:
+    count: 3136
+    win_rate: 55.0
+    median_ret: 1.4
+    mean_ret: 3.05
+    std: 16.59
+    avg_win: 12.81
+    avg_loss: -8.89
+    kelly: 0.2379
+    worst_1pct: -27.77
+    var_95: -16.73
+  after_4d:
+    count: 2068
+    win_rate: 54.5
+    median_ret: 1.17
+    mean_ret: 3.03
+    std: 19.09
+    avg_win: 13.49
+    avg_loss: -9.51
+    kelly: 0.2242
+    worst_1pct: -31.92
+    var_95: -19.17
+  after_5d:
+    count: 1535
+    win_rate: 51.1
+    median_ret: 0.42
+    mean_ret: 1.41
+    std: 16.35
+    avg_win: 12.44
+    avg_loss: -10.1
+    kelly: 0.1135
+    worst_1pct: -37.54
+    var_95: -19.62
+  before_1d:
+    count: 5233
+    win_rate: 39.7
+    median_ret: -3.18
+    mean_ret: -1.25
+    std: 18.2
+    avg_win: 13.92
+    avg_loss: -11.23
+    kelly: 0
+    worst_1pct: -32.93
+    var_95: -23.03
+  before_2d:
+    count: 2722
+    win_rate: 38.4
+    median_ret: -3.44
+    mean_ret: -1.42
+    std: 17.01
+    avg_win: 13.8
+    avg_loss: -10.92
+    kelly: 0
+    worst_1pct: -32.97
+    var_95: -22.72
+  before_3d:
+    count: 3071
+    win_rate: 40.7
+    median_ret: -2.88
+    mean_ret: -0.81
+    std: 17.85
+    avg_win: 13.58
+    avg_loss: -10.7
+    kelly: 0
+    worst_1pct: -30.8
+    var_95: -21.74
+  before_4d:
+    count: 2161
+    win_rate: 40.4
+    median_ret: -3.36
+    mean_ret: -1.45
+    std: 17.93
+    avg_win: 13.56
+    avg_loss: -11.64
+    kelly: 0
+    worst_1pct: -35.97
+    var_95: -23.38
+  before_5d:
+    count: 1746
+    win_rate: 42.7
+    median_ret: -2.51
+    mean_ret: -0.31
+    std: 17.64
+    avg_win: 14.31
+    avg_loss: -11.2
+    kelly: 0
+    worst_1pct: -35.98
+    var_95: -22.63
+improvement_tests:
+  rs250_gate: {}
+  b1_return_buckets: {}
+  decline_buckets: {}
+  factor_correlations: {}

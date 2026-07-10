@@ -97,6 +97,7 @@
       <div class="chart-card"><div class="chart-title">应收周转率</div><div id="chart-rt" style="height:260px"></div><div id="text-rt" class="analysis-text"></div></div>
       <div class="chart-card"><div class="chart-title">存货周转率</div><div id="chart-it" style="height:260px"></div><div id="text-it" class="analysis-text"></div></div>
       <div class="chart-card"><div class="chart-title">负债结构（亿）</div><div id="chart-debt-stack" style="height:260px"></div><div id="text-debt-stack" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="chart-title">现金/有息负债率 <span style="font-size:9px;color:var(--muted)">货币资金÷有息负债</span></div><div id="chart-cabb" style="height:260px"></div><div id="text-cabb" class="analysis-text"></div></div>
     </div>
   </div>
 
@@ -258,21 +259,29 @@ async function loadFinancials(code){
   buildBar('chart-rt','应收周转率',d.dates,d.receivables_turnover,'#E8A838');genFText('text-rt','应收周转率',d.receivables_turnover,'次');
   buildBar('chart-it','存货周转率',d.dates,d.inventory_turnover,'#8B5CF6');genFText('text-it','存货周转率',d.inventory_turnover,'次');
 
-  // 负债结构堆叠柱状图
+  // 负债结构堆叠柱状图（hanako-glass）
   if(d.total_debt&&d.total_debt.length){
     var dom=document.getElementById('chart-debt-stack');if(dom._echart)dom._echart.dispose();
     var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark';
     var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
     ch.setOption({
       backgroundColor:'transparent',
-      tooltip:{trigger:'axis',formatter:function(p){return p[0].name+'<br/>'+p.map(function(x){return x.marker+x.seriesName+': '+x.value+'亿'}).join('<br/>')}},
-      grid:{left:'10%',right:'4%',top:20,bottom:36},
-      xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9}},
+      tooltip:{trigger:'axis',axisPointer:{type:'line'},
+        formatter:function(p){
+          var h='<b>'+p[0].name+'</b><br/>';var total=0;
+          p.forEach(function(x){if(x.value&&x.value!=='-'&&x.value!==null){h+=x.marker+x.seriesName+': '+x.value+'亿<br/>';total+=parseFloat(x.value)}});
+          h+='<hr style="margin:3px 0;border:none;border-top:1px solid '+tx+'"><b>合计: '+total.toFixed(1)+'亿</b>';
+          return h;
+        }
+      },
+      legend:{data:['有息负债','无息负债'],bottom:4,textStyle:{color:tx,fontSize:10},itemWidth:12,itemHeight:8},
+      grid:{left:'10%',right:'4%',top:12,bottom:40},
+      xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}},axisTick:{show:false}},
       yAxis:{type:'value',axisLabel:{color:tx,fontSize:9,formatter:function(v){return v+'亿'}},splitLine:{lineStyle:{color:sp}}},
       series:[
-        {name:'有息负债',type:'bar',stack:'debt',data:d.interest_debt.map(function(v){return v?(v/1e8).toFixed(1):null}),itemStyle:{color:'#E8553D'},barWidth:'50%'},
-        {name:'无息负债',type:'bar',stack:'debt',data:d.interest_free_debt.map(function(v){return v?(v/1e8).toFixed(1):null}),itemStyle:{color:'#539BF5'},barWidth:'50%'},
-        {name:'合计',type:'bar',stack:'debt',data:d.total_debt.map(function(v){return v?(v/1e8).toFixed(1):null}),itemStyle:{color:'transparent'},barWidth:'50%',label:{show:true,position:'top',color:tx,fontSize:9,formatter:function(p){return p.value+'亿'}}}
+        {name:'有息负债',type:'bar',stack:'total',data:d.interest_debt.map(function(v){return v?(v/1e8).toFixed(1):null}),itemStyle:{color:'#FF6B6B',borderRadius:0},barWidth:'55%'},
+        {name:'无息负债',type:'bar',stack:'total',data:d.interest_free_debt.map(function(v){return v?(v/1e8).toFixed(1):null}),itemStyle:{color:'#4ECDC4',borderRadius:[4,4,0,0]},barWidth:'55%',label:{show:true,position:'top',color:tx,fontSize:9,formatter:function(p){var t=d.total_debt[p.dataIndex];return t?(t/1e8).toFixed(1)+'亿':''}}},
+        {name:'均值',type:'line',data:function(){var vv=d.total_debt.filter(function(v){return v!=null});var avg=vv.reduce(function(a,b){return a+b},0)/vv.length;return d.total_debt.map(function(){return avg?(avg/1e8).toFixed(1):null})}(),symbol:'none',lineStyle:{color:'#E8A838',width:1.5,type:'dashed'},itemStyle:{color:'#E8A838'}}
       ]
     });dom._echart=ch;
     // 文字分析
@@ -282,6 +291,23 @@ async function loadFinancials(code){
       var curInt=d.interest_debt.filter(function(v){return v!=null});
       var ci=curInt.length?curInt[curInt.length-1]/1e8:0;
       document.getElementById('text-debt-stack').innerHTML='<b>最新总负债：</b>'+cur.toFixed(0)+'亿（有息 '+ci.toFixed(0)+'亿），历史均值 '+avg.toFixed(0)+'亿。'+(cur>avg?'当前高于':'当前低于')+'历史均值。';
+    }
+  }
+  
+  // 现金/有息负债率
+  if(d.cabb&&d.interest_bearing_debt){
+    var cabbRatio=[];
+    for(var i=0;i<d.dates.length;i++){
+      var cab=d.cabb[i];
+      var ibd=d.interest_bearing_debt[i];
+      cabbRatio.push(cab&&ibd&&ibd>0?parseFloat((cab/ibd).toFixed(2)):null);
+    }
+    buildBar('chart-cabb','现金/有息负债率',d.dates,cabbRatio,'#4ECDC4');
+    var bb=cabbRatio.filter(function(v){return v!=null});
+    if(bb.length){
+      var last=bb[bb.length-1];
+      var safe=last>=1?'✅ 现金完全覆盖有息负债':last>=0.5?'⚠️ 现金覆盖'+Math.round(last*100)+'%有息负债':'🔴 现金仅覆盖'+Math.round(last*100)+'%有息负债';
+      document.getElementById('text-cabb').innerHTML='<b>最新比值：</b>'+last.toFixed(2)+' — '+safe+'。数值>1表示现金足以偿还全部有息负债。';
     }
   }
 
@@ -328,7 +354,7 @@ function buildBigBar(id,name,dates,vals,unit){
     xAxis:{type:'category',data:dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
     yAxis:{type:'value',axisLabel:{color:tx,fontSize:9,formatter:function(v){return v+unit}},splitLine:{lineStyle:{color:sp}}},
     series:[
-      {name:name,type:'bar',data:vals.map(function(v){return v!=null?(v/1e8).toFixed(1):null}),itemStyle:{color:'#539BF5',borderRadius:[4,4,0,0]},barWidth:'50%',label:{show:true,position:'top',color:isDark?'#999':'#6E6E6E',fontSize:9}},
+      {name:name,type:'bar',data:vals.map(function(v){return v!=null?(v/1e8).toFixed(1):null}),itemStyle:{color:'#4ECDC4',borderRadius:[4,4,0,0]},barWidth:'50%',label:{show:true,position:'top',color:isDark?'#999':'#6E6E6E',fontSize:9}},
       {name:'均值',type:'line',data:vals.map(function(){return (avg/1e8).toFixed(1)}),symbol:'none',lineStyle:{color:'#E8A838',width:1,type:'dashed'}}
     ]
   });dom._echart=ch;

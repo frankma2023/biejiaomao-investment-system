@@ -1,0 +1,12 @@
+import sqlite3
+db=sqlite3.connect('D:/hanako/investment-system/data/lixinger.db')
+c=db.cursor()
+c.execute("SELECT date,open,high,low,close,volume,change_pct FROM daily_kline WHERE stock_code='513120' ORDER BY date DESC LIMIT 5")
+for r in c.fetchall(): print(r)
+c.execute("SELECT COUNT(*) FROM daily_kline WHERE stock_code='513120'")
+print('Total:', c.fetchone()[0])
+c.execute("SELECT COUNT(*) FROM daily_kline WHERE stock_code='513120' AND open IS NOT NULL AND open>0")
+print('Valid OHLC:', c.fetchone()[0])
+c.execute("SELECT COUNT(*) FROM stock_basic WHERE stock_code='513120'")
+print('In stock_basic:', c.fetchone()[0])
+db.close()

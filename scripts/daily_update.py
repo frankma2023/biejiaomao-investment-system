@@ -11,6 +11,7 @@
   1. 股票状态更新       (fetch_stock_basic)
   2. 指数日K线          (fetch_index_daily_kline)
   3. 指数估值PE/PB      (fetch_index_fundamental — 每日增量)
+  3.5 通达信ETF补K线    (fetch_tdx_kline — 理杏仁缺的ETF)
   4. 个股日K线          (fetch_stock_daily_kline)
   5. 个股基本面         (fetch_fundamental_nonfinancial — 每日增量)
   6. 指数拥挤度         (index_crowding)
@@ -29,7 +30,7 @@
   19. 持仓监控扫描      (monitoring — 每日)
   20. 欧奈尔每日精选·股票 (screener — 每日)
   21. 欧奈尔每日精选·指数 (index_screener — 每日)
-  22. 缠论分钟数据预下载 (download_minute_kline — 每日)
+  22. 缠论分钟数据(TDX)  (fetch_tdx_minute — 每日，从通达信读.lc1)
   23. 缠论批量扫描      (chanlun_scan — 每日)
   24. 缠论vs欧奈尔回测  (chanlun_backtest_compare — 每日)
   25. MW信号扫描        (mw_signal — 每日，依赖RS/CANSLIM/观察池/缠论缓存)
@@ -131,6 +132,7 @@ TASKS = [
     ("📋 股票状态",         [PYTHON_EXE, "scripts/fetch_stock_basic.py"]),
     ("📊 指数日K线",       [PYTHON_EXE, "scripts/fetch_index_daily_kline.py", "--all", "--end", today_str]),
     ("💹 指数估值(PE/PB)",  [PYTHON_EXE, "scripts/fetch_index_fundamental.py", "--incremental", "--end", today_str]),
+    ("📡 通达信ETF补K线",   [PYTHON_EXE, "scripts/fetch_tdx_kline.py"]),
     ("📈 个股日K线",       [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py"]),
     ("📐 指数拥挤度",      [PYTHON_EXE, "src/scanners/index_crowding.py", "--date", today_str]),
     ("🔄 融资融券(新API)", [PYTHON_EXE, "scripts/fetch_margin_daily.py"]),
@@ -185,7 +187,7 @@ TASKS.append(("📊 欧奈尔每日精选·指数", [PYTHON_EXE, "src/discipline
 
 # 步骤16：缠论分钟数据预下载（每日执行，为区间套分析缓存关注股票的分钟K线）
 # 优化后一次登录批量拉取，取代之前的逐只登录登出
-TASKS.append(("⏱️ 缠论分钟数据预下载", [PYTHON_EXE, "src/scripts/download_minute_kline.py"]))
+TASKS.append(("⏱️ 缠论分钟数据(TDX)", [PYTHON_EXE, "scripts/fetch_tdx_minute.py"]))
 
 # 步骤17：缠论批量扫描（每日执行，全市场过滤ST+低量后缓存bi数据，供MW信号等下游使用）
 TASKS.append(("🎋 缠论批量扫描", [PYTHON_EXE, "src/scanners/chanlun_scan.py", "--date", today_str, "--all"]))

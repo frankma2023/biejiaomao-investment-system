@@ -60,11 +60,11 @@ def get_candidates(date_str, top_n=None, all_stocks=False):
                 SELECT e.stock_code, e.capitalization
                 FROM stock_equity_change e
                 JOIN (
-                    SELECT stock_code, MAX(date) as max_date
+                    SELECT stock_code, MAX(change_date) as max_date
                     FROM stock_equity_change
-                    WHERE date <= ?
+                    WHERE change_date <= ?
                     GROUP BY stock_code
-                ) latest ON e.stock_code = latest.stock_code AND e.date = latest.max_date
+                ) latest ON e.stock_code = latest.stock_code AND e.change_date = latest.max_date
             ) eq ON r.stock_code = eq.stock_code
             WHERE r.date = ?
               AND b.listing_status = 'normally_listed'

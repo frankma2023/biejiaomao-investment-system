@@ -492,10 +492,9 @@ class BacktestEngine:
         
         db = get_db()
         
-        # 建结果表
+        # 建结果表（增量模式，不删已有数据）
         db.executescript("""
-            DROP TABLE IF EXISTS backtest_results;
-            CREATE TABLE backtest_results (
+            CREATE TABLE IF NOT EXISTS backtest_results (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 stock_code TEXT NOT NULL,
                 signal_date TEXT NOT NULL,

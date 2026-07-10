@@ -181,6 +181,36 @@ async function loadData(params){
   }
 }
 
+// 构建B1关注度评分明细表 v3.0
+function buildTechScoreDetail(s,isB1){
+  if(!isB1) return '';
+  if(!s.tech_score||s.tech_score<=0) return '';
+  var labelMap={
+    'h_rs250':'前高RS','turnover':'换手率','days_since_h':'距H天数',
+    'decline':'回调深度','b1_moderation':'B1温和度'
+  };
+  var maxMap={'h_rs250':35,'turnover':25,'days_since_h':20,'decline':15,'b1_moderation':5};
+  var order=['h_rs250','turnover','days_since_h','decline','b1_moderation'];
+  var detail=null;
+  try{ if(s.tech_score_detail) detail=JSON.parse(s.tech_score_detail); }catch(e){}
+  // 如果是新格式(v3.0)，展示5因子明细；否则只展示总分
+  var isNewFormat = detail && (detail.h_rs250!==undefined || detail.turnover!==undefined);
+  if(!isNewFormat){
+    return '<table style="margin-top:6px;border-top:1px solid var(--border)">'+
+      '<tr><td class="lbl" colspan="2" style="font-size:.6rem;color:var(--muted);padding-bottom:4px">👁 B1关注度评分 v3.0 ('+(s.tech_score||0)+'/100)</td></tr>'+
+      '<tr><td class="lbl" colspan="2" style="font-size:.55rem;color:var(--muted)">（历史信号，无量表分项明细）</td></tr></table>';
+  }
+  var rows='';
+  for(var i=0;i<order.length;i++){
+    var k=order[i],v=detail[k]||0,max=maxMap[k];
+    rows+='<tr><td class="lbl" style="font-size:9px">'+labelMap[k]+'</td>'+
+      '<td class="val" style="font-size:9px;font-family:var(--font-mono)">'+v+'/'+max+'</td></tr>';
+  }
+  return '<table style="margin-top:6px;border-top:1px solid var(--border)">'+
+    '<tr><td class="lbl" colspan="2" style="font-size:.6rem;color:var(--muted);padding-bottom:4px">👁 B1关注度评分 v3.0 ('+(s.tech_score||0)+'/100)</td></tr>'+
+    rows+'</table>';
+}
+
 function render(){
   var conf=document.getElementById('conf-filter').value;
   var rs=document.getElementById('rs-filter').value;
@@ -216,6 +246,16 @@ function render(){
     if(amt && (!s.c_amount_avg || s.c_amount_avg < parseInt(amt)*10000)) return false;
     return true;
   });
+  // 排序: B1按关注度(tech_score)降序, B2按score降序
+  filtered.sort(function(a,b){
+    if(currentType==='b1'){
+      var sa=a.tech_score!=null?a.tech_score:0;
+      var sb=b.tech_score!=null?b.tech_score:0;
+      return sb-sa;
+    }else{
+      return (b.score||0)-(a.score||0);
+    }
+  });
   var el=document.getElementById('signals');
   if(!filtered.length){
     el.innerHTML='<div class="empty-state">'+(allSignals.length?'无匹配信号':'所选范围暂无MW信号')+'</div>';
@@ -236,7 +276,7 @@ function render(){
         '<span class="stock-info"><a href="http://'+window.location.hostname+':8772/pattern-scan/?code='+s.stock_code+'" target="_blank">'+(s.stock_name||s.stock_code)+'</a><span class="code">'+s.stock_code+'</span></span>'+
         '<span style="font-size:10px;color:var(--muted)">'+(isB1?'B1 ':'B2 ')+s[dateCol]+'</span>'+
         '<span style="font-size:10px;color:var(--muted)">RS'+(s.h_rs250||'—')+' | '+(s.c_amount_avg?(s.c_amount_avg/10000).toFixed(0)+'万':'—')+'</span>'+
-        (isB1?(s.tech_score?'<span class="badge" style="'+(s.tech_score>=75?'background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)':'background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.25)')+'">技术置信度:'+s.tech_score+'/'+(s.tech_score>=85?'极高':s.tech_score>=75?'很高':s.tech_score>=65?'高':s.tech_score>=50?'中':'低')+'</span>':'<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+'</span>'):'<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+' ('+s.score+'分)</span>')+
+        (isB1?(s.tech_score?'<span class="badge" style="'+(s.tech_score>=80?'background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)':s.tech_score>=65?'background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.25)':'background:rgba(139,139,144,.12);color:var(--muted);border:1px solid rgba(139,139,144,.2)')+'">关注度:'+s.tech_score+'/'+(s.tech_score>=80?'极高':s.tech_score>=65?'高':s.tech_score>=50?'关注':'一般')+'</span>':'<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+'</span>'):'<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+' ('+s.score+'分)</span>')+
         (!isB1&&s.is_plus ? '<span class="badge" style="background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.2);margin-left:4px">✦ PLUS</span>' : '') +
       '</div>'+
       '<div class="node-line">'+
@@ -266,25 +306,19 @@ function render(){
             '<td class="lbl">B1 量比</td><td class="val">'+(s.b1_vol_ratio!=null?s.b1_vol_ratio:'—')+'</td>'+
             '<td class="lbl">跌幅</td><td class="val">'+(s.decline_pct!=null?(s.decline_pct>0?'+':'')+s.decline_pct.toFixed(1)+'%':'—')+'</td>'+
             '<td class="lbl">横盘振幅</td><td class="val">'+(s.c_amplitude_pct!=null?s.c_amplitude_pct.toFixed(1)+'%':'—')+'</td></tr>'+
-          // HDC 评分
-          '<tr><td class="lbl">H 前高趋势</td><td class="val '+(s.score_h?'sc-ok':'sc-no')+'">'+(s.score_h?'✅ '+s.score_h+'/15 (高点¥'+(s.h_price||0).toFixed(0)+')':'— 0/15')+'</td>'+
-            '<td class="lbl">D 调整深度</td><td class="val '+(s.score_d?'sc-ok':'sc-no')+'">'+(s.score_d?'✅ '+s.score_d+'/15 (跌幅'+(s.decline_pct||0).toFixed(1)+'%)':'— 0/15')+'</td></tr>'+
-          '<tr><td class="lbl">C 横盘质量</td><td class="val '+(s.score_c?'sc-ok':'sc-no')+'">'+(s.score_c?'✅ '+s.score_c+'/5 (振幅'+(s.c_amplitude_pct||0).toFixed(1)+'%)':'— 0/5')+'</td>'+
-            // P 仅 B2 显示
-            (isB1 ? '<td class="lbl" colspan="2"></td>' : '<td class="lbl">P 整理回撤</td><td class="val '+(s.score_p?'sc-ok':'sc-no')+'">'+(s.score_p?'✅ '+s.score_p+'/15':'— 0/15')+'</td>')+'</tr>'+
-          // 行业RS
-          '<tr style="border-top:1px solid var(--border)"><td class="lbl" colspan="2">'+(s.ind_name?'L2: '+s.ind_code+' '+s.ind_name:'L2指数: '+(s.ind_code||'无L2行业归属'))+'</td>'+
-            '<td class="lbl">I-1 行业RS250</td><td class="val '+(s.score_i1?'sc-ok':'sc-no')+'">'+(s.score_i1?'✅ '+s.score_i1+'/15':'— 0/15')+' (RS='+(s.ind_rs250!=null?s.ind_rs250:'—')+')</td></tr>'+
-          '<tr><td class="lbl"></td><td class="val"></td>'+
-            '<td class="lbl">I-2 个股RS250</td><td class="val '+(s.score_i2?'sc-ok':'sc-no')+'">'+(s.score_i2?'✅ '+s.score_i2+'/15':'— 0/15')+' (RS='+(s.h_rs250!=null?s.h_rs250:'—')+')</td></tr>'+
-          // 共振和跳空
+          // MW 形态评分 v4.0
+          '<tr><td class="lbl" colspan="4" style="font-size:.6rem;color:var(--muted);padding:2px 0">── MW形态评分 ──</td></tr>'+
+          '<tr><td class="lbl">I2 个股RS</td><td class="val '+(s.score_i2?'sc-ok':'sc-no')+'">'+(s.score_i2?'✅ '+s.score_i2+'/30':'— 0/30')+' (RS'+(s.h_rs250||'—')+')</td>'+
+            '<td class="lbl">D 调整深度</td><td class="val '+(s.score_d?'sc-ok':'sc-no')+'">'+(s.score_d?'✅ '+s.score_d+'/25 (跌幅'+(s.decline_pct||0).toFixed(1)+'%)':'— 0/25')+'</td></tr>'+
+          '<tr><td class="lbl">I1 行业RS</td><td class="val '+(s.score_i1?'sc-ok':'sc-no')+'">'+(s.score_i1?'✅ '+s.score_i1+'/20':'— 0/20')+' (RS='+(s.ind_rs250!=null?s.ind_rs250:'—')+')</td>'+
+            '<td class="lbl">H 前高趋势</td><td class="val '+(s.score_h?'sc-ok':'sc-no')+'">'+(s.score_h?'✅ '+s.score_h+'/15 (MA200上+SMA50上行)':'— 0/15')+'</td></tr>'+
           '<tr><td class="lbl">Sig 信号共振</td><td class="val '+(s.score_sig?'sc-ok':'sc-no')+'">'+(s.score_sig?'✅ '+s.score_sig+'/10':'— 0/10')+'</td>'+
             (isB1 ? '<td class="lbl" colspan="2"></td>' : '<td class="lbl">Gap 跳空</td><td class="val '+(s.score_gap?'sc-ok':'sc-no')+'">'+(s.score_gap?'✅ '+s.score_gap+'/10':'— 0/10')+'</td>')+'</tr>'+
           // 共振信号详情
           (s.sig_details&&s.sig_details.length?'<tr><td class="lbl" style="font-size:.55rem;color:var(--muted)">共振信号</td><td class="val" colspan="3" style="font-size:.55rem;text-align:left">'+s.sig_details.map(function(d){return '<span style="display:inline-block;background:rgba(245,158,11,.1);padding:1px 6px;border-radius:4px;margin:1px">'+d.source+' '+(d.desc||d.type||'')+'</span>'}).join('')+'</td></tr>':'')+
           // 总分
-          '<tr style="border-top:1px solid var(--border)"><td class="lbl" colspan="4" style="color:var(--accent);font-weight:600">总分: '+s.score+'/'+(isB1?'75':'100')+' = 形态'+(s.score_h+s.score_d+s.score_c+(isB1?0:s.score_p))+' + 行业'+((s.score_i1||0)+(s.score_i2||0))+' + 共振'+(s.score_sig||0)+(isB1?'':' + 跳空'+(s.score_gap||0))+'</td></tr>'+
-        '</table>'+
+          '<tr style="border-top:1px solid var(--border)"><td class="lbl" colspan="4" style="color:var(--accent);font-weight:600">MW形态分: '+s.score+'/100 = I2'+(s.score_i2||0)+' + D'+(s.score_d||0)+' + I1'+(s.score_i1||0)+' + H'+(s.score_h||0)+' + Sig'+(s.score_sig||0)+(isB1?'':' | 延伸'+(s.score_gap||0)+'+'+(s.score_m1||0)+'+'+(s.score_m2||0)+'+'+(s.score_m3||0))+'</td></tr>'+'<tr><td class="lbl" colspan="4" style="font-size:.6rem;color:var(--muted)">'+(s.ind_name?'L2: '+s.ind_code+' '+s.ind_name:'L2指数: '+(s.ind_code||'无'))+'</td></tr>'+'<tr><td class="lbl" colspan="2" style="font-size:.55rem;color:var(--muted)">C横盘质量已删除('+(s.c_amplitude_pct||'—')+'%)</td>'+(isB1?'<td class="lbl" colspan="2"></td>':'<td class="lbl" colspan="2" style="font-size:.55rem;color:var(--muted)">P: '+(s.score_p||0)+'/15</td>')+'</tr>'+
+        '</table>'+buildTechScoreDetail(s,isB1)+
         '<div style="margin-top:8px;display:flex;gap:12px">'+
           '<a href="http://'+window.location.hostname+':8772/pattern-scan/?code='+s.stock_code+'" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🔍 形态复核 →</a>'+
           '<a href="http://'+window.location.hostname+':8772/chanlun-backtest/?code='+s.stock_code+'&mode=stock" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🎋 缠论分析 →</a>'+

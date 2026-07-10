@@ -1,0 +1,10 @@
+import sqlite3
+db=sqlite3.connect('D:/hanako/investment-system/data/lixinger.db')
+c=db.cursor()
+c.execute("PRAGMA table_info(stock_kline_15min)")
+print('15min columns:')
+for r in c.fetchall(): print(f'  {r[1]:20s} {r[2]}')
+c.execute("PRAGMA table_info(stock_kline_60min)")
+print('60min columns:')
+for r in c.fetchall(): print(f'  {r[1]:20s} {r[2]}')
+db.close()

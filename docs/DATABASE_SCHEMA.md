@@ -2,7 +2,7 @@
 
 > 引擎：SQLite，WAL 模式，PRAGMA synchronous=NORMAL  
 > 数据库文件：`data/lixinger.db`  
-> 更新时间：2026-06-09
+> 更新时间：2026-07-07
 
 ---
 
@@ -1176,66 +1176,103 @@
 
 ---
 
-## 39. backtest_runs — 回测运行记录
+## 39. backtest_results — 全信号回测结果
+
+> M0 回测引擎产出。每行为一笔回测交易（信号 × 入场方式 × 持有期）。
 
 | 字段名 | 类型 | 说明 |
 |--------|------|------|
 | id | INTEGER | **PK**，自增 |
-| name | TEXT | 回测名称 |
-| signal_type | TEXT | 信号类型（默认 distribution_day） |
-| stock_code | TEXT | 指数代码（如 000985） |
-| start_date | TEXT | 开始日期 |
-| end_date | TEXT | 结束日期 |
-| params | TEXT | 参数(JSON) |
-| created_at | TEXT | 创建时间 |
+| stock_code | TEXT | 股票代码 |
+| signal_date | TEXT | 信号日期 |
+| signal_mask | INTEGER | 信号位掩码（见下方） |
+| combo_label | TEXT | 信号组合标签 |
+| signal_count | INTEGER | 当天触发的信号数 |
+| entry_method | TEXT | 入场方式：`T+0_C`/`T+1_O`/`T+2_O` |
+| hold_days | INTEGER | 持有天数：5/10/20/60 |
+| market_regime | TEXT | 市场环境：`bull`/`bear`/`ranging` |
+| pool_mode | TEXT | 股票池：`full`/`filtered` |
+| entry_price | REAL | 入场价格 |
+| exit_price | REAL | 出场价格 |
+| ret_pct | REAL | 毛收益（%） |
+| net_ret_pct | REAL | 净收益（%，已扣 0.3% 成本） |
+| is_win | INTEGER | 是否盈利 0/1 |
+| peak_ret_pct | REAL | 持有期内最大浮盈 |
+| trough_ret_pct | REAL | 持有期内最大浮亏 |
+| index_ret_pct | REAL | 同期基准（000985）收益 |
+| excess_ret_pct | REAL | 超额收益 |
+| skipped_reason | TEXT | 跳过原因（停牌/涨跌停/无K线） |
 
-**索引**：`idx_br_stock(stock_code, signal_type)`  
-**数据量**：~0 条  
-**写入脚本**：`src/server.py`（回测API）  
-**读取场景**：分布日回测看板
+**信号位掩码**：bit0=MW_B1, bit1=MW_B2, bit2=MW_PLUS, bit3=PP_V1, bit4=PP_V2, bit5=BO_V2  
+**数据量**：~9,500,000 行  
+**索引**：`idx_bt_query(signal_mask, entry_method, hold_days, signal_date)`  
+**唯一键**：`(stock_code, signal_date, entry_method, hold_days, pool_mode)`  
+**写入脚本**：`scripts/backtest_signals.py`  
+**读取场景**：赢家因子分析、信号回测统计
+
+**常用查询**：MW B1 H20/T+1_O
+```sql
+SELECT * FROM backtest_results 
+WHERE signal_mask & 1 = 1 AND entry_method='T+1_O' AND hold_days=20
+```
 
 ---
 
-## 40. backtest_signals — 回测信号明细
+## 40. signal_events — 信号事件汇总
+
+> 回测引擎的中间表。每行为一个交易日某个股票触发的所有信号聚合。
+
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| stock_code | TEXT | **PK(1)**，股票代码 |
+| date | TEXT | **PK(2)**，信号日期 |
+| stock_name | TEXT | 股票名称 |
+| signal_mask | INTEGER | 位掩码（同 backtest_results） |
+| combo_label | TEXT | 如 `MW_B1+PP_V1` |
+| signal_count | INTEGER | 当天触发的信号数 |
+| mw_b1_decline_pct | REAL | MW B1 调整深度 |
+| mw_b1_h_rs250 | INTEGER | MW B1 H 点 RS250 |
+| pp_v1_vol_ratio | REAL | PP_V1 量比 |
+| pp_v1_rps_250 | INTEGER | PP_V1 RPS250 |
+| pp_v2_vol_ratio | REAL | PP_V2 量比 |
+| bo_v2_vol_ratio | REAL | BO_V2 量比 |
+| bo_v2_decline_pct | REAL | BO_V2 调整深度 |
+
+**数据量**：~841,000 行  
+**写入脚本**：`scripts/backtest_signals.py`（step1）  
+**读取场景**：回测引擎遍历信号
+
+---
+
+## 41. stock_equity_change — 股本变动历史
+
+> 从理杏仁股本变动 API 拉取。用于计算换手率。
 
 | 字段名 | 类型 | 说明 |
 |--------|------|------|
 | id | INTEGER | **PK**，自增 |
-| run_id | INTEGER | 回测运行ID → `backtest_runs.id` |
-| stock_code | TEXT | 指数代码 |
-| date | TEXT | 信号日期 |
-| signal_type | TEXT | standard/heavy/stealth/reversal |
-| score | REAL | 评分 |
-| open/high/low/close | REAL | 价格 |
-| change_pct | REAL | 涨跌幅(%) |
-| volume/amount | REAL/INTEGER | 量/额 |
-| vol_5d/10d/20d | REAL | 波动率 |
-| ma5/10/20/50/120/250 | REAL | 均线 |
-| volume_score/decline_score/position_score/gap_score/special_score | INTEGER | 分项评分 |
-| total_score | INTEGER | 总分 |
-| close_position | REAL | 收盘位置(0-1) |
-| upper_shadow_pct | REAL | 上影线(%) |
-| lower_shadow_pct | REAL | 下影线(%) |
-| volume_ratio | REAL | 量比 |
-| volume_ratio_ma5 | REAL | 5日均量比 |
+| stock_code | TEXT | 股票代码 |
+| change_date | TEXT | 变动日期 |
+| declaration_date | TEXT | 公告日期 |
+| change_reason | TEXT | 变动原因 |
+| capitalization | REAL | 总股本（股） |
+| outstanding_shares_a | REAL | 流通A股（股） |
+| limited_shares_a | REAL | 限售A股（股） |
+| cap_change_ratio | REAL | 总股本变动比例 |
+| outstanding_a_change_ratio | REAL | 流通A股变动比例 |
 
-**索引**：`idx_bs_run(run_id)`, `idx_bs_date(date)`  
-**数据量**：~0 条  
-**写入脚本**：`src/server.py`（回测API）  
-**读取场景**：分布日回测看板信号列表
+**数据量**：~156,000 行（5,388 只股票，2016-2026）  
+**索引**：`idx_sec_code(stock_code)`, `idx_sec_date(change_date)`  
+**写入脚本**：`scripts/backfill_equity_change.py`  
+**API**：`src/data/lixr_api/api_stock_equity_change.py`  
+**读取场景**：计算换手率 = `c_amount_avg / (outstanding_shares_a × close)` × 100%
 
----
-
-## 41. backtest_stats — 回测统计
-
-| 字段名 | 类型 | 说明 |
-|--------|------|------|
-| run_id | INTEGER | **PK** → `backtest_runs.id` |
-| total_days | INTEGER | 总交易日数 |
-| signal_count | INTEGER | 信号总数 |
-| standard_count | INTEGER | 标准抛盘日数 |
-| heavy_count | INTEGER | 重抛盘日数 |
-| stealth_count | INTEGER | 假阳线数 |
+**按日期查流通股本**：
+```sql
+SELECT outstanding_shares_a FROM stock_equity_change 
+WHERE stock_code=? AND change_date<=? 
+ORDER BY change_date DESC LIMIT 1
+```
 | reversal_count | INTEGER | 盘中反转数 |
 | weighted_count | INTEGER | 加权合计 |
 | avg_vol_10d | REAL | 平均10日波动率 |
@@ -1550,60 +1587,76 @@
 
 ---
 
-## 50. mw_signal_daily — MW信号（牛市回调后再启动）
+## 50. mw_signal_daily — MW信号
+
+> v4.0 更新：2026-07-07 基于 10 年全周期回测重标定评分体系
 
 | 字段名 | 类型 | 说明 |
 |--------|------|------|
 | id | INTEGER | **PK**，自增 |
-| b2_date | TEXT | **UNIQUE(1)**，B2突破日 |
 | stock_code | TEXT | **UNIQUE(1)**，股票代码 |
+| b1_date | TEXT | **UNIQUE(1)**，B1 突破日 |
 | stock_name | TEXT | 股票名称 |
-| confidence | TEXT | 体系1置信度：高/中/低 |
-| score | INTEGER | 体系1总分（0~100） |
-| confidence_v2 | TEXT | 体系2置信度 |
-| score_v2 | INTEGER | 体系2总分（0~115） |
-| h_date / h_price | TEXT/REAL | H点前高日期/价格 |
-| l_date / l_price | TEXT/REAL | L点最低日期/价格 |
-| c_start / c_end | TEXT/TEXT | C横盘区起止日期 |
-| b1_date | TEXT | B1突破日 |
-| b1_return_pct | REAL | B1涨幅% |
-| b1_vol_ratio | REAL | B1量比 |
-| b2_return_pct | REAL | B2涨幅% |
-| b2_close_pos | REAL | B2收盘位置% |
-| b2_is_gap | INTEGER | B2是否跳空 0/1 |
-| b2_ma_count | INTEGER | B2突破均线条数 |
-| decline_pct | REAL | D段跌幅% |
-| c_amplitude_pct | REAL | C段振幅% |
-| h_rs20 / h_rs250 | INTEGER | H点股票RS20/RS250 |
-| c_amount_avg | REAL | 横盘期日均成交额 |
-| h_pre_rise_pct | REAL | H点前60日涨幅% |
-| p_max_dd_pct | REAL | P段最大回撤% |
-| p_vol_ratio | REAL | P段缩量率（均量/B1量） |
-| score_h / score_d / score_c / score_p | INTEGER | HDCP形态评分（15/5/5/15） |
-| score_i1 / score_i2 | INTEGER | 行业RS评分（15/10） |
-| score_o1 / score_o2 | INTEGER | 已废弃（CANSLIM I/L），恒为0 |
-| score_ma | INTEGER | 已废弃（MA排列），恒为0 |
-| score_sig | INTEGER | 信号共振评分（累加制，封顶25） |
-| score_gap | INTEGER | B2跳空评分（10/0） |
-| score_m1 / score_m2 / score_m3 | INTEGER | 体系2新指标（大盘强度/缩量率/跳空） |
-| is_plus | INTEGER | PLUS标志（≥65=1） |
-| ind_rs20 / ind_rs250 | INTEGER | 行业指数RS20/RS250值 |
-| ind_code | TEXT | L2/L1行业指数代码 |
-| ind_name | TEXT | L2/L1行业指数名称 |
+| b2_date | TEXT | B2 突破日（可为 NULL） |
+| confidence | TEXT | 置信度：高/中/低 |
+| score | INTEGER | HDC v4.0 总分（0~100） |
+| confidence_v2 | TEXT | 体系2 置信度（扩展指标） |
+| score_v2 | INTEGER | 体系2 总分 |
+| h_date / h_price | TEXT/REAL | H 点前高日期/价格 |
+| l_date / l_price | TEXT/REAL | L 点最低日期/价格 |
+| c_start / c_end | TEXT/TEXT | C 横盘区起止日期 |
+| b1_return_pct | REAL | B1 日涨幅（%） |
+| b1_vol_ratio | REAL | B1 日量比（vs 20日均量） |
+| b2_return_pct | REAL | B2 日涨幅（%） |
+| b2_close_pos | REAL | B2 收盘位置（%） |
+| b2_is_gap | INTEGER | B2 是否跳空 0/1 |
+| b2_ma_count | INTEGER | B2 突破均线条数 |
+| decline_pct | REAL | H→L 回调深度（%） |
+| c_amplitude_pct | REAL | C 横盘振幅（%） |
+| h_rs20 / h_rs250 | INTEGER | H 点个股 RS20/RS250（0-99） |
+| c_amount_avg | REAL | 横盘期日均成交额（元） |
+| h_pre_rise_pct | REAL | H 点前 60 日涨幅（%） |
+| p_max_dd_pct | REAL | P 段最大回撤（%） |
+| p_vol_ratio | REAL | P 段缩量率 |
+| score_h | INTEGER | H 子项：前高趋势（0/15） |
+| score_d | INTEGER | D 子项：调整深度（0/5/15/25） |
+| score_c | INTEGER | C 子项：v4.0 已删除，恒为 0 |
+| score_p | INTEGER | P 子项：整理回撤（0/15，不参与主评分） |
+| score_i1 | INTEGER | I1 子项：行业 RS（0/10/20） |
+| score_i2 | INTEGER | I2 子项：个股 RS（0/10/20/30） |
+| score_o1 / score_o2 | INTEGER | 已废弃 |
+| score_ma | INTEGER | 已废弃 |
+| score_sig | INTEGER | Sig 子项：信号共振（0-10） |
+| score_gap | INTEGER | Gap 子项：跳空（0/10，不参与主评分） |
+| score_m1 / score_m2 / score_m3 | INTEGER | 体系2 扩展指标 |
+| is_plus | INTEGER | PLUS 标志（总分≥80 且 D=25 且 I1=20） |
+| tech_score | INTEGER | B1 技术置信度：9 因子评分（0-100） |
+| tech_score_detail | TEXT | 技术置信度 9 因子明细（JSON） |
+| ind_rs20 / ind_rs250 | INTEGER | 行业指数 RS20/RS250 |
+| ind_code | TEXT | L2/L1 行业指数代码 |
+| ind_name | TEXT | L2/L1 行业指数名称 |
 | scan_date | TEXT | 扫描日期 |
 | created_at | TEXT | 创建时间 |
 
-**数据量**：~2367条  
+**数据量**：~103,000 行  
+**索引**：`idx_mw_b1date(b1_date)`, `idx_mw_code(stock_code)`  
 **写入脚本**：`src/scanners/mw_signal.py`  
-**读取场景**：MW信号看板、回测分析
+**读取场景**：MW 信号看板、回测分析
 
-### 评分体系（v2.4）
+### 评分体系（HDC v4.0）
 
-体系1满分100：HDCP形态40(H15/D5/C5/P15) + 行业RS25(I1=15,I2=10,L2优先L1兜底) + 信号共振25(累加制) + B2跳空10
+| 子项 | 满分 | 规则 |
+|------|:---:|------|
+| I2（个股RS） | 30 | `h_rs250≥90`(30) / `≥85`(20) / `≥75`(10) |
+| D（调整深度） | 25 | 跌幅 `25%~40%`(25) / `20%~25%`(15) / `15%~20%`(5) |
+| I1（行业RS） | 20 | `ind_rs250≥85`(20) / `≥80`(10) |
+| H（前高趋势） | 15 | SMA50 斜率>0 且价格>MA200 |
+| Sig（信号共振） | 10 | PP_V1(+5)+BO_V2(+3)+缠论(+2)+蜡烛(+1)，上限 10 |
 
-置信度：高≥80 中55~79 低<55
-
-PLUS：总分≥65
+**硬门禁**：`h_rs250 ≥ 60`，不满足则不出 B1  
+**置信度**：高 ≥ 70 / 中 50~69 / 低 < 50  
+**PLUS**：总分 ≥ 80 且 D=25 且 I1=20  
+**已删除**：C（横盘质量），全周期负相关 r=-0.036
 
 ---
 

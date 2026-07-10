@@ -438,7 +438,7 @@ def api_review(stock_code):
     if trade and trade['asset_type']:
         asset_type = trade['asset_type']
 
-    kline_rows = _lookup_kline(db, stock_code, asset_type, 400)
+    kline_rows = _lookup_kline(db, stock_code, asset_type, 750)
     klines = [dict(r) for r in reversed(kline_rows)]
 
     # 2. 代码信息
@@ -488,51 +488,49 @@ def api_review(stock_code):
     """, (stock_code,)).fetchone()
     obs_data = dict(obs) if obs else {}
 
-    # 8. V2: 信号加载 — 优先 pattern_scan_signals 历史数据，不足时实时扫描
+    # 8. 信号加载 — 实时引擎优先（同 pattern-scan），兜底 pattern_scan_signals 表
     signals = []
     signal_source = None
     seen = set()
 
-    # 8a. 从 pattern_scan_signals 表读取已有数据
-    from datetime import datetime, timedelta
-    sig_rows = db.execute("""
-        SELECT date, signals_json FROM pattern_scan_signals
-        WHERE stock_code = ? ORDER BY date DESC
-    """, (stock_code,)).fetchall()
-
-    if sig_rows:
-        signal_source = 'pattern_scan'
-        for sr in sig_rows:
-            if not sr['signals_json']:
-                continue
-            try:
-                day_sigs = json.loads(sr['signals_json'])
-                for s in day_sigs:
-                    key = (s.get('date',''), s.get('source',''), s.get('type',''), s.get('signal_date',''))
-                    if key not in seen:
-                        seen.add(key)
-                        signals.append(s)
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-    # 8b. 历史数据不足（<5天）时，用已加载的K线实时跑扫描引擎
-    if len(sig_rows) < 5 and klines and len(klines) >= 50:
+    # 8a. 实时引擎优先（同 pattern-scan）
+    if klines and len(klines) >= 50:
         try:
             from engine_registry import run_all_engines
-            # klines 已按日期升序排列
             from src.server import _compute_indicators
             ind = _compute_indicators(klines)
             engine_signals = run_all_engines(klines=klines, indicators=ind)
-            if not signal_source:
-                signal_source = 'real_time'
+            signal_source = 'real_time'
             for s in engine_signals:
                 key = (s.get('date',''), s.get('source',''), s.get('type',''), s.get('signal_date',''))
                 if key not in seen:
                     seen.add(key)
                     signals.append(s)
         except Exception:
-            pass  # 引擎不可用时静默跳过
+            pass
 
+    # 8b. 实时引擎无结果时，从 pattern_scan_signals 表兜底
+    if not signals:
+        sig_rows = db.execute('''
+            SELECT date, signals_json FROM pattern_scan_signals
+            WHERE stock_code = ? ORDER BY date DESC
+        ''', (stock_code,)).fetchall()
+        if sig_rows:
+            signal_source = 'pattern_scan'
+            for sr in sig_rows:
+                if not sr['signals_json']:
+                    continue
+                try:
+                    day_sigs = json.loads(sr['signals_json'])
+                    for s in day_sigs:
+                        key = (s.get('date',''), s.get('source',''), s.get('type',''), s.get('signal_date',''))
+                        if key not in seen:
+                            seen.add(key)
+                            signals.append(s)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+    # 8c. 都没数据就回退观察池快照 / 旧格式
     # 8c. 都没数据就回退观察池快照 / 旧格式
     if not signals:
         if obs_data.get('signals_json'):

@@ -89,7 +89,7 @@
 
     <!-- 参数横条 -->
     <div class="top-bar">
-      <div class="fld" style="flex:0.7;min-width:160px"><label>股票/指数代码</label><div style="display:flex;gap:6px;align-items:center"><button class="mode-btn active" id="btn-stock" onclick="switchMode('stock')">个股</button><button class="mode-btn" id="btn-index" onclick="switchMode('index')">指数</button><input type="text" id="code" value="600519" style="flex:1" onkeydown="if(event.key==='Enter')scan()"><span id="stock-name" style="font-size:0.65rem;color:var(--muted);white-space:nowrap;flex-shrink:0"></span></div></div>
+      <div class="fld" style="flex:0.7;min-width:160px"><label>股票/指数代码</label><div style="display:flex;gap:6px;align-items:center"><button class="mode-btn active" id="btn-stock" onclick="switchMode('stock')">个股</button><button class="mode-btn" id="btn-index" onclick="switchMode('index')">指数</button><input type="text" id="code" placeholder="输入代码，如513120" style="flex:1" onkeydown="if(event.key==='Enter')scan()"><span id="stock-name" style="font-size:0.65rem;color:var(--muted);white-space:nowrap;flex-shrink:0"></span></div></div>
       <div class="fld"><label>开始日期</label><input type="date" id="date-start"></div>
       <div class="fld"><label>结束日期</label><input type="date" id="date-end"></div>
       <button class="btn-scan" onclick="scan()">🔍 扫描</button>

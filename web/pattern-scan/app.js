@@ -70,8 +70,8 @@ document.addEventListener('DOMContentLoaded', function () {
     attributeFilter: ['data-theme']
   });
 
-  // 自动扫描
-  scan();
+  // 自动扫描已关闭，用户手动输入代码后点击扫描
+  // scan();
 });
 
 // ── API 调用 ──
@@ -90,11 +90,13 @@ async function scan() {
 
   // 查询股票名称
   var code = document.getElementById('code').value.trim();
+  var nameSpan = document.getElementById('stock-name');
+  nameSpan.textContent = '';
   try {
     var nr = await fetch('http://' + window.location.hostname + ':8788/api/stock-name?code=' + code + '&mode=' + state.mode);
     if (nr.ok) {
       var nd = await nr.json();
-      document.getElementById('stock-name').textContent = nd.name || '';
+      if (nd.name) nameSpan.textContent = nd.name;
     }
   } catch (e) {}
 
@@ -192,7 +194,8 @@ function switchMode(mode) {
   state.mode = mode;
   document.getElementById('btn-stock').className = 'mode-btn' + (mode === 'stock' ? ' active' : '');
   document.getElementById('btn-index').className = 'mode-btn' + (mode === 'index' ? ' active' : '');
-  scan();
+  var code = document.getElementById('code').value.trim();
+  if (code) scan();
 }
 
 // ── 周期切换：日K / 周K / 月K ──
@@ -200,12 +203,12 @@ function switchPeriod(period) {
   if (state.period === period) return;
   state.period = period;
 
-  // 按钮激活态
   document.getElementById('btn-daily').className = 'ctrl-btn' + (period === 'daily' ? ' active' : '');
   document.getElementById('btn-weekly').className = 'ctrl-btn' + (period === 'weekly' ? ' active' : '');
   document.getElementById('btn-monthly').className = 'ctrl-btn' + (period === 'monthly' ? ' active' : '');
 
-  scan();
+  var code = document.getElementById('code').value.trim();
+  if (code) scan();
 }
 
 // ── 总渲染 ──

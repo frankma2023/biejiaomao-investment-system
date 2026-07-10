@@ -50,7 +50,7 @@
     </header>
 
     <div class="pg-stats">
-      <div class="pg-stat"><div class="n" style="color:#4CAF50">105</div><div class="l">已完成</div></div>
+      <div class="pg-stat"><div class="n" style="color:#4CAF50">108</div><div class="l">已完成</div></div>
       <div class="pg-stat"><div class="n" style="color:#FF9800">3</div><div class="l">进行中</div></div>
       <div class="pg-stat"><div class="n">0</div><div class="l">待开发</div></div>
     </div>
@@ -328,6 +328,11 @@
 <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">69. 回测实验室</div><div class="ld">web/backtest-lab/ 信号多选+质量过滤+入场三方式并排对比+MW置信度。串行调用避免Flask单线程互锁。</div></div>
 <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">70. SQLite生产级PRAGMA</div><div class="ld">server.py get_db() 加5行PRAGMA: WAL+synchronous=NORMAL+cache_size=64MB+busy_timeout=5s+foreign_keys=ON。140GB库性能提升30-60%。</div></div>
 <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">71. 硬编码日期</div><div class="ld">index-valuation/stock-valuation均有2026-05-07/2026-05-10硬编码。全部改为动态new Date()。</div></div>
+
+
+<div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">72. 通达信分钟数据替代Baostock</div><div class="ld">9003只A股.lc1文件→1分钟K线→聚合15/60分钟→写入stock_kline_15min/60min表。零网络依赖，本地毫秒级读取。daily_update.py已切换。</div></div>
+<div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">73. ETF数据源双轨制</div><div class="ld">index_style.yaml新增etf分类，理杏仁拉不到的ETF从通达信补日K线和分钟K线。fetch_tdx_kline.py自动读yaml配置，daily_update.py步骤3.5自动运行。</div></div>
+<div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">74. 通达信.day文件OHLC是int*100非float</div><div class="ld">struct.unpack('IfffffI')误当浮点解出e-42级价格。正确格式:'IIIIIfI'，价格÷100。教训：二进制解析前先验证数据范围。</div></div>
 
 </div>
 <script>

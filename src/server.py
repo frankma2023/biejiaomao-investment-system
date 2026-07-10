@@ -2896,7 +2896,7 @@ def api_stock_financials():
                gross_margin, roe,
                free_cash_flow, asset_liability_ratio, interest_bearing_debt_ratio,
                current_ratio, quick_ratio, receivables_turnover, inventory_turnover,
-               total_liabilities, interest_bearing_debt
+               total_liabilities, interest_bearing_debt, cabb
         FROM stock_financials_annual
         WHERE stock_code=? AND report_date >= '2016-12-31'
         ORDER BY report_date
@@ -2906,7 +2906,8 @@ def api_stock_financials():
               'roe': [], 'eps': [], 'fcf': [], 'debt_ratio': [],
               'interest_debt_ratio': [], 'current_ratio': [], 'quick_ratio': [],
               'receivables_turnover': [], 'inventory_turnover': [],
-              'total_debt': [], 'interest_debt': [], 'interest_free_debt': []}
+              'total_debt': [], 'interest_debt': [], 'interest_free_debt': [],
+              'cabb': [], 'interest_bearing_debt': []}
     for r in rows:
         result['dates'].append(r['report_date'][:4])
         result['revenue'].append(r['revenue'])
@@ -2915,9 +2916,11 @@ def api_stock_financials():
         result['net_profit_yoy'].append(r['net_profit_yoy'])
         result['gross_margin'].append(r['gross_margin'])
         result['roe'].append(r['roe'])
+        result['cabb'].append(r['cabb'] if r['cabb'] else None)
+        result['interest_bearing_debt'].append(r['interest_bearing_debt'] if r['interest_bearing_debt'] else None)
         # EPS = 净利润 / 总股本
         cap_row = db.execute('''SELECT capitalization FROM stock_equity_change
-            WHERE stock_code=? AND date <= ? ORDER BY date DESC LIMIT 1''',
+            WHERE stock_code=? AND change_date <= ? ORDER BY change_date DESC LIMIT 1''',
             (code, r['report_date'])).fetchone()
         cap = cap_row['capitalization'] if cap_row and cap_row['capitalization'] else None
         eps = (r['net_profit'] / cap) if (r['net_profit'] and cap) else None
