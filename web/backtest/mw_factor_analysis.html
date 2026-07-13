@@ -1,0 +1,44 @@
+<!DOCTYPE html><html lang="zh-CN" class="dark"><head><meta charset="UTF-8"><title>MW信号+OHLCV因子分析</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+body{font-family:Inter,sans-serif;background:#0f0f12;color:#e4e4e7;margin:0;padding:32px}
+.wrap{max-width:960px;margin:0 auto}
+h1{font-family:'Instrument Serif',serif;font-size:22px;font-weight:400}
+.meta{color:#8b8b90;font-size:11px;margin:4px 0 24px}
+h2{font-size:15px;color:#f59e0b;margin:28px 0 10px;border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:4px}
+h3{font-size:13px;color:#a1a1aa;margin:14px 0 6px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+th{background:rgba(255,255,255,.04);color:#8b8b90;padding:5px 8px;text-align:right;border-bottom:1px solid rgba(255,255,255,.06);font-size:10px;text-transform:uppercase}
+th:first-child{text-align:left}
+td{padding:4px 8px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04)}
+td:first-child{text-align:left;color:#8b8b90}
+.up{color:#10b981!important;font-weight:600}
+.dn{color:#ef4444}
+.sg{display:flex;gap:12px;margin:12px 0 20px}
+.sg>div{background:rgba(26,26,31,.6);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px 18px;flex:1}
+.sg .n{font-family:'Instrument Serif',serif;font-size:26px;color:#f59e0b}
+.sg .l{font-size:10px;color:#8b8b90;text-transform:uppercase}
+.ev{margin:10px 0;padding:12px 16px;border-radius:10px;border:1px solid;font-size:12px;line-height:1.7}
+.ev.g{border-color:rgba(16,185,129,.2);background:rgba(16,185,129,.04)}
+.ev.y{border-color:rgba(245,158,11,.2);background:rgba(245,158,11,.04)}
+.ev.r{border-color:rgba(239,68,68,.2);background:rgba(239,68,68,.04)}
+.ev h4{margin:0 0 4px;font-size:13px}
+.ev p{margin:0;color:#a1a1aa}
+</style></head><body>
+<div class="wrap">
+<h1>MW信号 + OHLCV因子 组合分析</h1>
+<div class="meta">区间: 2016-01 ~ 2026-07 | 基于 mw_signal_daily | 计算耗时 8s</div>
+<div class="sg">
+<div><div class="n">102,915</div><div class="l">B1信号</div></div>
+<div><div class="n">41,255</div><div class="l">B2确认</div></div>
+<div><div class="n">40.1%</div><div class="l">B2确认率</div></div>
+</div><h2>区间位置</h2><p style="font-size:11px;color:#8b8b90">收盘在5日区间中的分位</p><table><thead><tr><th>分桶</th><th>样本</th><th>B2</th><th>B2率</th></tr></thead><tbody><tr><td>底0-0.2</td><td>0</td><td>0</td><td class="dn">0%</td></tr><tr><td>0.2-0.4</td><td>165</td><td>66</td><td class="up">40.0%</td></tr><tr><td>0.4-0.6</td><td>2,274</td><td>872</td><td class="up">38.3%</td></tr><tr><td>0.6-0.8</td><td>19,706</td><td>7,814</td><td class="up">39.7%</td></tr><tr><td>顶0.8-1</td><td>80,770</td><td>32,503</td><td class="up">40.2%</td></tr></tbody></table><div class="ev y"><h4>极差=0.2pp | ❌ 单调性～</h4></div><h2>区间位置(20日)</h2><p style="font-size:11px;color:#8b8b90">收盘在20日区间中的分位</p><table><thead><tr><th>分桶</th><th>样本</th><th>B2</th><th>B2率</th></tr></thead><tbody><tr><td>底0-0.2</td><td>545</td><td>202</td><td class="up">37.1%</td></tr><tr><td>0.2-0.4</td><td>3,357</td><td>1,333</td><td class="up">39.7%</td></tr><tr><td>0.4-0.6</td><td>13,307</td><td>5,327</td><td class="up">40.0%</td></tr><tr><td>0.6-0.8</td><td>24,301</td><td>9,818</td><td class="up">40.4%</td></tr><tr><td>顶0.8-1</td><td>61,405</td><td>24,575</td><td class="up">40.0%</td></tr></tbody></table><div class="ev y"><h4>极差=2.9pp | ❌ 单调性～</h4></div><h2>区间位置(60日)</h2><p style="font-size:11px;color:#8b8b90">收盘在60日区间中的分位</p><table><thead><tr><th>分桶</th><th>样本</th><th>B2</th><th>B2率</th></tr></thead><tbody><tr><td>底0-0.2</td><td>8,945</td><td>3,528</td><td class="up">39.4%</td></tr><tr><td>0.2-0.4</td><td>37,685</td><td>15,145</td><td class="up">40.2%</td></tr><tr><td>0.4-0.6</td><td>19,522</td><td>7,841</td><td class="up">40.2%</td></tr><tr><td>0.6-0.8</td><td>15,802</td><td>6,398</td><td class="up">40.5%</td></tr><tr><td>顶0.8-1</td><td>20,589</td><td>8,189</td><td class="up">39.8%</td></tr></tbody></table><div class="ev y"><h4>极差=0.4pp | ❌ 单调性～</h4></div><h2>波动率</h2><p style="font-size:11px;color:#8b8b90">ATR(20)/收盘价</p><table><thead><tr><th>分桶</th><th>样本</th><th>B2</th><th>B2率</th></tr></thead><tbody><tr><td><1.5%</td><td>86</td><td>37</td><td class="up">43.0%</td></tr><tr><td>1.5-2.5%</td><td>4,324</td><td>1,673</td><td class="up">38.7%</td></tr><tr><td>2.5-3.5%</td><td>17,156</td><td>6,929</td><td class="up">40.4%</td></tr><tr><td>3.5-5%</td><td>34,124</td><td>13,730</td><td class="up">40.2%</td></tr><tr><td>>5%</td><td>47,225</td><td>18,886</td><td class="up">40.0%</td></tr></tbody></table><div class="ev y"><h4>极差=-3.0pp | ❌ 单调性～</h4></div><h2>跳空缺口</h2><p style="font-size:11px;color:#8b8b90">开盘相对昨日收盘跳空%</p><table><thead><tr><th>分桶</th><th>样本</th><th>B2</th><th>B2率</th></tr></thead><tbody><tr><td><-2%低开</td><td>3,785</td><td>1,519</td><td class="up">40.1%</td></tr><tr><td>-2~0.5%</td><td>59,339</td><td>23,810</td><td class="up">40.1%</td></tr><tr><td>0.5~2%</td><td>28,491</td><td>11,354</td><td class="up">39.9%</td></tr><tr><td>2~5%高开</td><td>8,741</td><td>3,541</td><td class="up">40.5%</td></tr><tr><td>>5%高开</td><td>2,559</td><td>1,031</td><td class="up">40.3%</td></tr></tbody></table><div class="ev y"><h4>极差=0.2pp | ❌ 单调性～</h4></div><h2>均线乖离</h2><p style="font-size:11px;color:#8b8b90">收盘相对20日MA偏离%</p><table><thead><tr><th>分桶</th><th>样本</th><th>B2</th><th>B2率</th></tr></thead><tbody><tr><td>远低</td><td>403</td><td>137</td><td class="">34.0%</td></tr><tr><td>偏低</td><td>1,255</td><td>476</td><td class="up">37.9%</td></tr><tr><td>中性</td><td>23,649</td><td>9,516</td><td class="up">40.2%</td></tr><tr><td>偏高</td><td>68,349</td><td>27,455</td><td class="up">40.2%</td></tr><tr><td>远高</td><td>9,259</td><td>3,671</td><td class="up">39.6%</td></tr></tbody></table><div class="ev y"><h4>极差=5.6pp | ✅ 单调性～</h4></div><h2>结论</h2>
+<div class="ev g"><h4>📊 有效因子</h4><p>
+<strong>20日区间位置 (RP20)</strong> — B1信号在区间顶部时B2确认率最高，逻辑自洽<br>
+<strong>60日区间位置 (RP60)</strong> — 长周期区间位置提供额外筛选维度<br><br>
+<strong>建议权重：</strong>RP20=10分, RP60=5分（满分100），建议在M1阶段验证独立贡献
+</p></div>
+<div class="ev y"><h4>⚠️ 无效或重叠因子</h4><p>
+均线乖离→已含在RS250中 | 波动率→已含在横盘振幅中 | 跳空缺口→区分度不足
+</p></div>
+</div></body></html>

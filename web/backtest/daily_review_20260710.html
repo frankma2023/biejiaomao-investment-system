@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head><meta charset="UTF-8"><title>A股收盘复盘 2026-07-10</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@300;400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<style>
+body{font-family:Inter,sans-serif;background:#0f0f12;color:#e4e4e7;margin:0;padding:32px}
+.wrap{max-width:960px;margin:0 auto}
+h1{font-family:'Instrument Serif',serif;font-size:22px;font-weight:400}
+.meta{color:#8b8b90;font-size:11px;margin:4px 0 24px}
+h2{font-size:15px;color:#f59e0b;margin:28px 0 10px;border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0}
+th{background:rgba(255,255,255,.04);color:#8b8b90;padding:5px 8px;text-align:right;border-bottom:1px solid rgba(255,255,255,.06);font-size:10px;text-transform:uppercase}
+th:first-child{text-align:left}
+td{padding:4px 8px;text-align:right;border-bottom:1px solid rgba(255,255,255,.04)}
+td:first-child{text-align:left;color:#8b8b90}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.gc{background:rgba(26,26,31,.6);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px;text-align:center}
+.gc .n{font-family:'Instrument Serif',serif;font-size:22px;color:#f59e0b}
+.gc .l{font-size:9px;color:#8b8b90;text-transform:uppercase;margin-top:2px}
+.gc .d{font-size:11px;color:#a1a1aa;margin-top:2px}
+.r{color:#ef4444!important}
+.g{color:#10b981!important}
+</style></head>
+<body><div class="wrap">
+
+<h1>A股每日收盘复盘</h1>
+<div class="meta">交易日期：2026-07-10（周五）| 请求日期：2026-07-11（周六，非交易日）| 数据来源：本地数据库 lixinger.db</div>
+
+<div class="grid4">
+<div class="gc"><div class="n">3,996</div><div class="l">上证综指</div><div class="d r">-0.01%</div></div>
+<div class="gc"><div class="n">4,781</div><div class="l">沪深300</div><div class="d r">-0.02%</div></div>
+<div class="gc"><div class="n">2,065</div><div class="l">科创50</div><div class="d r">-0.06%</div></div>
+<div class="gc"><div class="n">3,843</div><div class="l">创业板指</div><div class="d r">-0.04%</div></div>
+</div>
+
+<h2>摘要</h2>
+<p style="font-size:12px;color:#a1a1aa;line-height:1.7">
+7月10日A股整体窄幅震荡，四大指数基本收平（涨跌幅均在-0.1%~0%之间）。市场宽度较好，上涨3814家 vs 下跌1701家（约69%上涨），但权重股拖累指数。全市场成交额3.41万亿，处于近期高位。无明显涨跌停极端情绪信号。
+</p>
+
+<h2>1. 指数概览</h2>
+<table>
+<thead><tr><th>指数</th><th>收盘点位</th><th>涨跌幅</th><th>数据日</th></tr></thead>
+<tbody>
+<tr><td>上证综指 (000001)</td><td>3,996.16</td><td class="r">-0.01%</td><td>2026-07-10</td></tr>
+<tr><td>沪深300 (000300)</td><td>4,780.79</td><td class="r">-0.02%</td><td>2026-07-10</td></tr>
+<tr><td>科创50 (000688)</td><td>2,064.98</td><td class="r">-0.06%</td><td>2026-07-10</td></tr>
+<tr><td>创业板指 (399006)</td><td>3,842.73</td><td class="r">-0.04%</td><td>2026-07-10</td></tr>
+</tbody>
+</table>
+
+<h2>2. 市场宽度与情绪</h2>
+<table>
+<thead><tr><th>指标</th><th>数值</th><th>口径</th></tr></thead>
+<tbody>
+<tr><td>上涨家数</td><td>3,814</td><td>全市场（含所有上市股票）</td></tr>
+<tr><td>下跌家数</td><td>1,701</td><td>全市场</td></tr>
+<tr><td>涨跌比</td><td>2.24:1</td><td>上涨/下跌</td></tr>
+<tr><td>涨停 (≥9.5%)</td><td>0</td><td>不含ST</td></tr>
+<tr><td>跌停 (≤-9.5%)</td><td>0</td><td>不含ST</td></tr>
+<tr><td>全市场成交额</td><td>3.41万亿</td><td>含所有板块</td></tr>
+</tbody>
+</table>
+<p style="font-size:12px;color:#a1a1aa;line-height:1.6">
+市场宽度积极（69%个股上涨），但指数走平，说明权重股在拖累。无个股触及涨跌停±9.5%，市场情绪平稳，无明显极端方向。成交额3.41万亿处于近期高位，交投活跃但缺乏方向性共识。
+</p>
+
+<h2>3. 数据说明</h2>
+<p style="font-size:12px;color:#8b8b90;line-height:1.6">
+本次复盘数据来源于本地 lixinger.db 数据库。以下模块因数据源限制未覆盖：行业与概念热点排名、龙虎榜详情、大宗交易、两融余额变动、北向资金流向。如需完整复盘，需接入 Pandadata API 或东方财富/同花顺等实时行情接口。<br><br>
+2026-07-11为周六，A股休市。本报告基于最近交易日2026-07-10生成。
+</p>
+
+<h2>4. 2026-07-13（周一）关注点</h2>
+<p style="font-size:12px;color:#a1a1aa;line-height:1.7">
+• 上证3996点逼近4000关口，能否放量突破<br>
+• 科创50上周表现，成长vs价值的风格切换信号<br>
+• 7月11日（周六）是否有重要政策发布，影响周一开盘<br>
+• 成交额能否维持在3万亿以上
+</p>
+
+</div></body></html>

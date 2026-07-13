@@ -580,7 +580,8 @@ def save_signals(conn, scan_date, signals):
         ts_detail_json = ''
         try:
             ts, ts_detail = compute_attention_score(
-                s['code'], s['b1_date'], [], 
+                s['code'], s['b1_date'], 
+                _kline_cache.get(s['code'], []) if _kline_cache else [],
                 s.get('decline_pct'), s.get('h_rs250'), s.get('b1_return_pct'),
                 s.get('h_date'), s.get('c_amount_avg', 0),
                 conn=conn, return_detail=True
@@ -660,45 +661,45 @@ def compute_tech_score(code, b1_date, klines, rs_cache=None, return_detail=False
 def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_return_pct,
                              h_date, c_amount_avg, conn=None, return_detail=False):
     """
-    B1 关注度评分 v3.0（满分 100）。替代旧 tech_score。
+    B1 关注度评分 v3.2（满分 100）。
     
-    目的：排序 B1 信号，让用户优先关注最可能出 B2 的 B1。
-    不用于买卖决策——B1 关注度高 ≠ 可以直接买入。
+    基于 10 年全周期赢家归因 + QuantSkills 800 因子增量检验的 6 个最强因子：
     
-    基于 10 年全周期赢家归因分析的 5 个最强 B1 日可观测因子：
+    1. h_rs250 (30分) — 前高时的个股 RS250
+       ≥90→30, ≥80→25, ≥70→15, ≥60→8
     
-    1. h_rs250 (35分) — 前高时的个股 RS250
-       ≥90→35, ≥80→28, ≥70→18, ≥60→10
+    2. 换手率 (20分) — 横盘期日均换手率
+       <0.5%→20, <1.0%→16, <1.5%→12, <2.0%→8, <3.0%→4
     
-    2. 换手率 (25分) — 横盘期日均换手率
-       <0.5%→25, <1.0%→20, <1.5%→15, <2.0%→10, <3.0%→5, ≥3.0%→0
-       无股本数据时默认 0
-    
-    3. 距H天数 (20分) — 前高到 B1 的整理时长
-       40~60天→20, 30~40天→15, 20~30天或60~80天→10, >80天→5
+    3. 距H天数 (15分) — 前高到 B1 的整理时长
+       40~60天→15, 30~40天→12, 20~30天或60~80天→8, >80天→5
     
     4. 回调深度 (15分) — H→L 的最大跌幅
        >35%→15, 25~35%→12, 20~25%→8, 15~20%→4
     
-    5. B1 温和度 (5分) — B1 日涨幅越小越好
-       <3%→5, 3~5%→3, 5~8%→1
+    5. 振幅收缩 (15分) — 近5日振幅 vs 20日振幅（QuantSkills R774 验证）
+       收缩到<70%→15, <85%→10, <100%→5
+    
+    6. 下影线 (5分) — B1 日前10日均下影线占比（QuantSkills R688 验证）
+       >30%→5, >20%→3, >10%→1
     
     分层：极高≥80 / 高65~79 / 关注50~64 / 一般35~49 / 低<35
     """
     from datetime import date
+    import numpy as np
     sc = 0
     detail = {}
     
-    # 1. h_rs250 (35分)
+    # 1. h_rs250 (30分)
     rs = h_rs250 or 0
-    if rs >= 90: v = 35
-    elif rs >= 80: v = 28
-    elif rs >= 70: v = 18
-    elif rs >= 60: v = 10
+    if rs >= 90: v = 30
+    elif rs >= 80: v = 25
+    elif rs >= 70: v = 15
+    elif rs >= 60: v = 8
     else: v = 0
     sc += v; detail['h_rs250'] = v
     
-    # 2. 换手率 (25分)
+    # 2. 换手率 (20分)
     to_v = 0
     if conn and c_amount_avg and c_amount_avg > 0:
         row = conn.execute("""
@@ -707,27 +708,26 @@ def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_retu
             ORDER BY change_date DESC LIMIT 1
         """, (code, b1_date)).fetchone()
         if row and row[0]:
-            # 取 B1 日收盘价
             close_row = conn.execute(
                 "SELECT close FROM daily_kline WHERE stock_code=? AND date=?",
                 (code, b1_date)
             ).fetchone()
             if close_row and close_row[0] and close_row[0] > 0:
                 to_rate = c_amount_avg / (row[0] * close_row[0]) * 100
-                if to_rate < 0.5: to_v = 25
-                elif to_rate < 1.0: to_v = 20
-                elif to_rate < 1.5: to_v = 15
-                elif to_rate < 2.0: to_v = 10
-                elif to_rate < 3.0: to_v = 5
+                if to_rate < 0.5: to_v = 20
+                elif to_rate < 1.0: to_v = 16
+                elif to_rate < 1.5: to_v = 12
+                elif to_rate < 2.0: to_v = 8
+                elif to_rate < 3.0: to_v = 4
     sc += to_v; detail['turnover'] = to_v
     
-    # 3. 距H天数 (20分)
+    # 3. 距H天数 (15分)
     dh_v = 0
     if h_date and h_date > '2000-01-01' and b1_date:
         dh = (date.fromisoformat(b1_date) - date.fromisoformat(h_date)).days
-        if 40 <= dh <= 60: dh_v = 20
-        elif 30 <= dh < 40: dh_v = 15
-        elif (20 <= dh < 30) or (60 < dh <= 80): dh_v = 10
+        if 40 <= dh <= 60: dh_v = 15
+        elif 30 <= dh < 40: dh_v = 12
+        elif (20 <= dh < 30) or (60 < dh <= 80): dh_v = 8
         elif dh > 80: dh_v = 5
     sc += dh_v; detail['days_since_h'] = dh_v
     
@@ -740,13 +740,42 @@ def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_retu
     else: dec_v = 0
     sc += dec_v; detail['decline'] = dec_v
     
-    # 5. B1 温和度 (5分)
-    b1r = b1_return_pct or 0
-    if b1r < 3: b1r_v = 5
-    elif b1r < 5: b1r_v = 3
-    elif b1r < 8: b1r_v = 1
-    else: b1r_v = 0
-    sc += b1r_v; detail['b1_moderation'] = b1r_v
+    # 5. 振幅收缩 (15分) — B1 前振幅是否在收缩
+    amp_v = 0
+    if klines and len(klines) >= 20:
+        try:
+            highs = np.array([k['high'] for k in klines[-20:]], dtype=np.float64)
+            lows = np.array([k['low'] for k in klines[-20:]], dtype=np.float64)
+            closes_arr = np.array([k['close'] for k in klines[-20:]], dtype=np.float64)
+            daily_range = (highs - lows) / closes_arr
+            recent = np.mean(daily_range[-5:]) if len(daily_range) >= 5 else 1
+            prior = np.mean(daily_range[:-5]) if len(daily_range) > 5 else 1
+            if prior > 0:
+                ratio = recent / prior
+                if ratio < 0.70: amp_v = 15
+                elif ratio < 0.85: amp_v = 10
+                elif ratio < 1.00: amp_v = 5
+        except:
+            pass
+    sc += amp_v; detail['range_contract'] = amp_v
+    
+    # 6. 下影线 (5分) — B1 日前10日均下影线占比
+    wick_v = 0
+    if klines and len(klines) >= 10:
+        try:
+            def _wick(kbar):
+                body_low = min(kbar['open'], kbar['close'])
+                rng = kbar['high'] - kbar['low']
+                return (body_low - kbar['low']) / rng * 100 if rng > 0 else 0
+            # B1日及前9日的均下影线
+            wicks = [_wick(klines[j]) for j in range(-10, 0)]
+            avg_wick = sum(wicks) / len(wicks)
+            if avg_wick > 30: wick_v = 5
+            elif avg_wick > 20: wick_v = 3
+            elif avg_wick > 10: wick_v = 1
+        except:
+            pass
+    sc += wick_v; detail['lower_wick'] = wick_v
     
     return (sc, detail) if return_detail else sc
 

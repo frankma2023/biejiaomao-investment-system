@@ -1754,3 +1754,39 @@ ORDER BY change_date DESC LIMIT 1
 **数据量**：~5条/日
 **写入脚本**：`src/cockpit/pipeline.py --save`
 **读取场景**：投资决策驾驶舱前端 /cockpit/
+### daily_review_lhb — 每日龙虎榜
+| 列 | 类型 | 说明 |
+|---|------|------|
+| date | TEXT | 交易日期 |
+| stock_code | TEXT | 股票代码 |
+| stock_name | TEXT | 股票名称 |
+| reason | TEXT | 披露原因 |
+| total_buy/total_sell/net_amount | REAL | 买卖总额/净额 |
+| inst_buy/inst_sell/inst_net | REAL | 机构买卖/净额 |
+
+### daily_review_block_trade — 大宗交易
+| 列 | 类型 | 说明 |
+|---|------|------|
+| date | TEXT | 交易日期 |
+| stock_code | TEXT | 股票代码 |
+| trading_price/volume/amount | REAL | 成交价/量/额 |
+| discount_rate | REAL | 折价率 |
+| buy_branch/sell_branch | TEXT | 营业部 |
+
+### daily_review_margin — 融资融券
+| 列 | 类型 | 说明 |
+|---|------|------|
+| date | TEXT | 交易日期 |
+| stock_code | TEXT | 股票代码 |
+| margin_balance | REAL | 两融余额 |
+| net_buy_d1 | REAL | 当日融资净买入 |
+| fb_balance/sb_balance | REAL | 融资/融券余额 |
+
+### daily_review_summary — 每日市场汇总
+| 列 | 类型 | 说明 |
+|---|------|------|
+| date | TEXT PRIMARY KEY | 交易日期 |
+| up_count/down_count | INT | 上涨/下跌家数 |
+| total_amount | REAL | 全市场成交额(亿) |
+| sh_idx_close/sh_idx_chg | REAL | 上证收盘/涨跌 |
+| hs300_close/hs300_chg | REAL | 沪深300收盘/涨跌 |

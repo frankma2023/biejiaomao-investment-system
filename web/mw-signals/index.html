@@ -181,16 +181,16 @@ async function loadData(params){
   }
 }
 
-// 构建B1关注度评分明细表 v3.0
+// 构建B1关注度评分明细表 v3.2
 function buildTechScoreDetail(s,isB1){
   if(!isB1) return '';
   if(!s.tech_score||s.tech_score<=0) return '';
   var labelMap={
     'h_rs250':'前高RS','turnover':'换手率','days_since_h':'距H天数',
-    'decline':'回调深度','b1_moderation':'B1温和度'
+    'decline':'回调深度','range_contract':'振幅收缩','lower_wick':'下影线'
   };
-  var maxMap={'h_rs250':35,'turnover':25,'days_since_h':20,'decline':15,'b1_moderation':5};
-  var order=['h_rs250','turnover','days_since_h','decline','b1_moderation'];
+  var maxMap={'h_rs250':30,'turnover':20,'days_since_h':15,'decline':15,'range_contract':15,'lower_wick':5};
+  var order=['h_rs250','turnover','days_since_h','decline','range_contract','lower_wick'];
   var detail=null;
   try{ if(s.tech_score_detail) detail=JSON.parse(s.tech_score_detail); }catch(e){}
   // 如果是新格式(v3.0)，展示5因子明细；否则只展示总分
