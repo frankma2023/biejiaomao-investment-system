@@ -31,7 +31,8 @@ def init_tables(db):
         CREATE TABLE IF NOT EXISTS daily_review_summary (
             date TEXT PRIMARY KEY, up_count INT, down_count INT,
             total_amount REAL, sh_idx_close REAL, sh_idx_chg REAL,
-            hs300_close REAL, hs300_chg REAL, created_at TEXT);
+            hs300_close REAL, hs300_chg REAL,
+            margin_balance REAL, margin_net_buy REAL, created_at TEXT);
     ''')
     db.commit()
 
@@ -120,10 +121,6 @@ def generate_report(date=None):
     vol = db.execute('SELECT SUM(amount) as v FROM daily_kline WHERE date=?', (date,)).fetchone()
 
     sh = idx_data.get('上证综指',{}); hs = idx_data.get('沪深300',{})
-    db.execute('INSERT OR REPLACE INTO daily_review_summary VALUES (?,?,?,?,?,?,?,?,?)',
-        (date, bd['up'] or 0, bd['dn'] or 0, vol['v']/1e8 if vol and vol['v'] else 0,
-         sh.get('close'), sh.get('chg'), hs.get('close'), hs.get('chg'),
-         datetime.now().strftime('%Y-%m-%d %H:%M')))
     db.commit()
 
     # 3. 龙虎榜
@@ -145,6 +142,14 @@ def generate_report(date=None):
     print('  两融...'); margin = fetch_margin(db, date)
     total_margin = sum(r['margin_balance'] or 0 for r in margin)
     total_net_buy = sum(r['net_buy_d1'] or 0 for r in margin)
+
+    # 保存两融汇总到 daily_review_summary
+    db.execute('INSERT OR REPLACE INTO daily_review_summary (date,up_count,down_count,total_amount,sh_idx_close,sh_idx_chg,hs300_close,hs300_chg,created_at,margin_balance,margin_net_buy) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+        (date, bd['up'] or 0, bd['dn'] or 0, vol['v']/1e8 if vol and vol['v'] else 0,
+         sh.get('close'), sh.get('chg'), hs.get('close'), hs.get('chg'),
+         datetime.now().strftime('%Y-%m-%d %H:%M'),
+         total_margin/1e8, total_net_buy/1e8))
+    db.commit()
 
     # 缓存股票名称供HTML使用
     name_cache = {}

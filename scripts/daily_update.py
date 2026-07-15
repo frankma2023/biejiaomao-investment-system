@@ -16,6 +16,7 @@
   5. 个股基本面         (fetch_fundamental_nonfinancial — 每日增量)
   6. 指数拥挤度         (index_crowding)
   7. 融资融券           (fetch_margin_daily)
+  7.5 龙虎榜+大宗+汇总   (daily_review_v2)
   8. 大盘健康度         (market_health)
   9. 大盘卖出评分       (market_sell_score)
   10. 大盘扫描快照      (compute_market_snapshot)
@@ -136,6 +137,7 @@ TASKS = [
     ("📈 个股日K线",       [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py"]),
     ("📐 指数拥挤度",      [PYTHON_EXE, "src/scanners/index_crowding.py", "--date", today_str]),
     ("🔄 融资融券(新API)", [PYTHON_EXE, "scripts/fetch_margin_daily.py"]),
+    ("📰 龙虎榜+大宗+汇总",  [PYTHON_EXE, "scripts/daily_review_v2.py", today_str]),
     ("💊 大盘健康度",      [PYTHON_EXE, "src/scanners/market_health.py", "--date", today_str]),
     ("💪 个股RS强度",      [PYTHON_EXE, "src/scanners/stock_rs.py", "--date", today_str]),
     ("📊 指数RS强度",      [PYTHON_EXE, "src/scanners/index_rs.py", "--date", today_str]),

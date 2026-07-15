@@ -495,7 +495,8 @@ def api_market_health():
     indicators = [
         {'key': 'ma50_above',   'value': row['ma50_above_value'],   'score': row['ma50_above_score'],   'detail': ''},
         {'key': 'hl_ratio',     'value': row['hl_ratio_value'],     'score': row['hl_ratio_score'],     'detail': ''},
-        {'key': 'ad_ratio',     'value': row['ad_ratio_value'],     'score': row['ad_ratio_score'],     'detail': ''},
+        {'key': 'ad_ratio',     'value': row['ad_ratio_value'],     'score': row['ad_ratio_score'],
+         'today': row['ad_ratio_today'] if 'ad_ratio_today' in row.keys() else None, 'detail': ''},
         {'key': 'vol_breakout', 'value': row['vol_breakout_value'], 'score': row['vol_breakout_score'],  'detail': ''},
         {'key': 'margin_5d',    'value': row['margin_5d_value'],    'score': row['margin_5d_score'],     'detail': ''},
         {'key': 'sector_rot',   'value': row['sector_rot_score'],   'score': row['sector_rot_score'],   'detail': ''},
@@ -1098,12 +1099,81 @@ def api_market_breakouts():
         'change_pct': r['change_pct'],
         'volume': r['volume'],
         'amount': r['amount'],
+        'vol_ma50': r['vol_ma50'] if 'vol_ma50' in r.keys() else 0,
+        'vol_ratio': r['vol_ratio'] if 'vol_ratio' in r.keys() else 0,
+        'break_ma': r['break_ma'] if 'break_ma' in r.keys() else '',
     } for r in rows]
     return jsonify({'date': rows[0]['date'] if rows else target_date, 'count': len(stocks), 'stocks': stocks})
 
 # ═══════════════════════════════════════════════
 # API: GET /api/strongest-index
 # ═══════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════
+# API: GET /api/market-scan/capital-flow
+# ═══════════════════════════════════════════════
+
+@app.route('/api/market-scan/capital-flow')
+def api_market_capital_flow():
+    """资金情绪：两融趋势/龙虎榜/大宗交易"""
+    target_date = request.args.get('date', '')
+    if not target_date:
+        target_date = datetime.now().strftime('%Y-%m-%d')
+    db = get_db()
+    
+    # 两融趋势（近60日）
+    trend_rows = db.execute('''
+        SELECT date, margin_balance, margin_net_buy
+        FROM daily_review_summary
+        WHERE margin_balance IS NOT NULL AND margin_balance != 0
+        ORDER BY date DESC LIMIT 60
+    ''').fetchall()
+    trend = [{'date': r['date'], 'balance': r['margin_balance']} for r in reversed(trend_rows)]
+    latest_margin = trend_rows[0] if trend_rows else None
+    
+    # 龙虎榜：精确匹配请求日期
+    lhb_rows = db.execute(
+        "SELECT stock_code, stock_name, reason, net_amount FROM daily_review_lhb WHERE date=? ORDER BY net_amount DESC",
+        (target_date,)
+    ).fetchall()
+    total_buy = sum(r['net_amount'] or 0 for r in lhb_rows if (r['net_amount'] or 0) > 0)
+    total_sell = abs(sum(r['net_amount'] or 0 for r in lhb_rows if (r['net_amount'] or 0) < 0))
+    net_amount = total_buy - total_sell
+    lhb_summary = {
+        'total_buy': round(total_buy, 2), 'total_sell': round(total_sell, 2),
+        'net_amount': round(net_amount, 2), 'count': len(lhb_rows),
+    }
+    
+    # 大宗交易：精确匹配请求日期
+    bt_rows = db.execute(
+        "SELECT stock_code, trading_amount, discount_rate FROM daily_review_block_trade WHERE date=? ORDER BY trading_amount DESC",
+        (target_date,)
+    ).fetchall()
+    bt_discounts = [r['discount_rate'] for r in bt_rows if r['discount_rate']]
+    bt_summary = {
+        'total_count': len(bt_rows),
+        'total_amount': round(sum(r['trading_amount'] for r in bt_rows), 2),
+        'avg_discount': round(sum(bt_discounts)/len(bt_discounts), 2) if bt_discounts else 0,
+        'max_discount': round(min(bt_discounts), 2) if bt_discounts else 0,
+        'details': [{'code': r['stock_code'], 'amount': r['trading_amount'], 'discount': r['discount_rate']} for r in bt_rows],
+    }
+    
+    # 龙虎榜Top
+    top_buy = [{'code': r['stock_code'], 'name': r['stock_name'], 'net': r['net_amount'] or 0, 'reason': (r['reason'] or '')[:20]}
+               for r in lhb_rows if (r['net_amount'] or 0) > 0][:10]
+    top_sell = [{'code': r['stock_code'], 'name': r['stock_name'], 'net': abs(r['net_amount'] or 0), 'reason': (r['reason'] or '')[:20]}
+                for r in lhb_rows if (r['net_amount'] or 0) < 0][:10]
+    
+    return jsonify({
+        'date': target_date, 'data_date': target_date,
+        'margin': {
+            'balance': round(latest_margin['margin_balance'], 0) if latest_margin and latest_margin['margin_balance'] is not None else None,
+            'net_buy': round(latest_margin['margin_net_buy'], 0) if latest_margin and latest_margin['margin_net_buy'] is not None else None,
+            'trend': trend,
+        },
+        'lhb': {**lhb_summary, 'top_buy': top_buy, 'top_sell': top_sell},
+        'block_trade': bt_summary,
+    })
 
 @app.route('/api/strongest-index')
 def api_strongest_index():
@@ -1253,6 +1323,48 @@ def api_pocket_pivot():
     klines_out = [k for k in klines_full if start <= k['date'] <= end]
     signals_out = [s for s in signals if start <= s['date'] <= end]
     return jsonify({'klines': klines_out, 'signals': signals_out})
+
+
+def _ensure_adj_prices(klines):
+    """前复权：用 change_pct 逆向推算 adj_close，按比例同步缩放 OHLC。
+    
+    步骤：
+    1. 从最后一天向前递推 adj_close：prev_adj_close = curr_adj_close / (1 + chg)
+    2. 每晚用 adj_close / raw_close 的比例同步缩放当天的 open/high/low
+
+    这样 OHLC 的比例关系和影线形态完全保留。
+    """
+    if not klines or len(klines) < 2:
+        return
+    n = len(klines)
+    
+    # Step 1: 从后往前推算 adj_close
+    for i in range(n - 2, -1, -1):
+        curr = klines[i + 1]
+        prev = klines[i]
+        chg = curr.get('change_pct')
+        if chg is None:
+            continue
+        if abs(chg) > 1:
+            chg = chg / 100
+        factor = 1 + chg
+        if factor <= 0:
+            continue
+        if curr.get('close') is not None:
+            prev['_adj_close'] = curr.get('_adj_close', curr['close']) / factor
+    
+    # Step 2: 用 adj_close / raw_close 比例同步 OHLC
+    for i in range(n):
+        k = klines[i]
+        raw_close = k['close']
+        adj_close = k.get('_adj_close', raw_close)
+        if raw_close and raw_close > 0:
+            ratio = adj_close / raw_close
+            if k.get('open'): k['open'] *= ratio
+            if k.get('high'): k['high'] *= ratio
+            if k.get('low'): k['low'] *= ratio
+            k['close'] = adj_close
+        k.pop('_adj_close', None)
 
 
 def _aggregate_klines(klines, period):
@@ -3608,9 +3720,14 @@ def api_pattern_scan():
     kf = "AND kline_type='normal'" if is_index else ''
 
     # 获取足够的历史K线（至少2年）
+    # 个股优先用前复权价（adj_*），NULL 时退回不复权
     chg_col = 'change' if is_index else 'change_pct'
+    if is_index:
+        ohlc = "open, high, low, close"
+    else:
+        ohlc = "COALESCE(adj_open, open) as open, COALESCE(adj_high, high) as high, COALESCE(adj_low, low) as low, COALESCE(adj_close, close) as close"
     if start:
-        rows = db.execute(f"""SELECT date, open, high, low, close, volume, {chg_col} as change_pct
+        rows = db.execute(f"""SELECT date, {ohlc}, volume, {chg_col} as change_pct
             FROM {table} WHERE stock_code=? {kf}
             AND date>=date(?, '-750 days') AND date<=?
             ORDER BY date""", (code, start, end)).fetchall()
@@ -3624,6 +3741,10 @@ def api_pattern_scan():
         return jsonify({'code': code, 'error': 'no_data'})
 
     klines_full = [dict(r) for r in rows]
+
+    # ── 前复权：用 change_pct 逆向推算（adj_*/complex_factor 大量缺失后的兜底方案）──
+    if not is_index:
+        _ensure_adj_prices(klines_full)
 
     # 获取股票名称
     name = code

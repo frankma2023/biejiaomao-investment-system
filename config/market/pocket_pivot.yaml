@@ -4,7 +4,7 @@ pocket_pivot:
   sma50_check: true
   sma50_slope_10d: -0.01
   sma50_slope_enabled: false
-  close_position_min: 0.6
+  close_position_min: 0.5
   require_green: true
   vol_down_lookback: 10
   vol_fallback_enabled: true

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="theme-color" content="#0d0d12">
+<title>放量突破个股</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<style>
+  .layout{max-width:1100px;margin:0 auto}
+  .hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .hdr h1{font-family:var(--font-display);font-size:1.1rem;font-weight:800;color:var(--text-primary)}
+  .hdr .date{font-size:0.65rem;color:var(--muted)}
+  .controls{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+  .controls input,.controls select{font-family:var(--font-body);padding:5px 10px;border:1px solid var(--border);border-radius:10px;font-size:11px;background:var(--card);color:var(--text-primary)}
+  .controls .btn{font-family:var(--font-body);font-size:10px;padding:5px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text-secondary);cursor:pointer;transition:all .15s}
+  .controls .btn:hover{color:var(--text-primary);border-color:var(--border-hover)}
+  .controls .count{font-size:0.65rem;color:var(--muted);margin-left:auto}
+  table{width:100%;border-collapse:collapse;font-size:0.7rem}
+  th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--divider);font-size:0.6rem;color:var(--muted);font-weight:700;cursor:pointer;white-space:nowrap;user-select:none}
+  th:hover{color:var(--accent)}
+  th.sorted{color:var(--accent)}
+  td{padding:6px 10px;border-bottom:1px solid var(--divider);color:var(--text-secondary)}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .code{font-family:var(--font-display);font-weight:700;color:var(--accent);cursor:pointer;text-decoration:none}
+  .code:hover{text-decoration:underline}
+  .up{color:#ef4444}.down{color:#10b981}
+  .ma-tag{display:inline-block;padding:1px 7px;border-radius:8px;font-size:0.58rem;font-weight:600;background:rgba(245,158,11,.12);color:#f59e0b}
+  .ma-tag.ma-big{background:rgba(239,68,68,.12);color:#ef4444}
+  .loading{padding:48px;text-align:center;color:var(--muted);font-size:0.8rem}
+  @media(max-width:700px){.layout{padding:0 10px}th,td{padding:5px 6px;font-size:0.65rem}}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<script>(function(){var c=document.getElementById("bg-canvas"),w=c.width=window.innerWidth,h=c.height=window.innerHeight;var ctx=c.getContext("2d"),N=60;var p=[];for(var i=0;i<N;i++)p.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var P=p[i];P.x+=P.vx;P.y+=P.vy;if(P.x<0)P.x=w;if(P.x>w)P.x=0;if(P.y<0)P.y=h;if(P.y>h)P.y=0;ctx.beginPath();ctx.arc(P.x,P.y,P.r,0,2*Math.PI);ctx.fillStyle='rgba(255,255,255,'+P.o+')';ctx.fill()}};setInterval(draw,50)})();</script>
+<div class="app-container">
+  <nav id="top-nav"></nav>
+  <div class="layout">
+    <div class="hdr">
+      <h1>🚀 放量突破个股</h1>
+      <span class="date" id="date-label"></span>
+    </div>
+    <div class="controls">
+      <input type="text" id="filter-code" placeholder="代码/名称筛选" oninput="render()">
+      <select id="filter-ma" onchange="render()">
+        <option value="">全部均线</option>
+        <option value="MA200">MA200</option>
+        <option value="MA120">MA120</option>
+        <option value="MA50">MA50</option>
+        <option value="MA20">MA20</option>
+        <option value="MA10">MA10</option>
+        <option value="MA5">MA5</option>
+      </select>
+      <select id="filter-dir" onchange="render()">
+        <option value="">涨跌不限</option>
+        <option value="up">上涨</option>
+        <option value="down">下跌</option>
+      </select>
+      <button class="btn" onclick="toggleSort('vol_ratio')">⇅ 量比排序</button>
+      <button class="btn" onclick="toggleSort('break_ma')">⇅ 均线排序</button>
+      <button class="btn" id="btn-refresh" onclick="load()">🔄 刷新</button>
+      <span class="count" id="count-label"></span>
+    </div>
+    <div id="table"></div>
+  </div>
+</div>
+<script src="../shared/js/nav.js"></script>
+<script>
+var API_BASE='';
+var allStocks=[], dataDate='', sortKey='', sortAsc=false;
+
+function fm(v){if(v==null)return'—';if(v>=1e8)return(v/1e8).toFixed(2)+'亿';if(v>=1e4)return(v/1e4).toFixed(0)+'万';return v.toString();}
+
+async function load(){
+  document.getElementById('table').innerHTML='<div class="loading">加载中...</div>';
+  try{
+    var r=await fetch(API_BASE+'/api/market-health/breakouts?date=latest');
+    var d=await r.json();
+    allStocks=d.stocks||[];
+    dataDate=d.date||'';
+    document.getElementById('date-label').textContent=dataDate;
+    render();
+  }catch(e){
+    document.getElementById('table').innerHTML='<div class="loading">加载失败: '+e.message+'</div>';
+  }
+}
+
+function maOrder(v){
+  var o={'MA200':6,'MA120':5,'MA50':4,'MA20':3,'MA10':2,'MA5':1};
+  return o[v]||0;
+}
+
+function toggleSort(k){
+  if(sortKey===k){sortAsc=!sortAsc}else{sortKey=k;sortAsc=false}
+  render();
+  // highlight sorted header
+  document.querySelectorAll('th').forEach(function(th){th.classList.remove('sorted')});
+  var h=document.querySelector('th[data-key="'+k+'"]');
+  if(h)h.classList.add('sorted');
+}
+
+function render(){
+  var codeFilter=(document.getElementById('filter-code').value||'').toUpperCase();
+  var maFilter=document.getElementById('filter-ma').value;
+  var dirFilter=document.getElementById('filter-dir').value;
+
+  var filtered=allStocks.filter(function(s){
+    if(codeFilter&&s.stock_code.indexOf(codeFilter)<0&&(s.name||'').toUpperCase().indexOf(codeFilter)<0)return false;
+    if(maFilter&&s.break_ma!==maFilter)return false;
+    if(dirFilter==='up'&&(s.change_pct||0)<0)return false;
+    if(dirFilter==='down'&&(s.change_pct||0)>=0)return false;
+    return true;
+  });
+
+  if(sortKey){
+    filtered.sort(function(a,b){
+      var va=a[sortKey]||0, vb=b[sortKey]||0;
+      if(sortKey==='break_ma'){va=maOrder(a.break_ma);vb=maOrder(b.break_ma)}
+      return sortAsc?(va>vb?1:-1):(va<vb?1:-1);
+    });
+  }
+
+  document.getElementById('count-label').textContent='共'+filtered.length+'只'+(filtered.length!==allStocks.length?' / 全部'+allStocks.length+'只':'');
+
+  var tbl='<table><thead><tr>'
+    +'<th data-key="stock_code" onclick="toggleSort(\'stock_code\')">代码</th>'
+    +'<th>名称</th>'
+    +'<th data-key="change_pct" onclick="toggleSort(\'change_pct\')">涨跌幅</th>'
+    +'<th data-key="amount" onclick="toggleSort(\'amount\')">成交金额</th>'
+    +'<th data-key="vol_ma50" onclick="toggleSort(\'vol_ma50\')">MA50均量</th>'
+    +'<th data-key="vol_ratio" onclick="toggleSort(\'vol_ratio\')">成交量倍数</th>'
+    +'<th data-key="break_ma" onclick="toggleSort(\'break_ma\')">突破均线</th>'
+    +'</tr></thead><tbody>';
+
+  filtered.forEach(function(s){
+    var cl=(s.change_pct||0)>=0?'up':'down';
+    var pct=((s.change_pct||0)>=0?'+':'')+((s.change_pct||0)*100).toFixed(2)+'%';
+    var maCls=s.break_ma==='MA200'||s.break_ma==='MA120'?'ma-big':'';
+    tbl+='<tr>'
+      +'<td><a class="code" href="../pattern-scan/?code='+s.stock_code+'" target="_blank">'+s.stock_code+'</a></td>'
+      +'<td>'+(s.name||'—')+'</td>'
+      +'<td class="'+cl+'">'+pct+'</td>'
+      +'<td>'+fm(s.amount)+'</td>'
+      +'<td>'+fm(s.vol_ma50)+'</td>'
+      +'<td>'+(s.vol_ratio?s.vol_ratio.toFixed(1)+'x':'—')+'</td>'
+      +'<td><span class="ma-tag '+maCls+'">'+(s.break_ma||'—')+'</span></td>'
+      +'</tr>';
+  });
+
+  tbl+='</tbody></table>';
+  if(!filtered.length)tbl='<div class="loading">无匹配结果</div>';
+  document.getElementById('table').innerHTML=tbl;
+
+  // restore sort header highlight
+  if(sortKey){
+    var h=document.querySelector('th[data-key="'+sortKey+'"]');
+    if(h)h.classList.add('sorted');
+  }
+}
+
+load();
+</script>
+</body>
+</html>

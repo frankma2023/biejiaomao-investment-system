@@ -1,4 +1,4 @@
-const CACHE = 'hana-v2';
+const CACHE = 'hana-v3';
 const URLS = [
   '/mobile/',
   '/cockpit/',
@@ -19,32 +19,31 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys => 
+    caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
-  // API 请求：网络优先（不缓存）
+  // API 请求：网络优先，失败不缓存
   if (e.request.url.indexOf('/api/') >= 0) {
-    e.respondWith(fetch(e.request));
+    e.respondWith(fetch(e.request).catch(() => new Response('', {status: 502})));
     return;
   }
-  // HTML 文件：网络优先（先问服务器，更新缓存）
-  if (e.request.mode === 'navigate' || e.request.headers.get('Accept').includes('text/html')) {
+  // HTML：网络优先，失败走缓存
+  if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request).then(r => {
-        var clone = r.clone();
+        const clone = r.clone();
         caches.open(CACHE).then(c => c.put(e.request, clone));
         return r;
-      }).catch(() => caches.match(e.request))
+      }).catch(() => caches.match(e.request).then(r => r || fetch(e.request)))
     );
-  } else {
-    // 静态资源：缓存优先
-    e.respondWith(
-      caches.match(e.request).then(r => r || fetch(e.request))
-    );
+    return;
   }
+  // 其他资源：缓存优先，失败走网络
+  e.respondWith(
+    caches.match(e.request).then(r => r || fetch(e.request).catch(() => new Response('', {status: 502})))
+  );
 });

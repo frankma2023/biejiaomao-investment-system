@@ -58,6 +58,7 @@ def ensure_tables():
             hl_ratio_value    REAL,
             hl_ratio_score    INTEGER,
             ad_ratio_value    REAL,
+            ad_ratio_today    REAL,
             ad_ratio_score    INTEGER,
             vol_breakout_value REAL,
             vol_breakout_score INTEGER,
@@ -87,6 +88,9 @@ def ensure_tables():
             change_pct  REAL,
             volume      REAL,
             amount      REAL,
+            vol_ma50    REAL,
+            vol_ratio   REAL,
+            break_ma    TEXT,
             PRIMARY KEY (date, stock_code)
         );
 
@@ -116,6 +120,17 @@ def ensure_tables():
             UNIQUE(date, group_name)
         );
     """)
+    # 迁移已有表：加新列
+    for tbl_col in [
+        ("market_health_daily", "ad_ratio_today REAL"),
+        ("market_breakout_daily", "vol_ma50 REAL"),
+        ("market_breakout_daily", "vol_ratio REAL"),
+        ("market_breakout_daily", "break_ma TEXT"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE {tbl_col[0]} ADD COLUMN {tbl_col[1]}")
+        except sqlite3.OperationalError:
+            pass  # column already exists
     conn.commit()
     conn.close()
 
@@ -136,7 +151,7 @@ def _tier6(val, thresholds, scores):
 # ═══════════════════════════════════════════════
 
 def compute_ad_ratio(conn, target_date):
-    """上涨家数 / 下跌家数，5日均值"""
+    """上涨家数 / 下跌家数，返回 (5日均值, 当日单日比)"""
     rows = conn.execute("""
         SELECT date,
                SUM(CASE WHEN close > prev_close THEN 1 ELSE 0 END) as up,
@@ -158,7 +173,8 @@ def compute_ad_ratio(conn, target_date):
         else:
             values.append(10.0)
     avg = sum(values) / len(values) if values else 0
-    return round(avg, 2)
+    today_val = values[0] if values else 0
+    return round(avg, 2), round(today_val, 2)
 
 
 def score_ad_ratio(val): return _tier6(val, [2.0, 1.5, 1.0, 0.6, 0.3], [15, 12, 9, 6, 3, 0])
@@ -254,15 +270,22 @@ def compute_vol_breakout(conn, target_date):
     past_20 = [r['cnt'] for r in rows[1:21]]
     avg_20 = sum(past_20) / len(past_20) if past_20 else 0
 
-    # 取当日具体股票列表
+    # 取当日具体股票列表（含各均线值）
     stock_rows = conn.execute("""
-        SELECT stock_code, close, change_pct, volume, amount
+        SELECT stock_code, close, change_pct, volume, amount, vol_ma50,
+               ma5, ma10, ma20, ma50, ma120, ma200
         FROM (
             SELECT date, stock_code, close, change_pct, volume, amount,
                    AVG(volume) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) as vol_ma50,
-                   MAX(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) as max_20_close
+                   MAX(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) as max_20_close,
+                   AVG(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) as ma5,
+                   AVG(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW) as ma10,
+                   AVG(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) as ma20,
+                   AVG(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) as ma50,
+                   AVG(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 119 PRECEDING AND CURRENT ROW) as ma120,
+                   AVG(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) as ma200
             FROM daily_kline
-            WHERE date >= date(?, '-100 days') AND date <= ?
+            WHERE date >= date(?, '-250 days') AND date <= ?
         )
         WHERE date = ?
           AND vol_ma50 > 0 AND max_20_close IS NOT NULL
@@ -271,13 +294,28 @@ def compute_vol_breakout(conn, target_date):
         ORDER BY volume DESC
     """, (target_date, target_date, target_date)).fetchall()
 
-    stock_list = [{
-        'stock_code': r['stock_code'],
-        'close': r['close'],
-        'change_pct': r['change_pct'],
-        'volume': r['volume'],
-        'amount': r['amount'],
-    } for r in stock_rows]
+    stock_list = []
+    for r in stock_rows:
+        close = r['close']
+        # 成交量倍数
+        vol_ratio = round(r['volume'] / r['vol_ma50'], 2) if r['vol_ma50'] and r['vol_ma50'] > 0 else 0
+        # 突破均线：找到被突破的最高级别均线（MA5→MA10→MA20→MA50→MA120→MA200，优先显示大级别的）
+        break_ma = ''
+        for ma_level in [('MA200', r['ma200']), ('MA120', r['ma120']), ('MA50', r['ma50']),
+                          ('MA20', r['ma20']), ('MA10', r['ma10']), ('MA5', r['ma5'])]:
+            if ma_level[1] is not None and close > ma_level[1]:
+                break_ma = ma_level[0]
+                break
+        stock_list.append({
+            'stock_code': r['stock_code'],
+            'close': close,
+            'change_pct': r['change_pct'],
+            'volume': r['volume'],
+            'amount': r['amount'],
+            'vol_ma50': r['vol_ma50'],
+            'vol_ratio': vol_ratio,
+            'break_ma': break_ma,
+        })
 
     return today_cnt, avg_20, stock_list
 
@@ -488,12 +526,13 @@ def compute_fear_greed(conn, target_date, ma50_pct=None):
         ret_5d = 0
     momentum_pct = max(0, -ret_5d) / 10 * 100  # 跌幅越大越恐慌
 
-    # 综合
-    composite = (vol_rank + width_pct + momentum_pct) / 3
-    return round(composite, 1), score_fear_greed(composite)
+    # 综合：三个子指标越高=越恐慌，取反得贪婪指数（0=极度恐慌 / 100=极度贪婪）
+    fear_raw = (vol_rank + width_pct + momentum_pct) / 3
+    composite = round(100 - fear_raw, 1)
+    return composite, score_fear_greed(composite)
 
 
-def score_fear_greed(val): return _tier6(val, [80, 60, 40, 20], [0, 4, 6, 8, 10])
+def score_fear_greed(val): return _tier6(val, [80, 60, 40, 20], [10, 8, 6, 4, 0])
 
 
 # ═══════════════════════════════════════════════
@@ -507,9 +546,9 @@ def compute_all(target_date):
     logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
     # 1
-    ad = compute_ad_ratio(conn, target_date)
+    ad, ad_today = compute_ad_ratio(conn, target_date)
     ad_s = score_ad_ratio(ad)
-    logger.info(f"  涨跌家数比: {ad} → {ad_s}分")
+    logger.info(f"  涨跌家数比: {ad}(5日)/{ad_today}(当日) → {ad_s}分")
 
     # 2
     hl = compute_hl_ratio(conn, target_date)
@@ -530,8 +569,8 @@ def compute_all(target_date):
     conn.execute("DELETE FROM market_breakout_daily WHERE date = ?", (target_date,))
     for s in vb_stocks:
         conn.execute(
-            "INSERT INTO market_breakout_daily (date, stock_code, close, change_pct, volume, amount) VALUES (?, ?, ?, ?, ?, ?)",
-            (target_date, s['stock_code'], s['close'], s['change_pct'], s['volume'], s['amount'])
+            "INSERT INTO market_breakout_daily (date, stock_code, close, change_pct, volume, amount, vol_ma50, vol_ratio, break_ma) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (target_date, s['stock_code'], s['close'], s['change_pct'], s['volume'], s['amount'], s.get('vol_ma50', 0), s.get('vol_ratio', 0), s.get('break_ma', ''))
         )
 
     # 5
@@ -566,14 +605,14 @@ def compute_all(target_date):
         (date, total_score, rating,
          ma50_above_value, ma50_above_score,
          hl_ratio_value, hl_ratio_score,
-         ad_ratio_value, ad_ratio_score,
+         ad_ratio_value, ad_ratio_today, ad_ratio_score,
          vol_breakout_value, vol_breakout_score,
          margin_5d_value, margin_5d_score,
          sector_rot_score,
          fear_greed_value, fear_greed_score)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (target_date, total, rating,
-          ma50, ma50_s, hl, hl_s, ad, ad_s, vb, vb_s, mg, mg_s,
+          ma50, ma50_s, hl, hl_s, ad, ad_today, ad_s, vb, vb_s, mg, mg_s,
           sector_score, fg, fg_s))
     conn.commit()
 

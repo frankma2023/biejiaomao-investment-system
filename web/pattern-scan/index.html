@@ -152,6 +152,16 @@
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==="dark"?"light":"dark";h.dataset.theme=n;localStorage.setItem("theme",n)}
 (function(){var s=localStorage.getItem("theme")||"dark";document.documentElement.dataset.theme=s})();
 </script>
+<script>
+(function(){
+  var p=new URLSearchParams(location.search);
+  var autoCode=p.get('code');
+  if(autoCode){
+    document.getElementById('code').value=autoCode;
+    setTimeout(function(){if(typeof scan==='function')scan()},300);
+  }
+})();
+</script>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js")}</script>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js")}</script>
 </body>
