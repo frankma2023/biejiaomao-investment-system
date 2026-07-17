@@ -584,6 +584,7 @@ def save_signals(conn, scan_date, signals):
                 _kline_cache.get(s['code'], []) if _kline_cache else [],
                 s.get('decline_pct'), s.get('h_rs250'), s.get('b1_return_pct'),
                 s.get('h_date'), s.get('c_amount_avg', 0),
+                ind_rs20=s.get('ind_rs20'),
                 conn=conn, return_detail=True
             )
             import json as _json
@@ -656,33 +657,33 @@ def compute_tech_score(code, b1_date, klines, rs_cache=None, return_detail=False
     return (0, {}) if return_detail else 0
 
 
-# ══════════════════════ B1 关注度评分 v3.0 ══════════════════
+# ══════════════════ B1 关注度评分 v3.4 ══════════════════
 
 def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_return_pct,
-                             h_date, c_amount_avg, conn=None, return_detail=False):
+                             h_date, c_amount_avg, ind_rs20=None, conn=None, return_detail=False):
     """
-    B1 关注度评分 v3.2（满分 100）。
-    
-    基于 10 年全周期赢家归因 + QuantSkills 800 因子增量检验的 6 个最强因子：
-    
-    1. h_rs250 (30分) — 前高时的个股 RS250
-       ≥90→30, ≥80→25, ≥70→15, ≥60→8
-    
-    2. 换手率 (20分) — 横盘期日均换手率
-       <0.5%→20, <1.0%→16, <1.5%→12, <2.0%→8, <3.0%→4
-    
+    B1 关注度评分 v3.4（满分 100）。
+
+    基于 76,512 个 B1 信号的 7 因子逐步回归（|β| 比例分配权重）的 6 个因子：
+
+    1. h_rs250 (38分) — 前高时的个股 RS250
+       ≥90→38, ≥80→30, ≥70→20, ≥60→10
+
+    2. 换手率 (18分) — 横盘期日均换手率
+       <0.5%→18, <1.0%→14, <1.5%→10, <2.0%→6, <3.0%→3
+
     3. 距H天数 (15分) — 前高到 B1 的整理时长
        40~60天→15, 30~40天→12, 20~30天或60~80天→8, >80天→5
-    
-    4. 回调深度 (15分) — H→L 的最大跌幅
-       >35%→15, 25~35%→12, 20~25%→8, 15~20%→4
-    
-    5. 振幅收缩 (15分) — 近5日振幅 vs 20日振幅（QuantSkills R774 验证）
-       收缩到<70%→15, <85%→10, <100%→5
-    
-    6. 下影线 (5分) — B1 日前10日均下影线占比（QuantSkills R688 验证）
-       >30%→5, >20%→3, >10%→1
-    
+
+    4. 行业 RS_20 (12分) — B1 日所属行业 RS_20
+       ≥80→12
+
+    5. 回调深度 (10分) — H→L 的最大跌幅
+       >35%→10, 25~35%→8, 20~25%→5, 15~20%→3
+
+    6. 振幅收缩 (7分) — 近5日振幅 vs 前15日振幅
+       收缩到<70%→7, <85%→5, <100%→3
+
     分层：极高≥80 / 高65~79 / 关注50~64 / 一般35~49 / 低<35
     """
     from datetime import date
@@ -690,16 +691,16 @@ def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_retu
     sc = 0
     detail = {}
     
-    # 1. h_rs250 (30分)
+    # 1. h_rs250 (38分)
     rs = h_rs250 or 0
-    if rs >= 90: v = 30
-    elif rs >= 80: v = 25
-    elif rs >= 70: v = 15
-    elif rs >= 60: v = 8
+    if rs >= 90: v = 38
+    elif rs >= 80: v = 30
+    elif rs >= 70: v = 20
+    elif rs >= 60: v = 10
     else: v = 0
     sc += v; detail['h_rs250'] = v
     
-    # 2. 换手率 (20分)
+    # 2. 换手率 (18分)
     to_v = 0
     if conn and c_amount_avg and c_amount_avg > 0:
         row = conn.execute("""
@@ -714,11 +715,11 @@ def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_retu
             ).fetchone()
             if close_row and close_row[0] and close_row[0] > 0:
                 to_rate = c_amount_avg / (row[0] * close_row[0]) * 100
-                if to_rate < 0.5: to_v = 20
-                elif to_rate < 1.0: to_v = 16
-                elif to_rate < 1.5: to_v = 12
-                elif to_rate < 2.0: to_v = 8
-                elif to_rate < 3.0: to_v = 4
+                if to_rate < 0.5: to_v = 18
+                elif to_rate < 1.0: to_v = 14
+                elif to_rate < 1.5: to_v = 10
+                elif to_rate < 2.0: to_v = 6
+                elif to_rate < 3.0: to_v = 3
     sc += to_v; detail['turnover'] = to_v
     
     # 3. 距H天数 (15分)
@@ -731,16 +732,16 @@ def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_retu
         elif dh > 80: dh_v = 5
     sc += dh_v; detail['days_since_h'] = dh_v
     
-    # 4. 回调深度 (15分)
+    # 4. 回调深度 (10分)
     dec = decline_pct or 0
-    if dec > 35: dec_v = 15
-    elif dec >= 25: dec_v = 12
-    elif dec >= 20: dec_v = 8
-    elif dec >= 15: dec_v = 4
+    if dec > 35: dec_v = 10
+    elif dec >= 25: dec_v = 8
+    elif dec >= 20: dec_v = 5
+    elif dec >= 15: dec_v = 3
     else: dec_v = 0
     sc += dec_v; detail['decline'] = dec_v
     
-    # 5. 振幅收缩 (15分) — B1 前振幅是否在收缩
+    # 5. 振幅收缩 (7分) — B1 前振幅是否在收缩
     amp_v = 0
     if klines and len(klines) >= 20:
         try:
@@ -752,31 +753,19 @@ def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_retu
             prior = np.mean(daily_range[:-5]) if len(daily_range) > 5 else 1
             if prior > 0:
                 ratio = recent / prior
-                if ratio < 0.70: amp_v = 15
-                elif ratio < 0.85: amp_v = 10
-                elif ratio < 1.00: amp_v = 5
+                if ratio < 0.70: amp_v = 7
+                elif ratio < 0.85: amp_v = 5
+                elif ratio < 1.00: amp_v = 3
         except:
             pass
     sc += amp_v; detail['range_contract'] = amp_v
-    
-    # 6. 下影线 (5分) — B1 日前10日均下影线占比
-    wick_v = 0
-    if klines and len(klines) >= 10:
-        try:
-            def _wick(kbar):
-                body_low = min(kbar['open'], kbar['close'])
-                rng = kbar['high'] - kbar['low']
-                return (body_low - kbar['low']) / rng * 100 if rng > 0 else 0
-            # B1日及前9日的均下影线
-            wicks = [_wick(klines[j]) for j in range(-10, 0)]
-            avg_wick = sum(wicks) / len(wicks)
-            if avg_wick > 30: wick_v = 5
-            elif avg_wick > 20: wick_v = 3
-            elif avg_wick > 10: wick_v = 1
-        except:
-            pass
-    sc += wick_v; detail['lower_wick'] = wick_v
-    
+
+    # 6. 行业RS_20 (12分) — 所属行业短期强势
+    ind_v = 0
+    if ind_rs20 is not None and ind_rs20 >= 80:
+        ind_v = 12
+    sc += ind_v; detail['ind_rs20'] = ind_v
+
     return (sc, detail) if return_detail else sc
 
 

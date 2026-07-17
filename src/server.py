@@ -1100,6 +1100,7 @@ def api_market_breakouts():
         'volume': r['volume'],
         'amount': r['amount'],
         'vol_ma50': r['vol_ma50'] if 'vol_ma50' in r.keys() else 0,
+        'amt_ma50': r['amt_ma50'] if 'amt_ma50' in r.keys() else 0,
         'vol_ratio': r['vol_ratio'] if 'vol_ratio' in r.keys() else 0,
         'break_ma': r['break_ma'] if 'break_ma' in r.keys() else '',
     } for r in rows]
@@ -3727,12 +3728,12 @@ def api_pattern_scan():
     else:
         ohlc = "COALESCE(adj_open, open) as open, COALESCE(adj_high, high) as high, COALESCE(adj_low, low) as low, COALESCE(adj_close, close) as close"
     if start:
-        rows = db.execute(f"""SELECT date, {ohlc}, volume, {chg_col} as change_pct
+        rows = db.execute(f"""SELECT date, {ohlc}, volume, amount, {chg_col} as change_pct
             FROM {table} WHERE stock_code=? {kf}
             AND date>=date(?, '-750 days') AND date<=?
             ORDER BY date""", (code, start, end)).fetchall()
     else:
-        rows = db.execute(f"""SELECT date, open, high, low, close, volume, {chg_col} as change_pct
+        rows = db.execute(f"""SELECT date, open, high, low, close, volume, amount, {chg_col} as change_pct
             FROM {table} WHERE stock_code=? {kf}
             AND date<=?
             ORDER BY date""", (code, end)).fetchall()

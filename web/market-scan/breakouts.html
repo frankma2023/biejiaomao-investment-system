@@ -130,8 +130,8 @@ function render(){
     +'<th>名称</th>'
     +'<th data-key="change_pct" onclick="toggleSort(\'change_pct\')">涨跌幅</th>'
     +'<th data-key="amount" onclick="toggleSort(\'amount\')">成交金额</th>'
-    +'<th data-key="vol_ma50" onclick="toggleSort(\'vol_ma50\')">MA50均量</th>'
-    +'<th data-key="vol_ratio" onclick="toggleSort(\'vol_ratio\')">成交量倍数</th>'
+    +'<th data-key="amt_ma50" onclick="toggleSort(\'amt_ma50\')">MA50均额(元)</th>'
+    +'<th data-key="vol_ratio" onclick="toggleSort(\'vol_ratio\')">量比</th>'
     +'<th data-key="break_ma" onclick="toggleSort(\'break_ma\')">突破均线</th>'
     +'</tr></thead><tbody>';
 
@@ -144,7 +144,7 @@ function render(){
       +'<td>'+(s.name||'—')+'</td>'
       +'<td class="'+cl+'">'+pct+'</td>'
       +'<td>'+fm(s.amount)+'</td>'
-      +'<td>'+fm(s.vol_ma50)+'</td>'
+      +'<td>'+fm(s.amt_ma50||0)+'</td>'
       +'<td>'+(s.vol_ratio?s.vol_ratio.toFixed(1)+'x':'—')+'</td>'
       +'<td><span class="ma-tag '+maCls+'">'+(s.break_ma||'—')+'</span></td>'
       +'</tr>';

@@ -89,6 +89,7 @@ def ensure_tables():
             volume      REAL,
             amount      REAL,
             vol_ma50    REAL,
+            amt_ma50    REAL,
             vol_ratio   REAL,
             break_ma    TEXT,
             PRIMARY KEY (date, stock_code)
@@ -126,6 +127,7 @@ def ensure_tables():
         ("market_breakout_daily", "vol_ma50 REAL"),
         ("market_breakout_daily", "vol_ratio REAL"),
         ("market_breakout_daily", "break_ma TEXT"),
+        ("market_breakout_daily", "amt_ma50 REAL"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {tbl_col[0]} ADD COLUMN {tbl_col[1]}")
@@ -272,11 +274,13 @@ def compute_vol_breakout(conn, target_date):
 
     # 取当日具体股票列表（含各均线值）
     stock_rows = conn.execute("""
-        SELECT stock_code, close, change_pct, volume, amount, vol_ma50,
+        SELECT stock_code, close, change_pct, volume, amount, vol_ma50, amt_ma50,
                ma5, ma10, ma20, ma50, ma120, ma200
         FROM (
             SELECT date, stock_code, close, change_pct, volume, amount,
                    AVG(volume) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) as vol_ma50,
+                   AVG(amount) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) as amt_ma50,
+                   MAX(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) as max_20_close,
                    MAX(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) as max_20_close,
                    AVG(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 4 PRECEDING AND CURRENT ROW) as ma5,
                    AVG(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW) as ma10,
@@ -297,9 +301,9 @@ def compute_vol_breakout(conn, target_date):
     stock_list = []
     for r in stock_rows:
         close = r['close']
-        # 成交量倍数
-        vol_ratio = round(r['volume'] / r['vol_ma50'], 2) if r['vol_ma50'] and r['vol_ma50'] > 0 else 0
-        # 突破均线：找到被突破的最高级别均线（MA5→MA10→MA20→MA50→MA120→MA200，优先显示大级别的）
+        # 成交量倍数（基于金额）
+        vol_ratio = round(r['amount'] / r['amt_ma50'], 2) if r['amt_ma50'] and r['amt_ma50'] > 0 else 0
+        # 突破均线：找到被突破的最高级别均线（MA200优先）
         break_ma = ''
         for ma_level in [('MA200', r['ma200']), ('MA120', r['ma120']), ('MA50', r['ma50']),
                           ('MA20', r['ma20']), ('MA10', r['ma10']), ('MA5', r['ma5'])]:
@@ -313,6 +317,7 @@ def compute_vol_breakout(conn, target_date):
             'volume': r['volume'],
             'amount': r['amount'],
             'vol_ma50': r['vol_ma50'],
+            'amt_ma50': r['amt_ma50'],
             'vol_ratio': vol_ratio,
             'break_ma': break_ma,
         })
@@ -569,8 +574,8 @@ def compute_all(target_date):
     conn.execute("DELETE FROM market_breakout_daily WHERE date = ?", (target_date,))
     for s in vb_stocks:
         conn.execute(
-            "INSERT INTO market_breakout_daily (date, stock_code, close, change_pct, volume, amount, vol_ma50, vol_ratio, break_ma) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (target_date, s['stock_code'], s['close'], s['change_pct'], s['volume'], s['amount'], s.get('vol_ma50', 0), s.get('vol_ratio', 0), s.get('break_ma', ''))
+            "INSERT INTO market_breakout_daily (date, stock_code, close, change_pct, volume, amount, vol_ma50, amt_ma50, vol_ratio, break_ma) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (target_date, s['stock_code'], s['close'], s['change_pct'], s['volume'], s['amount'], s.get('vol_ma50', 0), s.get('amt_ma50', 0), s.get('vol_ratio', 0), s.get('break_ma', ''))
         )
 
     # 5

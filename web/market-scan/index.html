@@ -144,7 +144,15 @@
 <div class="app-container">
 
   <nav id="top-nav"></nav>
-    <div class="layout"><div id="content"></div></div>
+    <div class="layout">
+      <div id="date-bar" style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span style="font-family:var(--font-display);font-size:0.85rem;font-weight:800;color:var(--text-primary)">📅 大盘扫描</span>
+        <input type="date" id="date-picker" style="font-family:var(--font-body);padding:5px 12px;border:1px solid var(--border);border-radius:10px;font-size:12px;background:var(--card);color:var(--text-primary);outline:none" onchange="onDateChange(this.value)">
+        <span id="date-label" style="font-size:0.6rem;color:var(--muted)"></span>
+        <button onclick="computeSnapshot()" style="margin-left:auto;font-size:10px;padding:4px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer;font-family:var(--font-body)">🔄 刷新计算</button>
+      </div>
+      <div id="content"></div>
+    </div>
     <div class="modal-overlay" id="breakout-modal" onclick="if(event.target===this)closeBreakoutModal()">
       <div class="modal-box"><button class="modal-close" onclick="closeBreakoutModal()">✕</button><h2>🚀 放量突破个股</h2><div class="modal-sub" id="breakout-meta"></div><div id="breakout-table"></div></div>
     </div>
@@ -175,18 +183,23 @@
     };
     function fm(v){if(v==null)return'—';if(v>=1e8)return(v/1e8).toFixed(2)+'亿';if(v>=1e4)return(v/1e4).toFixed(0)+'万';return v.toString();}
 
-    async function load() {
+    async function load(specificDate) {
       const div=document.getElementById('content');
       try{
+        var dateParam = specificDate || 'latest';
         const[hr,pr,sr]=await Promise.all([
-          fetch(API_BASE+'/api/market-health?date=latest').then(r=>r.json()),
+          fetch(API_BASE+'/api/market-health?date='+dateParam).then(r=>r.json()),
           fetch(API_BASE+'/api/market-panorama').then(r=>r.json()),
-          fetch(API_BASE+'/api/market-sell-score?date=latest').then(r=>r.json()).catch(()=>({status:'no_data'}))
+          fetch(API_BASE+'/api/market-sell-score?date='+dateParam).then(r=>r.json()).catch(()=>({status:'no_data'}))
         ]);
-        if(hr.status==='no_data'){div.innerHTML='<div class="no-data">📡 暂无健康度数据</div>';return;}
+        if(hr.status==='no_data'){div.innerHTML='<div class="no-data">📡 暂无健康度数据 (date='+dateParam+')</div>';return;}
         render(hr,pr,sr);
         loadMajorIndices();
       }catch(e){div.innerHTML='<div class="no-data">📡 数据加载失败</div>';}
+    }
+
+    function onDateChange(newDate){
+      load(newDate);
     }
 
     // 主要指数数据
@@ -262,6 +275,11 @@
     }
 
     function render(h,p,sr){
+      // 更新静态日期选择器
+      document.getElementById('date-picker').value = h.date;
+      document.getElementById('date-label').textContent = h.date;
+      document.title = '大盘扫描 · '+h.date;
+      
       const score=h.total_score||0;const rt=rl(score);const rcc=rc(score);
       let html='';
 
@@ -481,9 +499,6 @@
         });
         html+='</div>';
       }
-
-      // 刷新按钮移到下面
-      html+='<div style="text-align:right;margin-bottom:8px"><span style="font-size:10px;color:var(--muted);margin-right:8px">'+h.date+'</span><button onclick="computeSnapshot()" style="font-size:10px;padding:4px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer;font-family:var(--font-body)">刷新计算</button></div>';
 
       // ═══ L1: 核心信号 ═══
       html+='<div class="section-hdr">📡 核心信号</div><div class="core-grid">';

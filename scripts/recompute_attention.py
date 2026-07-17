@@ -89,6 +89,7 @@ def main():
             r['stock_code'], r['b1_date'], b1_klines,
             r['decline_pct'], r['h_rs250'], r['b1_return_pct'],
             r['h_date'], r['c_amount_avg'],
+            ind_rs20=r['ind_rs20'],
             conn=conn, return_detail=True
         )
         detail_json = json.dumps(detail, ensure_ascii=False)

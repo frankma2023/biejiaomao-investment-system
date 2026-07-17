@@ -76,4 +76,4 @@ HANDOFF-*.md
 SESSION_HANDOFF_*.md
 
 # Product docs (local only)
-docs/product/
+docs/
