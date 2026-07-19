@@ -20,6 +20,9 @@ DB_PATH = os.path.join(SRC_DIR, '..', 'data', 'lixinger.db')
 KLINE_LOOKBACK = 250  # 扫描所需的 K 线天数
 B2_RECENT_DAYS = 3    # B2 必须在最近 N 天内
 _chanlun_cache = {}   # 内存缓存 {code: bi_list}
+_fallback_log = []    # 兜底日志: [(code, scan_date, source), ...]
+_fallback_stats = {'total_scanned': 0, 'fallback_sql': 0, 'fallback_live': 0}
+_disable_fallback = False  # True=禁止兜底(等同实盘，预加载未命中则跳过该股票)
 
 # ── 批量预加载缓存（回填脚本设置后，scan_stock 跳过 SQL）──
 _rs_cache = None          # {stock_code: (rps_20, rps_250)}
@@ -87,59 +90,90 @@ def scan_stock(klines, scan_date, code=None, conn=None):
     
     dates = [k['date'] for k in klines]
 
-    # ── 1. 找前高 H：用缠论笔顶 ──
-    h_date_str = None; h_price = 0
-    # 从缓存获取 bi_list：先查 chanlun_scan_daily，没有再调 analyze()
+    # ── 1. 找前高 H：用缠论笔顶，选 pre_rise 最大的 ──
+    h_date_str = None; h_price = 0; h_idx = 0
     bi_list = None
     cache_key = (code, scan_date)
-    bi_list = None
     if cache_key not in _chanlun_cache:
-        if conn:
-            row = conn.execute(
-                "SELECT bi_json FROM chanlun_bi_json WHERE stock_code=? AND scan_date=?",
-                (code, scan_date)
-            ).fetchone()
-            if not row:
+        if _disable_fallback:
+            # 禁止兜底：等同实盘，预加载未命中则直接跳过该股票
+            _fallback_log.append((code, scan_date, 'skipped'))
+            bi_list = []  # 空笔列表 → H 检测失败 → 无信号
+        else:
+            fallback_source = 'sql'
+            if conn:
                 row = conn.execute(
                     "SELECT bi_json FROM chanlun_bi_json WHERE stock_code=? ORDER BY scan_date DESC LIMIT 1",
                     (code,)
                 ).fetchone()
-            if row and row[0]:
-                try: bi_list = json.loads(row[0])
-                except: pass
-        if bi_list is None:
-            from scanners.chanlun import analyze as _af
-            bi_list = _af(code, 'D', 500, data_mode='stock').get('bi_list', [])
+                if row and row[0]:
+                    try: bi_list = json.loads(row[0])
+                    except: pass
+            if bi_list is None:
+                from scanners.chanlun import analyze as _af
+                bi_list = _af(code, 'D', 500, data_mode='stock').get('bi_list', [])
+                fallback_source = 'live'
+            _fallback_log.append((code, scan_date, fallback_source))
+            if fallback_source == 'sql':
+                _fallback_stats['fallback_sql'] += 1
+            else:
+                _fallback_stats['fallback_live'] += 1
         _chanlun_cache[cache_key] = bi_list
     else:
         bi_list = _chanlun_cache[cache_key]
+    _fallback_stats['total_scanned'] += 1
     tops = [(b['sdt'][:10], b['high']) for b in bi_list if b['direction'] == '向下']
-    tops.sort(key=lambda x: x[0], reverse=True)
+    
+    # 在所有满足条件的顶中，选 pre_rise 最大的
+    best_h = None  # (pre_rise, date, price, idx)
     for top_date, top_price in tops:
         if top_date > scan_date: continue
         try: top_idx = dates.index(top_date)
         except ValueError: continue
+        
+        # 500天时间窗
+        scan_idx = len(dates) - 1
+        if top_idx < max(0, scan_idx - 500): continue
+        
         future_low = min(klines[j]['close'] for j in range(top_idx+1, n)) if top_idx+1 < n else top_price
         decline = (top_price - future_low)/top_price if top_price > 0 else 0
         if decline < 0.10: continue
+        
         pre60_start = max(0, top_idx-60)
         pre60_low = min(klines[j]['close'] for j in range(pre60_start, top_idx)) if pre60_start < top_idx else top_price
         pre_rise = (top_price - pre60_low)/pre60_low if pre60_low > 0 else 0
-        if pre_rise >= 0.20:
-            h_date_str = top_date; h_price = top_price; h_idx = top_idx
-            break
+        if pre_rise < 0.30: continue
+        
+        if best_h is None or pre_rise > best_h[0]:
+            best_h = (pre_rise, top_date, top_price, top_idx)
+    
+    if best_h:
+        h_date_str = best_h[1]; h_price = best_h[2]; h_idx = best_h[3]
+        
+        # ── 升级规则：沿笔顶序列向前，如果后续笔顶的 high 更高则升级 ──
+        tops_forward = sorted([(t[0], t[1]) for t in tops if t[0] > h_date_str], key=lambda x: x[0])
+        for next_date, next_high in tops_forward:
+            if next_date > scan_date: continue
+            if next_high >= h_price:
+                try:
+                    next_idx = dates.index(next_date)
+                    h_date_str = next_date; h_price = next_high; h_idx = next_idx
+                except ValueError:
+                    pass
+            # Note: 不 break——lower high 可能只是小回调，后面还有更高的
 
     if h_price == 0:
         return False, None
 
-    # ── 2. 找最低点 L：用缠论笔底 ──
+    # ── 2. 找最低点 L：H 之后最低收盘的缠论笔底 ──
     l_idx = h_idx; l_price = klines[h_idx]['close']
     bots = [(b['sdt'][:10], b['low']) for b in bi_list if b['direction'] == '向上']
     for bot_date, bot_price in bots:
         if bot_date > h_date_str:
-            try: l_idx = dates.index(bot_date); l_price = bot_price
-            except ValueError: pass
-            break
+            try: bi = dates.index(bot_date)
+            except ValueError: continue
+            if klines[bi]['close'] < l_price:
+                l_idx = bi; l_price = bot_price
 
     # ── 3. 找横盘区 C ──
     c_start = l_idx; c_end = l_idx
@@ -305,8 +339,8 @@ def scan_stock(klines, scan_date, code=None, conn=None):
             h_rs20 = row[0]
             h_rs250 = row[1]
 
-    # v3.0 硬门禁：前高 RS250 ≥ 60，不满足则不出 B1
-    if h_rs250 is None or h_rs250 < 60:
+    # v3.0 硬门禁：前高 RS250 ≥ 50，不满足则不出 B1
+    if h_rs250 is None or h_rs250 < 50:
         return False, None
 
     # ── 7. 行业共振 + 个股RS强度评分 ──
@@ -560,11 +594,6 @@ def scan_stock(klines, scan_date, code=None, conn=None):
         'ind_code': ind_code if 'ind_code' in dir() else None,
         'ind_name': ind_name if 'ind_name' in dir() else None,
     }
-    # v2.5: 仅返回扫描当日新出现的信号（B1当日 或 B2确认当日）
-    b2_is_today = b2_date_val is not None and b2_date_val == scan_date
-    b1_is_today = b1_date_str == scan_date
-    if not b1_is_today and not b2_is_today:
-        return False, None
     return True, result
 
 
@@ -657,32 +686,29 @@ def compute_tech_score(code, b1_date, klines, rs_cache=None, return_detail=False
     return (0, {}) if return_detail else 0
 
 
-# ══════════════════ B1 关注度评分 v3.4 ══════════════════
+# ══════════════════ B1 关注度评分 v3.5 ══════════════════
 
 def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_return_pct,
                              h_date, c_amount_avg, ind_rs20=None, conn=None, return_detail=False):
     """
-    B1 关注度评分 v3.4（满分 100）。
+    B1 关注度评分 v3.5（满分 100）。
 
-    基于 76,512 个 B1 信号的 7 因子逐步回归（|β| 比例分配权重）的 6 个因子：
+    基于 76,512 个 B1 信号的逐步回归 ΔR² 比例分配权重，5 个因子：
 
-    1. h_rs250 (38分) — 前高时的个股 RS250
-       ≥90→38, ≥80→30, ≥70→20, ≥60→10
+    1. h_rs250 (50分) — 前高时的个股 RS250
+       ≥90→50, ≥80→40, ≥70→30, ≥60→15
 
-    2. 换手率 (18分) — 横盘期日均换手率
-       <0.5%→18, <1.0%→14, <1.5%→10, <2.0%→6, <3.0%→3
+    2. 距H天数 (22分) — 前高到 B1 的整理时长
+       40~60天→22, 30~40天→18, 20~30天或60~80天→12, >80天→7
 
-    3. 距H天数 (15分) — 前高到 B1 的整理时长
-       40~60天→15, 30~40天→12, 20~30天或60~80天→8, >80天→5
+    3. 换手率 (15分) — 横盘期日均换手率
+       <0.5%→15, <1.0%→12, <1.5%→9, <2.0%→5, <3.0%→3
 
-    4. 行业 RS_20 (12分) — B1 日所属行业 RS_20
-       ≥80→12
+    4. 行业 RS_20 (8分) — B1 日所属行业 RS_20
+       ≥80→8
 
-    5. 回调深度 (10分) — H→L 的最大跌幅
-       >35%→10, 25~35%→8, 20~25%→5, 15~20%→3
-
-    6. 振幅收缩 (7分) — 近5日振幅 vs 前15日振幅
-       收缩到<70%→7, <85%→5, <100%→3
+    5. 回调深度 (5分) — H→L 的最大跌幅
+       >35%→5, 25~35%→4, 20~25%→3, 15~20%→2
 
     分层：极高≥80 / 高65~79 / 关注50~64 / 一般35~49 / 低<35
     """
@@ -691,16 +717,16 @@ def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_retu
     sc = 0
     detail = {}
     
-    # 1. h_rs250 (38分)
+    # 1. h_rs250 (50分)
     rs = h_rs250 or 0
-    if rs >= 90: v = 38
-    elif rs >= 80: v = 30
-    elif rs >= 70: v = 20
-    elif rs >= 60: v = 10
+    if rs >= 90: v = 50
+    elif rs >= 80: v = 40
+    elif rs >= 70: v = 30
+    elif rs >= 60: v = 15
     else: v = 0
     sc += v; detail['h_rs250'] = v
     
-    # 2. 换手率 (18分)
+    # 2. 换手率 (15分)
     to_v = 0
     if conn and c_amount_avg and c_amount_avg > 0:
         row = conn.execute("""
@@ -715,10 +741,10 @@ def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_retu
             ).fetchone()
             if close_row and close_row[0] and close_row[0] > 0:
                 to_rate = c_amount_avg / (row[0] * close_row[0]) * 100
-                if to_rate < 0.5: to_v = 18
-                elif to_rate < 1.0: to_v = 14
-                elif to_rate < 1.5: to_v = 10
-                elif to_rate < 2.0: to_v = 6
+                if to_rate < 0.5: to_v = 15
+                elif to_rate < 1.0: to_v = 12
+                elif to_rate < 1.5: to_v = 9
+                elif to_rate < 2.0: to_v = 5
                 elif to_rate < 3.0: to_v = 3
     sc += to_v; detail['turnover'] = to_v
     
@@ -726,44 +752,25 @@ def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_retu
     dh_v = 0
     if h_date and h_date > '2000-01-01' and b1_date:
         dh = (date.fromisoformat(b1_date) - date.fromisoformat(h_date)).days
-        if 40 <= dh <= 60: dh_v = 15
-        elif 30 <= dh < 40: dh_v = 12
-        elif (20 <= dh < 30) or (60 < dh <= 80): dh_v = 8
-        elif dh > 80: dh_v = 5
+        if 40 <= dh <= 60: dh_v = 22
+        elif 30 <= dh < 40: dh_v = 18
+        elif (20 <= dh < 30) or (60 < dh <= 80): dh_v = 12
+        elif dh > 80: dh_v = 7
     sc += dh_v; detail['days_since_h'] = dh_v
     
-    # 4. 回调深度 (10分)
+    # 4. 回调深度 (5分)
     dec = decline_pct or 0
-    if dec > 35: dec_v = 10
-    elif dec >= 25: dec_v = 8
-    elif dec >= 20: dec_v = 5
-    elif dec >= 15: dec_v = 3
+    if dec > 35: dec_v = 5
+    elif dec >= 25: dec_v = 4
+    elif dec >= 20: dec_v = 3
+    elif dec >= 15: dec_v = 2
     else: dec_v = 0
     sc += dec_v; detail['decline'] = dec_v
-    
-    # 5. 振幅收缩 (7分) — B1 前振幅是否在收缩
-    amp_v = 0
-    if klines and len(klines) >= 20:
-        try:
-            highs = np.array([k['high'] for k in klines[-20:]], dtype=np.float64)
-            lows = np.array([k['low'] for k in klines[-20:]], dtype=np.float64)
-            closes_arr = np.array([k['close'] for k in klines[-20:]], dtype=np.float64)
-            daily_range = (highs - lows) / closes_arr
-            recent = np.mean(daily_range[-5:]) if len(daily_range) >= 5 else 1
-            prior = np.mean(daily_range[:-5]) if len(daily_range) > 5 else 1
-            if prior > 0:
-                ratio = recent / prior
-                if ratio < 0.70: amp_v = 7
-                elif ratio < 0.85: amp_v = 5
-                elif ratio < 1.00: amp_v = 3
-        except:
-            pass
-    sc += amp_v; detail['range_contract'] = amp_v
 
-    # 6. 行业RS_20 (12分) — 所属行业短期强势
+    # 5. 行业RS_20 (8分) — 所属行业短期强势
     ind_v = 0
     if ind_rs20 is not None and ind_rs20 >= 80:
-        ind_v = 12
+        ind_v = 8
     sc += ind_v; detail['ind_rs20'] = ind_v
 
     return (sc, detail) if return_detail else sc
@@ -831,11 +838,11 @@ def run_scan(scan_date, fast=False, silent=False):
     except:
         pass
 
-    # ── 批量预加载：缠论笔（外部已加载则跳过）──
+    # ── 批量预加载：缠论笔（取每只股票最新，不限 scan_date）──
     global _chanlun_cache, _kline_cache, _rs_cache, _idx_comp_cache, _idx_rs_cache, _reso_cache, _names_cache
     if not _chanlun_cache:
         for row in conn.execute(
-            "SELECT stock_code, bi_json FROM chanlun_bi_json WHERE scan_date=?", (scan_date,)
+            "SELECT stock_code, bi_json FROM chanlun_bi_json GROUP BY stock_code HAVING scan_date=MAX(scan_date)"
         ).fetchall():
             try:
                 _chanlun_cache[(row['stock_code'], scan_date)] = __import__('orjson').loads(row['bi_json'])
@@ -922,9 +929,230 @@ def run_scan(scan_date, fast=False, silent=False):
         if not silent: print(f'  {s["code"]} {s["name"]} B1:{s["b1_date"]} B2:{s["b2_date"]} 置信度:{s["confidence"]}({s["score"]}分)')
 
 
+def _scan_worker(stock_codes, scan_date, db_path):
+    """
+    独立进程 worker：加载指定股票的数据并运行 scan_stock。
+    必须为模块级函数才能被 ProcessPoolExecutor(pickle) 在 Windows spawn 模式下使用。
+    """
+    import os as _os, sys as _sys
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+    import sqlite3 as _sql
+
+    # 确保 src/ 在 path 中（subprocess 的 cwd 可能不同）
+    _src = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..')
+    if _src not in _sys.path:
+        _sys.path.insert(0, _src)
+
+    # 在 worker 内部导入模块（避免 pickle 整个 mw_signal）
+    import scanners.mw_signal as mw
+
+    # 重置模块级缓存
+    mw._chanlun_cache = {}
+    mw._kline_cache = None
+    mw._rs_cache = None
+    mw._idx_comp_cache = None
+    mw._idx_rs_cache = None
+    mw._reso_cache = {}
+    mw._names_cache = None
+    mw._sell_existing_cache = {}
+
+    conn = _sql.connect(db_path)
+    conn.row_factory = _sql.Row
+    conn.execute("PRAGMA busy_timeout=30000")
+
+    codes = list(stock_codes)
+    if not codes:
+        conn.close()
+        return []
+
+    # ── 1. K 线 ──
+    mw._kline_cache = defaultdict(list)
+    kline_min = (datetime.strptime(scan_date, '%Y-%m-%d') - timedelta(days=400)).strftime('%Y-%m-%d')
+    ph = ','.join('?' * len(codes))
+    for r in conn.execute(
+        f"SELECT stock_code, date, open, high, low, close, volume, amount FROM daily_kline WHERE stock_code IN ({ph}) AND date>=? AND date<=? ORDER BY stock_code, date",
+        codes + [kline_min, scan_date]
+    ).fetchall():
+        mw._kline_cache[r['stock_code']].append(dict(r))
+
+    # ── 2. 缠论笔 ──
+    try:
+        import orjson as _ojson
+    except ImportError:
+        import json as _ojson
+    for row in conn.execute(
+        f"SELECT stock_code, bi_json FROM chanlun_bi_json WHERE stock_code IN ({ph}) GROUP BY stock_code HAVING scan_date=MAX(scan_date)",
+        codes
+    ).fetchall():
+        try:
+            mw._chanlun_cache[(row['stock_code'], scan_date)] = _ojson.loads(row['bi_json'])
+        except:
+            pass
+
+    # ── 3. 个股 RS ──
+    mw._rs_cache = {}
+    for r in conn.execute(
+        f"SELECT stock_code, rps_20, rps_250 FROM stock_rs_daily WHERE date=? AND stock_code IN ({ph})",
+        [scan_date] + codes
+    ).fetchall():
+        mw._rs_cache[r['stock_code']] = (r['rps_20'], r['rps_250'])
+
+    # ── 4. 行业成分 ──
+    mw._idx_comp_cache = defaultdict(list)
+    for r in conn.execute(
+        f"SELECT stock_code, index_code FROM index_constituents WHERE stock_code IN ({ph})",
+        codes
+    ).fetchall():
+        mw._idx_comp_cache[r['stock_code']].append(r['index_code'])
+
+    # ── 5. 指数 RS ──
+    mw._idx_rs_cache = {}
+    for r in conn.execute(
+        "SELECT stock_code, rs_20, rs_250 FROM index_rs_daily WHERE date=?",
+        (scan_date,)
+    ).fetchall():
+        mw._idx_rs_cache[r['stock_code']] = (r['rs_20'], r['rs_250'])
+
+    # ── 6. 名称 ──
+    mw._names_cache = {}
+    for r in conn.execute(
+        f"SELECT stock_code, name FROM stock_basic WHERE stock_code IN ({ph})",
+        codes
+    ).fetchall():
+        mw._names_cache[r['stock_code']] = r['name']
+
+    # ── 扫描 ──
+    min_date = (datetime.strptime(scan_date, '%Y-%m-%d') - timedelta(days=1000)).strftime('%Y-%m-%d')
+    results = []
+    for code in codes:
+        klines = mw.get_klines(conn, code, min_date, scan_date)
+        if len(klines) < 150:
+            continue
+        passed, result = mw.scan_stock(klines, scan_date, code, conn)
+        if passed and result:
+            result['code'] = code
+            result['name'] = mw._names_cache.get(code, code)
+            results.append(result)
+
+    conn.close()
+    return results
+
+
+def run_scan_parallel(scan_date, n_workers=8, fast=False, silent=False):
+    """多进程并行扫描。每个 worker 加载自己的数据子集并独立运行 scan_stock。"""
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    import time as _time
+    
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.row_factory = sqlite3.Row
+    
+    # 确保表存在
+    try:
+        conn.execute("SELECT confidence_v2 FROM mw_signal_daily LIMIT 0")
+    except:
+        conn.execute("DROP TABLE IF EXISTS mw_signal_daily")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mw_signal_daily (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            b2_date TEXT NOT NULL,
+            stock_code TEXT NOT NULL,
+            stock_name TEXT,
+            confidence TEXT, score INTEGER, confidence_v2 TEXT, score_v2 INTEGER,
+            h_date TEXT, h_price REAL, l_date TEXT, l_price REAL,
+            c_start TEXT, c_end TEXT,
+            b1_date TEXT, b1_return_pct REAL, b1_vol_ratio REAL,
+            b2_return_pct REAL, b2_close_pos REAL, b2_is_gap INTEGER, b2_ma_count INTEGER,
+            decline_pct REAL, c_amplitude_pct REAL,
+            h_rs20 INTEGER, h_rs250 INTEGER, c_amount_avg REAL, h_pre_rise_pct REAL,
+            p_max_dd_pct REAL, p_vol_ratio REAL,
+            score_h INTEGER, score_d INTEGER, score_c INTEGER, score_p INTEGER,
+            score_i1 INTEGER, score_i2 INTEGER, score_o1 INTEGER, score_o2 INTEGER,
+            score_ma INTEGER, score_sig INTEGER, score_gap INTEGER,
+            score_m1 INTEGER, score_m2 INTEGER, score_m3 INTEGER,
+            is_plus INTEGER DEFAULT 0,
+            tech_score INTEGER DEFAULT 0, tech_score_detail TEXT DEFAULT '',
+            ind_rs20 INTEGER, ind_rs250 INTEGER, ind_code TEXT, ind_name TEXT,
+            scan_date TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(stock_code, b1_date)
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_mw_b1date ON mw_signal_daily(b1_date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_mw_code ON mw_signal_daily(stock_code)")
+    try:
+        conn.execute("ALTER TABLE mw_signal_daily ADD COLUMN tech_score INTEGER DEFAULT 0")
+    except: pass
+    try:
+        conn.execute("ALTER TABLE mw_signal_daily ADD COLUMN tech_score_detail TEXT DEFAULT ''")
+    except: pass
+    
+    stocks = get_all_stocks(conn, scan_date)
+    conn.close()
+    
+    if fast:
+        import random
+        stocks = random.sample(stocks, min(200, len(stocks)))
+    
+    # 切分股票列表
+    chunk_size = max(1, len(stocks) // n_workers)
+    chunks = [stocks[i:i+chunk_size] for i in range(0, len(stocks), chunk_size)]
+    # 如果段数超过 workers，合并最后两段
+    if len(chunks) > n_workers:
+        chunks[-2].extend(chunks[-1])
+        chunks.pop()
+    
+    actual_workers = len(chunks)
+    if not silent:
+        print(f'多进程并行: {actual_workers} 进程 × {len(stocks)} 只股票')
+    
+    # 多进程扫描
+    all_signals = []
+    t_start = _time.time()
+    
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        futures = {executor.submit(_scan_worker, chunk, scan_date, DB_PATH): idx 
+                   for idx, chunk in enumerate(chunks)}
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                signals = future.result()
+                all_signals.extend(signals)
+                if not silent:
+                    print(f'  Worker {idx+1}/{actual_workers}: {len(signals)} 信号 ({len(chunks[idx])} 只)')
+            except Exception as e:
+                import traceback
+                print(f'  Worker {idx+1} 异常: {e}')
+                traceback.print_exc()
+    
+    # 保存结果（主进程写库，避免锁冲突）
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.row_factory = sqlite3.Row
+    save_signals(conn, scan_date, all_signals)
+    
+    total_b1 = conn.execute("SELECT COUNT(*) FROM mw_signal_daily WHERE b1_date=?", (scan_date,)).fetchone()[0]
+    conn.close()
+    
+    elapsed = _time.time() - t_start
+    if not silent:
+        b2_count = sum(1 for s in all_signals if s.get('b2_date'))
+        print(f'\n扫描完成: {len(stocks)} 只, B1={total_b1}, B2={b2_count} | {elapsed:.0f}s')
+        for s in all_signals[:20]:
+            print(f'  {s["code"]} {s.get("name","")} B1:{s.get("b1_date","")} B2:{s.get("b2_date","")}')
+        if len(all_signals) > 20:
+            print(f'  ... 共 {len(all_signals)} 条')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='MW信号扫描引擎')
     parser.add_argument('--date', type=str, default=datetime.now().strftime('%Y-%m-%d'))
     parser.add_argument('--fast', action='store_true', help='快速模式(随机采样200只)')
+    parser.add_argument('--workers', type=int, default=1, help='并行进程数(默认1=单进程, 建议4~8)')
     args = parser.parse_args()
-    run_scan(args.date, fast=args.fast)
+    if args.workers > 1:
+        run_scan_parallel(args.date, n_workers=args.workers, fast=args.fast)
+    else:
+        run_scan(args.date, fast=args.fast)

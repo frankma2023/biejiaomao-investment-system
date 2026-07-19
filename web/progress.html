@@ -46,12 +46,12 @@
 
     <header class="panel-header">
       <h1>📋 欧奈尔投资系统 · 项目进展</h1>
-      <p>2026-06-29（阶段收尾 · 行业分组健康分 + Prompt生成器v2）</p>
+      <p>2026-07-19（阶段收尾 · MW引擎兜底策略 + 并行扫描 + 回填脚本）</p>
     </header>
 
     <div class="pg-stats">
-      <div class="pg-stat"><div class="n" style="color:#4CAF50">108</div><div class="l">已完成</div></div>
-      <div class="pg-stat"><div class="n" style="color:#FF9800">3</div><div class="l">进行中</div></div>
+      <div class="pg-stat"><div class="n" style="color:#4CAF50">111</div><div class="l">已完成</div></div>
+      <div class="pg-stat"><div class="n" style="color:#FF9800">1</div><div class="l">进行中</div></div>
       <div class="pg-stat"><div class="n">0</div><div class="l">待开发</div></div>
     </div>
 
@@ -208,11 +208,13 @@
       </div>
 
       <div class="pg-card">
-        <h3>🐺 MW 信号引擎 <span class="badge" style="background:#F3E5F5;color:#7B1FA2">3项</span></h3>
+        <h3>🐺 MW 信号引擎 <span class="badge" style="background:#F3E5F5;color:#7B1FA2">7项</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span>MW信号全市场扫描</td><td>src/scanners/mw_signal.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>多进程并行扫描 (--workers N)</td><td>mw_signal.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>笔数据两层兜底策略</td><td>mw_signal.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>MW信号回填脚本 v3</td><td>scripts/backfill_mw.py</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>特定形态结构识别</td><td>src/scanners/pattern_structure.py</td></tr>
-          <tr><td><span class="pg-dot dot-done"></span>MW信号数据回填</td><td>scripts/backfill_mw_data.py</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>MW信号前端看板</td><td>/mw-signals/</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>形态结构前端页面</td><td>/pattern-structure/</td></tr>
         </table>
@@ -387,6 +389,11 @@
 <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">72. 通达信分钟数据替代Baostock</div><div class="ld">9003只A股.lc1文件→1分钟K线→聚合15/60分钟→写入stock_kline_15min/60min表。零网络依赖，本地毫秒级读取。daily_update.py已切换。</div></div>
 <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">73. ETF数据源双轨制</div><div class="ld">index_style.yaml新增etf分类，理杏仁拉不到的ETF从通达信补日K线和分钟K线。fetch_tdx_kline.py自动读yaml配置，daily_update.py步骤3.5自动运行。</div></div>
 <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">74. 通达信.day文件OHLC是int*100非float</div><div class="ld">struct.unpack('IfffffI')误当浮点解出e-42级价格。正确格式:'IIIIIfI'，价格÷100。教训：二进制解析前先验证数据范围。</div></div>
+
+<div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">75. MW引擎H/L检测重写：时序驱动→量级驱动</div><div class="ld">旧规则（最新顶+第一个笔底）在多数案例碰巧重合，601138/603986的极端路径才暴露bug。H改为pre_rise≥30%+取涨幅最大+笔顶序列升级。L改为H之后最低收盘笔底。本质是从先后顺序切换到绝对量级——先确认"涨幅足够大"再确认"回调足够深"，而非假设最近的就是最对的。</div></div>
+<div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">76. 笔数据两层兜底架构——预加载精确匹配+引擎逐只补漏</div><div class="ld">chanlun_bi_json 1068万行，GROUP BY取最新会超时。改为预加载层WHERE scan_date=?走索引（快）+引擎兜底层ORDER BY DESC LIMIT 1（逐只，慢但只对少数未命中触发）。实盘(daily_update)chanlun_scan先跑确保100%命中→0%兜底。回填中约21%触发兜底→含未来信息偏差。加_disable_fallback开关控制。</div></div>
+<div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">77. 回填≠实盘——锚点模式6天覆盖10年</div><div class="ld">逐日回填2500天×14s=10h。但引擎K线回看1000天+去掉"仅当天"过滤器后，一次扫描覆盖~3年。6个锚点日期各扫一次即可覆盖2016-2026，速度提升400倍。4分钟完成全部回填。教训：找到"扫描一次的覆盖半径"就能把天数级任务降为常数级。</div></div>
+<div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">78. 多进程并行在Windows spawn下需模块级函数</div><div class="ld">ProcessPoolExecutor在Windows用spawn模式，worker函数必须可在import时访问。lambda/嵌套函数不可pickle。_scan_worker必须在mw_signal.py模块级定义，子进程import后才能调用。每个worker独立开DB连接+加载自己的K线/笔数据子集。</div></div>
 
 </div>
 <script>
