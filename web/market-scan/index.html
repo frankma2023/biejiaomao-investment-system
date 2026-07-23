@@ -695,7 +695,7 @@
     // 两融
     var mc='',mn='';
     if(d.margin&&d.margin.balance!=null){mc='';mn='';var mb=d.margin.balance;var mnb=d.margin.net_buy;mc=mb.toLocaleString()+'亿';mn=(mnb>0?'+':'')+mnb.toFixed(0)+'亿';}
-    html+='<div class="cap-card" onclick="toggleCap(0)"><div class="ct">融资融券</div><div class="cv">'+mc+'</div><div class="cs">净买 '+mn+'</div><div id="cap-spark-0" style="height:50px;margin-top:4px"></div></div>';
+    html+='<div class="cap-card" onclick="window.open(\'margin.html\')"><div class="ct">融资融券</div><div class="cv">'+mc+'</div><div class="cs">净买 '+mn+'</div><div id="cap-spark-0" style="height:50px;margin-top:4px"></div></div>';
     
     // 龙虎榜（含买/卖比）
     var lhb=d.lhb||{};var lnet=lhb.net_amount||0;
@@ -714,7 +714,8 @@
     
     wrap.innerHTML=html;
     
-    // 画两融迷你趋势图
+    window._marginTrend=d.margin&&d.margin.trend?d.margin.trend:[];
+      // 画两融迷你趋势图
     if(d.margin&&d.margin.trend&&d.margin.trend.length>1){
       var dom=document.getElementById('cap-spark-0');
       var ch=echarts.init(dom);
@@ -729,22 +730,10 @@
     }
   
     // 展开内容渲染
-    // 两融展开：完整趋势图
-    if(d.margin&&d.margin.trend&&d.margin.trend.length>1){
+    // 两融：只放结构，图表在点击时初始化
+    if(window._marginTrend.length>1){
       var ed0=document.getElementById('cap-expand-0');
-      ed0.innerHTML='<div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px">两融余额趋势（近60日）</div><div id="cap-chart-0" style="height:260px"></div><div style="font-size:10px;color:var(--muted);margin-top:4px">来源：理杏仁API TOP500股票汇总，非全市场精确值</div>';
-      var c0=echarts.init(document.getElementById('cap-chart-0'));
-      var isDark=document.documentElement.dataset.theme==='dark';
-      var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(200,200,200,0.08)':'rgba(128,128,128,0.1)';
-      var tr=d.margin.trend;
-      c0.setOption({
-        backgroundColor:'transparent',tooltip:{trigger:'axis'},
-        grid:{left:'8%',right:'4%',top:12,bottom:36},
-        xAxis:{type:'category',data:tr.map(function(x){return x.date}),axisLabel:{color:tx,fontSize:9,rotate:45},axisLine:{lineStyle:{color:sp}}},
-        yAxis:{type:'value',axisLabel:{color:tx,fontSize:9,formatter:function(v){return v.toFixed(0)+'亿'}},splitLine:{lineStyle:{color:sp}}},
-        dataZoom:[{type:'inside',start:0,end:100}],
-        series:[{type:'line',data:tr.map(function(x){return x.balance}),smooth:true,lineStyle:{color:'#f59e0b',width:2},areaStyle:{color:isDark?'rgba(245,158,11,.1)':'rgba(245,158,11,.06)'},showSymbol:false}]
-      });
+      ed0.innerHTML='<div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px">两融余额趋势（近1年）</div><div id="cap-chart-0" style="height:260px"></div><div style="font-size:12px;font-weight:600;color:var(--accent);margin:16px 0 8px">融资净买入（每日流向）</div><div id="cap-chart-1" style="height:200px"></div><div style="font-size:10px;color:var(--muted);margin-top:4px">正值=杠杆资金流入 | 负值=流出 | 来源：TOP500汇总</div>';
     }
     
     // 龙虎榜展开：净买入Top10 + 净卖出Top10
@@ -788,6 +777,37 @@
 }
 
 window._capOpen=null;
+function renderMarginChart(){
+  var isDark=document.documentElement.dataset.theme==='dark';
+  var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(200,200,200,0.08)':'rgba(128,128,128,0.1)';
+  var tr=window._marginTrend||[];
+  if(tr.length<2)return;
+  
+  // Chart 1: 余额趋势线
+  var el0=document.getElementById('cap-chart-0');if(!el0||el0._rendered)return;el0._rendered=true;
+  var c0=echarts.init(el0);
+  c0.setOption({
+    backgroundColor:'transparent',tooltip:{trigger:'axis'},
+    grid:{left:'8%',right:'4%',top:12,bottom:36},
+    xAxis:{type:'category',data:tr.map(function(x){return x.date}),axisLabel:{color:tx,fontSize:9,rotate:45},axisLine:{lineStyle:{color:sp}}},
+    yAxis:{type:'value',min:9000,axisLabel:{color:tx,fontSize:9,formatter:function(v){return v.toFixed(0)+'亿'}},splitLine:{lineStyle:{color:sp}}},
+    dataZoom:[{type:'inside',start:0,end:100}],
+    series:[{type:'line',data:tr.map(function(x){return x.balance}),smooth:true,lineStyle:{color:'#f59e0b',width:2},areaStyle:{color:isDark?'rgba(245,158,11,.1)':'rgba(245,158,11,.06)'},showSymbol:false}]
+  });
+  
+  // Chart 2: 融资净买入柱状图
+  var el1=document.getElementById('cap-chart-1');if(!el1)return;
+  var c1=echarts.init(el1);
+  var nbData=tr.map(function(x){return x.net_buy});
+  c1.setOption({
+    backgroundColor:'transparent',tooltip:{trigger:'axis',formatter:function(p){return p[0].name+'<br/>净买入: '+p[0].value.toFixed(0)+'亿'}},
+    grid:{left:'8%',right:'4%',top:8,bottom:24},
+    xAxis:{type:'category',data:tr.map(function(x){return x.date}),axisLabel:{color:tx,fontSize:8,rotate:45},axisLine:{lineStyle:{color:sp}}},
+    yAxis:{type:'value',axisLabel:{color:tx,fontSize:9,formatter:function(v){return v.toFixed(0)+'亿'}},splitLine:{lineStyle:{color:sp}}},
+    dataZoom:[{type:'inside',start:0,end:100}],
+    series:[{type:'bar',data:nbData,itemStyle:{color:function(p){return p.value>=0?'#ef4444':'#10b981'},borderRadius:[4,4,0,0]},barWidth:'50%'}]
+  });
+}
 function toggleCap(idx){
   if(window._capOpen!==null&&window._capOpen!==idx){
     document.getElementById('cap-expand-'+window._capOpen).classList.remove('active');
@@ -795,6 +815,7 @@ function toggleCap(idx){
   var el=document.getElementById('cap-expand-'+idx);
   if(window._capOpen===idx){el.classList.remove('active');window._capOpen=null;return;}
   el.classList.add('active');window._capOpen=idx;
+  if(idx===0)setTimeout(renderMarginChart,50);
 }
 
 async function computeSnapshot(){

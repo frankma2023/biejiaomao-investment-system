@@ -80,8 +80,8 @@ def fetch_block_trades(db, date):
 def fetch_margin(db, date):
     rows = db.execute('SELECT * FROM daily_review_margin WHERE date=?', (date,)).fetchall()
     if rows: return rows
-    codes = [r[0] for r in db.execute(
-        'SELECT stock_code FROM daily_kline WHERE date=? ORDER BY amount DESC LIMIT 500', (date,)).fetchall()]
+    # 取所有可能有融资融券数据的股票（从历史记录和历史K线中获取）
+    codes = [r[0] for r in db.execute('SELECT stock_code FROM daily_kline WHERE date=?', (date,)).fetchall()]
     data = []
     for i in range(0, len(codes), 100):
         batch = codes[i:i+100]
@@ -217,7 +217,7 @@ td:first-child{text-align:left;color:#8b8b90}
         html += f'<tr><td>成交额</td><td>{va:.0f}亿</td></tr></tbody></table>'
 
     # 两融
-    html += f'<h2>3. 两融(TOP500)</h2><table><thead><tr><th>指标</th><th>数值</th></tr></thead><tbody>'
+    html += f'<h2>3. 两融(全市场两融标的)</h2><table><thead><tr><th>指标</th><th>数值</th></tr></thead><tbody>'
     cls = 'up' if total_net_buy > 0 else 'dn'
     html += f'<tr><td>两融余额</td><td>{total_margin/1e8:.0f}亿</td></tr>'
     html += f'<tr><td>融资净买入</td><td class="{cls}">{total_net_buy/1e8:+.0f}亿</td></tr></tbody></table>'

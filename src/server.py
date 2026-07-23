@@ -1127,9 +1127,9 @@ def api_market_capital_flow():
         SELECT date, margin_balance, margin_net_buy
         FROM daily_review_summary
         WHERE margin_balance IS NOT NULL AND margin_balance != 0
-        ORDER BY date DESC LIMIT 60
+        ORDER BY date DESC LIMIT 250
     ''').fetchall()
-    trend = [{'date': r['date'], 'balance': r['margin_balance']} for r in reversed(trend_rows)]
+    trend = [{'date': r['date'], 'balance': r['margin_balance'], 'net_buy': r['margin_net_buy']} for r in reversed(trend_rows)]
     latest_margin = trend_rows[0] if trend_rows else None
     
     # 龙虎榜：精确匹配请求日期
@@ -1258,6 +1258,49 @@ def api_strongest_index():
 # ═══════════════════════════════════════════════
 # API: GET /api/stock-name
 # ═══════════════════════════════════════════════
+@app.route('/api/market-scan/margin-by-sector')
+def api_margin_by_sector():
+    """两融数据：按L1行业拆解 (日频)"""
+    start = request.args.get('start', '2026-01-01')
+    end = request.args.get('end', datetime.now().strftime('%Y-%m-%d'))
+    db = get_db()
+    try:
+        import yaml
+        cfg = yaml.safe_load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'index_style.yaml'), 'r', encoding='utf-8'))
+        sectors = cfg['categories']['sector_l1']
+    except:
+        sectors = []
+    sector_stocks = {}
+    for sec in sectors:
+        code = sec['code']
+        name = sec['name'].replace('全指','')
+        stocks = db.execute('SELECT stock_code FROM index_constituents WHERE index_code=?', (code,)).fetchall()
+        codes = [s['stock_code'] for s in stocks]
+        if codes: sector_stocks[name] = codes
+    dates = [r[0] for r in db.execute('SELECT DISTINCT date FROM daily_review_margin WHERE date>=? AND date<=? ORDER BY date', (start, end)).fetchall()]
+    result = {'dates': dates, 'sectors': {}}
+    for sec_name, codes in sector_stocks.items():
+        bal = []; net = []
+        for dt in dates:
+            ph = ','.join(['?']*len(codes))
+            row = db.execute(f'SELECT SUM(margin_fb)/1e8 as fb, SUM(net_buy_d1)/1e8 as nt FROM daily_review_margin WHERE date=? AND stock_code IN ({ph})', (dt,)+tuple(codes)).fetchone()
+            bal.append(round(row[0],0) if row and row[0] else 0)
+            net.append(round(row[1],0) if row and row[1] else 0)
+        result['sectors'][sec_name] = {'balance': bal, 'net_buy': net}
+    total_bal = []; total_net = []
+    for dt in dates:
+        row = db.execute('SELECT SUM(margin_fb)/1e8 as fb, SUM(net_buy_d1)/1e8 as nt FROM daily_review_margin WHERE date=?', (dt,)).fetchone()
+        total_bal.append(round(row[0],0) if row and row[0] else 0)
+        total_net.append(round(row[1],0) if row and row[1] else 0)
+    # 用一致口径：以首日为基准，后续余额 = 首日余额 + 累计净买入
+    base_bal = total_bal[0] if total_bal else 0
+    consistent_bal = [base_bal]
+    for i in range(1, len(total_net)):
+        consistent_bal.append(round(consistent_bal[-1] + total_net[i], 0))
+    # 同时保留原始口径
+    result['total'] = {'balance': consistent_bal, 'net_buy': total_net, 'balance_raw': total_bal}
+    return jsonify(result)
+
 
 @app.route('/api/stock-name')
 def api_stock_name():
@@ -1276,6 +1319,19 @@ def api_stock_name():
 # ═══════════════════════════════════════════════
 # API: POST /api/pocket-pivot
 # ═══════════════════════════════════════════════
+
+@app.route('/api/market-scan/margin-history')
+def api_margin_history():
+    db = get_db()
+    rows = db.execute('''
+        SELECT date, SUM(financing_balance)/1e8 as fb, SUM(securities_balance)/1e8 as sb
+        FROM daily_margin_history WHERE date >= '2026-01-01' GROUP BY date ORDER BY date
+    ''').fetchall()
+    return jsonify({
+        'dates': [r['date'] for r in rows],
+        'financing': [round(r['fb'], 0) for r in rows],
+        'securities': [round(r['sb'], 2) for r in rows]
+    })
 
 @app.route('/api/pocket-pivot', methods=['POST', 'OPTIONS'])
 def api_pocket_pivot():
