@@ -337,8 +337,8 @@ def score_vol_breakout(today_cnt, avg_20):
 def compute_margin_5d(conn, target_date):
     """全市场融资余额 5 日累计变化率"""
     rows = conn.execute("""
-        SELECT date, SUM(mtaslb_fb) as total
-        FROM stock_margin
+        SELECT date, SUM(financing_balance) as total
+        FROM daily_margin_history
         WHERE date >= date(?, '-10 days') AND date <= ?
         GROUP BY date ORDER BY date DESC LIMIT 6
     """, (target_date, target_date)).fetchall()
@@ -642,9 +642,9 @@ def compute_all(target_date):
 # ═══════════════════════════════════════════════
 
 def _get_sector_index_rs(conn, target_date):
-    """读取当日所有 L2+主题指数的 RS_60"""
+    """读取当日所有 L2+主题指数的 RS_20"""
     rows = conn.execute("""
-        SELECT i.stock_code, i.name, r.rs_60
+        SELECT i.stock_code, i.name, r.rs_20
         FROM index_daily_kline i
         JOIN index_rs_daily r ON i.stock_code = r.stock_code AND r.date = i.date
         WHERE i.date = ? AND (
@@ -653,10 +653,10 @@ def _get_sector_index_rs(conn, target_date):
         )
     """, (target_date,)).fetchall()
     
-    # 按 RS_60 分组
+    # 按 RS_20 分组
     groups = {'strong': [], 'mid': [], 'weak': []}
     for r in rows:
-        rs = r['rs_60']
+        rs = r['rs_20']
         if rs >= 75:
             groups['strong'].append(r['stock_code'])
         elif rs >= 30:
@@ -936,7 +936,7 @@ def compute_sector_health_groups(target_date):
     # 分池：sector_l2 和 thematic
     # 从 index_rs_daily 查所有指数的 RS
     all_index_rs = conn.execute(f"""
-        SELECT r.stock_code, r.rs_60, i.close
+        SELECT r.stock_code, r.rs_20, i.close
         FROM index_rs_daily r
         JOIN index_daily_kline i ON r.stock_code = i.stock_code AND r.date = i.date
         WHERE r.date = ? AND i.date = ?
@@ -951,14 +951,16 @@ def compute_sector_health_groups(target_date):
     
     l2_codes = {item['code'] for item in style['categories'].get('sector_l2', [])}
     theme_codes = {item['code'] for item in style['categories'].get('thematic', [])}
+    strategy_codes = {item['code'] for item in style['categories'].get('strategy', [])}
     
     # RS 索引
-    rs_map = {r['stock_code']: r['rs_60'] for r in all_index_rs}
+    rs_map = {r['stock_code']: r['rs_20'] for r in all_index_rs}
     
     # 对每个池分组
     pools = [
         ('l2', 'L2', l2_codes),
         ('theme', '主题', theme_codes),
+        ('strategy', '策略', strategy_codes),
     ]
     
     all_groups = []

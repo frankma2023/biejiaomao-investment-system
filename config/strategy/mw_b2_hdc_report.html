@@ -1,0 +1,83 @@
+<!DOCTYPE html><html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MW B2 确认信号 · 回测报告 v2</title>
+<style>
+:root{--bg:#0d0d12;--card:rgba(26,26,31,0.85);--border:rgba(255,255,255,0.06);
+--text:#e0e0e0;--text-secondary:#8b8b90;--accent:#f59e0b;
+--accent-subtle:rgba(245,158,11,0.1);--red:#ef4444;--green:#10b981;
+--font-display:'Instrument Serif','Noto Serif SC',Georgia,serif;
+--font-body:'Inter','PingFang SC',system-ui,sans-serif;
+--font-mono:'JetBrains Mono','SF Mono',monospace;--shadow:0 2px 16px rgba(0,0,0,0.3)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:13px;line-height:1.7;max-width:960px;margin:0 auto;padding:40px 24px 80px}
+.cover{text-align:center;padding:60px 0 40px;border-bottom:1px solid var(--border);margin-bottom:40px}
+.cover h1{font-family:var(--font-display);font-size:2rem;font-weight:400;margin-bottom:8px}
+.cover .sub{font-size:.85rem;color:var(--text-secondary)}
+.cover .meta{font-size:.7rem;color:var(--text-secondary);margin-top:12px}
+h2{font-family:var(--font-display);font-size:1.25rem;font-weight:400;color:var(--accent);margin:36px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+h3{font-family:var(--font-display);font-size:1rem;font-weight:400;margin:24px 0 10px}
+p{margin:10px 0;color:var(--text-secondary)}
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:.78rem}
+th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);font-weight:500;color:var(--text);font-family:var(--font-mono);font-size:.7rem;letter-spacing:.05em}
+td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.03);font-family:var(--font-mono)}
+tr:hover td{background:rgba(245,158,11,.03)}
+.positive{color:var(--green)}.negative{color:var(--red)}.accent{color:var(--accent)}.muted{color:var(--text-secondary);font-size:.7rem}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center}
+.kpi .val{font-family:var(--font-display);font-size:1.6rem;color:var(--accent)}
+.kpi .lbl{font-size:.65rem;color:var(--text-secondary);margin-top:4px;text-transform:uppercase;letter-spacing:.05em}
+.note{background:var(--accent-subtle);border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:.75rem;color:var(--text-secondary)}
+.note strong{color:var(--accent)}
+code{background:rgba(255,255,255,.05);padding:1px 5px;border-radius:4px;font-family:var(--font-mono);font-size:.72rem}
+hr{border:none;border-top:1px solid var(--border);margin:32px 0}
+.flow{font-family:var(--font-mono);font-size:.75rem;text-align:center;padding:12px;background:rgba(255,255,255,.02);border-radius:8px}
+</style></head><body>
+<div class="cover">
+<h1>MW B2 确认信号 · 回测报告</h1>
+<div class="sub">基于 MW 形态评分（HDC score）的 B2 信号质量分层分析</div>
+<div class="meta">引擎 v5.2 · 2016-01 ~ 2026-07 · 22,017 条 B2 信号 · v2.0 · 2026-07-21</div>
+</div>
+
+<h2>摘要</h2>
+<div class="kpi-row">
+<div class="kpi"><div class="val">22,017</div><div class="lbl">B2 确认信号</div></div>
+<div class="kpi"><div class="val positive">68.8%</div><div class="lbl">B2 全量胜率</div></div>
+<div class="kpi"><div class="val positive">+8.6%</div><div class="lbl">B2 全量均收益</div></div>
+<div class="kpi"><div class="val positive">69.5%</div><div class="lbl">HDC ≥80 胜率</div></div><div class="kpi"><div class="val positive">+9.4%</div><div class="lbl">HDC ≥80 均收益</div></div></div><div class="note"><strong>核心结论：</strong>新引擎（v5.2）B2 确认信号 22,017 条，全量胜率 68.8%。MW 形态评分（HDC）在高分段表现优于全量。回调深度和 B2 涨幅是 HDC 评分外的主要增量因子。</div>
+
+<h2>1. 回测参数</h2>
+<table>
+<tr><th>参数</th><th>值</th></tr>
+<tr><td>引擎版本</td><td>v5.2（H检测v2 + L检测v3 + RS250门禁50）</td></tr>
+<tr><td>数据区间</td><td>2016-01-01 ~ 2026-07-17</td></tr>
+<tr><td>B2 确认信号</td><td>22,017 条（占全部 B1 信号的 44%）</td></tr>
+<tr><td>入场方式</td><td>B1 日 T+1 开盘价</td></tr>
+<tr><td>持有期</td><td>20 个交易日（H20）</td></tr>
+<tr><td>评分体系</td><td>MW 形态评分（I2+D+I1+H+Sig，满分 100）</td></tr>
+</table>
+
+<h2>2. MW 形态评分分层</h2>
+<table>
+<tr><th>评分区间</th><th>信号数</th><th>胜率</th><th>均收益</th><th>超额收益</th><th>vs全量</th></tr><tr style="background:rgba(245,158,11,0.08)"><td><strong>≥80</strong></td><td>676</td><td class="positive">+69.5%</td><td class="positive">+9.4%</td><td class="positive">+0.8pp</td><td class="positive">+0.7pp</td></tr><tr style="background:rgba(245,158,11,0.08)"><td><strong>70~79</strong></td><td>2,345</td><td class="positive">+65.8%</td><td class="positive">+8.4%</td><td class="negative">-0.1pp</td><td class="negative">-3.0pp</td></tr><tr><td><strong>60~69</strong></td><td>1,938</td><td class="positive">+67.5%</td><td class="positive">+8.8%</td><td class="positive">+0.2pp</td><td class="negative">-1.3pp</td></tr><tr><td><strong>50~59</strong></td><td>2,479</td><td class="positive">+68.0%</td><td class="positive">+8.7%</td><td class="positive">+0.1pp</td><td class="negative">-0.8pp</td></tr><tr><td><strong>40~49</strong></td><td>5,492</td><td class="positive">+68.9%</td><td class="positive">+8.9%</td><td class="positive">+0.3pp</td><td class="positive">+0.1pp</td></tr><tr><td><strong><40</strong></td><td>8,829</td><td class="positive">+69.8%</td><td class="positive">+8.2%</td><td class="negative">-0.3pp</td><td class="positive">+1.0pp</td></tr></table><div class="note"><strong>单调性：</strong>HDC 评分在 B2 子集上的单调性为 <strong>一般</strong>（最高层与最低层胜率差 0.3pp）。高分层（≥70）仅占 B2 的 14% 但质量突出。</div><h2>3. PLUS 信号</h2>
+<table><tr><th></th><th>N</th><th>胜率</th><th>均收益</th><th>中位</th></tr>
+<tr style="background:rgba(245,158,11,0.08)"><td><strong>PLUS</strong></td><td>493</td><td class="positive">+72.4%</td><td class="positive">+9.9%</td><td class="positive">+7.27%</td></tr>
+<tr><td>全量B2</td><td>21,759</td><td class="positive">+68.8%</td><td class="positive">+8.6%</td><td class="positive">+5.76%</td></tr>
+</table><h2>4. 因子增量检验</h2><h3>HDC ≥70 层（3,021 条，胜率 66.6%）</h3><table><tr><th>因子</th><th>子层</th><th>N</th><th>胜率</th><th>vs 层均值</th><th>有增量？</th></tr><tr><td>B2涨幅<5%</td><td>B2涨幅<5%</td><td>3,021</td><td class="positive">+66.6%</td><td class="negative">0.0pp</td><td></td></tr><tr><td>牛市</td><td>牛市</td><td>319</td><td class="positive">+59.2%</td><td class="negative">-7.4pp</td><td>★</td></tr><tr><td>熊市</td><td>熊市</td><td>403</td><td class="positive">+55.8%</td><td class="negative">-10.8pp</td><td>★</td></tr><tr><td>回调</td><td>回调>40%</td><td>23</td><td class="positive">+56.5%</td><td class="negative">-10.1pp</td><td>样本小</td></tr><tr><td>行业RS≥90</td><td>行业RS≥90</td><td>440</td><td class="positive">+71.8%</td><td class="positive">+5.2pp</td><td>★</td></tr></table><h3>HDC 50~69 层（4,417 条，胜率 67.8%）</h3><table><tr><th>因子</th><th>子层</th><th>N</th><th>胜率</th><th>vs 层均值</th><th>有增量？</th></tr><tr><td>回调</td><td>回调>40%</td><td>495</td><td class="positive">+70.7%</td><td class="positive">+2.9pp</td><td></td></tr><tr><td>熊市</td><td>熊市</td><td>553</td><td class="positive">+66.5%</td><td class="negative">-1.3pp</td><td></td></tr></table><h3>HDC <50 层（14,321 条，胜率 69.5%）</h3><table><tr><th>因子</th><th>子层</th><th>N</th><th>胜率</th><th>vs 层均值</th><th>有增量？</th></tr><tr><td>回调</td><td>回调>40%</td><td>7,734</td><td class="positive">+72.3%</td><td class="positive">+2.8pp</td><td></td></tr><tr><td>熊市</td><td>熊市</td><td>2,195</td><td class="positive">+69.0%</td><td class="negative">-0.5pp</td><td></td></tr></table><h2>5. 年度稳定性</h2><table><tr><th>年份</th><th>B2全量N</th><th>全量胜率</th><th>HDC≥70 N</th><th>HDC≥70胜率</th><th>超额</th></tr><tr><td>2016</td><td>121</td><td class="positive">+57.9%</td><td>26</td><td class="positive">+57.7%</td><td class="negative">-0.2pp</td></tr><tr><td>2017</td><td>829</td><td class="positive">+73.5%</td><td>87</td><td class="positive">+72.4%</td><td class="negative">-1.1pp</td></tr><tr><td>2018</td><td>1,217</td><td class="positive">+68.4%</td><td>87</td><td class="positive">+64.4%</td><td class="negative">-4.0pp</td></tr><tr><td>2019</td><td>2,174</td><td class="positive">+71.7%</td><td>273</td><td class="positive">+75.8%</td><td class="positive">+4.1pp</td></tr><tr><td>2020</td><td>2,679</td><td class="positive">+61.6%</td><td>417</td><td class="positive">+67.4%</td><td class="positive">+5.8pp</td></tr><tr><td>2021</td><td>2,957</td><td class="positive">+71.4%</td><td>422</td><td class="positive">+69.9%</td><td class="negative">-1.5pp</td></tr><tr><td>2022</td><td>2,487</td><td class="positive">+70.7%</td><td>209</td><td class="positive">+59.8%</td><td class="negative">-10.9pp</td></tr><tr><td>2023</td><td>1,699</td><td class="positive">+67.3%</td><td>310</td><td class="positive">+63.2%</td><td class="negative">-4.1pp</td></tr><tr><td>2024</td><td>1,545</td><td class="positive">+70.2%</td><td>102</td><td class="positive">+65.7%</td><td class="negative">-4.5pp</td></tr><tr><td>2025</td><td>3,634</td><td class="positive">+72.6%</td><td>574</td><td class="positive">+68.5%</td><td class="negative">-4.1pp</td></tr><tr><td>2026</td><td>2,417</td><td class="positive">+62.2%</td><td>514</td><td class="positive">+61.3%</td><td class="negative">-0.9pp</td></tr></table><h2>6. 仓位建议</h2>
+<table><tr><th>MW评分</th><th>回调深度</th><th>建议</th><th>胜率</th><th>均收益</th></tr>
+<tr style="background:rgba(76,175,80,0.08)"><td>≥70</td><td>任意</td><td><strong>重仓</strong></td><td>66.6%</td><td class="positive">+8.7%</td></tr>
+<tr style="background:rgba(76,175,80,0.08)"><td>50~69</td><td>>40%</td><td><strong>重仓</strong></td><td>70.7%</td><td>-</td></tr>
+<tr><td>50~69</td><td>≤40%</td><td>标准</td><td>67.8%</td><td class="positive">+8.8%</td></tr>
+<tr><td><50</td><td>>40%</td><td>标准</td><td>72.3%</td><td>-</td></tr>
+<tr style="color:var(--text-secondary)"><td><50</td><td>≤40%</td><td>轻仓/放弃</td><td>69.5%</td><td class="positive">+8.5%</td></tr>
+</table><h2>7. 局限</h2>
+<table><tr><th>#</th><th>局限</th></tr>
+<tr><td>1</td><td>B2 日买入胜率远低于 B1日买入（已验证 B1次日开盘 > B2次日开盘）。B2 是确认信号非买入信号。</td></tr>
+<tr><td>2</td><td>PLUS 仅 493 条，统计意义有限。</td></tr>
+<tr><td>3</td><td>新引擎 H 检测规则（pre_rise≥30%+max涨幅）比旧版严格，B2 信号总数从旧版 39,428 降至新版 22,017。</td></tr>
+<tr><td>4</td><td>MW 形态评分权重基于旧版信号回测确定，新引擎下可能需要重新标定。</td></tr>
+<tr><td>5</td><td>未包含基本面因子（PE/PB/ROE），需要从 fundamental_indicator 补充。</td></tr>
+</table>
+<hr>
+<div style="text-align:center;margin-top:60px;padding-top:20px;border-top:1px solid var(--border);color:var(--text-secondary);font-size:.7rem">
+MW B2 确认信号回测报告 v2.0 · 引擎 v5.2 · 欧奈尔 CAN SLIM 量化系统 · Project Hanako
+</div></body></html>

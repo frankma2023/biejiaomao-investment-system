@@ -1,0 +1,58 @@
+{
+  "hold_5": {
+    "n": 50163,
+    "win_rate": 45.7,
+    "median": -0.62,
+    "mean": 0.11,
+    "max_dd": -62.94,
+    "best": 171.2
+  },
+  "hold_10": {
+    "n": 50025,
+    "win_rate": 46.6,
+    "median": -0.65,
+    "mean": 0.33,
+    "max_dd": -75.62,
+    "best": 179.0
+  },
+  "hold_20": {
+    "n": 49464,
+    "win_rate": 44.9,
+    "median": -1.56,
+    "mean": 0.41,
+    "max_dd": -76.56,
+    "best": 306.1
+  },
+  "hold_60": {
+    "n": 47697,
+    "win_rate": 41.6,
+    "median": -3.9,
+    "mean": 1.13,
+    "max_dd": -83.53,
+    "best": 986.7
+  },
+  "ma10_exit": {
+    "n": 50375,
+    "win_rate": 30.4,
+    "median": -2.17,
+    "mean": -0.32,
+    "max_dd": -29.22,
+    "best": 279.4
+  },
+  "ma20_exit": {
+    "n": 50375,
+    "win_rate": 31.0,
+    "median": -2.92,
+    "mean": 0.21,
+    "max_dd": -31.26,
+    "best": 776.3
+  },
+  "stop7": {
+    "n": 50375,
+    "win_rate": 23.4,
+    "median": -7.71,
+    "mean": -0.46,
+    "max_dd": -75.62,
+    "best": 758.6
+  }
+}

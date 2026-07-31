@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>行业分组详情</title>
+<link rel="stylesheet" href="/shared/css/hanako-glass.css">
+<style>
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:13px}
+.app-container{max-width:1100px;margin:0 auto;padding:24px 24px 60px}
+h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--accent);margin:0 0 4px}
+.sub{font-size:0.68rem;color:var(--muted);margin-bottom:20px}
+.tabs{display:flex;gap:6px;margin:14px 0 18px;flex-wrap:wrap}
+.tab{padding:6px 16px;border-radius:10px;font-size:0.7rem;cursor:pointer;background:var(--card);color:var(--muted);border:1px solid var(--border);transition:all 0.15s}
+.tab:hover{border-color:var(--accent);color:var(--text)}
+.tab.active{background:var(--accent);color:#0d0d12;border-color:var(--accent);font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:0.72rem;margin:8px 0 16px}
+th{padding:10px 12px;border-bottom:2px solid var(--border);font-weight:600;color:var(--muted);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.04em;background:var(--card);text-align:left;cursor:pointer;user-select:none}
+th:hover{color:var(--accent)}
+th .arrow{font-size:0.55rem;margin-left:3px;opacity:0.4}
+th.sorted .arrow{opacity:1;color:var(--accent)}
+td{padding:7px 12px;border-bottom:1px solid var(--border);font-size:0.7rem}
+tr:hover td{background:rgba(245,158,11,0.04)}
+.back{font-size:0.68rem;color:var(--muted);cursor:pointer;margin-bottom:12px;display:inline-block}
+.back:hover{color:var(--accent)}
+.empty{text-align:center;color:var(--muted);padding:40px;font-size:0.75rem}
+.const-section{margin-top:24px;padding-top:16px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="app-container">
+  <nav id="top-nav"></nav>
+  <a class="back" href="./">← 返回大盘扫描</a>
+  <h1 id="title">🏭 行业分组详情</h1>
+  <div class="sub" id="meta"></div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab" data-group="l2_strong">强势 L2</div>
+    <div class="tab" data-group="l2_mid">中性 L2</div>
+    <div class="tab" data-group="l2_weak">弱势 L2</div>
+    <div class="tab" data-group="theme_strong">强势 主题</div>
+    <div class="tab" data-group="theme_mid">中性 主题</div>
+    <div class="tab" data-group="theme_weak">弱势 主题</div>
+    <div class="tab" data-group="strategy_strong">强势 策略</div>
+    <div class="tab" data-group="strategy_mid">中性 策略</div>
+    <div class="tab" data-group="strategy_weak">弱势 策略</div>
+  </div>
+
+  <h2 id="group-label">指数列表</h2>
+  <div id="table-container"></div>
+</div>
+
+<script src="/shared/js/nav.js"></script>
+<script>
+Nav.init({brandIcon:'📊',brandText:'行业分组',currentPage:'market-scan'});
+
+const params = new URLSearchParams(window.location.search);
+const initialGroup = params.get('group') || 'l2_strong';
+const date = params.get('date') || '';
+
+const labels = {
+  l2_strong:'强势 L2',l2_mid:'中性 L2',l2_weak:'弱势 L2',
+  theme_strong:'强势 主题',theme_mid:'中性 主题',theme_weak:'弱势 主题',
+  strategy_strong:'强势 策略',strategy_mid:'中性 策略',strategy_weak:'弱势 策略',
+  l2_strong_d1:'强势 L2·当日',l2_mid_d1:'中性 L2·当日',l2_weak_d1:'弱势 L2·当日',
+  theme_strong_d1:'强势 主题·当日',theme_mid_d1:'中性 主题·当日',theme_weak_d1:'弱势 主题·当日',
+  strategy_strong_d1:'强势 策略·当日',strategy_mid_d1:'中性 策略·当日',strategy_weak_d1:'弱势 策略·当日'
+};
+
+const isD1 = initialGroup.indexOf('_d1') >= 0;
+
+async function loadGroup(groupId) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`[data-group="${groupId}"]`)?.classList.add('active');
+
+  const apiUrl = `/api/market-health/sector-indices?group_name=${groupId}${date?'&date='+date:''}`;
+  const r = await fetch(apiUrl);
+  const d = await r.json();
+
+  document.getElementById('group-label').textContent = labels[groupId] + ' · 指数列表';
+  document.getElementById('meta').textContent = d.date + ' · ' + d.indices.length + '个指数 · MA50↑' + d.stats.above_ma50 + '/' + d.stats.total + ' · RS_20均' + d.stats.avg_rs_20;
+
+  if (!d.indices.length) {
+    document.getElementById('table-container').innerHTML = '<div class="empty">该组暂无指数</div>';
+    return;
+  }
+
+  var cols = ['code','name','rs_20','rs_60','rs_250','ma50','ma200','ret20'];
+  
+  window._sectorData = d.indices.map(function(idx) {
+    return {
+      code: idx.code, name: idx.name, rs_20: idx.rs_20, rs_60: idx.rs_60||0, rs_250: idx.rs_250||0,
+      ma50: idx.above_ma50?1:0, ma200: idx.above_ma200?1:0, ret20: idx.ret_20||0,
+      _raw: idx
+    };
+  });
+  window._sortCol = null; window._sortDir = -1;
+  renderSectorTable();
+}
+
+function renderSectorTable() {
+  var data = window._sectorData || [];
+  var col = window._sortCol || 'rs_20';
+  var dir = window._sortDir || -1;
+  data.sort(function(a,b) { var va=a[col]||0,vb=b[col]||0; return (va>vb?1:va<vb?-1:0)*dir; });
+  
+  // 当日模式：显示当日涨跌幅列，隐藏RS/MA列
+  var cols, headers;
+  if (isD1) {
+    cols = ['code','name','change_d1','rs_20'];
+    headers = ['代码','名称','当日涨跌','当日强度'];
+  } else {
+    cols = ['code','name','rs_20','rs_60','rs_250','ma50','ma200','ret20'];
+    headers = ['代码','名称','RS_20','RS_60','RS_250','MA50','MA200','20日涨跌'];
+  }
+  var th = '<tr>' + headers.map(function(h,i){
+    var sorted = col === cols[i] ? ' class="sorted"' : '';
+    return '<th'+sorted+' data-col="'+cols[i]+'" onclick="sortTable(this,\''+cols[i]+'\')">'+h+' <span class="arrow">⇅</span></th>';
+  }).join('') + '</tr>';
+  
+  var tbl = '<table><thead>' + th + '</thead><tbody>';
+  data.forEach(function(d) {
+    var idx = d._raw;
+    if (isD1) {
+      var chg = idx.change_d1||0;
+      var chgCls = chg>=0 ? '#ef4444' : '#10b981';
+      var strCls = idx.rs_20>=75 ? '#ef4444' : idx.rs_20>=30 ? '#f59e0b' : '#10b981';
+      tbl += '<tr>' +
+      '<td style="font-family:var(--font-mono)">' + idx.code + '</td>' +
+      '<td>' + idx.name + '</td>' +
+      '<td style="color:' + chgCls + ';font-weight:600;font-family:var(--font-mono)">' + (chg>0?'+':'') + chg.toFixed(2) + '%</td>' +
+      '<td style="color:' + strCls + ';font-weight:600;font-family:var(--font-mono)">' + (idx.rs_20||0).toFixed(0) + '</td>' +
+      '<td><a href="constituents.html?code=' + idx.code + '&name=' + encodeURIComponent(idx.name) + (date?'&date='+date:'') + '" target="_blank" style="color:var(--accent);font-size:0.65rem">成分股</a></td>' +
+      '</tr>';
+    } else {
+      var rs20c = idx.rs_20 >= 75 ? '#ef4444' : idx.rs_20 >= 30 ? '#f59e0b' : '#10b981';
+      tbl += '<tr>' +
+      '<td style="font-family:var(--font-mono)">' + idx.code + '</td>' +
+      '<td>' + idx.name + '</td>' +
+      '<td style="color:' + rs20c + ';font-weight:600;font-family:var(--font-mono)">' + idx.rs_20 + '</td>' +
+      '<td style="font-family:var(--font-mono)">' + (idx.rs_60 || '-') + '</td>' +
+      '<td style="font-family:var(--font-mono)">' + (idx.rs_250 || '-') + '</td>' +
+      '<td style="color:' + (idx.above_ma50 ? '#10b981' : '#ef4444') + '">' + (idx.above_ma50 ? '↑' : '↓') + '</td>' +
+      '<td style="color:' + (idx.above_ma200 ? '#10b981' : '#ef4444') + '">' + (idx.above_ma200 ? '↑' : '↓') + '</td>' +
+      '<td style="color:' + (idx.ret_20 >= 0 ? '#ef4444' : '#10b981') + ';font-family:var(--font-mono)">' + (idx.ret_20 || 0).toFixed(1) + '%</td>' +
+      '<td><a href="constituents.html?code=' + idx.code + '&name=' + encodeURIComponent(idx.name) + (date?'&date='+date:'') + '" target="_blank" style="color:var(--accent);font-size:0.65rem">成分股</a></td>' +
+      '</tr>';
+    }
+  });
+  tbl += '</tbody></table>';
+  document.getElementById('table-container').innerHTML = tbl;
+}
+
+function sortTable(th, col) {
+  if (window._sortCol === col) window._sortDir *= -1;
+  else { window._sortCol = col; window._sortDir = -1; }
+  document.querySelectorAll('th').forEach(function(t){ t.classList.remove('sorted'); });
+  th.classList.add('sorted');
+  renderSectorTable();
+}
+
+async function loadStocks(code, name) {
+  const r = await fetch(`/api/index-constituents?index_code=${code}${date?'&date='+date:''}`);
+  const d = await r.json();
+  var h = '<div class="const-section"><h2>📋 ' + name + ' (' + code + ') · 成分股</h2>';
+  h += '<table><thead><tr><th>代码</th><th>名称</th><th>权重</th></tr></thead><tbody>';
+  (d.constituents || []).forEach(function(s) {
+    h += '<tr><td style="font-family:var(--font-mono)">' + s.stock_code + '</td><td>' + s.name + '</td>' +
+      '<td style="font-family:var(--font-mono)">' + (s.weighting ? (s.weighting*100).toFixed(2)+'%' : '—') + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  document.getElementById('table-container').innerHTML += h;
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', function() { loadGroup(this.dataset.group); });
+});
+
+loadGroup(initialGroup);
+
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html><html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MW B2 信号 · 有效分层回测 v3</title>
+<style>
+:root{--bg:#0d0d12;--card:rgba(26,26,31,0.85);--border:rgba(255,255,255,0.06);
+--text:#e0e0e0;--text-secondary:#8b8b90;--accent:#f59e0b;
+--accent-subtle:rgba(245,158,11,0.1);--red:#ef4444;--green:#10b981;
+--font-display:'Instrument Serif','Noto Serif SC',Georgia,serif;
+--font-body:'Inter','PingFang SC',system-ui,sans-serif;
+--font-mono:'JetBrains Mono','SF Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:13px;line-height:1.7;max-width:960px;margin:0 auto;padding:40px 24px 80px}
+.cover{text-align:center;padding:60px 0 40px;border-bottom:1px solid var(--border);margin-bottom:40px}
+.cover h1{font-family:var(--font-display);font-size:1.8rem;font-weight:400;margin-bottom:8px}
+.cover .sub{font-size:.85rem;color:var(--text-secondary)}
+.cover .meta{font-size:.7rem;color:var(--text-secondary);margin-top:12px}
+h2{font-family:var(--font-display);font-size:1.2rem;font-weight:400;color:var(--accent);margin:36px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+h3{font-size:.78rem;font-weight:600;margin:18px 0 6px;color:var(--text)}
+p{margin:10px 0;color:var(--text-secondary)}
+table{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:.75rem}
+th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);font-weight:500;color:var(--text);font-family:var(--font-mono);font-size:.65rem;letter-spacing:.05em}
+td{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.03);font-family:var(--font-mono)}
+tr:hover td{background:rgba(245,158,11,.03)}
+tr.hl td{background:rgba(245,158,11,0.06)}
+.positive{color:var(--green)}.negative{color:var(--red)}.accent{color:var(--accent)}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:16px 0}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+.kpi .val{font-family:var(--font-display);font-size:1.5rem;color:var(--accent)}
+.kpi .lbl{font-size:.6rem;color:var(--text-secondary);margin-top:4px;text-transform:uppercase;letter-spacing:.05em}
+.note{background:var(--accent-subtle);border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:.72rem;color:var(--text-secondary)}
+.note strong{color:var(--accent)}
+.flow{font-family:var(--font-mono);font-size:.72rem;text-align:center;padding:12px;background:rgba(255,255,255,.02);border-radius:8px}
+.best{background:rgba(16,185,129,0.06)}
+</style></head><body>
+<div class="cover">
+<h1>MW B2 确认信号 · 有效分层回测</h1>
+<div class="sub">新引擎 v5.2 下的真实区分维度</div>
+<div class="meta">22,017 条 B2 信号 · 2016-01 ~ 2026-07 · B1 T+1 开盘入场 · 20 日持有 · 2026-07-21</div>
+</div>
+
+<h2>摘要</h2>
+<div class="kpi-row">
+<div class="kpi"><div class="val">22,017</div><div class="lbl">B2 确认信号</div></div>
+<div class="kpi"><div class="val positive">68.8%</div><div class="lbl">20日胜率</div></div>
+<div class="kpi"><div class="val positive">+5.8%</div><div class="lbl">20日中位收益</div></div>
+<div class="kpi"><div class="val positive">+8.6%</div><div class="lbl">20日平均收益</div></div>
+<div class="kpi"><div class="val">493</div><div class="lbl">PLUS 信号</div></div>
+</div>
+
+<div class="note"><strong>关键发现：</strong>新引擎 v5.2 的 H/L 检测（pre_rise≥30% + max涨幅 + RS250门禁）已预过滤低质信号。B2 全量胜率即达 68.8%，MW 形态评分（HDC）失去分层效力。真正有增量区分力的维度是 <strong>行业 RS_20、回调深度、B2 涨幅、市场环境</strong>。</div>
+
+<h2>1. 行业 RS_20（行业动量）</h2>
+<p>B1 日所属行业的 RS_20 强度。行业领涨时突破信号质量显著更高。</p>
+<h3>行业 RS_20</h3><table><tr><th>子层</th><th>N</th><th>20日胜率</th><th>20日中位</th><th>20日均值</th><th>10日胜率</th><th>10日中位</th></tr><tr><td>≥90（行业领涨）</td><td>1,914</td><td class="positive">71.0%</td><td class="positive">6.79%</td><td class="positive">9.68%</td><td class="positive">72.4%</td><td class="positive">4.98%</td></tr><tr><td>80~89</td><td>1,504</td><td class="positive">71.7%</td><td class="positive">7.45%</td><td class="positive">10.01%</td><td class="positive">73.2%</td><td class="positive">4.74%</td></tr><tr><td>60~79</td><td>5,731</td><td class="positive">68.0%</td><td class="positive">5.23%</td><td class="positive">7.75%</td><td class="positive">68.4%</td><td class="positive">3.75%</td></tr><tr><td><60 或缺失</td><td>12,868</td><td class="positive">68.4%</td><td class="positive">5.69%</td><td class="positive">8.60%</td><td class="positive">68.1%</td><td class="positive">4.11%</td></tr></table>
+
+<h2>2. 回调深度</h2>
+<p>H→L 的最大跌幅。浅回调（V 型反弹）信号质量最高。</p>
+<h3>回调深度</h3><table><tr><th>子层</th><th>N</th><th>20日胜率</th><th>20日中位</th><th>20日均值</th><th>10日胜率</th><th>10日中位</th></tr><tr><td>浅调 <20%（V型反弹）</td><td>4,693</td><td class="positive">65.0%</td><td class="positive">5.78%</td><td class="positive">8.99%</td><td class="positive">71.7%</td><td class="positive">5.83%</td></tr><tr><td>中调 20~35%</td><td>6,777</td><td class="positive">67.3%</td><td class="positive">5.15%</td><td class="positive">8.61%</td><td class="positive">66.6%</td><td class="positive">3.60%</td></tr><tr><td>深调 >35%</td><td>10,547</td><td class="positive">71.3%</td><td class="positive">6.02%</td><td class="positive">8.35%</td><td class="positive">69.1%</td><td class="positive">3.87%</td></tr></table>
+
+<h2>3. B2 涨幅</h2>
+<p>B2 确认日的涨幅强度。强劲的 B2 意味着更强的突破动能。</p>
+<h3>B2 涨幅</h3><table><tr><th>子层</th><th>N</th><th>20日胜率</th><th>20日中位</th><th>20日均值</th><th>10日胜率</th><th>10日中位</th></tr><tr><td>弱 B2 <5%</td><td>22,017</td><td class="positive">68.8%</td><td class="positive">5.76%</td><td class="positive">8.57%</td><td class="positive">68.9%</td><td class="positive">4.13%</td></tr></table>
+
+<h2>4. 市场环境</h2>
+<p>中证全指 60 日涨跌分类：≥15%牛 ≤-15%熊。</p>
+<h3>市场环境</h3><table><tr><th>子层</th><th>N</th><th>20日胜率</th><th>20日中位</th><th>20日均值</th><th>10日胜率</th><th>10日中位</th></tr><tr><td>牛市（60日涨≥15%）</td><td>3,120</td><td class="positive">65.1%</td><td class="positive">5.00%</td><td class="positive">7.50%</td><td class="positive">67.1%</td><td class="positive">3.61%</td></tr><tr><td>震荡市</td><td>15,488</td><td class="positive">69.9%</td><td class="positive">6.00%</td><td class="positive">9.30%</td><td class="positive">69.4%</td><td class="positive">4.24%</td></tr><tr><td>熊市（60日跌≥15%）</td><td>3,409</td><td class="positive">66.9%</td><td class="positive">5.06%</td><td class="positive">6.02%</td><td class="positive">68.4%</td><td class="positive">4.20%</td></tr></table>
+
+<h2>5. 乖离率（入场时偏离 MA20）</h2>
+<h3>乖离率（MA20）</h3><table><tr><th>子层</th><th>N</th><th>20日胜率</th><th>20日中位</th><th>20日均值</th><th>10日胜率</th><th>10日中位</th></tr><tr><td>正乖离 0~10%</td><td>15,043</td><td class="positive">71.1%</td><td class="positive">6.06%</td><td class="positive">8.55%</td><td class="positive">70.1%</td><td class="positive">4.03%</td></tr><tr><td>负乖离（超跌反弹）</td><td>363</td><td class="positive">74.9%</td><td class="positive">9.92%</td><td class="positive">11.35%</td><td class="positive">77.8%</td><td class="positive">6.51%</td></tr><tr><td>高乖离 ≥10%</td><td>6,611</td><td class="positive">63.0%</td><td class="positive">4.47%</td><td class="positive">8.46%</td><td class="positive">65.7%</td><td class="positive">4.21%</td></tr></table>
+
+<h2>6. B1 涨幅</h2>
+<h3>B1 涨幅</h3><table><tr><th>子层</th><th>N</th><th>20日胜率</th><th>20日中位</th><th>20日均值</th><th>10日胜率</th><th>10日中位</th></tr><tr><td>强 B1 ≥5%</td><td>11,447</td><td class="positive">65.2%</td><td class="positive">5.11%</td><td class="positive">8.40%</td><td class="positive">66.2%</td><td class="positive">3.95%</td></tr><tr><td>温和 B1 2~5%</td><td>10,570</td><td class="positive">72.6%</td><td class="positive">6.22%</td><td class="positive">8.74%</td><td class="positive">71.8%</td><td class="positive">4.28%</td></tr></table>
+
+<h2>7. 最优交叉组合</h2>
+<table><tr><th>组合</th><th>N</th><th>20日胜率</th><th>20日中位</th><th>20日均值</th><th>10日胜率</th><th>10日中位</th></tr><tr><td>🏆 行业领涨 + 浅回调</td><td>462</td><td class="positive">62.5%</td><td class="positive">5.40%</td><td class="positive">7.94%</td><td class="positive">69.9%</td><td class="positive">5.47%</td></tr><tr><td>🏆 行业领涨 + 深回调</td><td>838</td><td class="positive">74.5%</td><td class="positive">7.30%</td><td class="positive">9.82%</td><td class="positive">75.7%</td><td class="positive">4.86%</td></tr><tr><td>🏆 熊市 + 深回调</td><td>2,212</td><td class="positive">70.0%</td><td class="positive">5.89%</td><td class="positive">6.98%</td><td class="positive">70.1%</td><td class="positive">4.43%</td></tr><tr><td>PLUS 信号</td><td>498</td><td class="positive">72.4%</td><td class="positive">7.27%</td><td class="positive">9.87%</td><td class="positive">70.5%</td><td class="positive">5.16%</td></tr></table><h2>8. 年度稳定性</h2><table><tr><th>年份</th><th>N</th><th>20日胜率</th><th>20日中位</th><th>20日均值</th></tr><tr><td>2016</td><td>121</td><td class="positive">57.9%</td><td class="positive">3.09%</td><td class="positive">2.65%</td></tr><tr><td>2017</td><td>829</td><td class="positive">73.5%</td><td class="positive">5.20%</td><td class="positive">6.15%</td></tr><tr><td>2018</td><td>1,217</td><td class="positive">68.4%</td><td class="positive">4.15%</td><td class="positive">5.89%</td></tr><tr><td>2019</td><td>2,174</td><td class="positive">71.7%</td><td class="positive">6.65%</td><td class="positive">8.48%</td></tr><tr><td>2020</td><td>2,679</td><td class="positive">61.6%</td><td class="positive">3.98%</td><td class="positive">6.53%</td></tr><tr><td>2021</td><td>2,957</td><td class="positive">71.4%</td><td class="positive">6.34%</td><td class="positive">9.70%</td></tr><tr><td>2022</td><td>2,487</td><td class="positive">70.7%</td><td class="positive">6.46%</td><td class="positive">8.13%</td></tr><tr><td>2023</td><td>1,699</td><td class="positive">67.3%</td><td class="positive">4.29%</td><td class="positive">6.77%</td></tr><tr><td>2024</td><td>1,545</td><td class="positive">70.2%</td><td class="positive">6.72%</td><td class="positive">10.47%</td></tr><tr><td>2025</td><td>3,634</td><td class="positive">72.6%</td><td class="positive">7.10%</td><td class="positive">11.29%</td></tr><tr><td>2026</td><td>2,417</td><td class="positive">62.2%</td><td class="positive">4.71%</td><td class="positive">8.39%</td></tr></table><h2>9. 结论</h2>
+<div class="note"><strong>操作建议：</strong>B2 信号全量即高质量（胜率 68.8%，中位 +5.76%），无需复杂分层。如需进一步筛选，优先看行业 RS_20（≥90 时胜率提升明显）和回调深度（浅调<20% 最佳）。B2 涨幅≥8% 时 20 日胜率可达 70%+。熊市深回调中的 B2 信号是逆向布局窗口。</div>
+
+<hr><div style="text-align:center;margin-top:40px;color:var(--text-secondary);font-size:.65rem">MW B2 回测 v3 · 引擎 v5.2 · Project Hanako</div>
+</body></html>

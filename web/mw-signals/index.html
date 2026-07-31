@@ -181,24 +181,24 @@ async function loadData(params){
   }
 }
 
-// 构建B1关注度评分明细表 v3.2
+// 构建B1关注度评分明细表 v4.4
 function buildTechScoreDetail(s,isB1){
   if(!isB1) return '';
   if(!s.tech_score||s.tech_score<=0) return '';
   var labelMap={
-    'h_rs250':'前高RS','turnover':'换手率','days_since_h':'距H天数',
-    'decline':'回调深度','range_contract':'振幅收缩','ind_rs20':'行业RS'
+    'upper_band':'上轨突破','deviation':'乖离率MA20','trend_eff':'趋势效率',
+    'days_since_h':'距H天数','decline':'回调深度','ind_rs20':'行业RS20','h_rs250':'前高RS'
   };
-  var maxMap={'h_rs250':38,'turnover':18,'days_since_h':15,'decline':10,'range_contract':7,'ind_rs20':12};
-  var order=['h_rs250','turnover','days_since_h','ind_rs20','decline','range_contract'];
+  var maxMap={'upper_band':25,'deviation':20,'trend_eff':20,'days_since_h':15,'decline':10,'ind_rs20':5,'h_rs250':5};
+  var order=['upper_band','deviation','trend_eff','days_since_h','decline','ind_rs20','h_rs250'];
   var detail=null;
   try{ if(s.tech_score_detail) detail=JSON.parse(s.tech_score_detail); }catch(e){}
   // 如果是新格式(v3.0)，展示5因子明细；否则只展示总分
-  var isNewFormat = detail && (detail.h_rs250!==undefined || detail.turnover!==undefined);
+  var isNewFormat = detail && (detail.upper_band!==undefined || detail.deviation!==undefined);
   if(!isNewFormat){
     return '<table style="margin-top:6px;border-top:1px solid var(--border)">'+
-      '<tr><td class="lbl" colspan="2" style="font-size:.6rem;color:var(--muted);padding-bottom:4px">👁 B1关注度评分 v3.0 ('+(s.tech_score||0)+'/100)</td></tr>'+
-      '<tr><td class="lbl" colspan="2" style="font-size:.55rem;color:var(--muted)">（历史信号，无量表分项明细）</td></tr></table>';
+      '<tr><td class="lbl" colspan="2" style="font-size:.6rem;color:var(--muted);padding-bottom:4px">👁 B1关注度评分 v4.4 ('+(s.tech_score||0)+'/100)</td></tr>'+
+      '<tr><td class="lbl" colspan="2" style="font-size:.55rem;color:var(--muted)">（历史信号，无v4.4分项明细）</td></tr></table>';
   }
   var rows='';
   for(var i=0;i<order.length;i++){
@@ -207,7 +207,7 @@ function buildTechScoreDetail(s,isB1){
       '<td class="val" style="font-size:9px;font-family:var(--font-mono)">'+v+'/'+max+'</td></tr>';
   }
   return '<table style="margin-top:6px;border-top:1px solid var(--border)">'+
-    '<tr><td class="lbl" colspan="2" style="font-size:.6rem;color:var(--muted);padding-bottom:4px">👁 B1关注度评分 v3.0 ('+(s.tech_score||0)+'/100)</td></tr>'+
+    '<tr><td class="lbl" colspan="2" style="font-size:.6rem;color:var(--muted);padding-bottom:4px">👁 B1关注度评分 v4.4 ('+(s.tech_score||0)+'/100)</td></tr>'+
     rows+'</table>';
 }
 
@@ -276,7 +276,7 @@ function render(){
         '<span class="stock-info"><a href="http://'+window.location.hostname+':8772/pattern-scan/?code='+s.stock_code+'" target="_blank">'+(s.stock_name||s.stock_code)+'</a><span class="code">'+s.stock_code+'</span></span>'+
         '<span style="font-size:10px;color:var(--muted)">'+(isB1?'B1 ':'B2 ')+s[dateCol]+'</span>'+
         '<span style="font-size:10px;color:var(--muted)">RS'+(s.h_rs250||'—')+' | '+(s.c_amount_avg?(s.c_amount_avg/10000).toFixed(0)+'万':'—')+'</span>'+
-        (isB1?(s.tech_score?'<span class="badge" style="'+(s.tech_score>=80?'background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)':s.tech_score>=65?'background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.25)':'background:rgba(139,139,144,.12);color:var(--muted);border:1px solid rgba(139,139,144,.2)')+'">关注度:'+s.tech_score+'/'+(s.tech_score>=80?'极高':s.tech_score>=65?'高':s.tech_score>=50?'关注':'一般')+'</span>':'<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+'</span>'):'<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+' ('+s.score+'分)</span>')+
+        (isB1?(s.tech_score?'<span class="badge" style="'+(s.tech_score>=70?'background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25)':s.tech_score>=60?'background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.25)':'background:rgba(139,139,144,.12);color:var(--muted);border:1px solid rgba(139,139,144,.2)')+'">关注分:'+s.tech_score+'/'+(s.tech_score>=70?'极高':s.tech_score>=60?'高':s.tech_score>=50?'中':'低')+'</span>':'<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+'</span>'):'<span class="badge '+badgeCls+'">'+stars+' '+s.confidence+' ('+s.score+'分)</span>')+
         (!isB1&&s.is_plus ? '<span class="badge" style="background:rgba(16,185,129,.12);color:#10b981;border:1px solid rgba(16,185,129,.2);margin-left:4px">✦ PLUS</span>' : '') +
       '</div>'+
       '<div class="node-line">'+

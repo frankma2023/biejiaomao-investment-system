@@ -96,9 +96,8 @@ def scan_stock(klines, scan_date, code=None, conn=None):
     cache_key = (code, scan_date)
     if cache_key not in _chanlun_cache:
         if _disable_fallback:
-            # 禁止兜底：等同实盘，预加载未命中则直接跳过该股票
             _fallback_log.append((code, scan_date, 'skipped'))
-            bi_list = []  # 空笔列表 → H 检测失败 → 无信号
+            bi_list = []
         else:
             fallback_source = 'sql'
             if conn:
@@ -111,8 +110,16 @@ def scan_stock(klines, scan_date, code=None, conn=None):
                     except: pass
             if bi_list is None:
                 from scanners.chanlun import analyze as _af
-                bi_list = _af(code, 'D', 500, data_mode='stock').get('bi_list', [])
+                bi_list = _af(code, 'D', 500, data_mode='stock', end_date=scan_date).get('bi_list', [])
                 fallback_source = 'live'
+            else:
+                # DB 缓存的 bi 可能 lookback 不够（如 2026 算的 bi 没有 2016 的顶）
+                # 检查：bi 中是否有 scan_date 之前的顶，没有则走实时计算（带 end_date）
+                cached_tops = [b for b in bi_list if b['direction'] == '向下' and b['sdt'][:10] <= scan_date]
+                if len(cached_tops) < 1 and bi_list:
+                    from scanners.chanlun import analyze as _af
+                    bi_list = _af(code, 'D', 500, data_mode='stock', end_date=scan_date).get('bi_list', [])
+                    fallback_source = 'live'
             _fallback_log.append((code, scan_date, fallback_source))
             if fallback_source == 'sql':
                 _fallback_stats['fallback_sql'] += 1
@@ -328,13 +335,20 @@ def scan_stock(klines, scan_date, code=None, conn=None):
         if p_dd >= -7 and p_vol_avg < klines[b1_idx]['volume']:
             score['P'] = 15
 
-    # ── 6.5 前高时的 RS 强度（必须按 H 点日期查询，不能用 scan_date 缓存）──
+    # ── 6.5 前高时的 RS 强度（按 H 点日期查询）──
     h_rs250 = h_rs20 = None
     if conn and code:
         row = conn.execute(
             "SELECT rps_20, rps_250 FROM stock_rs_daily WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1",
             (code, dates[h_idx])
         ).fetchone()
+        if not row:
+            # H 日期在 RS 数据覆盖之前（如 H=2015-08，stock_rs_daily 最早 2016-01-04）
+            # 取最早可用的 RS 数据，不直接拒绝信号
+            row = conn.execute(
+                "SELECT rps_20, rps_250 FROM stock_rs_daily WHERE stock_code=? ORDER BY date ASC LIMIT 1",
+                (code,)
+            ).fetchone()
         if row:
             h_rs20 = row[0]
             h_rs250 = row[1]
@@ -380,10 +394,31 @@ def scan_stock(klines, scan_date, code=None, conn=None):
         else:
             use_set = l2_set_local
         
+        # 兜底：L2/L1 都没匹配 → 查 SW 行业映射 → 最后兜底 000985
+        if not use_set:
+            # 查 stock_sw_industry 获取申万行业
+            if not hasattr(scan_stock, '_sw_map'):
+                import yaml
+                _sw_cfg = yaml.safe_load(open(_os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))), 'config', 'sw_to_index.yaml'), 'r', encoding='utf-8'))
+                scan_stock._sw_map = _sw_cfg
+            sw_row = conn.execute(
+                "SELECT industry_name FROM stock_sw_industry WHERE stock_code=? ORDER BY updated_at DESC LIMIT 1",
+                (code,)
+            ).fetchone()
+            if sw_row and sw_row[0] in scan_stock._sw_map:
+                mapped = scan_stock._sw_map[sw_row[0]]
+                # 优先 L2，其次 L1
+                use_set = {str(mapped['l2'])} if 'l2' in mapped else set()
+                if not use_set and 'l1' in mapped:
+                    use_set = {str(mapped['l1'])}
+        # 最终兜底：中证全指
+        if not use_set:
+            use_set = {'000985'}
+        
         if use_set:
             placeholders = ','.join('?' * len(use_set))
-            if _idx_rs_cache is not None:
-                # 从预加载缓存取最高 RS
+            # 取预加载缓存中的最高行业 RS（缓存非空才用，空则走 SQL 兜底查 H 日期数据）
+            if _idx_rs_cache:
                 best_idx = max(use_set, key=lambda c: _idx_rs_cache.get(c, (0,0))[1], default=None)
                 best = (best_idx,) + _idx_rs_cache.get(best_idx, (0,0)) if best_idx and best_idx in _idx_rs_cache else None
             else:
@@ -686,92 +721,120 @@ def compute_tech_score(code, b1_date, klines, rs_cache=None, return_detail=False
     return (0, {}) if return_detail else 0
 
 
-# ══════════════════ B1 关注度评分 v3.5 ══════════════════
+# ══════════════════ B1 关注度评分 v4.4 (IC校准) ══════════════════
 
 def compute_attention_score(code, b1_date, klines, decline_pct, h_rs250, b1_return_pct,
                              h_date, c_amount_avg, ind_rs20=None, conn=None, return_detail=False):
     """
-    B1 关注度评分 v3.5（满分 100）。
+    B1 关注度评分 v4.4（满分 100）。
 
-    基于 76,512 个 B1 信号的逐步回归 ΔR² 比例分配权重，5 个因子：
+    2026-07-24 基于 49,395 条信号 Spearman IC 校准权重。
+    Q1-Q5 区分力从 v3.5 的 0.3pp 提升至 11.2pp。
 
-    1. h_rs250 (50分) — 前高时的个股 RS250
-       ≥90→50, ≥80→40, ≥70→30, ≥60→15
+    1. 上轨突破% (25分) — 反向，远低于布林上轨=安全
+       <-5%→25, -5~-2%→18, -2~0%→12, 0~5%→6, >5%→0
 
-    2. 距H天数 (22分) — 前高到 B1 的整理时长
-       40~60天→22, 30~40天→18, 20~30天或60~80天→12, >80天→7
+    2. 乖离率 MA20 (20分) — 反向，低乖离=安全
+       <0%→20, 0~5%→15, 5~10%→10, >10%→5
 
-    3. 换手率 (15分) — 横盘期日均换手率
-       <0.5%→15, <1.0%→12, <1.5%→9, <2.0%→5, <3.0%→3
+    3. 趋势效率 (20分) — 反向，横盘整理=蓄力
+       <-0.5→20, -0.5~-0.2→15, -0.2~0→10, 0~0.3→5, >0.3→0
 
-    4. 行业 RS_20 (8分) — B1 日所属行业 RS_20
-       ≥80→8
+    4. 距H天数 (15分) — 正向，40~60天最佳
+       40~60→15, 30~40→12, 20~30或60~80→8, >80→5
 
-    5. 回调深度 (5分) — H→L 的最大跌幅
-       >35%→5, 25~35%→4, 20~25%→3, 15~20%→2
+    5. 回调深度 (10分) — 正向，深调=洗盘充分
+       >35%→10, 25~35%→8, 20~25%→5, 15~20%→3
 
-    分层：极高≥80 / 高65~79 / 关注50~64 / 一般35~49 / 低<35
+    6. 行业 RS_20 (5分) — 正向，行业动量
+       ≥90→5, ≥80→4, ≥70→3, ≥60→2
+
+    7. h_rs250 (5分) — 正向，仅保留微弱权重
+       ≥90→5, ≥80→3, ≥70→2
     """
     from datetime import date
     import numpy as np
     sc = 0
     detail = {}
-    
-    # 1. h_rs250 (50分)
-    rs = h_rs250 or 0
-    if rs >= 90: v = 50
-    elif rs >= 80: v = 40
-    elif rs >= 70: v = 30
-    elif rs >= 60: v = 15
+
+    # 上轨突破% 和 趋势效率 需从 klines 实时计算
+    ub_pct = 0
+    teh = 0
+    dev_ma20 = 0
+    if klines and len(klines) >= 20:
+        closes = np.array([k['close'] for k in klines[-20:]])
+        ma20 = np.mean(closes)
+        std20 = np.std(closes)
+        upper = ma20 + 2 * std20
+        # 上轨突破% = (B1收盘 - 布林上轨) / 布林上轨 * 100
+        if upper > 0:
+            ub_pct = (klines[-1]['close'] - upper) / upper * 100
+        # 趋势效率 = 净涨跌 / 路径长度
+        net = closes[-1] - closes[0]
+        path = np.sum(np.abs(np.diff(closes)))
+        if path > 0:
+            teh = net / path
+        # 乖离率
+        if ma20 > 0:
+            dev_ma20 = (klines[-1]['close'] - ma20) / ma20 * 100
+
+    # 1. 上轨突破% (25分) 反向
+    if ub_pct < -5: v = 25
+    elif ub_pct < -2: v = 18
+    elif ub_pct < 0: v = 12
+    elif ub_pct < 5: v = 6
     else: v = 0
-    sc += v; detail['h_rs250'] = v
-    
-    # 2. 换手率 (15分)
-    to_v = 0
-    if conn and c_amount_avg and c_amount_avg > 0:
-        row = conn.execute("""
-            SELECT outstanding_shares_a FROM stock_equity_change
-            WHERE stock_code=? AND change_date <= ?
-            ORDER BY change_date DESC LIMIT 1
-        """, (code, b1_date)).fetchone()
-        if row and row[0]:
-            close_row = conn.execute(
-                "SELECT close FROM daily_kline WHERE stock_code=? AND date=?",
-                (code, b1_date)
-            ).fetchone()
-            if close_row and close_row[0] and close_row[0] > 0:
-                to_rate = c_amount_avg / (row[0] * close_row[0]) * 100
-                if to_rate < 0.5: to_v = 15
-                elif to_rate < 1.0: to_v = 12
-                elif to_rate < 1.5: to_v = 9
-                elif to_rate < 2.0: to_v = 5
-                elif to_rate < 3.0: to_v = 3
-    sc += to_v; detail['turnover'] = to_v
-    
-    # 3. 距H天数 (15分)
+    sc += v; detail['upper_band'] = v
+
+    # 2. 乖离率 MA20 (20分) 反向
+    if dev_ma20 < 0: v = 20
+    elif dev_ma20 < 5: v = 15
+    elif dev_ma20 < 10: v = 10
+    else: v = 5
+    sc += v; detail['deviation'] = v
+
+    # 3. 趋势效率 (20分) 反向
+    if teh < -0.5: v = 20
+    elif teh < -0.2: v = 15
+    elif teh < 0: v = 10
+    elif teh < 0.3: v = 5
+    else: v = 0
+    sc += v; detail['trend_eff'] = v
+
+    # 4. 距H天数 (15分) 正向
     dh_v = 0
     if h_date and h_date > '2000-01-01' and b1_date:
         dh = (date.fromisoformat(b1_date) - date.fromisoformat(h_date)).days
-        if 40 <= dh <= 60: dh_v = 22
-        elif 30 <= dh < 40: dh_v = 18
-        elif (20 <= dh < 30) or (60 < dh <= 80): dh_v = 12
-        elif dh > 80: dh_v = 7
+        if 40 <= dh <= 60: dh_v = 15
+        elif 30 <= dh < 40: dh_v = 12
+        elif (20 <= dh < 30) or (60 < dh <= 80): dh_v = 8
+        elif dh > 80: dh_v = 5
     sc += dh_v; detail['days_since_h'] = dh_v
-    
-    # 4. 回调深度 (5分)
+
+    # 5. 回调深度 (10分) 正向
     dec = decline_pct or 0
-    if dec > 35: dec_v = 5
-    elif dec >= 25: dec_v = 4
-    elif dec >= 20: dec_v = 3
-    elif dec >= 15: dec_v = 2
+    if dec > 35: dec_v = 10
+    elif dec >= 25: dec_v = 8
+    elif dec >= 20: dec_v = 5
+    elif dec >= 15: dec_v = 3
     else: dec_v = 0
     sc += dec_v; detail['decline'] = dec_v
 
-    # 5. 行业RS_20 (8分) — 所属行业短期强势
+    # 6. 行业 RS_20 (5分) 正向
     ind_v = 0
-    if ind_rs20 is not None and ind_rs20 >= 80:
-        ind_v = 8
+    if ind_rs20 is not None and ind_rs20 >= 90: ind_v = 5
+    elif ind_rs20 is not None and ind_rs20 >= 80: ind_v = 4
+    elif ind_rs20 is not None and ind_rs20 >= 70: ind_v = 3
+    elif ind_rs20 is not None and ind_rs20 >= 60: ind_v = 2
     sc += ind_v; detail['ind_rs20'] = ind_v
+
+    # 7. h_rs250 (5分) 正向
+    rs = h_rs250 or 0
+    if rs >= 90: rs_v = 5
+    elif rs >= 80: rs_v = 3
+    elif rs >= 70: rs_v = 2
+    else: rs_v = 0
+    sc += rs_v; detail['h_rs250'] = rs_v
 
     return (sc, detail) if return_detail else sc
 

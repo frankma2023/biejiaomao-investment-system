@@ -271,38 +271,8 @@ class DBManager:
         return results
 
     def upsert_stock_margin(self, data_list: List[Dict[str, Any]]):
-        """写入融资融券数据"""
-        sql = """INSERT OR REPLACE INTO stock_margin
-            (stock_code, date, mtaslb, mtaslb_fb, mtaslb_sb, mtaslb_mc_r,
-             npa_o_f_d1, npa_o_f_d5, npa_o_f_d10, npa_o_f_d20, npa_o_f_d60,
-             npa_o_f_d120, npa_o_f_d240,
-             fb_mc_rc_d1, fb_mc_rc_d5, fb_mc_rc_d10, fb_mc_rc_d20, fb_mc_rc_d60,
-             fb_mc_rc_d120, fb_mc_rc_d240)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
-        rows = []
-        for item in data_list:
-            code = item.get("stockCode")
-            if not code:
-                continue
-            date_str = str(item.get("last_data_date") or item.get("date", ""))[:10]
-            if not date_str:
-                continue
-            mtaslb = item.get("mtaslb")
-            # 提取融资相关字段
-            mtaslb_fb = item.get("mtaslb_fb") or item.get("mtaslfb")
-            mtaslb_sb = item.get("mtaslb_sb") or item.get("mtaslsb")
-            mtaslb_mc_r = item.get("mtaslb_mc_r") or item.get("mtaslfb_mcr")
-            rows.append((
-                code, date_str, mtaslb, mtaslb_fb, mtaslb_sb, mtaslb_mc_r,
-                item.get("npa_o_f_d1"), item.get("npa_o_f_d5"), item.get("npa_o_f_d10"),
-                item.get("npa_o_f_d20"), item.get("npa_o_f_d60"), item.get("npa_o_f_d120"),
-                item.get("npa_o_f_d240"),
-                item.get("fb_mc_rc_d1"), item.get("fb_mc_rc_d5"), item.get("fb_mc_rc_d10"),
-                item.get("fb_mc_rc_d20"), item.get("fb_mc_rc_d60"), item.get("fb_mc_rc_d120"),
-                item.get("fb_mc_rc_d240"),
-            ))
-        self.execute_many(sql, rows)
-        logger.info(f"[DB] stock_margin: 写入 {len(rows)} 条")
+        """[已废弃] stock_margin 表已删除，融资融券统一使用 daily_margin_history"""
+        pass
 
     def upsert_shareholders_v2(self, data_list: List[Dict[str, Any]]):
         """写入股东人数V2数据"""

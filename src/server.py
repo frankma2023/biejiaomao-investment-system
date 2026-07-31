@@ -456,8 +456,8 @@ def get_capital_flow_data(target_date, db):
             if not idx_codes:
                 continue
             ph = ','.join('?' * len(idx_codes))
-            rs_rows = db.execute(f"SELECT stock_code, rs_60 FROM index_rs_daily WHERE date=? AND stock_code IN ({ph})", (target_date, *idx_codes)).fetchall()
-            group_codes = [r['stock_code'] for r in rs_rows if cond(r['rs_60'])]
+            rs_rows = db.execute(f"SELECT stock_code, rs_20 FROM index_rs_daily WHERE date=? AND stock_code IN ({ph})", (target_date, *idx_codes)).fetchall()
+            group_codes = [r['stock_code'] for r in rs_rows if cond(r['rs_20'])]
             
             if not group_codes:
                 continue
@@ -542,12 +542,13 @@ def api_market_health():
         style = yaml.safe_load(f)
     l2_names = {item['code']: item['name'] for item in style['categories'].get('sector_l2', [])}
     theme_names = {item['code']: item['name'] for item in style['categories'].get('thematic', [])}
+    strategy_names = {item['code']: item['name'] for item in style['categories'].get('strategy', [])}
     
     groups = []
     for g in group_rows:
         gn = g['group_name']
         pool_key = gn.rsplit('_', 1)[0]
-        pool_names = l2_names if pool_key == 'l2' else theme_names
+        pool_names = l2_names if pool_key == 'l2' else (theme_names if pool_key == 'theme' else strategy_names)
         
         # 计算该组的技术健康度
         codes = list(pool_names.keys())
@@ -556,14 +557,14 @@ def api_market_health():
         # 确定 RS 条件
         suffix = gn.rsplit('_', 1)[1]
         if suffix == 'strong':
-            rs_cond = 'rs_60 >= 75'
+            rs_cond = 'rs_20 >= 75'
         elif suffix == 'weak':
-            rs_cond = 'rs_60 < 30'
+            rs_cond = 'rs_20 < 30'
         else:
-            rs_cond = 'rs_60 >= 30 AND rs_60 < 75'
+            rs_cond = 'rs_20 >= 30 AND rs_20 < 75'
         
         idx_rows = db.execute(f"""
-            SELECT r.rs_60, r.ma50, r.ma200,
+            SELECT r.rs_20, r.rs_60, r.ma50, r.ma200,
                    r.close, r.ret_20
             FROM index_rs_daily r
             WHERE r.date = ? AND r.stock_code IN ({placeholders}) AND ({rs_cond})
@@ -572,7 +573,7 @@ def api_market_health():
         tech = {
             'above_ma50': sum(1 for r in idx_rows if r['ma50'] and r['close'] > r['ma50']),
             'above_ma200': sum(1 for r in idx_rows if r['ma200'] and r['close'] > r['ma200']),
-            'avg_rs_60': round(sum(r['rs_60'] for r in idx_rows) / len(idx_rows), 1) if idx_rows else 0,
+            'avg_rs_20': round(sum(r['rs_20'] for r in idx_rows) / len(idx_rows), 1) if idx_rows else 0,
             'positive_20d': sum(1 for r in idx_rows if r['ret_20'] and r['ret_20'] > 0),
         }
         
@@ -588,6 +589,63 @@ def api_market_health():
             'tech': tech,
         })
 
+    # ── 当日行业分组快照（v2.6）──
+    # 基于当日涨跌幅的池内百分位排名，实时计算不存库
+    def _groups_d1(target_date):
+        pools = [
+            ('l2', 'L2', list(l2_names.keys())),
+            ('theme', '主题', list(theme_names.keys())),
+            ('strategy', '策略', list(strategy_names.keys())),
+        ]
+        result = []
+        for pool_key, pool_label, pool_codes in pools:
+            if not pool_codes:
+                continue
+            ph = ','.join('?' * len(pool_codes))
+            rows = db.execute(f"""
+                SELECT stock_code, change FROM index_daily_kline
+                WHERE date = ? AND stock_code IN ({ph}) AND change IS NOT NULL
+            """, (target_date, *pool_codes)).fetchall()
+            if not rows:
+                continue
+            # 池内百分位排名：把涨跌幅从小到大排序，取每只的分位
+            sorted_rows = sorted(rows, key=lambda r: r['change'])
+            n = len(sorted_rows)
+            rank_map = {}
+            for idx, r in enumerate(sorted_rows):
+                # 百分位 = 排名/(n-1)*100，排名0=最弱，n-1=最强
+                rank_map[r['stock_code']] = (idx / (n - 1)) * 100 if n > 1 else 50.0
+            # 分组
+            groups_d1 = {'strong': [], 'mid': [], 'weak': []}
+            for r in rows:
+                score = rank_map.get(r['stock_code'], 50)
+                if score >= 75:
+                    groups_d1['strong'].append(r)
+                elif score >= 30:
+                    groups_d1['mid'].append(r)
+                else:
+                    groups_d1['weak'].append(r)
+            for suffix, label_suffix, grp in [
+                ('strong', '强势', groups_d1['strong']),
+                ('mid', '中性', groups_d1['mid']),
+                ('weak', '弱势', groups_d1['weak']),
+            ]:
+                if not grp:
+                    continue
+                avg_chg = sum(r['change'] for r in grp) / len(grp)
+                up = sum(1 for r in grp if r['change'] > 0)
+                result.append({
+                    'group_name': f'{pool_key}_{suffix}_d1',
+                    'group_label': f'{pool_label}{label_suffix}·当日',
+                    'indices_count': len(grp),
+                    'avg_change': round(avg_chg * 100, 2),
+                    'up_count': up,
+                    'down_count': len(grp) - up,
+                })
+        return result
+
+    groups_d1 = _groups_d1(row['date'])
+
     return jsonify({
         'date': row['date'],
         'total_score': row['total_score'],
@@ -595,6 +653,7 @@ def api_market_health():
         'indicators': indicators,
         'rotations': rotations,
         'groups': groups,
+        'groups_d1': groups_d1,
         'capital_flow': get_capital_flow_data(row['date'], db),
     })
 
@@ -666,36 +725,87 @@ def api_market_sell_score():
 
 @app.route('/api/market-health/sector-indices')
 def api_market_sector_indices():
-    """返回某个行业分组下的指数列表及RS/MA数据"""
+    """返回某个行业分组下的指数列表及RS/MA数据（支持当日分组 _d1 后缀）"""
     group_name = request.args.get('group_name', '')
     target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
-    
+
+    # 当日分组模式：group_name 形如 l2_strong_d1 / theme_weak_d1
+    is_d1 = group_name.endswith('_d1')
+    if is_d1:
+        group_name = group_name[:-3]  # 去掉 _d1
+
     # 解析分组名称获取池和RS条件
     pool_key, suffix = group_name.rsplit('_', 1)
-    # pool_key: 'l2' or 'theme', suffix: 'strong'/'mid'/'weak'
-    
+    # pool_key: 'l2' or 'theme' or 'strategy', suffix: 'strong'/'mid'/'weak'
+
     import yaml
     yaml_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'index_style.yaml')
     with open(yaml_path, encoding='utf-8') as f:
         style = yaml.safe_load(f)
-    
+
     if pool_key == 'l2':
         pool_codes = {item['code']: item['name'] for item in style['categories'].get('sector_l2', [])}
-    else:
+    elif pool_key == 'theme':
         pool_codes = {item['code']: item['name'] for item in style['categories'].get('thematic', [])}
-    
-    db = get_db()
-    
-    # RS阈值
-    if suffix == 'strong':
-        cond = 'rs_60 >= 75'
-    elif suffix == 'weak':
-        cond = 'rs_60 < 30'
     else:
-        cond = 'rs_60 >= 30 AND rs_60 < 75'
-    
+        pool_codes = {item['code']: item['name'] for item in style['categories'].get('strategy', [])}
+
+    db = get_db()
     codes_list = list(pool_codes.keys())
     placeholders = ','.join('?' * len(codes_list))
+
+    # ── 当日分组模式：基于当日涨跌幅的池内百分位排名 ──
+    if is_d1:
+        rows = db.execute(f"""
+            SELECT stock_code, change FROM index_daily_kline
+            WHERE date = ? AND stock_code IN ({placeholders}) AND change IS NOT NULL
+        """, (target_date, *codes_list)).fetchall()
+        if not rows:
+            return jsonify({'date': target_date, 'indices': [], 'stats': {'total': 0, 'above_ma50': 0, 'avg_rs_20': 0}})
+        # 池内百分位排名
+        sorted_rows = sorted(rows, key=lambda r: r['change'])
+        n = len(sorted_rows)
+        rank_map = {}
+        for idx, r in enumerate(sorted_rows):
+            rank_map[r['stock_code']] = (idx / (n - 1)) * 100 if n > 1 else 50.0
+        # 按档位过滤
+        if suffix == 'strong':
+            filtered = [r for r in rows if rank_map.get(r['stock_code'], 50) >= 75]
+        elif suffix == 'weak':
+            filtered = [r for r in rows if rank_map.get(r['stock_code'], 50) < 30]
+        else:
+            filtered = [r for r in rows if 30 <= rank_map.get(r['stock_code'], 50) < 75]
+        filtered.sort(key=lambda r: r['change'], reverse=True)
+        indices = [{
+            'code': r['stock_code'],
+            'name': pool_codes.get(r['stock_code'], r['stock_code']),
+            'rs_20': round(rank_map.get(r['stock_code'], 50), 1),  # 当日强度分
+            'rs_60': None,
+            'rs_250': None,
+            'close': None,
+            'ma50': None,
+            'ma200': None,
+            'ad_slope': None,
+            'ret_20': None,
+            'ret_60': None,
+            'above_ma50': False,
+            'above_ma200': False,
+            'change_d1': round((r['change'] or 0) * 100, 2),
+        } for r in filtered]
+        return jsonify({
+            'date': target_date,
+            'indices': indices,
+            'stats': {'total': len(filtered), 'above_ma50': 0, 'avg_rs_20': round(sum(i['rs_20'] for i in indices) / len(indices), 1) if indices else 0},
+        })
+
+    # RS阈值
+    if suffix == 'strong':
+        cond = 'rs_20 >= 75'
+    elif suffix == 'weak':
+        cond = 'rs_20 < 30'
+    else:
+        cond = 'rs_20 >= 30 AND rs_20 < 75'
+
     rows = db.execute(f"""
         SELECT r.stock_code, r.rs_20, r.rs_60, r.rs_250,
                r.ma50, r.ma200, r.ad_slope_display,
@@ -703,7 +813,7 @@ def api_market_sector_indices():
         FROM index_rs_daily r
         WHERE r.date = ? AND r.stock_code IN ({placeholders})
           AND ({cond})
-        ORDER BY r.rs_60 DESC
+        ORDER BY r.rs_20 DESC
     """, (target_date, *codes_list))
     
     indices = []
@@ -730,7 +840,7 @@ def api_market_sector_indices():
         'total': len(indices),
         'above_ma50': sum(1 for i in indices if i['above_ma50']),
         'above_ma200': sum(1 for i in indices if i['above_ma200']),
-        'avg_rs_60': round(sum(i['rs_60'] for i in indices) / len(indices), 1) if indices else 0,
+        'avg_rs_20': round(sum(i['rs_20'] for i in indices) / len(indices), 1) if indices else 0,
     }
     
     db.close()
@@ -1277,19 +1387,19 @@ def api_margin_by_sector():
         stocks = db.execute('SELECT stock_code FROM index_constituents WHERE index_code=?', (code,)).fetchall()
         codes = [s['stock_code'] for s in stocks]
         if codes: sector_stocks[name] = codes
-    dates = [r[0] for r in db.execute('SELECT DISTINCT date FROM daily_review_margin WHERE date>=? AND date<=? ORDER BY date', (start, end)).fetchall()]
+    dates = [r[0] for r in db.execute('SELECT DISTINCT date FROM daily_margin_history WHERE date>=? AND date<=? ORDER BY date', (start, end)).fetchall()]
     result = {'dates': dates, 'sectors': {}}
     for sec_name, codes in sector_stocks.items():
         bal = []; net = []
         for dt in dates:
             ph = ','.join(['?']*len(codes))
-            row = db.execute(f'SELECT SUM(margin_fb)/1e8 as fb, SUM(net_buy_d1)/1e8 as nt FROM daily_review_margin WHERE date=? AND stock_code IN ({ph})', (dt,)+tuple(codes)).fetchone()
+            row = db.execute(f'SELECT SUM(financing_balance)/1e8 as fb, SUM(net_purchase)/1e8 as nt FROM daily_margin_history WHERE date=? AND stock_code IN ({ph})', (dt,)+tuple(codes)).fetchone()
             bal.append(round(row[0],0) if row and row[0] else 0)
             net.append(round(row[1],0) if row and row[1] else 0)
         result['sectors'][sec_name] = {'balance': bal, 'net_buy': net}
     total_bal = []; total_net = []
     for dt in dates:
-        row = db.execute('SELECT SUM(margin_fb)/1e8 as fb, SUM(net_buy_d1)/1e8 as nt FROM daily_review_margin WHERE date=?', (dt,)).fetchone()
+        row = db.execute('SELECT SUM(financing_balance)/1e8 as fb, SUM(net_purchase)/1e8 as nt FROM daily_margin_history WHERE date=?', (dt,)).fetchone()
         total_bal.append(round(row[0],0) if row and row[0] else 0)
         total_net.append(round(row[1],0) if row and row[1] else 0)
     # 用一致口径：以首日为基准，后续余额 = 首日余额 + 累计净买入
@@ -1323,14 +1433,41 @@ def api_stock_name():
 @app.route('/api/market-scan/margin-history')
 def api_margin_history():
     db = get_db()
+    # daily_margin_history 是全A股融资格局最全的（~3835只/日），逐日更新
     rows = db.execute('''
-        SELECT date, SUM(financing_balance)/1e8 as fb, SUM(securities_balance)/1e8 as sb
+        SELECT date, SUM(financing_balance)/1e8 as fb, SUM(COALESCE(securities_balance,0))/1e8 as sb
         FROM daily_margin_history WHERE date >= '2026-01-01' GROUP BY date ORDER BY date
     ''').fetchall()
     return jsonify({
         'dates': [r['date'] for r in rows],
         'financing': [round(r['fb'], 0) for r in rows],
         'securities': [round(r['sb'], 2) for r in rows]
+    })
+
+@app.route('/api/market-scan/margin-top-flow')
+def api_margin_top_flow():
+    db = get_db()
+    date = request.args.get('date', db.execute('SELECT MAX(date) FROM daily_margin_history').fetchone()[0])
+    # 净流入 TOP20
+    top_in = db.execute('''
+        SELECT m.stock_code, b.name, m.net_purchase
+        FROM daily_margin_history m
+        LEFT JOIN stock_basic b ON m.stock_code=b.stock_code
+        WHERE m.date=? AND m.net_purchase IS NOT NULL
+        ORDER BY m.net_purchase DESC LIMIT 20
+    ''', (date,)).fetchall()
+    # 净流出 TOP20
+    top_out = db.execute('''
+        SELECT m.stock_code, b.name, m.net_purchase
+        FROM daily_margin_history m
+        LEFT JOIN stock_basic b ON m.stock_code=b.stock_code
+        WHERE m.date=? AND m.net_purchase IS NOT NULL
+        ORDER BY m.net_purchase ASC LIMIT 20
+    ''', (date,)).fetchall()
+    return jsonify({
+        'date': date,
+        'top_in': [{'code': r['stock_code'], 'name': r['name'] or r['stock_code'], 'net': round(r['net_purchase']/1e8, 2)} for r in top_in],
+        'top_out': [{'code': r['stock_code'], 'name': r['name'] or r['stock_code'], 'net': round(r['net_purchase']/1e8, 2)} for r in top_out],
     })
 
 @app.route('/api/pocket-pivot', methods=['POST', 'OPTIONS'])
@@ -3303,18 +3440,34 @@ def api_index_constituents():
 
     snap_date = snap['date']
 
-    # 拉取成分股及权重（权重表仅有前10大，其余显示为—）
+    # 拉取成分股及权重 + 涨跌幅
     rows = db.execute("""SELECT ic.stock_code, sb.name,
         (SELECT icw.weighting FROM index_constituent_weightings icw
          WHERE icw.index_code = ic.index_code AND icw.stock_code = ic.stock_code
-         ORDER BY icw.date DESC LIMIT 1) as weighting
+         ORDER BY icw.date DESC LIMIT 1) as weighting,
+        (SELECT close FROM daily_kline WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1) as close,
+        (SELECT close FROM daily_kline WHERE stock_code=ic.stock_code AND date<=(SELECT date FROM daily_kline WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1 OFFSET 1) ORDER BY date DESC LIMIT 1) as prev_close,
+        (SELECT close FROM daily_kline WHERE stock_code=ic.stock_code AND date<=(SELECT date FROM daily_kline WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1 OFFSET 4) ORDER BY date DESC LIMIT 1) as close_5d_ago,
+        (SELECT close FROM daily_kline WHERE stock_code=ic.stock_code AND date<=(SELECT date FROM daily_kline WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1 OFFSET 9) ORDER BY date DESC LIMIT 1) as close_10d_ago,
+        (SELECT close FROM daily_kline WHERE stock_code=ic.stock_code AND date<=(SELECT date FROM daily_kline WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1 OFFSET 19) ORDER BY date DESC LIMIT 1) as close_20d_ago
         FROM index_constituents ic
         LEFT JOIN stock_basic sb ON ic.stock_code = sb.stock_code
         WHERE ic.index_code = ? AND ic.date = ?
         ORDER BY weighting DESC NULLS LAST""",
-        (index_code, snap_date)).fetchall()
+        (date, date, date, date, date, index_code, snap_date)).fetchall()
 
-    constituents = [dict(r) for r in rows]
+    constituents = []
+    for r in rows:
+        c = {'stock_code': r['stock_code'], 'name': r['name'], 'weighting': r['weighting']}
+        if r['close'] and r['prev_close']:
+            c['chg_d1'] = round((r['close']/r['prev_close']-1)*100, 2)
+        if r['close'] and r['close_5d_ago']:
+            c['chg_5d'] = round((r['close']/r['close_5d_ago']-1)*100, 2)
+        if r['close'] and r['close_10d_ago']:
+            c['chg_10d'] = round((r['close']/r['close_10d_ago']-1)*100, 2)
+        if r['close'] and r['close_20d_ago']:
+            c['chg_20d'] = round((r['close']/r['close_20d_ago']-1)*100, 2)
+        constituents.append(c)
 
     return jsonify({
         'index_code': index_code,

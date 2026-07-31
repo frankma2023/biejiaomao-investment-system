@@ -46,7 +46,7 @@
 
     <header class="panel-header">
       <h1>📋 欧奈尔投资系统 · 项目进展</h1>
-      <p>2026-07-19（阶段收尾 · MW引擎兜底策略 + 并行扫描 + 回填脚本）</p>
+      <p>2026-07-31（阶段收尾 · 当日行业分组快照 + 两融旧API管道 + 四位大师选股漏斗）</p>
     </header>
 
     <div class="pg-stats">
@@ -394,6 +394,47 @@
 <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">76. 笔数据两层兜底架构——预加载精确匹配+引擎逐只补漏</div><div class="ld">chanlun_bi_json 1068万行，GROUP BY取最新会超时。改为预加载层WHERE scan_date=?走索引（快）+引擎兜底层ORDER BY DESC LIMIT 1（逐只，慢但只对少数未命中触发）。实盘(daily_update)chanlun_scan先跑确保100%命中→0%兜底。回填中约21%触发兜底→含未来信息偏差。加_disable_fallback开关控制。</div></div>
 <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">77. 回填≠实盘——锚点模式6天覆盖10年</div><div class="ld">逐日回填2500天×14s=10h。但引擎K线回看1000天+去掉"仅当天"过滤器后，一次扫描覆盖~3年。6个锚点日期各扫一次即可覆盖2016-2026，速度提升400倍。4分钟完成全部回填。教训：找到"扫描一次的覆盖半径"就能把天数级任务降为常数级。</div></div>
 <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">78. 多进程并行在Windows spawn下需模块级函数</div><div class="ld">ProcessPoolExecutor在Windows用spawn模式，worker函数必须可在import时访问。lambda/嵌套函数不可pickle。_scan_worker必须在mw_signal.py模块级定义，子进程import后才能调用。每个worker独立开DB连接+加载自己的K线/笔数据子集。</div></div>
+
+    <div class="section-title" style="margin-top:28px">📆 2026-07-31 阶段收尾</div>
+    <div class="pg-grid">
+      <div class="pg-card">
+        <h3>📊 大盘扫描 v2.6：当日行业分组快照</h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>当日涨跌幅池内百分位分组</td><td>L2/策略/主题独立排名</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>groups_d1 实时计算</td><td>server.py 不存库</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>当日分组卡片区块</td><td>与RS_20区块并排</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>sector-detail 钻入支持_d1</td><td>当日涨跌/强度列</td></tr>
+        </table>
+      </div>
+      <div class="pg-card">
+        <h3>🔄 两融数据旧API管道</h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>fetch_margin_daily 重写</td><td>/company/路径+8线程</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>daily_margin_history 标准源</td><td>margin-by-sector直读</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>与交易所数据对比</td><td>偏差约-4.4%（北交所/两融ETF未覆盖）</td></tr>
+        </table>
+      </div>
+      <div class="pg-card">
+        <h3>👨‍🎓 四位大师选股漏斗</h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>第0层基础池</td><td>3803只</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>第1层段永平（好生意）</td><td>84只</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>第2层巴菲特（护城河+估值）</td><td>35只</td></tr>
+        </table>
+      </div>
+      <div class="pg-card">
+        <h3>🧩 Mattpocock Skills v1.1</h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>五步闭环技能安装</td><td>grilling→to-spec→to-tickets→implement→code-review</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>当日分组功能走完闭环</td><td>首个完整实践</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:28px">📋 本次开发经验教训</div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">79. 前端静态服务必须用 serve_dev.py——裸 http.server 无 Cache-Control 头引发启发式缓存</div><div class="ld">python -m http.server 不发送 Cache-Control，浏览器按启发式缓存保存旧 HTML/JS，改文件后页面仍执行旧逻辑（表现：API 返回正常但页面显示旧值/0值）。8772 已固定改用 scripts/serve_dev.py（no-cache）。排查"前端异常但API正常"时第一嫌疑：验证 8772 响应头 + 文件内容是否含最新代码片段。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">80. 理杏仁API路径有坑：/index/ 返回指数级汇总，/company/ 才是个股级</div><div class="ld">旧文档写 /api/cn/index/margin-trading-and-securities-lending，实际会把 000001 当上证综指解析返回全指数汇总（单只"股票"融资余额1.26万亿）。个股级正确路径是 /api/cn/company/margin-trading-and-securities-lending。文档已修正。教训：对接第三方API先用手动示例验证数据量级，别信路径字面。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">81. 当日分组快照 vs RS_20 分组——快照不做评级，趋势才做评级</div><div class="ld">当日涨跌幅百分位分组定位是"今日谁强谁弱"的快照，若复用 RS_20 的总分/评级/仓位会与趋势口径打架（20日A级但当日大跌）。轻量卡片（组名/平均涨跌幅/涨跌家数）+ 与趋势区块并排，才能一眼抓出"趋势强但当日转弱"的背离信号。</div></div>
 
 </div>
 <script>

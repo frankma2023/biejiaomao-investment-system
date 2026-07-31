@@ -89,233 +89,52 @@ def analyze_structure(code, start_date, end_date):
         ma60.append(compute_ma(klines, i, 60))
         ma50.append(compute_ma(klines, i, 50))
 
-    # ── 3. 前高 (H) ──
-    # 用盘中最高价找前高（前高 = 阻力天花板，盘中最高价才是真正的"曾经到过的高度"）
-    # 局部峰值：高于前后40天、且之后有≥10%的下跌
-    h_idx = start_idx
-    h_price = 0
-    for i in range(start_idx, end_idx + 1):
-        hi = klines[i]['high']
-        pre_start = max(0, i - 40)
-        pre_max = max(klines[j]['high'] for j in range(pre_start, i)) if i > pre_start else 0
-        post_end = min(i + 40, end_idx)
-        post_max = max(klines[j]['high'] for j in range(i+1, post_end+1)) if post_end > i else 0
-        is_local_peak = hi >= pre_max and (post_end <= i or hi > post_max)
-        if not is_local_peak:
-            continue
-        # 之后必须有显著下跌（≥10%），用收盘价计算跌幅（盘中最低不可靠）
-        future_low = min(klines[j]['close'] for j in range(i+1, end_idx+1)) if i < end_idx else hi
-        decline = (hi - future_low) / hi if hi > 0 else 0
-        if decline < 0.10:
-            continue
-        if hi > h_price:
-            h_price = hi
-            h_idx = i
-    # 如果没找到符合条件的局部峰值，退化为区间内最高点（但有最低点在它之后）
-    if h_price == 0:
-        for i in range(start_idx, end_idx + 1):
-            hi = klines[i]['high']
-            future_low = min(klines[j]['close'] for j in range(i+1, end_idx+1)) if i < end_idx else hi
-            if (hi - future_low) / hi >= 0.05 and hi > h_price:
-                h_price = hi
-                h_idx = i
-    # 最后兜底：取 start_idx 到区间中间的最高点
-    if h_price == 0:
-        mid = start_idx + (end_idx - start_idx) // 2
-        for i in range(start_idx, min(mid + 20, end_idx + 1)):
-            hi = klines[i]['high']
-            if hi > h_price:
-                h_price = hi
-                h_idx = i
+    # ── 3. 调用 mw_signal.scan_stock 统一检测 H/L/C/B1/B2 ──
+    # 与 PRD v5.2 保持完全一致，不再维护独立的检测逻辑。
+    try:
+        import scanners.mw_signal as mw
+    except ImportError:
+        conn.close()
+        return {'error': '无法导入 mw_signal 模块'}
 
-    # ── 4. 最低点 (L) ──
-    # 在前高和 end_idx 之间找最低收盘价
-    l_idx = h_idx
-    l_price = klines[h_idx]['close']
-    for i in range(h_idx, end_idx + 1):
-        if klines[i]['close'] < l_price:
-            l_price = klines[i]['close']
-            l_idx = i
+    # 设置模块级缓存（scan_stock 内部会用到）
+    mw._rs_cache = mw._rs_cache or {}
+    mw._idx_comp_cache = mw._idx_comp_cache or None
+    mw._idx_rs_cache = mw._idx_rs_cache or {}
+    mw._reso_cache = mw._reso_cache or {}
+    mw._names_cache = mw._names_cache or {}
+    mw._sell_existing_cache = mw._sell_existing_cache or {}
+    # 注意：不预填充 _chanlun_cache，让 scan_stock 走内部的 ORDER BY DESC LIMIT 1 兜底
+    # 这样与 pattern-scan 页面行为一致
 
-    # ── 5. 横盘区 (C) ──
-    # 从最低点开始往后找，直到价格明显脱离底部
-    consolidation_start = l_idx
-    consolidation_end = l_idx
-    max_amplitude = 0.10  # 振幅阈值 10%
+    passed, result = mw.scan_stock(klines, end_date, code, conn)
 
-    # 以最低点为中心，向前后扩展找横盘区间
-    c_values = [klines[i]['close'] for i in range(l_idx, min(l_idx + 30, end_idx + 1))]
-    for i in range(l_idx, min(l_idx + 30, end_idx + 1)):
-        segment = [klines[j]['close'] for j in range(l_idx, i + 1)]
-        if not segment:
-            continue
-        seg_min = min(segment)
-        seg_max = max(segment)
-        seg_amp = (seg_max - seg_min) / seg_min if seg_min > 0 else 999
-        if seg_amp <= max_amplitude:
-            consolidation_end = i
-        else:
-            break
+    if not passed or not result:
+        conn.close()
+        return {'error': f'未检测到MW信号结构（{code}，区间 {start_date}~{end_date}）'}
 
-    # 如果横盘区太短（< 3 天），扩展搜索
-    if consolidation_end - consolidation_start < 3:
-        # 向后继续找，放宽振幅到 15%
-        for i in range(l_idx, min(l_idx + 40, end_idx + 1)):
-            segment = [klines[j]['close'] for j in range(l_idx, i + 1)]
-            seg_min = min(segment)
-            seg_max = max(segment)
-            seg_amp = (seg_max - seg_min) / seg_min if seg_min > 0 else 999
-            if seg_amp <= 0.15:
-                consolidation_end = i
-            elif i - consolidation_start >= 3:
-                break
+    # 从 scan_stock 结果中提取日期 → 对应 klines 索引
+    try:
+        h_idx = dates.index(result['h_date'])
+        l_idx = dates.index(result['l_date'])
+        h_price = result['h_price']
+        l_price = result['l_price']
+        consolidation_start = dates.index(result['c_start'])
+        consolidation_end = dates.index(result['c_end'])
+        b1_idx = dates.index(result['b1_date']) if result.get('b1_date') else None
+        b2_idx = dates.index(result['b2_date']) if result.get('b2_date') else None
+    except (ValueError, KeyError) as e:
+        conn.close()
+        return {'error': f'日期映射失败: {e}'}
 
-    # ── 6. 突破日1 (B1) ──
-    # 与 mw_signal.py / PRD v2.0 对齐：
-    #   阳线 + 涨幅≥2% + MA5>MA10且收盘站上两者 +
-    #   成交量>前10日最大下跌量且>20日均量×1.5 + 收盘>横盘区最高收盘价
-    c_max_close = max(klines[j]['close'] for j in range(consolidation_start, consolidation_end + 1))
-
-    b1_idx = None
-    for i in range(consolidation_end + 1, min(consolidation_end + 20, end_idx + 1)):
-        k = klines[i]
-        if k['close'] <= k['open']:
-            continue
-
-        ret = (k['close'] / klines[i-1]['close'] - 1) if i > 0 else 0
-        if ret < 0.02:
-            continue
-
-        # 均线: MA5>MA10 且收盘站上两者
-        if ma5[i] is None or ma10[i] is None:
-            continue
-        if not (ma5[i] > ma10[i] and k['close'] > ma5[i] and k['close'] > ma10[i]):
-            continue
-
-        # 成交量: > 前10日最大下跌量 AND > 20日均量×1.5
-        # 下跌日 = close < 前日收盘
-        max_down_b1 = 0
-        for j in range(max(0, i - 10), i):
-            if j > 0 and klines[j]['close'] < klines[j-1]['close']:
-                v = klines[j].get('volume') or 0
-                if v > max_down_b1:
-                    max_down_b1 = v
-
-        vol_20 = [klines[j]['volume'] for j in range(max(0, i - 20), i) if klines[j].get('volume') is not None]
-        avg_vol_20 = sum(vol_20) / len(vol_20) if vol_20 else 0
-        vol_ratio = k['volume'] / avg_vol_20 if avg_vol_20 > 0 else 0
-
-        if not (k['volume'] > max_down_b1 and vol_ratio >= 1.5):
-            continue
-
-        # 空间: 收盘 > 横盘区最高收盘价
-        if k['close'] <= c_max_close:
-            continue
-
-        b1_idx = i
-        break
-
-    # ── 7. 整理段 (P) 和 突破日2 (B2) ──
-    # 与 mw_signal.py / PRD v2.0 对齐：
-    #   阳线 + 涨幅≥3% + 成交量>前10日最大下跌量且>20日均量×1.1 +
-    #   收盘>平台最高收盘价×1.02(不含B1高点) + 三选一超越 +
-    #   均线突破≥4条 + 收盘位置(跳空≥40%/非跳空≥80%)
+    # ── 4. 整理段 (P) ──
     p_start = b1_idx + 1 if b1_idx is not None else consolidation_end + 1
-    p_end = p_start
-    b2_idx = None
-
-    if b1_idx is not None and b1_idx < end_idx:
-        b1_high = klines[b1_idx]['high']
-        b1_close = klines[b1_idx]['close']
-
-        # 记录 B1 日的 MA 状态（只跟踪 MA60 是否站上 + MA 交叉）
-        def ma_status(idx):
-            mas = {}
-            for p in [5,10,20,30,60]:
-                if idx >= p-1:
-                    mas[p] = sum(klines[j]['close'] for j in range(idx-p+1, idx+1))/p
-                else:
-                    mas[p] = None
-            above = [p for p in [60] if mas[p] and klines[idx]['close'] > mas[p] * 1.02]
-            crosses = []
-            if mas[20] and mas[30] and mas[20] > mas[30]: crosses.append('MA20>MA30')
-            if mas[30] and mas[60] and mas[30] > mas[60]: crosses.append('MA30>MA60')
-            return above, crosses, mas
-
-        b1_above, b1_crosses, _ = ma_status(b1_idx)
-
-        # 在 B1 之后找 B2
-        for i in range(b1_idx + 1, min(b1_idx + 30, end_idx + 1)):
-            k = klines[i]
-            if k['close'] <= k['open']:
-                continue
-
-            # 平台突破约束（不含 B1 盘中高点，仅含 B1 之后收盘价）
-            if i > b1_idx + 1:
-                p_max_close = max(klines[j]['close'] for j in range(b1_idx + 1, i))
-            else:
-                p_max_close = b1_close
-            plateau_top = p_max_close
-            if k['close'] <= plateau_top * 1.02:
-                continue
-
-            # 三选一超越
-            b2_above, b2_crosses, _ = ma_status(i)
-            new_above = bool(set(b2_above) - set(b1_above))
-            new_cross = bool(set(b2_crosses) - set(b1_crosses))
-            price_break = k['close'] > b1_high
-            if not (new_above or new_cross or price_break):
-                continue
-
-            # 涨幅 ≥ 3%
-            ret = (k['close'] / klines[i-1]['close'] - 1) if i > 0 else 0
-            if ret < 0.03:
-                continue
-
-            # 成交额 > 前10日任意下跌日成交额（取消量比条件）
-            max_down_amt = 0
-            for j in range(max(0, i - 10), i):
-                if j > 0 and klines[j]['close'] < klines[j-1]['close']:
-                    v = klines[j].get('amount') or 0
-                    if v > max_down_amt:
-                        max_down_amt = v
-
-            if not ((k.get('amount') or 0) > max_down_amt):
-                continue
-
-            # 收盘位置: 跳空≥40% / 非跳空≥80%
-            is_gap = i > 0 and k['open'] > klines[i-1]['high']
-            if k['high'] != k['low']:
-                close_pos = (k['close'] - k['low']) / (k['high'] - k['low'])
-            else:
-                close_pos = 1.0
-            if is_gap and close_pos < 0.40:
-                continue
-            if not is_gap and close_pos < 0.80:
-                continue
-
-            # 均线突破 ≥ 4 条（MA5/10/20/30/60），且必须站上 MA60
-            ma_count = 0
-            ma60_val = None
-            for period in [5, 10, 20, 30, 60]:
-                if i >= period - 1:
-                    ma = sum(klines[j]['close'] for j in range(i - period + 1, i + 1)) / period
-                    if k['close'] > ma:
-                        ma_count += 1
-                    if period == 60:
-                        ma60_val = ma
-            if ma_count < 4:
-                continue
-            if ma60_val is None or k['close'] <= ma60_val:
-                continue
-
-            b2_idx = i
-            break
-
-        if b2_idx is not None:
-            p_end = b2_idx - 1
-        else:
-            p_end = min(b1_idx + 15, end_idx)
+    if b2_idx is not None:
+        p_end = b2_idx - 1
+    elif b1_idx is not None:
+        p_end = min(b1_idx + 15, end_idx)
+    else:
+        p_end = p_start
 
     # ── 8. 计算 6 阶段特征 ──
     features = compute_features(klines, h_idx, l_idx, h_price, l_price,

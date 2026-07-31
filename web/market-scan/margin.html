@@ -26,6 +26,22 @@ h1{font-family:'Instrument Serif',serif;font-size:20px;font-weight:400;margin:0 
 <div class="chart-card"><div class="ct">个股融券余额趋势</div><div id="chart-sb" style="height:220px"></div><div class="cs">融券余额远小于融资，单独展示以便观察变化</div></div>
 <div class="chart-card"><div class="ct">个股融资净买入（每日流向）</div><div id="chart-net" style="height:220px"></div><div class="cs">正值=杠杆资金流入 负值=流出</div></div>
 
+<div class="chart-card">
+  <div class="ct" style="display:flex;align-items:center;gap:8px">
+    <span>L1 行业融资余额分解</span>
+    <span class="mode-tab" id="sector-mode-balance" style="font-size:10px;padding:2px 8px;border-radius:6px;cursor:pointer;background:var(--accent);color:#fff">余额</span>
+    <span class="mode-tab" id="sector-mode-netbuy" style="font-size:10px;padding:2px 8px;border-radius:6px;cursor:pointer;background:var(--card);color:var(--muted);border:1px solid var(--border)">净买入</span>
+  </div>
+  <div id="chart-sector" style="height:300px"></div>
+  <div class="cs">按L1行业指数成分股汇总，展示前8大行业融资余额趋势</div>
+</div>
+
+<div class="chart-card">
+  <div class="ct">当日个股融资净买卖 TOP20 <span style="font-size:0.6rem;color:var(--muted);margin-left:4px" id="flow-date"></span></div>
+  <div id="flow-top10"></div>
+  <div class="cs">来源：理杏仁API个股日频数据 · 单位：亿元</div>
+</div>
+
 </div>
 <script src="../shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:'📊',brandText:'两融分析',currentPage:'margin'})</script>
@@ -72,6 +88,73 @@ h1{font-family:'Instrument Serif',serif;font-size:20px;font-weight:400;margin:0 
       dataZoom:[{type:'inside',start:60,end:100}],
       series:[{type:'bar',data:net,itemStyle:{color:function(p){return p.value>=0?'#ef4444':'#10b981'},borderRadius:[4,4,0,0]},barWidth:'40%'}]
     });
+
+    // 4. L1 行业融资余额分解
+    fetch('/api/market-scan/margin-by-sector').then(function(r){return r.json()}).then(function(sd){
+      var sectorNames = Object.keys(sd.sectors);
+      var latestBal = sectorNames.map(function(n){return {name:n,bal:sd.sectors[n].balance[sd.dates.length-1]||0}});
+      latestBal.sort(function(a,b){return b.bal-a.bal});
+      var topSectors = latestBal.slice(0,8).map(function(s){return s.name});
+
+      var mode = 'balance';
+      var c4;
+      function renderSector(){
+        if(!c4) c4=echarts.init(document.getElementById('chart-sector'));
+        var isStack = mode === 'balance';
+        var series = topSectors.map(function(n){
+          var data = isStack ? sd.sectors[n].balance : sd.sectors[n].net_buy;
+          return {
+            name:n, type:'line', stack:isStack?'total':undefined,
+            areaStyle:{opacity:0.6}, smooth:true, showSymbol:false,
+            data:data, lineStyle:{width:1}
+          };
+        });
+        c4.setOption({
+          backgroundColor:'transparent',
+          tooltip:{trigger:'axis'},
+          legend:{data:topSectors,textStyle:{color:tx,fontSize:9},bottom:0,itemWidth:10,itemHeight:8},
+          grid:{left:'8%',right:'4%',top:8,bottom:36},
+          xAxis:{type:'category',data:sd.dates,axisLabel:{color:tx,fontSize:8,rotate:45},axisLine:{lineStyle:{color:sp}}},
+          yAxis:{type:'value',axisLabel:{color:tx,fontSize:9,formatter:function(v){return v.toFixed(0)+'亿'}},splitLine:{lineStyle:{color:sp}}},
+          dataZoom:[{type:'inside',start:60,end:100}],
+          color:['#f59e0b','#539BF5','#10b981','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316'],
+          series:series
+        });
+        window.addEventListener('resize',function(){c4.resize()});
+      }
+      renderSector();
+
+      document.getElementById('sector-mode-balance').onclick=function(){
+        mode='balance';
+        document.getElementById('sector-mode-balance').style.background='var(--accent)';document.getElementById('sector-mode-balance').style.color='#fff';
+        document.getElementById('sector-mode-netbuy').style.background='var(--card)';document.getElementById('sector-mode-netbuy').style.color='var(--muted)';
+        renderSector();
+      };
+      document.getElementById('sector-mode-netbuy').onclick=function(){
+        mode='netbuy';
+        document.getElementById('sector-mode-netbuy').style.background='var(--accent)';document.getElementById('sector-mode-netbuy').style.color='#fff';
+        document.getElementById('sector-mode-balance').style.background='var(--card)';document.getElementById('sector-mode-balance').style.color='var(--muted)';
+        renderSector();
+      };
+    });
+  });
+
+  // 5. 当日融资净流入/流出 TOP20
+  fetch('/api/market-scan/margin-top-flow').then(function(r){return r.json()}).then(function(fd){
+    document.getElementById('flow-date').textContent=fd.date;
+    var h='';
+    // 净流入TOP20
+    h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+    h+='<div><div style="font-size:0.7rem;font-weight:600;color:#ef4444;margin-bottom:8px">🔥 融资净流入 TOP20</div>';
+    h+='<table style="width:100%;font-size:11px"><thead><tr><th style="text-align:left;padding:3px 6px;border-bottom:1px solid var(--border)">股票</th><th style="text-align:right;padding:3px 6px;border-bottom:1px solid var(--border)">净流入(亿)</th></tr></thead>';
+    (fd.top_in||[]).forEach(function(x){h+='<tr><td style="padding:2px 6px"><a href="http://'+window.location.hostname+':8772/pattern-scan/?code='+x.code+'" target="_blank" style="color:var(--text-primary);text-decoration:none">'+x.name+'</a><span style="color:var(--muted);font-size:9px;margin-left:4px">'+x.code+'</span></td><td style="text-align:right;padding:2px 6px;color:#ef4444">+'+x.net.toFixed(2)+'</td></tr>';});
+    h+='</table></div>';
+    // 净流出TOP20
+    h+='<div><div style="font-size:0.7rem;font-weight:600;color:#10b981;margin-bottom:8px">❄️ 融资净流出 TOP20</div>';
+    h+='<table style="width:100%;font-size:11px"><thead><tr><th style="text-align:left;padding:3px 6px;border-bottom:1px solid var(--border)">股票</th><th style="text-align:right;padding:3px 6px;border-bottom:1px solid var(--border)">净流出(亿)</th></tr></thead>';
+    (fd.top_out||[]).forEach(function(x){h+='<tr><td style="padding:2px 6px"><a href="http://'+window.location.hostname+':8772/pattern-scan/?code='+x.code+'" target="_blank" style="color:var(--text-primary);text-decoration:none">'+x.name+'</a><span style="color:var(--muted);font-size:9px;margin-left:4px">'+x.code+'</span></td><td style="text-align:right;padding:2px 6px;color:#10b981">'+x.net.toFixed(2)+'</td></tr>';});
+    h+='</table></div></div>';
+    document.getElementById('flow-top10').innerHTML=h;
   });
 
   function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}

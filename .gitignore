@@ -77,3 +77,12 @@ SESSION_HANDOFF_*.md
 
 # Product docs (local only)
 docs/
+
+# Runtime artifacts
+data/cockpit/
+data/analysis/
+data/reports/
+
+# Shell quoting artifacts
+[0-9]*
+'*'

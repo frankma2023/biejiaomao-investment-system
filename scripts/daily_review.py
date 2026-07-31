@@ -80,7 +80,33 @@ def fetch_block_trades(db, date):
 def fetch_margin(db, date):
     rows = db.execute('SELECT * FROM daily_review_margin WHERE date=?', (date,)).fetchall()
     if rows: return rows
-    # 取所有可能有融资融券数据的股票（从历史记录和历史K线中获取）
+
+    # 优先从 daily_margin_history 取（旧API回填，最完整）
+    rows = db.execute('SELECT * FROM daily_margin_history WHERE date=?', (date,)).fetchall()
+    if rows:
+        for row in rows:
+            fb = row['financing_balance'] or 0
+            sb = row['securities_balance'] or 0
+            db.execute('INSERT OR REPLACE INTO daily_review_margin VALUES (?,?,?,?,?,?,?,?)',
+                (date, row['stock_code'], fb + sb, fb, sb,
+                 row['net_purchase'] or 0, fb, sb))
+        db.commit()
+        return db.execute('SELECT * FROM daily_review_margin WHERE date=?', (date,)).fetchall()
+
+    # 其次从 daily_margin_history 取（由 daily_update.py 步骤7 fetch_margin_daily.py 写入）
+    rows = db.execute('SELECT * FROM daily_margin_history WHERE date=?', (date,)).fetchall()
+    if rows:
+        for row in rows:
+            fb = row['financing_balance'] or 0
+            sb = row['securities_balance'] or 0
+            bal = fb + sb
+            db.execute('INSERT OR REPLACE INTO daily_review_margin VALUES (?,?,?,?,?,?,?,?)',
+                (date, row['stock_code'], bal, fb, sb,
+                 row['net_purchase'] or 0, fb, sb))
+        db.commit()
+        return db.execute('SELECT * FROM daily_review_margin WHERE date=?', (date,)).fetchall()
+
+    # 最后兜底：直接调新API
     codes = [r[0] for r in db.execute('SELECT stock_code FROM daily_kline WHERE date=?', (date,)).fetchall()]
     data = []
     for i in range(0, len(codes), 100):

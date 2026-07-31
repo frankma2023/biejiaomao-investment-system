@@ -59,9 +59,9 @@ DEFAULT_TIMEOUT = 60  # 秒，10年33指标查询偶尔超过30s
 # ════════════════════════════════════════════════════════
 
 class RateLimiter:
-    """线程安全的请求频率控制 — 默认每 2 秒最多 10 次"""
+    """线程安全的请求频率控制 — 默认每 2 秒最多 5 次"""
 
-    def __init__(self, max_requests: int = 10, window: float = 2.0):
+    def __init__(self, max_requests: int = 5, window: float = 2.0):
         self.max_requests = max_requests
         self.window = window
         self.timestamps: List[float] = []
@@ -148,7 +148,7 @@ def api_post(path: str, payload: Dict[str, Any], timeout: int = DEFAULT_TIMEOUT)
         try:
             resp = session.post(url, json=payload, timeout=timeout)
             if resp.status_code == 429:
-                wait_s = [2, 5, 10][attempt] if attempt < 3 else 15
+                wait_s = [5, 15, 30][attempt] if attempt < 3 else 60
                 log.warning(f"触发 429 限流，等待 {wait_s} 秒后重试...")
                 time.sleep(wait_s)
                 continue

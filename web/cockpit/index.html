@@ -158,8 +158,8 @@ function getPosition(s,isB2){
 }
 
 function getAttnTier(ts){
-  if(ts>=80) return {label:'极高',cls:'badge-attn'};
-  if(ts>=65) return {label:'高',cls:'badge-attn-hi'};
+  if(ts>=70) return {label:'极高',cls:'badge-attn'};
+  if(ts>=60) return {label:'高',cls:'badge-attn-hi'};
   return {label:'关注',cls:''};
 }
 
@@ -173,7 +173,7 @@ function render(){
       return s._tab==='b2' && currentTab==='b2';
     }else{
       // B1 Tab: 只显示关注度≥80 的 B1
-      return s._tab==='b1' && (s.tech_score||0)>=80;
+      return s._tab==='b1' && (s.tech_score||0)>=50;
     }
   });
   
@@ -184,7 +184,7 @@ function render(){
   });
   
   // 更新计数
-  var b1cnt=allSignals.filter(function(s){return s._tab==='b1'&&(s.tech_score||0)>=80;}).length;
+  var b1cnt=allSignals.filter(function(s){return s._tab==='b1'&&(s.tech_score||0)>=50;}).length;
   var b2cnt=allSignals.filter(function(s){return s._tab==='b2';}).length;
   document.getElementById('cnt-b1').textContent=b1cnt;
   document.getElementById('cnt-b2').textContent=b2cnt;
@@ -199,7 +199,7 @@ function render(){
   if(!filtered.length){
     var emptyMsg=isB2
       ? '今日暂无B2确认信号'
-      : '今日暂无高关注度(≥80)的B1信号';
+      : '今日暂无关注分≥50的B1信号';
     el.innerHTML='<div class="empty-state">'+emptyMsg+'</div>';
     return;
   }

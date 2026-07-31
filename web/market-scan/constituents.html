@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>指数成分股</title>
+<link rel="stylesheet" href="/shared/css/hanako-glass.css">
+<style>
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:13px}
+.app-container{max-width:1100px;margin:0 auto;padding:24px 24px 60px}
+h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--accent);margin:0 0 4px}
+.sub{font-size:0.68rem;color:var(--muted);margin-bottom:20px}
+table{width:100%;border-collapse:collapse;font-size:0.72rem;margin:8px 0}
+th{padding:10px 12px;border-bottom:2px solid var(--border);font-weight:600;color:var(--muted);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.04em;background:var(--card);text-align:left;cursor:pointer;user-select:none}
+th:hover{color:var(--accent)}
+th .arrow{font-size:0.55rem;margin-left:3px;opacity:0.4}
+th.sorted .arrow{opacity:1;color:var(--accent)}
+td{padding:7px 12px;border-bottom:1px solid var(--border);font-size:0.7rem}
+tr:hover td{background:rgba(245,158,11,0.04)}
+.back{font-size:0.68rem;color:var(--muted);cursor:pointer;display:inline-block;margin-bottom:12px}
+.back:hover{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="app-container">
+  <nav id="top-nav"></nav>
+  <a class="back" href="javascript:history.back()">← 返回</a>
+  <h1 id="title">📋 指数成分股</h1>
+  <div class="sub" id="meta"></div>
+  <div id="table-container"></div>
+</div>
+<script src="/shared/js/nav.js"></script>
+<script>
+Nav.init({brandIcon:'📊',brandText:'成分股',currentPage:'market-scan'});
+var p=new URLSearchParams(location.search);
+var code=p.get('code'),name=p.get('name'),date=p.get('date')||'';
+document.getElementById('title').textContent='📋 '+name+' ('+code+') · 成分股';
+
+var cols=['stock_code','name','weighting','chg_d1','chg_5d','chg_10d','chg_20d'];
+var hdrs=['代码','名称','权重','当日','5日','10日','20日'];
+var sortCol=null,sortDir=-1;
+
+function render(){
+  var data=window._all||[];
+  var col=sortCol||'weighting',dir=sortDir;
+  data.sort(function(a,b){var va=a[col]||0,vb=b[col]||0;return(va>vb?1:va<vb?-1:0)*dir});
+  var th='<tr>'+hdrs.map(function(h,i){
+    var sorted=col===cols[i]?' class="sorted"':'';
+    return '<th'+sorted+' data-col="'+cols[i]+'" onclick="doSort(\''+cols[i]+'\',this)">'+h+' <span class="arrow">⇅</span></th>';
+  }).join('')+'</tr>';
+  var rows='';
+  data.forEach(function(d){var s=d._raw;
+    var c1=s.chg_d1!=null?(s.chg_d1>=0?'#ef4444':'#10b981'):'var(--muted)';
+    var c5=s.chg_5d!=null?(s.chg_5d>=0?'#ef4444':'#10b981'):'var(--muted)';
+    var c10=s.chg_10d!=null?(s.chg_10d>=0?'#ef4444':'#10b981'):'var(--muted)';
+    var c20=s.chg_20d!=null?(s.chg_20d>=0?'#ef4444':'#10b981'):'var(--muted)';
+    rows+='<tr><td style="font-family:var(--font-mono)">'+s.stock_code+'</td><td>'+s.name+'</td><td style="font-family:var(--font-mono)">'+(s.weighting?(s.weighting*100).toFixed(2)+'%':'—')+'</td>'
+      +'<td style="color:'+c1+';font-family:var(--font-mono)">'+(s.chg_d1!=null?(s.chg_d1>0?'+':'')+s.chg_d1.toFixed(2)+'%':'—')+'</td>'
+      +'<td style="color:'+c5+';font-family:var(--font-mono)">'+(s.chg_5d!=null?(s.chg_5d>0?'+':'')+s.chg_5d.toFixed(2)+'%':'—')+'</td>'
+      +'<td style="color:'+c10+';font-family:var(--font-mono)">'+(s.chg_10d!=null?(s.chg_10d>0?'+':'')+s.chg_10d.toFixed(2)+'%':'—')+'</td>'
+      +'<td style="color:'+c20+';font-family:var(--font-mono)">'+(s.chg_20d!=null?(s.chg_20d>0?'+':'')+s.chg_20d.toFixed(2)+'%':'—')+'</td></tr>';
+  });
+  document.getElementById('table-container').innerHTML='<table><thead>'+th+'</thead><tbody>'+rows+'</tbody></table>';
+}
+
+function doSort(col,th){
+  if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=-1}
+  render();
+}
+
+fetch('/api/index-constituents?index_code='+code+(date?'&date='+date:'')).then(r=>r.json()).then(d=>{
+  document.getElementById('meta').textContent='快照日期: '+(d.snapshot_date||'—')+' · 共 '+d.count+' 只';
+  if(!d.constituents||!d.constituents.length)return;
+  window._all=d.constituents.map(function(s){return{
+    stock_code:s.stock_code,name:s.name,weighting:s.weighting||0,
+    chg_d1:s.chg_d1||-999,chg_5d:s.chg_5d||-999,chg_10d:s.chg_10d||-999,chg_20d:s.chg_20d||-999,_raw:s}});
+  render();
+});
+
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+</script>
+</body>
+</html>

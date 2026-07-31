@@ -309,7 +309,7 @@ function renderChart() {
   var hasBB = bbM.some(function (v) { return v !== null; });
 
   // ── 成交量 ──
-  var vols = ck.map(function (k) { return k.volume; });
+  var vols = ck.map(function (k) { return k.amount || k.volume; });
   var volMA = ind.vol_ma50 || [];
 
   // ── 主题背景（与卡片底色一致）──
@@ -433,14 +433,14 @@ function renderChart() {
     });
   }
 
-  // Grid 1 — 成交量
+  // Grid 1 — 成交额
   series.push({
-    name: '成交量',
+    name: '成交额',
     type: 'bar',
     xAxisIndex: 1,
     yAxisIndex: 1,
     data: vols.map(function (v, i) {
-      // 成交量柱颜色跟随真实涨跌
+      // 成交额柱颜色跟随真实涨跌
       var isUp;
       if (ck[i].change_pct != null) {
         var raw = ck[i].change_pct;
@@ -457,7 +457,7 @@ function renderChart() {
     })
   });
   series.push({
-    name: 'VOL均线',
+    name: '成交额均线',
     type: 'line',
     xAxisIndex: 1,
     yAxisIndex: 1,
