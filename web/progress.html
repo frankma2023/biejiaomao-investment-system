@@ -46,7 +46,7 @@
 
     <header class="panel-header">
       <h1>📋 欧奈尔投资系统 · 项目进展</h1>
-      <p>2026-07-31（阶段收尾 · 当日行业分组快照 + 两融旧API管道 + 四位大师选股漏斗）</p>
+      <p>2026-07-31（阶段收尾 · 大师漏斗4层完成 + 当日分组精度修复）</p>
     </header>
 
     <div class="pg-stats">
@@ -435,6 +435,9 @@
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">79. 前端静态服务必须用 serve_dev.py——裸 http.server 无 Cache-Control 头引发启发式缓存</div><div class="ld">python -m http.server 不发送 Cache-Control，浏览器按启发式缓存保存旧 HTML/JS，改文件后页面仍执行旧逻辑（表现：API 返回正常但页面显示旧值/0值）。8772 已固定改用 scripts/serve_dev.py（no-cache）。排查"前端异常但API正常"时第一嫌疑：验证 8772 响应头 + 文件内容是否含最新代码片段。</div></div>
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">80. 理杏仁API路径有坑：/index/ 返回指数级汇总，/company/ 才是个股级</div><div class="ld">旧文档写 /api/cn/index/margin-trading-and-securities-lending，实际会把 000001 当上证综指解析返回全指数汇总（单只"股票"融资余额1.26万亿）。个股级正确路径是 /api/cn/company/margin-trading-and-securities-lending。文档已修正。教训：对接第三方API先用手动示例验证数据量级，别信路径字面。</div></div>
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">81. 当日分组快照 vs RS_20 分组——快照不做评级，趋势才做评级</div><div class="ld">当日涨跌幅百分位分组定位是"今日谁强谁弱"的快照，若复用 RS_20 的总分/评级/仓位会与趋势口径打架（20日A级但当日大跌）。轻量卡片（组名/平均涨跌幅/涨跌家数）+ 与趋势区块并排，才能一眼抓出"趋势强但当日转弱"的背离信号。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">82. 四位大师漏斗完整闭环：3803→8只</div><div class="ld">第0层基础池3803→第1层段永平84（毛利率>30%/净利率>10%/ROE>15%/OCF>净利）→第2层巴菲特35（毛利稳定/PE<25/PB<5/股息>1%）→第3层芒格8（债务<5年/应收<30%/存货<25%/营收不萎缩）→第4层李录定性评级（3只4星：福耀/电投/青啤）。芒格层淘汰大头是应收账款（白酒渠道压货）。质押/减持数据缺失暂跳过。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">83. index_daily_kline.change 仅1%粒度——反推涨跌幅才能精确到2位小数</div><div class="ld">指数表 change 字段全市场都是 1% 粒度（0.01=1%），而个股表 change_pct 精度正常。当日分组显示 X.00% 的根因在此。修复：用 close/前一交易日close-1 反推精确涨跌幅（精度0.0001），前收盘缺失时退回 change。教训：数据库字段精度要先验证再直接用，宁可多一次反推。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">84. 页面模式常量 vs tab切换请求不一致——isD1 是页面级，data-group 不带后缀</div><div class="ld">sector-detail.html 当日模式下 isD1 为全局常量，但 tab 的 data-group 不带 _d1 后缀，点击切换时请求的是 RS_20 模式 API（无 change_d1 字段），渲染仍按当日模式 → 全 0.00%。修复：isD1 为 true 时初始化阶段给所有 tab 的 data-group 自动补 _d1。教训：模式相关状态必须在入口统一派生，不能散落在不同层级。</div></div>
 
 </div>
 <script>

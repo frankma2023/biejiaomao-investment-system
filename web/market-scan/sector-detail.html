@@ -69,6 +69,14 @@ const labels = {
 
 const isD1 = initialGroup.indexOf('_d1') >= 0;
 
+// 当日模式下：tab 的 data-group 自动补 _d1 后缀，保证切换时请求/渲染/高亮全链路一致
+if (isD1) {
+  document.querySelectorAll('.tab[data-group]').forEach(function(tab) {
+    var g = tab.getAttribute('data-group');
+    if (g.indexOf('_d1') < 0) tab.setAttribute('data-group', g + '_d1');
+  });
+}
+
 async function loadGroup(groupId) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelector(`[data-group="${groupId}"]`)?.classList.add('active');
@@ -91,6 +99,7 @@ async function loadGroup(groupId) {
     return {
       code: idx.code, name: idx.name, rs_20: idx.rs_20, rs_60: idx.rs_60||0, rs_250: idx.rs_250||0,
       ma50: idx.above_ma50?1:0, ma200: idx.above_ma200?1:0, ret20: idx.ret_20||0,
+      chg_d1: idx.chg_d1!=null?idx.chg_d1:-999,
       _raw: idx
     };
   });
@@ -110,8 +119,8 @@ function renderSectorTable() {
     cols = ['code','name','change_d1','rs_20'];
     headers = ['代码','名称','当日涨跌','当日强度'];
   } else {
-    cols = ['code','name','rs_20','rs_60','rs_250','ma50','ma200','ret20'];
-    headers = ['代码','名称','RS_20','RS_60','RS_250','MA50','MA200','20日涨跌'];
+    cols = ['code','name','rs_20','rs_60','rs_250','chg_d1','ret20','ma50','ma200'];
+    headers = ['代码','名称','RS_20','RS_60','RS_250','当日','20日','MA50','MA200'];
   }
   var th = '<tr>' + headers.map(function(h,i){
     var sorted = col === cols[i] ? ' class="sorted"' : '';
@@ -140,8 +149,7 @@ function renderSectorTable() {
       '<td style="color:' + rs20c + ';font-weight:600;font-family:var(--font-mono)">' + idx.rs_20 + '</td>' +
       '<td style="font-family:var(--font-mono)">' + (idx.rs_60 || '-') + '</td>' +
       '<td style="font-family:var(--font-mono)">' + (idx.rs_250 || '-') + '</td>' +
-      '<td style="color:' + (idx.above_ma50 ? '#10b981' : '#ef4444') + '">' + (idx.above_ma50 ? '↑' : '↓') + '</td>' +
-      '<td style="color:' + (idx.above_ma200 ? '#10b981' : '#ef4444') + '">' + (idx.above_ma200 ? '↑' : '↓') + '</td>' +
+      '<td style="color:' + (idx.chg_d1!=null&&idx.chg_d1>-999?(idx.chg_d1>=0?'#ef4444':'#10b981'):'var(--muted)') + ';font-family:var(--font-mono)">' + (idx.chg_d1!=null&&idx.chg_d1>-999?(idx.chg_d1>0?'+':'')+idx.chg_d1.toFixed(2)+'%':'—') + '</td>' +
       '<td style="color:' + (idx.ret_20 >= 0 ? '#ef4444' : '#10b981') + ';font-family:var(--font-mono)">' + (idx.ret_20 || 0).toFixed(1) + '%</td>' +
       '<td><a href="constituents.html?code=' + idx.code + '&name=' + encodeURIComponent(idx.name) + (date?'&date='+date:'') + '" target="_blank" style="color:var(--accent);font-size:0.65rem">成分股</a></td>' +
       '</tr>';

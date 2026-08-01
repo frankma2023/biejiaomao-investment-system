@@ -597,19 +597,41 @@ def api_market_health():
             ('theme', '主题', list(theme_names.keys())),
             ('strategy', '策略', list(strategy_names.keys())),
         ]
+        # 先取前一交易日，用于反推精确涨跌幅（index_daily_kline.change 仅1%粒度）
+        prev_date_row = db.execute(
+            "SELECT MAX(date) as d FROM index_daily_kline WHERE date < ?", (target_date,)
+        ).fetchone()
+        prev_date = prev_date_row['d'] if prev_date_row else None
+        prev_close_map = {}
+        if prev_date:
+            prev_rows = db.execute(
+                "SELECT stock_code, close FROM index_daily_kline WHERE date = ?", (prev_date,)
+            ).fetchall()
+            prev_close_map = {r['stock_code']: r['close'] for r in prev_rows}
+
         result = []
         for pool_key, pool_label, pool_codes in pools:
             if not pool_codes:
                 continue
             ph = ','.join('?' * len(pool_codes))
             rows = db.execute(f"""
-                SELECT stock_code, change FROM index_daily_kline
-                WHERE date = ? AND stock_code IN ({ph}) AND change IS NOT NULL
+                SELECT stock_code, close, change FROM index_daily_kline
+                WHERE date = ? AND stock_code IN ({ph}) AND close IS NOT NULL
             """, (target_date, *pool_codes)).fetchall()
             if not rows:
                 continue
+            # 用 close 反推精确涨跌幅：change 字段只有 1% 粒度
+            # 优先用 (close/prev_close-1)，prev 缺失时退回 change 字段
+            enriched = []
+            for r in rows:
+                prev = prev_close_map.get(r['stock_code'])
+                if prev and prev > 0:
+                    chg = (r['close'] / prev) - 1
+                else:
+                    chg = r['change'] or 0
+                enriched.append({'stock_code': r['stock_code'], 'change': chg})
             # 池内百分位排名：把涨跌幅从小到大排序，取每只的分位
-            sorted_rows = sorted(rows, key=lambda r: r['change'])
+            sorted_rows = sorted(enriched, key=lambda r: r['change'])
             n = len(sorted_rows)
             rank_map = {}
             for idx, r in enumerate(sorted_rows):
@@ -617,7 +639,7 @@ def api_market_health():
                 rank_map[r['stock_code']] = (idx / (n - 1)) * 100 if n > 1 else 50.0
             # 分组
             groups_d1 = {'strong': [], 'mid': [], 'weak': []}
-            for r in rows:
+            for r in enriched:
                 score = rank_map.get(r['stock_code'], 50)
                 if score >= 75:
                     groups_d1['strong'].append(r)
@@ -756,25 +778,46 @@ def api_market_sector_indices():
 
     # ── 当日分组模式：基于当日涨跌幅的池内百分位排名 ──
     if is_d1:
+        # 先取前一交易日，用 close 反推精确涨跌幅（change 字段仅1%粒度）
+        prev_date_row = db.execute(
+            "SELECT MAX(date) as d FROM index_daily_kline WHERE date < ?", (target_date,)
+        ).fetchone()
+        prev_date = prev_date_row['d'] if prev_date_row else None
+        prev_close_map = {}
+        if prev_date:
+            prev_rows = db.execute(
+                "SELECT stock_code, close FROM index_daily_kline WHERE date = ?", (prev_date,)
+            ).fetchall()
+            prev_close_map = {r['stock_code']: r['close'] for r in prev_rows}
+
         rows = db.execute(f"""
-            SELECT stock_code, change FROM index_daily_kline
-            WHERE date = ? AND stock_code IN ({placeholders}) AND change IS NOT NULL
+            SELECT stock_code, close, change FROM index_daily_kline
+            WHERE date = ? AND stock_code IN ({placeholders}) AND close IS NOT NULL
         """, (target_date, *codes_list)).fetchall()
         if not rows:
             return jsonify({'date': target_date, 'indices': [], 'stats': {'total': 0, 'above_ma50': 0, 'avg_rs_20': 0}})
+        # 用 close 反推精确涨跌幅
+        enriched = []
+        for r in rows:
+            prev = prev_close_map.get(r['stock_code'])
+            if prev and prev > 0:
+                chg = (r['close'] / prev) - 1
+            else:
+                chg = r['change'] or 0
+            enriched.append({'stock_code': r['stock_code'], 'change': chg})
         # 池内百分位排名
-        sorted_rows = sorted(rows, key=lambda r: r['change'])
+        sorted_rows = sorted(enriched, key=lambda r: r['change'])
         n = len(sorted_rows)
         rank_map = {}
         for idx, r in enumerate(sorted_rows):
             rank_map[r['stock_code']] = (idx / (n - 1)) * 100 if n > 1 else 50.0
         # 按档位过滤
         if suffix == 'strong':
-            filtered = [r for r in rows if rank_map.get(r['stock_code'], 50) >= 75]
+            filtered = [r for r in enriched if rank_map.get(r['stock_code'], 50) >= 75]
         elif suffix == 'weak':
-            filtered = [r for r in rows if rank_map.get(r['stock_code'], 50) < 30]
+            filtered = [r for r in enriched if rank_map.get(r['stock_code'], 50) < 30]
         else:
-            filtered = [r for r in rows if 30 <= rank_map.get(r['stock_code'], 50) < 75]
+            filtered = [r for r in enriched if 30 <= rank_map.get(r['stock_code'], 50) < 75]
         filtered.sort(key=lambda r: r['change'], reverse=True)
         indices = [{
             'code': r['stock_code'],
@@ -806,15 +849,24 @@ def api_market_sector_indices():
     else:
         cond = 'rs_20 >= 30 AND rs_20 < 75'
 
+    # 日期回退：如果目标日期无 RS 数据，取最近有数据的日期
+    has_rs = db.execute("SELECT COUNT(*) FROM index_rs_daily WHERE date=?", (target_date,)).fetchone()[0]
+    rs_date = target_date
+    if not has_rs:
+        fallback = db.execute("SELECT MAX(date) FROM index_rs_daily").fetchone()[0]
+        if fallback:
+            rs_date = fallback
+
     rows = db.execute(f"""
         SELECT r.stock_code, r.rs_20, r.rs_60, r.rs_250,
                r.ma50, r.ma200, r.ad_slope_display,
-               r.close, r.ret_20, r.ret_60
+               r.close, r.ret_20, r.ret_60,
+               (SELECT k.change FROM index_daily_kline k WHERE k.stock_code=r.stock_code AND k.date=?) as chg_d1
         FROM index_rs_daily r
         WHERE r.date = ? AND r.stock_code IN ({placeholders})
           AND ({cond})
         ORDER BY r.rs_20 DESC
-    """, (target_date, *codes_list))
+    """, (target_date, rs_date, *codes_list))
     
     indices = []
     for r in rows:
@@ -831,6 +883,7 @@ def api_market_sector_indices():
             'ad_slope': r['ad_slope_display'] or r['rs_60'],
             'ret_20': r['ret_20'],
             'ret_60': r['ret_60'],
+            'chg_d1': round((r['chg_d1'] or 0) * 100, 2) if r['chg_d1'] is not None else None,
             'above_ma50': r['close'] > r['ma50'] if r['ma50'] else False,
             'above_ma200': r['close'] > r['ma200'] if r['ma200'] else False,
         })
