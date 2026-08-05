@@ -187,12 +187,14 @@
       const div=document.getElementById('content');
       try{
         var dateParam = specificDate || 'latest';
-        const[hr,pr,sr]=await Promise.all([
+        const[hr,pr,sr,da]=await Promise.all([
           fetch(API_BASE+'/api/market-health?date='+dateParam).then(r=>r.json()),
           fetch(API_BASE+'/api/market-panorama').then(r=>r.json()),
-          fetch(API_BASE+'/api/market-sell-score?date='+dateParam).then(r=>r.json()).catch(()=>({status:'no_data'}))
+          fetch(API_BASE+'/api/market-sell-score?date='+dateParam).then(r=>r.json()).catch(()=>({status:'no_data'})),
+          fetch(API_BASE+'/api/market-scan/dividend-advice?date='+(dateParam==='latest'?'':dateParam)).then(r=>r.json()).catch(()=>({indices:[]}))
         ]);
         if(hr.status==='no_data'){div.innerHTML='<div class="no-data">📡 暂无健康度数据 (date='+dateParam+')</div>';return;}
+        hr.dividend_advice=da;
         render(hr,pr,sr);
         loadMajorIndices();
       }catch(e){div.innerHTML='<div class="no-data">📡 数据加载失败</div>';}
@@ -315,16 +317,17 @@
         margin_5d:{n:'融资余额5日',u:'%',t:'资金',max:15,hi:1.5,lo:-1},
         sector_rot:{n:'板块轮动',u:'分',t:'结构',max:15,hi:15,lo:0},
         fear_greed:{n:'恐慌贪婪',u:'%',t:'极端',max:10,hi:80,lo:20},
+        limit_up_down:{n:'涨跌停家数',u:'家',t:'情绪',max:15,hi:400,lo:0},
       };
       (h.indicators||[]).forEach(ind=>{
         const m=meta[ind.key]||{n:ind.key,u:'',t:'',max:15,hi:100,lo:0};
         const bw=m.u==='%'?Math.min(100,Math.max(0,(ind.value-m.lo)/(m.hi-m.lo)*100)):Math.min(100,Math.max(0,ind.value/m.hi*100));
         const bc=ind.value>=m.hi*.7?'#4CAF50':ind.value>=m.hi*.4?'#F9A825':'#E53935';
-        const vv=ind.key==='vol_breakout'?`<span class="clickable" onclick="window.open('breakouts.html')">${ind.value}</span>`:ind.key==='ad_ratio'?`${ind.value.toFixed(2)}<span style="font-size:0.55rem;color:var(--muted)">(5日)/${(ind.today||ind.value).toFixed(2)}<span style="font-size:0.55rem;color:var(--muted)">(当日)</span></span>`:(Number.isInteger(ind.value)?ind.value:ind.value.toFixed(2));
+        const vv=ind.key==='vol_breakout'?`<span class="clickable" onclick="window.open('breakouts.html')">${ind.value}</span>`:ind.key==='ad_ratio'?`${ind.value.toFixed(2)}<span style="font-size:0.55rem;color:var(--muted)">(5日)/${(ind.today||ind.value).toFixed(2)}<span style="font-size:0.55rem;color:var(--muted)">(当日)</span></span>`:ind.key==='limit_up_down'?`<span style="color:#ef4444">${ind.limit_up}↑</span> / <span style="color:#10b981">${ind.limit_down}↓</span>`:(Number.isInteger(ind.value)?ind.value:ind.value.toFixed(2));
         html+=`<div class="ind-card"><div class="ih"><span class="in">${m.n}</span><span class="it">${m.t}</span></div>
           <div class="iv">${vv}<span class="iu"> ${m.u}</span></div>
           <div class="ibar"><div class="ibar-fill" style="width:${bw}%;background:${bc}"></div></div>
-          <div class="is">${ind.score}/${m.max}分</div><div class="id">${DESC[ind.key]||''}</div></div>`;
+          <div class="is">${ind.score}/${m.max}分</div><div class="id">${DESC[ind.key]||ind.detail||''}</div></div>`;
       });
       html+='</div>';
 
@@ -400,6 +403,38 @@
           html+='<div style="font-size:10px;color:var(--muted)">'+dg.indices_count+'指数</div>';
           html+='<div style="margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">';
           html+='<div style="font-size:11px;font-weight:500;color:var(--text-secondary)"><span style="color:#ef4444">'+dg.up_count+'涨</span> · <span style="color:#10b981">'+dg.down_count+'跌</span></div>';
+          html+='</div></div>';
+        }
+        html+='</div>';
+      }
+
+      // ═══ 大盘操作建议（红利指数规则）═══
+      if(h.dividend_advice&&h.dividend_advice.indices&&h.dividend_advice.indices.length){
+        var da=h.dividend_advice;
+        html+='<div class="section-hdr" style="margin-top:18px">📌 大盘操作建议 <span style="font-size:9px;color:var(--muted);font-weight:400">红利指数规则引擎 · 回测验证</span></div>';
+        html+='<div style="font-size:9px;color:var(--muted);margin-bottom:8px">'+da.summary+' · 点击卡片查看历史回撤/估值/信号详情</div>';
+        html+='<div class="sector-grid">';
+        var daColorMap={'strong_buy':'#ef4444','buy':'#ef4444','reduce':'#10b981','caution':'#f59e0b','hold':'#8b8b90'};
+        var daBgMap={'strong_buy':{'bg':'rgba(239,68,68,.08)','bd':'rgba(239,68,68,.25)'},'buy':{'bg':'rgba(239,68,68,.06)','bd':'rgba(239,68,68,.2)'},'reduce':{'bg':'rgba(16,185,129,.08)','bd':'rgba(16,185,129,.25)'},'caution':{'bg':'rgba(245,158,11,.08)','bd':'rgba(245,158,11,.25)'},'hold':{'bg':'rgba(139,139,144,.06)','bd':'rgba(139,139,144,.2)'}};
+        var daLevelText={'strong_buy':'强买入','buy':'买入','reduce':'减仓','caution':'谨慎','hold':'观望'};
+        for(var dai=0;dai<da.indices.length;dai++){
+          var dax=da.indices[dai];
+          var daColor=daColorMap[dax.advice_level]||'#8b8b90';
+          var daBg=daBgMap[dax.advice_level]||{'bg':'rgba(139,139,144,.06)','bd':'rgba(139,139,144,.2)'};
+          var ddCls=dax.dd_250>=15?'#ef4444':(dax.dd_250>=10?'#f59e0b':'#8b8b90');
+          var peV=dax.valuation?dax.valuation.pe_pct:'—';
+          var dyrV=dax.valuation?dax.valuation.dyr_pct:'—';
+          var sigText=dax.signals&&dax.signals.length?dax.signals.join('·'):'—';
+          html+='<div class="sector-card" style="background:'+daBg.bg+';border:1px solid '+daBg.bd+'" onclick="window.open(\'dividend-advice-detail.html?code='+dax.code+'&date='+da.date+'\')">';
+          html+='<div class="sc-title">'+dax.name+' <span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">'+dax.code+'</span></div>';
+          html+='<div style="display:flex;align-items:baseline;gap:6px;margin:4px 0">';
+          html+='<span style="font-size:11px;font-weight:600;color:'+daColor+'">'+daLevelText[dax.advice_level]+'</span>';
+          html+='<span style="font-size:10px;color:var(--muted)">'+dax.advice+'</span>';
+          html+='</div>';
+          html+='<div style="font-size:10px;color:'+ddCls+'">回撤 '+dax.dd_250+'%</div>';
+          html+='<div style="margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">';
+          html+='<div style="font-size:9px;color:var(--muted)">PE分位 '+peV+'% · 股息率分位 '+dyrV+'%</div>';
+          html+='<div style="font-size:9px;color:var(--muted);margin-top:2px">信号: '+sigText+'</div>';
           html+='</div></div>';
         }
         html+='</div>';
@@ -856,6 +891,9 @@ async function computeSnapshot(){
 
     load();
   </script>
+  <div style="max-width:1400px;margin:0 auto;padding:0 24px 20px;font-size:10px;color:var(--muted);line-height:1.7">
+    口径声明：涨跌停按 10%/20% 涨跌幅阈值近似（主板 ≥9.9%，创业板/科创板 ≥19.9%），不含 ST（5% 档）与北交所（30% 档）；两融、龙虎榜、大宗为 T+1 披露数据，取最新可用交易日。数据源：理杏仁（本地 SQLite）。
+  </div>
   <script src="../shared/js/nav.js"></script>
   <script>Nav.init({brandIcon:"⬤",brandText:"大盘扫描",currentPage:"market-scan"})
 // Theme toggle for hanako-glass

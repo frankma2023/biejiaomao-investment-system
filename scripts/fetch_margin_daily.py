@@ -75,7 +75,18 @@ def main():
     elif args.date:
         dates = [args.date]
     else:
-        dates = [date.today().isoformat()]
+        # 默认取 daily_kline 最新交易日（两融数据 T+1 发布，date.today() 当天拉不到）
+        db = get_db()
+        r = db.execute("SELECT MAX(date) FROM daily_kline").fetchone()
+        latest_trade = r[0] if r and r[0] else date.today().isoformat()
+        # 从最新交易日往前取 3 个交易日作为候选（T+1：最新日可能还没有，自动回退）
+        probe_dates = db.execute(
+            "SELECT DISTINCT date FROM daily_kline WHERE date<=? ORDER BY date DESC LIMIT 3",
+            (latest_trade,)
+        ).fetchall()
+        db.close()
+        dates = [row[0] for row in probe_dates]
+        log.info(f"候选日期: {dates}（daily_kline最近3个交易日，逐个尝试，跳过已有数据/无数据日）")
     
     # 多日拉取时预加载全量股票代码
     db = get_db()

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>红利指数超跌触发验证</title>
+<link rel="stylesheet" href="/shared/css/hanako-glass.css">
+<style>
+body{background:var(--bg);color:var(--text-primary);font-family:var(--font-body);font-size:13px;margin:0;padding:24px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-family:var(--font-display);font-size:1.4rem;font-weight:400;color:var(--accent);margin:0 0 6px}
+.sub{font-size:0.7rem;color:var(--muted);margin-bottom:24px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px}
+.card h2{font-size:0.85rem;font-weight:600;color:var(--text-primary);margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.card h2 .tag{font-size:0.55rem;background:var(--color-accent-subtle);color:var(--color-accent);padding:2px 8px;border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:0.72rem}
+th{padding:8px 10px;border-bottom:2px solid var(--border);font-weight:600;color:var(--muted);font-size:0.6rem;text-transform:uppercase;letter-spacing:0.05em;text-align:right;background:var(--card)}
+th:first-child{text-align:left}
+td{padding:7px 10px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono)}
+td:first-child{text-align:left;font-family:var(--font-body)}
+tr:hover td{background:var(--color-accent-subtle)}
+.up{color:#ef4444;font-weight:600}
+.dn{color:#10b981;font-weight:600}
+.mid{color:#f59e0b;font-weight:600}
+.muted{color:var(--muted)}
+.highlight{background:var(--color-accent-subtle)!important}
+.legend{display:flex;gap:16px;font-size:0.65rem;color:var(--muted);margin-bottom:12px}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.meta{font-size:0.62rem;color:var(--muted);margin-top:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>📊 红利指数超跌触发验证报告</h1>
+<div class="sub">2016-01 ~ 2026-07 · 次日开盘买入 · 持有 20 个交易日 · 事件合并去重（20日窗口）</div>
+<div class="legend"><span><span class="dot" style="background:#ef4444"></span> 胜率≥60%</span><span><span class="dot" style="background:#f59e0b"></span> 胜率50-60%</span><span><span class="dot" style="background:#10b981"></span> 胜率&lt;50%</span></div>
+<div class="card"><h2>🎯 全红利池合并 · 触发-胜率-收益矩阵（20日）</h2><table><thead><tr><th>触发条件</th><th>次数</th><th>胜率</th><th>平均收益</th><th>中位收益</th></tr></thead><tbody>
+<tr class="highlight"><td>250日回撤15%</td><td>442</td><td class="up">65.8%</td><td class="up">+2.53%</td><td class="up">+2.10%</td></tr>
+<tr class="highlight"><td>250日回撤20%</td><td>178</td><td class="up">63.5%</td><td class="up">+2.65%</td><td class="up">+1.57%</td></tr>
+<tr><td>股息率分位>90%</td><td>558</td><td class="up">61.5%</td><td class="up">+1.25%</td><td class="up">+1.12%</td></tr>
+<tr><td>历史高点回撤25%</td><td>872</td><td class="up">60.6%</td><td class="up">+1.25%</td><td class="up">+1.31%</td></tr>
+<tr><td>PE分位<10%</td><td>443</td><td class="mid">59.1%</td><td class="up">+0.88%</td><td class="up">+1.10%</td></tr>
+<tr><td>PB分位<10%</td><td>681</td><td class="mid">59.0%</td><td class="up">+0.85%</td><td class="up">+0.84%</td></tr>
+<tr><td>250日回撤10%</td><td>922</td><td class="mid">58.9%</td><td class="up">+1.13%</td><td class="up">+0.91%</td></tr>
+<tr><td>股息率分位>80%</td><td>868</td><td class="mid">56.9%</td><td class="up">+0.94%</td><td class="up">+0.46%</td></tr>
+<tr><td>PB分位<20%</td><td>861</td><td class="mid">56.3%</td><td class="up">+0.87%</td><td class="up">+0.62%</td></tr>
+<tr><td>PE分位<20%</td><td>694</td><td class="mid">55.8%</td><td class="up">+0.81%</td><td class="up">+0.46%</td></tr>
+<tr><td>PB分位<30%</td><td>1056</td><td class="mid">55.4%</td><td class="up">+0.81%</td><td class="up">+0.66%</td></tr>
+<tr><td>历史高点回撤15%</td><td>1442</td><td class="mid">55.3%</td><td class="up">+0.76%</td><td class="up">+0.61%</td></tr>
+<tr><td>PE分位<30%</td><td>909</td><td class="mid">54.9%</td><td class="up">+0.75%</td><td class="up">+0.44%</td></tr>
+</tbody></table><div class="meta">高亮行 = 胜率≥63% 的最强信号</div></div>
+<div class="card"><h2>🏷️ 纯红利 <span class="tag">13 个条件</span></h2>
+<table><thead><tr><th>触发条件</th><th>次数</th><th>胜率</th><th>平均收益</th><th>中位收益</th></tr></thead><tbody>
+<tr class="highlight"><td>250日回撤15%</td><td>322</td><td class="up">65.2%</td><td class="up">+2.46%</td><td class="up">+1.86%</td></tr>
+<tr><td>股息率分位>90%</td><td>357</td><td class="up">62.7%</td><td class="up">+1.34%</td><td class="up">+1.34%</td></tr>
+<tr><td>250日回撤20%</td><td>135</td><td class="up">62.2%</td><td class="up">+2.90%</td><td class="up">+1.61%</td></tr>
+<tr><td>历史高点回撤25%</td><td>543</td><td class="up">61.7%</td><td class="up">+1.34%</td><td class="up">+1.30%</td></tr>
+<tr><td>PE分位<10%</td><td>289</td><td class="up">60.6%</td><td class="up">+0.87%</td><td class="up">+1.26%</td></tr>
+<tr><td>PB分位<10%</td><td>507</td><td class="mid">59.0%</td><td class="up">+0.86%</td><td class="up">+0.82%</td></tr>
+<tr><td>250日回撤10%</td><td>610</td><td class="mid">58.0%</td><td class="up">+0.92%</td><td class="up">+0.73%</td></tr>
+<tr><td>PB分位<20%</td><td>627</td><td class="mid">57.3%</td><td class="up">+0.83%</td><td class="up">+0.73%</td></tr>
+<tr><td>股息率分位>80%</td><td>563</td><td class="mid">57.2%</td><td class="up">+0.97%</td><td class="up">+0.48%</td></tr>
+<tr><td>PE分位<20%</td><td>478</td><td class="mid">56.9%</td><td class="up">+0.74%</td><td class="up">+0.56%</td></tr>
+<tr><td>PB分位<30%</td><td>773</td><td class="mid">56.0%</td><td class="up">+0.77%</td><td class="up">+0.65%</td></tr>
+<tr><td>PE分位<30%</td><td>623</td><td class="mid">55.1%</td><td class="up">+0.74%</td><td class="up">+0.55%</td></tr>
+<tr><td>历史高点回撤15%</td><td>942</td><td class="mid">54.9%</td><td class="up">+0.73%</td><td class="up">+0.57%</td></tr>
+</tbody></table></div>
+<div class="card"><h2>🏷️ 红利低波 <span class="tag">13 个条件</span></h2>
+<table><thead><tr><th>触发条件</th><th>次数</th><th>胜率</th><th>平均收益</th><th>中位收益</th></tr></thead><tbody>
+<tr class="highlight"><td>250日回撤15%</td><td>41</td><td class="up">78.0%</td><td class="up">+4.14%</td><td class="up">+3.57%</td></tr>
+<tr class="highlight"><td>250日回撤20%</td><td>14</td><td class="up">71.4%</td><td class="up">+1.34%</td><td class="up">+0.78%</td></tr>
+<tr class="highlight"><td>250日回撤10%</td><td>152</td><td class="up">69.7%</td><td class="up">+2.28%</td><td class="up">+1.71%</td></tr>
+<tr class="highlight"><td>股息率分位>90%</td><td>112</td><td class="up">65.2%</td><td class="up">+1.66%</td><td class="up">+1.13%</td></tr>
+<tr><td>PB分位<10%</td><td>145</td><td class="up">62.1%</td><td class="up">+0.97%</td><td class="up">+1.02%</td></tr>
+<tr><td>股息率分位>80%</td><td>178</td><td class="up">60.1%</td><td class="up">+1.22%</td><td class="up">+0.54%</td></tr>
+<tr><td>历史高点回撤25%</td><td>201</td><td class="mid">59.7%</td><td class="up">+1.16%</td><td class="up">+1.37%</td></tr>
+<tr><td>PE分位<30%</td><td>172</td><td class="mid">59.3%</td><td class="up">+1.18%</td><td class="up">+0.80%</td></tr>
+<tr><td>PE分位<10%</td><td>97</td><td class="mid">57.7%</td><td class="up">+1.23%</td><td class="up">+0.74%</td></tr>
+<tr><td>历史高点回撤15%</td><td>301</td><td class="mid">56.8%</td><td class="up">+0.87%</td><td class="up">+0.77%</td></tr>
+<tr><td>PE分位<20%</td><td>131</td><td class="mid">56.5%</td><td class="up">+1.11%</td><td class="up">+0.53%</td></tr>
+<tr><td>PB分位<30%</td><td>224</td><td class="mid">54.0%</td><td class="up">+1.09%</td><td class="up">+0.58%</td></tr>
+<tr><td>PB分位<20%</td><td>187</td><td class="mid">54.0%</td><td class="up">+1.11%</td><td class="up">+0.31%</td></tr>
+</tbody></table></div>
+<div class="card"><h2>🏷️ 红利质量/成长 <span class="tag">13 个条件</span></h2>
+<table><thead><tr><th>触发条件</th><th>次数</th><th>胜率</th><th>平均收益</th><th>中位收益</th></tr></thead><tbody>
+<tr class="highlight"><td>250日回撤20%</td><td>16</td><td class="up">68.8%</td><td class="up">+2.89%</td><td class="up">+2.35%</td></tr>
+<tr class="highlight"><td>250日回撤15%</td><td>47</td><td class="up">63.8%</td><td class="up">+1.94%</td><td class="up">+1.96%</td></tr>
+<tr><td>历史高点回撤25%</td><td>79</td><td class="mid">59.5%</td><td class="up">+1.24%</td><td class="up">+1.43%</td></tr>
+<tr><td>PE分位<10%</td><td>32</td><td class="mid">56.2%</td><td class="up">+0.86%</td><td class="up">+1.22%</td></tr>
+<tr><td>股息率分位>90%</td><td>54</td><td class="mid">55.6%</td><td class="up">+1.02%</td><td class="up">+0.71%</td></tr>
+<tr><td>历史高点回撤15%</td><td>126</td><td class="mid">54.0%</td><td class="up">+0.61%</td><td class="up">+0.22%</td></tr>
+<tr><td>250日回撤10%</td><td>102</td><td class="mid">52.9%</td><td class="up">+0.72%</td><td class="up">+0.26%</td></tr>
+<tr><td>PB分位<20%</td><td>35</td><td class="mid">51.4%</td><td class="up">+0.79%</td><td class="up">+0.18%</td></tr>
+<tr><td>股息率分位>80%</td><td>84</td><td class="mid">51.2%</td><td class="up">+0.77%</td><td class="up">+0.15%</td></tr>
+<tr><td>PB分位<30%</td><td>38</td><td class="mid">50.0%</td><td class="up">+0.44%</td><td class="up">+0.30%</td></tr>
+<tr><td>PE分位<20%</td><td>57</td><td class="dn">49.1%</td><td class="up">+1.50%</td><td class="up">-0.07%</td></tr>
+<tr><td>PE分位<30%</td><td>83</td><td class="dn">48.2%</td><td class="up">+0.54%</td><td class="up">-0.07%</td></tr>
+<tr><td>PB分位<10%</td><td>24</td><td class="dn">45.8%</td><td class="up">+0.52%</td><td class="up">-0.29%</td></tr>
+</tbody></table></div>
+<div class="card"><h2>🏷️ 行业/其他 <span class="tag">13 个条件</span></h2>
+<table><thead><tr><th>触发条件</th><th>次数</th><th>胜率</th><th>平均收益</th><th>中位收益</th></tr></thead><tbody>
+<tr><td>250日回撤20%</td><td>13</td><td class="up">61.5%</td><td class="up">+1.21%</td><td class="up">+1.11%</td></tr>
+<tr><td>250日回撤15%</td><td>32</td><td class="mid">59.4%</td><td class="up">+2.04%</td><td class="up">+3.19%</td></tr>
+<tr><td>PB分位<20%</td><td>12</td><td class="mid">58.3%</td><td class="dn">-0.55%</td><td class="dn">+0.10%</td></tr>
+<tr><td>PB分位<30%</td><td>21</td><td class="mid">57.1%</td><td class="up">+0.03%</td><td class="up">+1.04%</td></tr>
+<tr><td>历史高点回撤15%</td><td>73</td><td class="mid">56.2%</td><td class="up">+0.97%</td><td class="up">+0.81%</td></tr>
+<tr><td>历史高点回撤25%</td><td>49</td><td class="mid">53.1%</td><td class="up">+0.69%</td><td class="up">+1.09%</td></tr>
+<tr><td>PE分位<10%</td><td>25</td><td class="mid">52.0%</td><td class="dn">-0.29%</td><td class="dn">+1.28%</td></tr>
+<tr><td>股息率分位>80%</td><td>43</td><td class="mid">51.2%</td><td class="dn">-0.26%</td><td class="dn">+0.05%</td></tr>
+<tr><td>250日回撤10%</td><td>58</td><td class="mid">50.0%</td><td class="up">+1.12%</td><td class="up">+0.06%</td></tr>
+<tr><td>PE分位<20%</td><td>28</td><td class="dn">46.4%</td><td class="dn">-0.78%</td><td class="dn">-0.72%</td></tr>
+<tr><td>股息率分位>90%</td><td>35</td><td class="dn">45.7%</td><td class="dn">-0.64%</td><td class="dn">-1.22%</td></tr>
+<tr><td>PE分位<30%</td><td>31</td><td class="dn">45.2%</td><td class="dn">-0.81%</td><td class="dn">-0.63%</td></tr>
+<tr><td>PB分位<10%</td><td>5</td><td class="dn">40.0%</td><td class="dn">-3.06%</td><td class="dn">-3.98%</td></tr>
+</tbody></table></div>
+<div class="card"><h2>🔍 单指数明细（按最强条件胜率排序，前12）</h2><table><thead><tr><th>指数</th><th>类别</th><th>最强条件</th><th>次数</th><th>胜率</th><th>平均收益</th></tr></thead><tbody>
+<tr><td>930955 红利低波100</td><td>红利低波</td><td>250日回撤10%</td><td>26</td><td class="up">84.6%</td><td class="up">+2.72%</td></tr>
+<tr><td>930838 CS高股息</td><td>纯红利</td><td>PB分位<10%</td><td>17</td><td class="up">82.4%</td><td class="up">+2.73%</td></tr>
+<tr><td>000825 央企红利</td><td>纯红利</td><td>股息率分位>90%</td><td>20</td><td class="up">80.0%</td><td class="up">+1.58%</td></tr>
+<tr><td>000821 300红利</td><td>纯红利</td><td>股息率分位>90%</td><td>25</td><td class="up">76.0%</td><td class="up">+1.54%</td></tr>
+<tr><td>H30269 红利低波</td><td>红利低波</td><td>股息率分位>90%</td><td>25</td><td class="up">76.0%</td><td class="up">+2.07%</td></tr>
+<tr><td>000922 中证红利</td><td>纯红利</td><td>250日回撤20%</td><td>12</td><td class="up">75.0%</td><td class="up">+3.15%</td></tr>
+<tr><td>000824 国企红利</td><td>纯红利</td><td>250日回撤15%</td><td>31</td><td class="up">74.2%</td><td class="up">+3.81%</td></tr>
+<tr><td>000015 红利指数</td><td>纯红利</td><td>历史高点回撤25%</td><td>23</td><td class="up">73.9%</td><td class="up">+1.77%</td></tr>
+<tr><td>000150 380红利</td><td>纯红利</td><td>250日回撤20%</td><td>15</td><td class="up">73.3%</td><td class="up">+3.87%</td></tr>
+<tr><td>931373 股息龙头</td><td>纯红利</td><td>历史高点回撤25%</td><td>17</td><td class="up">70.6%</td><td class="up">+2.22%</td></tr>
+<tr><td>931132 诚通央企红利</td><td>纯红利</td><td>250日回撤10%</td><td>13</td><td class="up">69.2%</td><td class="up">+3.22%</td></tr>
+<tr><td>000151 上国红利</td><td>纯红利</td><td>股息率分位>90%</td><td>29</td><td class="up">69.0%</td><td class="up">+1.69%</td></tr>
+</tbody></table></div>
+</div></body></html>

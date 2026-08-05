@@ -99,7 +99,7 @@ async function loadGroup(groupId) {
     return {
       code: idx.code, name: idx.name, rs_20: idx.rs_20, rs_60: idx.rs_60||0, rs_250: idx.rs_250||0,
       ma50: idx.above_ma50?1:0, ma200: idx.above_ma200?1:0, ret20: idx.ret_20||0,
-      chg_d1: idx.chg_d1!=null?idx.chg_d1:-999,
+      change_d1: idx.change_d1!=null?idx.change_d1:-999,
       _raw: idx
     };
   });

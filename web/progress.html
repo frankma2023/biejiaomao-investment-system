@@ -431,6 +431,37 @@
       </div>
     </div>
 
+    <div class="section-title" style="margin-top:28px">📆 2026-08-05 阶段收尾</div>
+    <div class="pg-grid">
+      <div class="pg-card">
+        <h3>📰 收盘复盘脚本升级</h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>龙虎榜/大宗 T+1 自动回退</td><td>缺失日不再永久空缺</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>fetch 重试 + 失败日志</td><td>消除静默失败</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>报告数据日标注 + 口径声明</td><td>第6节口径声明</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>validate 区块检查</td><td>生成后自动校验</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>指数涨跌幅精度修复</td><td>close/前收盘反推</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>缺失数据补齐</td><td>7/23·7/27·7/30·7/31·8/4</td></tr>
+        </table>
+      </div>
+      <div class="pg-card">
+        <h3>📊 大盘扫描涨跌停卡片</h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>market_health 涨跌停计数</td><td>10%/20%阈值，不计分</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>辅助指标卡展示</td><td>涨停↑/跌停↓双色</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>页面口径声明</td><td>ST/北交所排除说明</td></tr>
+        </table>
+      </div>
+      <div class="pg-card">
+        <h3>📋 market-daily-review skill 验证</h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>确认已装（QuantSkills官方）</td><td>本地DB替代Pandadata</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>08-05 复盘跑通</td><td>docs/daily-reviews/</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>gen_daily_review_skill.py</td><td>可复用生成脚本</td></tr>
+        </table>
+      </div>
+    </div>
+
     <div class="section-title" style="margin-top:28px">📋 本次开发经验教训</div>
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">79. 前端静态服务必须用 serve_dev.py——裸 http.server 无 Cache-Control 头引发启发式缓存</div><div class="ld">python -m http.server 不发送 Cache-Control，浏览器按启发式缓存保存旧 HTML/JS，改文件后页面仍执行旧逻辑（表现：API 返回正常但页面显示旧值/0值）。8772 已固定改用 scripts/serve_dev.py（no-cache）。排查"前端异常但API正常"时第一嫌疑：验证 8772 响应头 + 文件内容是否含最新代码片段。</div></div>
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">80. 理杏仁API路径有坑：/index/ 返回指数级汇总，/company/ 才是个股级</div><div class="ld">旧文档写 /api/cn/index/margin-trading-and-securities-lending，实际会把 000001 当上证综指解析返回全指数汇总（单只"股票"融资余额1.26万亿）。个股级正确路径是 /api/cn/company/margin-trading-and-securities-lending。文档已修正。教训：对接第三方API先用手动示例验证数据量级，别信路径字面。</div></div>
@@ -438,6 +469,10 @@
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">82. 四位大师漏斗完整闭环：3803→8只</div><div class="ld">第0层基础池3803→第1层段永平84（毛利率>30%/净利率>10%/ROE>15%/OCF>净利）→第2层巴菲特35（毛利稳定/PE<25/PB<5/股息>1%）→第3层芒格8（债务<5年/应收<30%/存货<25%/营收不萎缩）→第4层李录定性评级（3只4星：福耀/电投/青啤）。芒格层淘汰大头是应收账款（白酒渠道压货）。质押/减持数据缺失暂跳过。</div></div>
     <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">83. index_daily_kline.change 仅1%粒度——反推涨跌幅才能精确到2位小数</div><div class="ld">指数表 change 字段全市场都是 1% 粒度（0.01=1%），而个股表 change_pct 精度正常。当日分组显示 X.00% 的根因在此。修复：用 close/前一交易日close-1 反推精确涨跌幅（精度0.0001），前收盘缺失时退回 change。教训：数据库字段精度要先验证再直接用，宁可多一次反推。</div></div>
     <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">84. 页面模式常量 vs tab切换请求不一致——isD1 是页面级，data-group 不带后缀</div><div class="ld">sector-detail.html 当日模式下 isD1 为全局常量，但 tab 的 data-group 不带 _d1 后缀，点击切换时请求的是 RS_20 模式 API（无 change_d1 字段），渲染仍按当日模式 → 全 0.00%。修复：isD1 为 true 时初始化阶段给所有 tab 的 data-group 自动补 _d1。教训：模式相关状态必须在入口统一派生，不能散落在不同层级。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">85. T+1 数据源的时序陷阱：当天拉不到不代表当天没数据</div><div class="ld">龙虎榜/大宗/两融均为 T+1 披露。daily_review.py 原先用目标日期直接请求 API，8/4 的大宗数据要到 8/5 才发布，但脚本不回退 → 8/4 永久缺失，页面显示"无数据"。修复：fetch 时若当天返回空或失败，自动回退前一交易日并返回实际数据日，报告标注真实数据日。教训：对接 T+1 数据源必须内置回退逻辑，否则"拉取当天"永远落后一天。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">86. except: pass 是数据完整性的慢性毒药</div><div class="ld">daily_review.py 原 fetch 函数所有异常被静默吞掉，API 失败即数据永久缺失，且无任何日志可查。本次补拉发现 5 天龙虎榜/大宗数据在 API 里都存在，是拉取时失败被吞了。修复：fetch 加 3 次重试 + 失败日志输出。教训：采集类代码禁止裸 except: pass，至少打日志留痕，否则数据缺口无法溯源。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">87. skill 报告模板的"数据日+口径+validate"三件套值得全站推广</div><div class="ld">对比 quantskills/market-daily-review 后借鉴：每项数据标注实际数据日（T+1 滞后明确写出）、统计口径显式声明（涨跌停 10%/20% 阈值、ST/北交所排除）、生成后 validate 检查必要区块。已落地到 daily_review.py（第6节口径声明 + validate_report 函数）和 market-scan 涨跌停卡片。教训：复盘类输出必须可溯源，数字背后的口径比数字本身重要。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">88. change_pct 小数格式 vs 百分数格式：数据库字段精度必须先验证再直接用</div><div class="ld">daily_kline.change_pct 为小数格式（0.0378=3.78%），但生成 skill 复盘时误当百分数直出 → 半导体行业显示 +0.09%（实际 +8.73%）。指数表 index_daily_kline.change 则是 1% 粒度（0.01=1%），与个股表格式不同。修复：行业聚合值 ×100 转百分数，指数用 close 反推。教训：同一系统内不同表的同一语义字段格式可能不同，聚合前先验证量级。</div></div>
 
 </div>
 <script>

@@ -86,3 +86,6 @@ data/reports/
 # Shell quoting artifacts
 [0-9]*
 '*'
+
+# 大文件（>100MB，GitHub限制）
+analysis/volume_reversal_stats.json

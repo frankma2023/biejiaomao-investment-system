@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<title>放量滞涨双日信号回测</title>
+<link rel="stylesheet" href="/shared/css/hanako-glass.css">
+<style>
+body{background:var(--bg);color:var(--text-primary);font-family:var(--font-body);font-size:13px;margin:0;padding:24px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-family:var(--font-display);font-size:1.4rem;font-weight:400;color:var(--accent);margin:0 0 6px}
+.sub{font-size:0.7rem;color:var(--muted);margin-bottom:24px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px}
+.card h2{font-size:0.85rem;font-weight:600;color:var(--text-primary);margin:0 0 12px}
+.card h2 .tag{font-size:0.55rem;background:var(--color-accent-subtle);color:var(--color-accent);padding:2px 8px;border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:0.7rem}
+th{padding:7px 8px;border-bottom:2px solid var(--border);font-weight:600;color:var(--muted);font-size:0.58rem;text-transform:uppercase;letter-spacing:0.04em;text-align:right;background:var(--card)}
+th:first-child,td:first-child{text-align:left}
+td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono)}
+td:first-child{font-family:var(--font-body)}
+tr:hover td{background:var(--color-accent-subtle)}
+.up{color:#ef4444;font-weight:600}
+.dn{color:#10b981;font-weight:600}
+.mid{color:#f59e0b;font-weight:600}
+.muted{color:var(--muted)}
+.highlight{background:var(--color-accent-subtle)!important}
+.conclusion{background:var(--card);border-left:3px solid #ef4444;border-radius:0 14px 14px 0;padding:16px 20px;margin-bottom:16px}
+.conclusion h3{font-size:0.8rem;color:#ef4444;margin:0 0 8px}
+.conclusion p{font-size:0.72rem;color:var(--text-secondary);line-height:1.7;margin:6px 0}
+.case{background:var(--card);border-left:3px solid #539BF5;border-radius:0 14px 14px 0;padding:14px 18px;margin-bottom:16px}
+.case h3{font-size:0.78rem;color:#539BF5;margin:0 0 6px}
+.case p{font-size:0.7rem;color:var(--text-secondary);line-height:1.6;margin:4px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>📉 放量滞涨双日信号 · 全市场回测报告</h1>
+<div class="sub">2023-08 ~ 2026-07 · 全A股(排除ST/次新) · 第1日放量上涨+次日放量下跌 · 第3日开盘买入 · 20日冷却去重 · 排除一字板</div>
+<div class="card"><h2>📖 信号与档位定义</h2>
+<div style="font-size:0.72rem;color:var(--text-secondary);line-height:1.8">
+<p style="margin:0 0 8px"><b>信号形态（双日）</b>：个股某日放量上涨，次日放量下跌——疑似主力出货/顶部反转。完整触发条件：</p>
+<table style="margin:6px 0 10px"><thead><tr><th>条件</th><th>参数</th><th>说明</th></tr></thead><tbody>
+<tr><td>第1日 · 涨幅</td><td>≥ +2% / +3% / +4%（按档位）</td><td>收盘价相对前收盘的涨幅</td></tr>
+<tr><td>第1日 · 量比</td><td>≥ 1.5x / 2.0x / 2.5x（按档位）</td><td>当日成交额 ÷ 前20日均额（不含当日）</td></tr>
+<tr><td>第2日 · 涨跌</td><td>收盘下跌（< 0，任意幅度）</td><td>所有档位固定，不设跌幅阈值</td></tr>
+<tr><td>第2日 · 量比</td><td>≥ 1.8x（固定）</td><td>当日成交额 ÷ 前20日均额</td></tr>
+<tr><td>买入</td><td>第3日开盘价</td><td>信号在第2日收盘确认，第3日才可操作</td></tr>
+<tr><td>排除</td><td>一字涨停板 / ST / 次新</td><td>第3日一字涨停买不进；ST、上市不满60日剔除</td></tr>
+<tr><td>去重</td><td>20交易日冷却期</td><td>同一股票触发后20个交易日内不重复计数</td></tr>
+</tbody></table>
+<p style="margin:0"><b>档位含义</b>：档位标注为 <code>+X% x Yx</code>，其中 <b>+X%</b> 是第1日涨幅阈值，<b>Yx</b> 是第1日量比阈值。例如 <code>+2% x 2.0x</code> = 第1日涨≥2% 且 成交额≥前20日均额2.0倍；第2日条件所有档位统一（下跌+量比≥1.8x）。9个档位是涨幅(2/3/4%)与量比(1.5/2.0/2.5x)的交叉组合，用于检验参数松紧对结果的影响。</p>
+</div></div>
+<div class="conclusion"><h3>📌 核心结论</h3>
+<p><b>信号后中位股票确实下跌，但跌幅有限，且存在明显右偏。</b>基准档(+2%x2.0x) 90日中位收益 <b class="dn">-1.19%</b>，胜率 48%，但平均收益 +6.83%——少数暴涨股拉高均值，多数人拿到的是负中位。</p>
+<p><b>真正危险的不是收益，是回撤。</b>90日内最大回撤中位 <b class="dn">33.8%</b>——即使最终收益为正，中途普遍要经历 1/3 的深回撤，对持仓心理和执行纪律是严峻考验。</p>
+<p><b>档位参数对结果影响很小</b>：从 1.5x 到 2.5x、+2% 到 +4%，90日中位收益只在 -1.0% ~ -1.46% 之间波动。说明该信号的有效性来自"放量滞涨"形态本身，而非具体阈值。</p>
+<p><b>与隆基案例的对照</b>：隆基 2026-03-20/23 触发后连续 4 个月下跌（最大回撤约 25%+），处于该信号分布的典型尾部——信号不保证下跌，但显著提高了遭遇深回撤的概率。</p></div>
+<div class="case"><h3>🔵 隆基绿能 601012 案例（信号触发）</h3>
+<p>2026-03-20 放量上涨 +2.54%（量比 2.47x，85.2亿）→ 03-23 放量下跌 -0.95%（量比 2.23x，76.9亿）→ 03-24 第3日开盘 18.94 买入。</p>
+<p>其后 4 个月持续下跌：03-30 -3.02%、04-03 -4.03%、04-07 最低 16.7，较买入价回撤约 -12%。该案例完美命中信号定义。</p></div>
+<div class="card"><h2>🎯 9 档位矩阵 · 90日表现 <span class="tag">第2日固定: 下跌+量比≥1.8x</span></h2>
+<table><thead><tr><th>档位</th><th>事件数</th><th>20日中位</th><th>90日中位</th><th>90日平均</th><th>胜率</th><th>最大回撤中位</th><th>反弹中位</th></tr></thead><tbody>
+<tr><td>+2% x 1.5x</td><td>34748</td><td class="dn">-0.51%</td><td class="dn">-0.56%</td><td class="up">+7.21%</td><td class="dn">48.9%</td><td class="dn">32.9%</td><td class="up">17.4%</td></tr>
+<tr class="highlight"><td>+2% x 2.0x</td><td>32208</td><td class="dn">-0.55%</td><td class="dn">-0.62%</td><td class="up">+7.23%</td><td class="dn">48.8%</td><td class="dn">32.8%</td><td class="up">17.3%</td></tr>
+<tr><td>+2% x 2.5x</td><td>28981</td><td class="dn">-0.56%</td><td class="dn">-0.45%</td><td class="up">+7.50%</td><td class="dn">49.1%</td><td class="dn">32.8%</td><td class="up">17.4%</td></tr>
+<tr><td>+3% x 1.5x</td><td>31529</td><td class="dn">-0.62%</td><td class="dn">-0.70%</td><td class="up">+7.21%</td><td class="dn">48.7%</td><td class="dn">33.2%</td><td class="up">17.6%</td></tr>
+<tr><td>+3% x 2.0x</td><td>29471</td><td class="dn">-0.68%</td><td class="dn">-0.67%</td><td class="up">+7.28%</td><td class="dn">48.8%</td><td class="dn">33.1%</td><td class="up">17.6%</td></tr>
+<tr><td>+3% x 2.5x</td><td>26743</td><td class="dn">-0.68%</td><td class="dn">-0.53%</td><td class="up">+7.54%</td><td class="dn">49.0%</td><td class="dn">33.0%</td><td class="up">17.6%</td></tr>
+<tr><td>+4% x 1.5x</td><td>27941</td><td class="dn">-0.80%</td><td class="dn">-0.92%</td><td class="up">+7.20%</td><td class="dn">48.4%</td><td class="dn">33.6%</td><td class="up">17.8%</td></tr>
+<tr><td>+4% x 2.0x</td><td>26224</td><td class="dn">-0.80%</td><td class="dn">-0.83%</td><td class="up">+7.29%</td><td class="dn">48.6%</td><td class="dn">33.5%</td><td class="up">17.8%</td></tr>
+<tr><td>+4% x 2.5x</td><td>23852</td><td class="dn">-0.79%</td><td class="dn">-0.69%</td><td class="up">+7.59%</td><td class="dn">48.8%</td><td class="dn">33.4%</td><td class="up">17.7%</td></tr>
+</tbody></table><div class="sub" style="margin-top:6px">高亮行 = 基准档（隆基案例所在档位）</div></div>
+<div class="card"><h2>📊 90日收益区间分布（基准档 +2%x2.0x）<span class="tag">n=32208</span></h2>
+<table><thead><tr><th>收益区间</th><th>次数</th><th>占比</th></tr></thead><tbody>
+<tr><td><-30%</td><td>2413</td><td>7.5%<div style="display:inline-block;height:10px;width:14.983854942871336px;background:#ef4444;border-radius:2px;vertical-align:middle;margin-left:6px"></div></td></tr>
+<tr><td>-30~-20%</td><td>3286</td><td>10.2%<div style="display:inline-block;height:10px;width:20.404868355688027px;background:#10b981;border-radius:2px;vertical-align:middle;margin-left:6px"></div></td></tr>
+<tr><td>-20~-10%</td><td>5074</td><td>15.8%<div style="display:inline-block;height:10px;width:31.507699950322905px;background:#10b981;border-radius:2px;vertical-align:middle;margin-left:6px"></div></td></tr>
+<tr><td>-10~0%</td><td>5640</td><td>17.5%<div style="display:inline-block;height:10px;width:35.02235469448584px;background:#10b981;border-radius:2px;vertical-align:middle;margin-left:6px"></div></td></tr>
+<tr><td>0~10%</td><td>4840</td><td>15.0%<div style="display:inline-block;height:10px;width:30.05464480874317px;background:#ef4444;border-radius:2px;vertical-align:middle;margin-left:6px"></div></td></tr>
+<tr><td>10~20%</td><td>3355</td><td>10.4%<div style="display:inline-block;height:10px;width:20.833333333333336px;background:#ef4444;border-radius:2px;vertical-align:middle;margin-left:6px"></div></td></tr>
+<tr><td>20~30%</td><td>2226</td><td>6.9%<div style="display:inline-block;height:10px;width:13.822652757078988px;background:#ef4444;border-radius:2px;vertical-align:middle;margin-left:6px"></div></td></tr>
+<tr><td>>30%</td><td>5373</td><td>16.7%<div style="display:inline-block;height:10px;width:33.364381520119224px;background:#ef4444;border-radius:2px;vertical-align:middle;margin-left:6px"></div></td></tr>
+</tbody></table><div class="sub" style="margin-top:6px">负收益区间合计: 43.5% · 正收益区间合计: 56.5%</div></div>
+<div class="card"><h2>🕐 信号后每10日累计涨跌幅（基准档 +2%x2.0x）</h2>
+<div class="sub">基准 = 第2日收盘价（信号确认日）· 观察点 = 第2日之后第 N 个交易日收盘 · 第3日为可操作首日</div>
+<table><thead><tr><th>持有天数</th><th>中位数</th><th>平均值</th><th>胜率</th><th>走势特征</th></tr></thead><tbody>
+<tr><td>D+10</td><td class="dn">-1.05%</td><td class="up">+0.11%</td><td class="dn">44.4%</td><td class="muted">信号后10日即走弱，中位为负</td></tr>
+<tr><td>D+20</td><td class="dn">-1.10%</td><td class="up">+1.35%</td><td class="dn">46.1%</td><td class="muted"></td></tr>
+<tr><td>D+30</td><td class="dn">-1.98%</td><td class="up">+1.76%</td><td class="dn">44.7%</td><td class="muted">中位跌幅加深至-2%，胜率<45%</td></tr>
+<tr><td>D+40</td><td class="dn">-2.21%</td><td class="up">+2.40%</td><td class="dn">44.7%</td><td class="muted"></td></tr>
+<tr><td>D+50</td><td class="dn">-1.83%</td><td class="up">+3.11%</td><td class="dn">45.8%</td><td class="muted"></td></tr>
+<tr><td>D+60</td><td class="dn">-2.58%</td><td class="up">+3.24%</td><td class="dn">44.4%</td><td class="muted">中位跌幅最大阶段（-2.6%）</td></tr>
+<tr><td>D+70</td><td class="dn">-2.33%</td><td class="up">+4.15%</td><td class="dn">45.3%</td><td class="muted"></td></tr>
+<tr><td>D+80</td><td class="dn">-1.74%</td><td class="up">+5.56%</td><td class="dn">47.0%</td><td class="muted"></td></tr>
+<tr><td>D+90</td><td class="dn">-1.21%</td><td class="up">+6.66%</td><td class="dn">48.0%</td><td class="muted">中位仍负，但均值明显回升（右偏）</td></tr>
+</tbody></table>
+<div class="sub" style="margin-top:6px">解读：中位数全程为负（-1.05% ~ -2.58%）——多数股票信号后持续走弱；平均值随持有期延长由负转正（D+10 +0.11% → D+90 +6.66%）——少数强势股拉高均值。两条线背离说明：信号后的反弹高度依赖个股选择，平均持有90日并不是多数人的真实体验。</div></div>
+<div class="case"><h3>🔵 隆基绿能 601012 每10日走势（对比）</h3>
+<p>D+10 -11.22% · D+20 -6.49% · D+30 -13.02% · D+40 -20.04% · D+50 -30.2% · D+60 -29.67% · D+70 -34.34% · D+80 -36.2% · D+90 -29.4%</p>
+<p>隆基的下跌深度远超全市场中位数：D+10 已 -11.2%（vs 全市场中位 -1.05%），D+50 达 -30.2%。属于该信号分布的极深尾部——信号后深跌的股票，跌幅通常远超中位水平。</p></div>
+</div></body></html>

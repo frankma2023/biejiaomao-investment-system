@@ -40,42 +40,109 @@ def init_tables(db):
 def get_latest_trade_date(db):
     return db.execute('SELECT MAX(date) FROM daily_kline').fetchone()[0]
 
+def _prev_trade_date(db, date):
+    """取 date 的前一个交易日（从 daily_kline 表）"""
+    r = db.execute('SELECT MAX(date) FROM daily_kline WHERE date<?', (date,)).fetchone()
+    return r[0] if r and r[0] else None
+
+
+def _api_get_with_retry(url, payload, retries=3, timeout=30):
+    """带重试的 API 调用，避免静默失败导致数据永久缺失"""
+    for attempt in range(1, retries + 1):
+        try:
+            r = requests.post(url, json=payload, timeout=timeout)
+            return r.json()
+        except Exception as e:
+            print(f'  ⚠️ {url} 第{attempt}次失败: {e}')
+            if attempt < retries:
+                time.sleep(2 * attempt)
+    return None
+
+
 def fetch_lhb(db, date):
+    """龙虎榜：先查本地，再拉 API（带重试 + T+1 回退）"""
     rows = db.execute('SELECT * FROM daily_review_lhb WHERE date=?', (date,)).fetchall()
-    if rows: return rows
+    if rows: return rows, date
+    # 龙虎榜 T+1 发布：当天拉不到时回退到前一交易日
     try:
-        r = requests.post('https://open.lixinger.com/api/cn/company/trading-abnormal',
-            json={'token': TOKEN, 'date': date}, timeout=30).json()
-        if r.get('code') == 1:
-            for item in r.get('data', []):
-                db.execute('INSERT OR REPLACE INTO daily_review_lHB VALUES (?,?,?,?,?,?,?,?,?,?)',
-                    (date, item.get('stockCode',''), item.get('stockName',''),
-                     item.get('reasonForDisclosure',''),
-                     item.get('totalPurchaseAmount',0), item.get('totalSellAmount',0),
-                     item.get('totalNetPurchaseAmount',0),
-                     item.get('institutionBuyAmount',0), item.get('institutionSellAmount',0),
-                     item.get('institutionNetPurchaseAmount',0)))
-            db.commit()
-            return db.execute('SELECT * FROM daily_review_lhb WHERE date=?', (date,)).fetchall()
-    except: pass
-    return []
+        r = _api_get_with_retry('https://open.lixinger.com/api/cn/company/trading-abnormal',
+            {'token': TOKEN, 'date': date})
+        data = r.get('data', []) if r and r.get('code') == 1 else None
+        if data is None:
+            # 请求失败（非空数据），回退前一交易日
+            prev = _prev_trade_date(db, date)
+            if prev:
+                print(f'  ↪️ 龙虎榜 {date} 请求失败，回退 {prev}')
+                rows = db.execute('SELECT * FROM daily_review_lhb WHERE date=?', (prev,)).fetchall()
+                if rows: return rows, prev
+                r = _api_get_with_retry('https://open.lixinger.com/api/cn/company/trading-abnormal',
+                    {'token': TOKEN, 'date': prev})
+                data = r.get('data', []) if r and r.get('code') == 1 else None
+                if data is not None:
+                    for item in data:
+                        db.execute('INSERT OR REPLACE INTO daily_review_lhb VALUES (?,?,?,?,?,?,?,?,?,?)',
+                            (prev, item.get('stockCode',''), item.get('stockName',''),
+                             item.get('reasonForDisclosure',''),
+                             item.get('totalPurchaseAmount',0), item.get('totalSellAmount',0),
+                             item.get('totalNetPurchaseAmount',0),
+                             item.get('institutionBuyAmount',0), item.get('institutionSellAmount',0),
+                             item.get('institutionNetPurchaseAmount',0)))
+                    db.commit()
+                    return db.execute('SELECT * FROM daily_review_lhb WHERE date=?', (prev,)).fetchall(), prev
+            return [], None
+        for item in data:
+            db.execute('INSERT OR REPLACE INTO daily_review_lhb VALUES (?,?,?,?,?,?,?,?,?,?)',
+                (date, item.get('stockCode',''), item.get('stockName',''),
+                 item.get('reasonForDisclosure',''),
+                 item.get('totalPurchaseAmount',0), item.get('totalSellAmount',0),
+                 item.get('totalNetPurchaseAmount',0),
+                 item.get('institutionBuyAmount',0), item.get('institutionSellAmount',0),
+                 item.get('institutionNetPurchaseAmount',0)))
+        db.commit()
+        return db.execute('SELECT * FROM daily_review_lhb WHERE date=?', (date,)).fetchall(), date
+    except Exception as e:
+        print(f'  ⚠️ 龙虎榜 {date} 异常: {e}')
+        return [], None
+
 
 def fetch_block_trades(db, date):
+    """大宗交易：先查本地，再拉 API（带重试 + T+1 回退）"""
     rows = db.execute('SELECT * FROM daily_review_block_trade WHERE date=?', (date,)).fetchall()
-    if rows: return rows
+    if rows: return rows, date
+    # 大宗交易 T+1 发布：当天拉不到时回退到前一交易日
     try:
-        r = requests.post('https://open.lixinger.com/api/cn/company/block-deal',
-            json={'token': TOKEN, 'date': date}, timeout=30).json()
-        if r.get('code') == 1:
-            for item in r.get('data', []):
-                db.execute('INSERT OR REPLACE INTO daily_review_block_trade VALUES (?,?,?,?,?,?,?,?)',
-                    (date, item.get('stockCode',''), item.get('tradingPrice',0),
-                     item.get('tradingVolume',0), item.get('tradingAmount',0),
-                     item.get('discountRate',0), item.get('buyBranch',''), item.get('sellBranch','')))
-            db.commit()
-            return db.execute('SELECT * FROM daily_review_block_trade WHERE date=?', (date,)).fetchall()
-    except: pass
-    return []
+        r = _api_get_with_retry('https://open.lixinger.com/api/cn/company/block-deal',
+            {'token': TOKEN, 'date': date})
+        data = r.get('data', []) if r and r.get('code') == 1 else None
+        if data is None or (data is not None and not data):
+            # 请求失败或空数据（T+1 未发布），回退前一交易日
+            prev = _prev_trade_date(db, date)
+            if prev:
+                print(f'  ↪️ 大宗 {date} 无数据/失败，回退 {prev}')
+                rows = db.execute('SELECT * FROM daily_review_block_trade WHERE date=?', (prev,)).fetchall()
+                if rows: return rows, prev
+                r = _api_get_with_retry('https://open.lixinger.com/api/cn/company/block-deal',
+                    {'token': TOKEN, 'date': prev})
+                data = r.get('data', []) if r and r.get('code') == 1 else None
+                if data is not None:
+                    for item in data:
+                        db.execute('INSERT OR REPLACE INTO daily_review_block_trade VALUES (?,?,?,?,?,?,?,?)',
+                            (prev, item.get('stockCode',''), item.get('tradingPrice',0),
+                             item.get('tradingVolume',0), item.get('tradingAmount',0),
+                             item.get('discountRate',0), item.get('buyBranch',''), item.get('sellBranch','')))
+                    db.commit()
+                    return db.execute('SELECT * FROM daily_review_block_trade WHERE date=?', (prev,)).fetchall(), prev
+            return [], None
+        for item in data:
+            db.execute('INSERT OR REPLACE INTO daily_review_block_trade VALUES (?,?,?,?,?,?,?,?)',
+                (date, item.get('stockCode',''), item.get('tradingPrice',0),
+                 item.get('tradingVolume',0), item.get('tradingAmount',0),
+                 item.get('discountRate',0), item.get('buyBranch',''), item.get('sellBranch','')))
+        db.commit()
+        return db.execute('SELECT * FROM daily_review_block_trade WHERE date=?', (date,)).fetchall(), date
+    except Exception as e:
+        print(f'  ⚠️ 大宗 {date} 异常: {e}')
+        return [], None
 
 def fetch_margin(db, date):
     rows = db.execute('SELECT * FROM daily_review_margin WHERE date=?', (date,)).fetchall()
@@ -141,7 +208,11 @@ def generate_report(date=None):
     idx_data = {}
     for code, name in [('000001','上证综指'),('000300','沪深300'),('000688','科创50'),('399006','创业板指')]:
         r = db.execute('SELECT close, change FROM index_daily_kline WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1', (code, date)).fetchone()
-        if r: idx_data[name] = {'close': r['close'], 'chg': r['change']}
+        if r:
+            # change 仅 1% 粒度（0.01 = 1%），用 close/前收盘反推精确涨跌幅
+            prev = db.execute('SELECT close FROM index_daily_kline WHERE stock_code=? AND date<? ORDER BY date DESC LIMIT 1', (code, date)).fetchone()
+            chg = round((r['close'] / prev['close'] - 1) * 100, 2) if prev and prev['close'] else None
+            idx_data[name] = {'close': r['close'], 'chg': chg if chg is not None else r['change'] * 100}
 
     # 2. 宽度
     bd = db.execute('SELECT COUNT(*) as t, SUM(CASE WHEN change_pct>0 THEN 1 ELSE 0 END) as up, SUM(CASE WHEN change_pct<0 THEN 1 ELSE 0 END) as dn FROM daily_kline WHERE date=?', (date,)).fetchone()
@@ -151,22 +222,25 @@ def generate_report(date=None):
     db.commit()
 
     # 3. 龙虎榜
-    print('  龙虎榜...'); lhb = fetch_lhb(db, date)
+    print('  龙虎榜...'); lhb, lhb_date = fetch_lhb(db, date)
     for r in lhb:
         if not r['stock_name']:
             nm = lookup_name(db, r['stock_code'])
-            db.execute('UPDATE daily_review_lhb SET stock_name=? WHERE date=? AND stock_code=?', (nm, date, r['stock_code']))
-    db.commit(); lhb = db.execute('SELECT * FROM daily_review_lhb WHERE date=?', (date,)).fetchall()
+            db.execute('UPDATE daily_review_lhb SET stock_name=? WHERE date=? AND stock_code=?', (nm, lhb_date, r['stock_code']))
+    db.commit(); lhb = db.execute('SELECT * FROM daily_review_lhb WHERE date=?', (lhb_date,)).fetchall()
 
     # 4. 大宗交易
-    print('  大宗交易...'); bt = fetch_block_trades(db, date)
+    print('  大宗交易...'); bt, bt_date = fetch_block_trades(db, date)
     bt_cmc = {}
     for r in bt:
-        row2 = db.execute("SELECT value FROM fundamental_indicator WHERE stock_code=? AND metric_code='cmc' AND date<=? ORDER BY date DESC LIMIT 1", (r['stock_code'], date)).fetchone()
+        row2 = db.execute("SELECT value FROM fundamental_indicator WHERE stock_code=? AND metric_code='cmc' AND date<=? ORDER BY date DESC LIMIT 1", (r['stock_code'], bt_date)).fetchone()
         if row2: bt_cmc[r['stock_code']] = row2[0]
 
-    # 5. 两融
-    print('  两融...'); margin = fetch_margin(db, date)
+    # 5. 两融（T+1：本地两融表存在则直接用，否则拉当日）
+    print('  两融...')
+    margin = db.execute('SELECT * FROM daily_review_margin WHERE date=?', (date,)).fetchall()
+    if not margin:
+        margin = fetch_margin(db, date)
     total_margin = sum(r['margin_balance'] or 0 for r in margin)
     total_net_buy = sum(r['net_buy_d1'] or 0 for r in margin)
 
@@ -216,7 +290,8 @@ td:first-child{text-align:left;color:#8b8b90}
 .sg .l{font-size:9px;color:#8b8b90;text-transform:uppercase;margin-top:1px}
 </style></head><body><div class="wrap">
 <h1>A股每日收盘复盘</h1>
-<div class="meta">''' + date + ''' | ''' + str(elapsed) + '''s</div>
+<div class="meta">''' + date + ''' | 生成耗时 ''' + str(elapsed) + '''s | 数据源: 理杏仁(本地SQLite)</div>
+<div class="meta" style="color:#f59e0b">数据日: 行情 ''' + date + ''' | 龙虎榜 ''' + str(lhb_date or '—') + ''' | 大宗 ''' + str(bt_date or '—') + ''' (T+1发布)</div>
 <div class="sg">'''
 
     for n in ['上证综指','沪深300','科创50','创业板指']:
@@ -247,9 +322,11 @@ td:first-child{text-align:left;color:#8b8b90}
     cls = 'up' if total_net_buy > 0 else 'dn'
     html += f'<tr><td>两融余额</td><td>{total_margin/1e8:.0f}亿</td></tr>'
     html += f'<tr><td>融资净买入</td><td class="{cls}">{total_net_buy/1e8:+.0f}亿</td></tr></tbody></table>'
+    html += '<div style="font-size:10px;color:#8b8b90;margin:2px 0 12px">数据日: 两融 T+1 披露，取最新可用交易日</div>'
 
     # 龙虎榜: 分净买入/净卖出
     html += f'<h2>4. 龙虎榜 ({len(lhb)}条)</h2>'
+    html += f'<div style="font-size:10px;color:#8b8b90;margin:2px 0 12px">数据日: {lhb_date or "—"}（T+1 自动回退）</div>'
     if lhb:
         buy_lhb = sorted([r for r in lhb if r['net_amount'] > 0], key=lambda x: x['net_amount'], reverse=True)
         sell_lhb = sorted([r for r in lhb if r['net_amount'] <= 0], key=lambda x: x['net_amount'])
@@ -268,6 +345,7 @@ td:first-child{text-align:left;color:#8b8b90}
 
     # 大宗交易
     html += f'<h2>5. 大宗交易 ({len(bt)}条)</h2>'
+    html += f'<div style="font-size:10px;color:#8b8b90;margin:2px 0 12px">数据日: {bt_date or "—"}（T+1 自动回退）</div>'
     if bt:
         html += '<table><thead><tr><th>股票</th><th>成交额</th><th>折价率</th><th>占流通市值</th></tr></thead><tbody>'
         for r in bt:
@@ -277,12 +355,48 @@ td:first-child{text-align:left;color:#8b8b90}
             html += f'<tr><td>{nm}</td><td>{r["trading_amount"]/1e4:.0f}万</td><td>{r["discount_rate"]:.1f}%</td><td>{pct}</td></tr>'
         html += '</tbody></table>'
 
+    # 口径声明 + 风险提示
+    html += '<h2>6. 口径声明</h2><div style="font-size:10px;color:#8b8b90;line-height:1.8">'
+    html += f'- 行情数据日 {date}；龙虎榜数据日 {lhb_date or "—"}；大宗数据日 {bt_date or "—"}（两融/龙虎榜/大宗均为 T+1 披露，缺失时自动回退前一交易日）<br>'
+    html += '- 上涨/下跌家数按当日涨跌幅正负统计，含北交所；成交额为全A汇总<br>'
+    html += '- 两融余额为两融标的汇总（daily_margin_history 全量），非 TOP500 口径<br>'
+    html += '- 本报告仅作市场事实归纳与结构梳理，不构成投资建议<br>'
+    html += '</div>'
+
     html += '</div></body></html>'
 
     os.makedirs(OUT_DIR, exist_ok=True)
     p = os.path.join(OUT_DIR, f'review_{date}.html')
     with open(p, 'w', encoding='utf-8') as f: f.write(html)
     print(f'✅ {p} ({elapsed:.0f}s)')
+
+    # validate 检查
+    issues = validate_report(html, date)
+    if issues:
+        print('⚠️ validate 检查发现:')
+        for i in issues:
+            print(f'   - {i}')
+    else:
+        print('✅ validate 检查通过')
+    return issues
+
+def validate_report(html, date):
+    """检查报告关键区块是否齐全，返回问题列表"""
+    issues = []
+    checks = [
+        ('指数', '1. 指数'), ('市场宽度', '2. 市场宽度'), ('两融', '3. 两融'),
+        ('龙虎榜', '4. 龙虎榜'), ('大宗交易', '5. 大宗交易'),
+        ('口径声明', '6. 口径声明'),
+        ('数据日标注', '数据日: 行情'),
+    ]
+    for name, needle in checks:
+        if needle not in html:
+            issues.append(f'缺少区块: {name}')
+    # 内容空洞检查：龙虎榜/大宗都为空时提示（不视为失败）
+    if '龙虎榜 (0条)' in html and '大宗交易 (0条)' in html:
+        issues.append('⚠️ 龙虎榜/大宗均无数据（可能当日 API 未发布，需人工确认）')
+    return issues
+
 
 if __name__ == '__main__':
     date = sys.argv[1] if len(sys.argv) > 1 else None

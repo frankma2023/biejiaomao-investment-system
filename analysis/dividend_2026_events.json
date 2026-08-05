@@ -1,0 +1,377 @@
+[
+ {
+  "high_date": "2026-03-12",
+  "high_price": 3377.03,
+  "dd_dates": {
+   "10": "2026-06-24",
+   "15": "2026-06-30"
+  },
+  "max_dd": 15.4,
+  "low_date": "2026-06-30",
+  "low_price": 2855.49,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 3227.27,
+  "bounce_pct": 13.0,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 3220.68,
+  "days_from_low_to_peak": 22,
+  "code": "000015",
+  "name": "红利指数",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-03-02",
+  "high_price": 13074.59,
+  "dd_dates": {
+   "10": "2026-06-18",
+   "15": "2026-06-26"
+  },
+  "max_dd": 18.0,
+  "low_date": "2026-06-30",
+  "low_price": 10724.45,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 12021.37,
+  "bounce_pct": 12.1,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 11993.68,
+  "days_from_low_to_peak": 22,
+  "code": "000150",
+  "name": "380红利",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-06-04",
+  "high_price": 1704.2,
+  "dd_dates": {
+   "10": "2026-06-24",
+   "15": "2026-06-30"
+  },
+  "max_dd": 15.5,
+  "low_date": "2026-06-30",
+  "low_price": 1440.5,
+  "bounce_peak_date": "2026-07-31",
+  "bounce_peak": 1640.49,
+  "bounce_pct": 13.9,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 1640.49,
+  "days_from_low_to_peak": 23,
+  "code": "000151",
+  "name": "上国红利",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-03-12",
+  "high_price": 6980.23,
+  "dd_dates": {
+   "10": "2026-06-24"
+  },
+  "max_dd": 14.5,
+  "low_date": "2026-06-30",
+  "low_price": 5967.9,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 6828.31,
+  "bounce_pct": 14.4,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 6758.21,
+  "days_from_low_to_peak": 22,
+  "code": "000821",
+  "name": "300红利",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-03-12",
+  "high_price": 11504.46,
+  "dd_dates": {
+   "10": "2026-06-18",
+   "15": "2026-06-26"
+  },
+  "max_dd": 16.6,
+  "low_date": "2026-06-30",
+  "low_price": 9597.83,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 10223.76,
+  "bounce_pct": 6.5,
+  "still_bouncing": true,
+  "last_date": "2026-07-30",
+  "last_close": 10223.76,
+  "days_from_low_to_peak": 22,
+  "code": "000822",
+  "name": "500红利",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-03-12",
+  "high_price": 2298.33,
+  "dd_dates": {
+   "10": "2026-06-18",
+   "15": "2026-06-30"
+  },
+  "max_dd": 15.4,
+  "low_date": "2026-06-30",
+  "low_price": 1945.33,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 2185.75,
+  "bounce_pct": 12.4,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 2183.12,
+  "days_from_low_to_peak": 22,
+  "code": "000824",
+  "name": "国企红利",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-03-03",
+  "high_price": 3771.88,
+  "dd_dates": {
+   "10": "2026-06-10",
+   "15": "2026-06-25"
+  },
+  "max_dd": 18.6,
+  "low_date": "2026-06-30",
+  "low_price": 3068.88,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 3480.7,
+  "bounce_pct": 13.4,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 3454.04,
+  "days_from_low_to_peak": 22,
+  "code": "000825",
+  "name": "央企红利",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-03-12",
+  "high_price": 5976.53,
+  "dd_dates": {
+   "10": "2026-06-18",
+   "15": "2026-06-30"
+  },
+  "max_dd": 16.0,
+  "low_date": "2026-06-30",
+  "low_price": 5022.46,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 5579.6,
+  "bounce_pct": 11.1,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 5569.41,
+  "days_from_low_to_peak": 22,
+  "code": "000922",
+  "name": "中证红利",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-01-29",
+  "high_price": 7896.96,
+  "dd_dates": {
+   "10": "2026-03-23",
+   "15": "2026-06-25"
+  },
+  "max_dd": 18.7,
+  "low_date": "2026-07-24",
+  "low_price": 6419.71,
+  "bounce_peak_date": "2026-07-31",
+  "bounce_peak": 6734.16,
+  "bounce_pct": 4.9,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 6734.16,
+  "days_from_low_to_peak": 5,
+  "code": "930838",
+  "name": "CS高股息",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-03-03",
+  "high_price": 1904.8,
+  "dd_dates": {
+   "10": "2026-05-27",
+   "15": "2026-06-11",
+   "20": "2026-06-26"
+  },
+  "max_dd": 21.2,
+  "low_date": "2026-06-30",
+  "low_price": 1500.15,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 1649.91,
+  "bounce_pct": 10.0,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 1648.62,
+  "days_from_low_to_peak": 22,
+  "code": "931132",
+  "name": "诚通央企红利",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-03-12",
+  "high_price": 2772.73,
+  "dd_dates": {
+   "10": "2026-06-18",
+   "15": "2026-06-30"
+  },
+  "max_dd": 15.2,
+  "low_date": "2026-06-30",
+  "low_price": 2350.88,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 2598.93,
+  "bounce_pct": 10.6,
+  "still_bouncing": true,
+  "last_date": "2026-07-30",
+  "last_close": 2598.93,
+  "days_from_low_to_peak": 22,
+  "code": "931644",
+  "name": "800红利",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-03-02",
+  "high_price": 2726.9,
+  "dd_dates": {
+   "10": "2026-03-23",
+   "15": "2026-06-18"
+  },
+  "max_dd": 19.8,
+  "low_date": "2026-06-30",
+  "low_price": 2187.97,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 2365.57,
+  "bounce_pct": 8.1,
+  "still_bouncing": true,
+  "last_date": "2026-07-30",
+  "last_close": 2365.57,
+  "days_from_low_to_peak": 22,
+  "code": "931645",
+  "name": "1000红利",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-03-02",
+  "high_price": 3269.94,
+  "dd_dates": {
+   "10": "2026-06-08",
+   "15": "2026-06-26"
+  },
+  "max_dd": 16.2,
+  "low_date": "2026-06-26",
+  "low_price": 2739.06,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 3060.54,
+  "bounce_pct": 11.7,
+  "still_bouncing": true,
+  "last_date": "2026-07-30",
+  "last_close": 3060.54,
+  "days_from_low_to_peak": 24,
+  "code": "932255",
+  "name": "A500红利增长",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-05-12",
+  "high_price": 12465.16,
+  "dd_dates": {
+   "10": "2026-06-18"
+  },
+  "max_dd": 14.9,
+  "low_date": "2026-06-30",
+  "low_price": 10611.8,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 11607.36,
+  "bounce_pct": 9.4,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 11561.33,
+  "days_from_low_to_peak": 22,
+  "code": "932305",
+  "name": "智选高股息",
+  "cat": "pure"
+ },
+ {
+  "high_date": "2026-03-12",
+  "high_price": 3397.74,
+  "dd_dates": {
+   "10": "2026-06-18"
+  },
+  "max_dd": 13.9,
+  "low_date": "2026-06-30",
+  "low_price": 2924.37,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 3250.66,
+  "bounce_pct": 11.2,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 3230.98,
+  "days_from_low_to_peak": 22,
+  "code": "931848",
+  "name": "800红利低波",
+  "cat": "lowvol"
+ },
+ {
+  "high_date": "2026-03-12",
+  "high_price": 3252.42,
+  "dd_dates": {
+   "10": "2026-06-18"
+  },
+  "max_dd": 14.0,
+  "low_date": "2026-06-30",
+  "low_price": 2795.56,
+  "bounce_peak_date": "2026-07-30",
+  "bounce_peak": 3147.32,
+  "bounce_pct": 12.6,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 3118.7,
+  "days_from_low_to_peak": 22,
+  "code": "932422",
+  "name": "A500红利低波",
+  "cat": "lowvol"
+ },
+ {
+  "high_date": "2026-05-11",
+  "high_price": 35774.99,
+  "dd_dates": {
+   "10": "2026-06-08"
+  },
+  "max_dd": 11.8,
+  "low_date": "2026-07-17",
+  "low_price": 31554.24,
+  "bounce_peak_date": "2026-07-31",
+  "bounce_peak": 33503.52,
+  "bounce_pct": 6.2,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 33503.52,
+  "days_from_low_to_peak": 10,
+  "code": "931468",
+  "name": "红利质量",
+  "cat": "quality"
+ },
+ {
+  "high_date": "2026-01-29",
+  "high_price": 5057.64,
+  "dd_dates": {
+   "10": "2026-03-23",
+   "15": "2026-06-04",
+   "20": "2026-07-08"
+  },
+  "max_dd": 21.1,
+  "low_date": "2026-07-13",
+  "low_price": 3990.3,
+  "bounce_peak_date": "2026-07-31",
+  "bounce_peak": 4387.29,
+  "bounce_pct": 9.9,
+  "still_bouncing": true,
+  "last_date": "2026-07-31",
+  "last_close": 4387.29,
+  "days_from_low_to_peak": 14,
+  "code": "932315",
+  "name": "中证红利质量",
+  "cat": "quality"
+ }
+]

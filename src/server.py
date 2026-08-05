@@ -503,6 +503,14 @@ def api_market_health():
         {'key': 'fear_greed',   'value': row['fear_greed_value'],   'score': row['fear_greed_score'],   'detail': ''},
     ]
 
+    # 涨跌停家数（情绪补充指标，不计分）
+    limit_up = row['limit_up_count'] if 'limit_up_count' in row.keys() else None
+    limit_down = row['limit_down_count'] if 'limit_down_count' in row.keys() else None
+    if limit_up is not None:
+        indicators.append({'key': 'limit_up_down', 'value': limit_up, 'score': 0,
+                           'detail': f'涨停 {limit_up} / 跌停 {limit_down}',
+                           'limit_up': limit_up, 'limit_down': limit_down})
+
     rot_rows = db.execute(
         "SELECT * FROM market_rotation_daily WHERE date = ?", (row['date'],)
     ).fetchall()
@@ -1272,6 +1280,299 @@ def api_market_breakouts():
 # ═══════════════════════════════════════════════
 # API: GET /api/strongest-index
 # ═══════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════
+# API: GET /api/market-scan/dividend-advice
+# ═══════════════════════════════════════════════
+
+DIVIDEND_INDICES = [
+    ('000922', '中证红利', 'pure'),
+    ('H30269', '红利低波', 'lowvol'),
+    ('931468', '红利质量', 'quality'),
+    ('000015', '红利指数', 'pure'),
+    ('931848', '800红利低波', 'lowvol'),
+]
+
+
+@app.route('/api/market-scan/dividend-advice')
+def api_market_dividend_advice():
+    """红利指数操作建议：信号检测+建议合成（支持历史回看）"""
+    target_date = request.args.get('date', '')
+    db = get_db()
+    if not target_date:
+        r = db.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
+        target_date = r[0]
+
+    results = []
+    for code, name, cat in DIVIDEND_INDICES:
+        # K线 300 日窗口
+        rows = db.execute("""
+            SELECT date, close FROM index_daily_kline
+            WHERE stock_code=? AND kline_type='normal' AND date<=?
+            ORDER BY date DESC LIMIT 300
+        """, (code, target_date)).fetchall()
+        rows = list(reversed(rows))
+        if len(rows) < 250:
+            continue
+        closes = [r['close'] for r in rows]
+        current = closes[-1]
+        high250 = max(closes[-250:])
+        dd_250 = (high250 - current) / high250 * 100
+
+        # 估值
+        v = db.execute("""
+            SELECT pe_ttm, pe_ttm_pct, pb, pb_pct, dyr, dyr_pct
+            FROM index_fundamental_daily
+            WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1
+        """, (code, target_date)).fetchone()
+        val = None
+        if v:
+            val = {
+                'pe': round(v['pe_ttm'], 1) if v['pe_ttm'] else None,
+                'pe_pct': round(v['pe_ttm_pct'] * 100) if v['pe_ttm_pct'] is not None else None,
+                'pb': round(v['pb'], 2) if v['pb'] else None,
+                'pb_pct': round(v['pb_pct'] * 100) if v['pb_pct'] is not None else None,
+                'dyr': round(v['dyr'] * 100, 2) if v['dyr'] else None,
+                'dyr_pct': round(v['dyr_pct'] * 100) if v['dyr_pct'] is not None else None,
+            }
+
+        # 信号
+        signals = []
+        if dd_250 >= 15:
+            signals.append('gold_buy')
+        if val and val['dyr_pct'] is not None and val['dyr_pct'] > 90:
+            signals.append('high_div')
+        if dd_250 >= 15 and val and val['dyr_pct'] is not None and val['dyr_pct'] > 80:
+            signals.append('double_confirm')
+        if val and val['pe_pct'] is not None and val['pe_pct'] > 80:
+            signals.append('pe_warn')
+        if val and val['dyr_pct'] is not None and val['dyr_pct'] < 10:
+            signals.append('low_div')
+
+        # 建议
+        advice, level = '持有/观望', 'hold'
+        if 'double_confirm' in signals:
+            advice, level = '分批买入（回撤+高息双确认）', 'strong_buy'
+        elif 'gold_buy' in signals or 'high_div' in signals:
+            advice, level = '观察买入（单信号触发）', 'buy'
+        elif 'pe_warn' in signals and dd_250 < 10:
+            advice, level = '估值偏高（PE分位>80%），建议减仓', 'reduce'
+        elif 'low_div' in signals:
+            advice, level = '股息保护不足（股息率分位<10%），谨慎', 'caution'
+
+        results.append({
+            'code': code, 'name': name, 'cat': cat,
+            'close': round(current, 2), 'date': rows[-1]['date'],
+            'dd_250': round(dd_250, 1),
+            'high_250': round(high250, 2),
+            'valuation': val,
+            'signals': signals,
+            'advice': advice,
+            'advice_level': level,
+        })
+
+    # 整体汇总
+    buy_count = sum(1 for r in results if r['advice_level'] in ('strong_buy', 'buy'))
+    reduce_count = sum(1 for r in results if r['advice_level'] == 'reduce')
+    if buy_count >= 3:
+        summary = f"{buy_count}/5 指数处于买入区，红利整体低估"
+    elif reduce_count >= 3:
+        summary = f"{reduce_count}/5 指数估值偏高，建议减仓"
+    else:
+        summary = f"买入区 {buy_count}/5 · 减仓区 {reduce_count}/5，整体中性"
+
+    return jsonify({'date': target_date, 'summary': summary, 'indices': results})
+
+
+@app.route('/api/market-scan/dividend-advice-detail')
+def api_market_dividend_detail():
+    """红利指数详情：历史回撤曲线/估值分位/信号时间线/历史类似情况统计"""
+    code = request.args.get('code', '000922')
+    target_date = request.args.get('date', '')
+    db = get_db()
+    if not target_date:
+        r = db.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
+        target_date = r[0]
+
+    # 近3年K线
+    rows = db.execute("""
+        SELECT date, close FROM index_daily_kline
+        WHERE stock_code=? AND kline_type='normal' AND date>=date(?,'-3 years') AND date<=?
+        ORDER BY date
+    """, (code, target_date, target_date)).fetchall()
+    dates = [r['date'] for r in rows]
+    closes = [r['close'] for r in rows]
+    if not dates:
+        return jsonify({'error': 'no data'})
+
+    # 全历史K线（用于类似事件统计，避免目标日期截断造成幸存者偏差）
+    hist_rows = db.execute("""
+        SELECT date, close FROM index_daily_kline
+        WHERE stock_code=? AND kline_type='normal' AND date>='2016-01-01'
+        ORDER BY date
+    """, (code,)).fetchall()
+    hist_dates = [r['date'] for r in hist_rows]
+    hist_closes = [r['close'] for r in hist_rows]
+
+    # 回撤曲线（250日滚动最高）
+    dd_series = []
+    for i in range(len(closes)):
+        w = closes[max(0, i-249):i+1]
+        hi = max(w)
+        dd_series.append(round((hi - closes[i]) / hi * 100, 2))
+
+    # 估值分位（近3年，按K线日期对齐）
+    val_rows = db.execute("""
+        SELECT date, pe_ttm_pct, pb_pct, dyr_pct FROM index_fundamental_daily
+        WHERE stock_code=? AND date>=date(?,'-3 years') AND date<=?
+        ORDER BY date
+    """, (code, target_date, target_date)).fetchall()
+    val_map = {r['date']: r for r in val_rows}
+    pe_series = [round(val_map[d]['pe_ttm_pct']*100) if d in val_map and val_map[d]['pe_ttm_pct'] is not None else None for d in dates]
+    pb_series = [round(val_map[d]['pb_pct']*100) if d in val_map and val_map[d]['pb_pct'] is not None else None for d in dates]
+    dyr_series = [round(val_map[d]['dyr_pct']*100) if d in val_map and val_map[d]['dyr_pct'] is not None else None for d in dates]
+
+    # 信号时间线：历史上 250日回撤>=15% 的事件（合并20日）
+    events = []
+    last_trig = -999
+    for i in range(250, len(closes)):
+        if dd_series[i] >= 15:
+            if i - last_trig >= 20:
+                events.append({'date': dates[i], 'dd': dd_series[i]})
+                last_trig = i
+
+    # 历史类似情况统计：当前回撤幅度下的所有事件（用全历史数据）
+    cur_dd = dd_series[-1] if dd_series else 0
+    # 全历史回撤序列
+    hist_dd = []
+    for i in range(len(hist_closes)):
+        w = hist_closes[max(0, i-249):i+1]
+        hi = max(w)
+        hist_dd.append((hi - hist_closes[i]) / hi * 100)
+    similar = []
+    last_s = -999
+    for i in range(250, len(hist_closes)):
+        ddv = hist_dd[i]
+        if ddv >= cur_dd and cur_dd > 0 and i - last_s >= 20:
+            fwd20 = (hist_closes[min(i+20, len(hist_closes)-1)] - hist_closes[i]) / hist_closes[i] * 100 if i+20 < len(hist_closes) else None
+            fwd60 = (hist_closes[min(i+60, len(hist_closes)-1)] - hist_closes[i]) / hist_closes[i] * 100 if i+60 < len(hist_closes) else None
+            peak = max(hist_closes[i:min(i+120, len(hist_closes))]) if i < len(hist_closes) else hist_closes[i]
+            bounce = (peak - hist_closes[i]) / hist_closes[i] * 100
+            days_to_peak = None
+            if i < len(hist_closes):
+                seg = hist_closes[i:min(i+120, len(hist_closes))]
+                if seg:
+                    days_to_peak = seg.index(max(seg))
+            similar.append({
+                'date': hist_dates[i], 'dd': round(ddv, 1),
+                'fwd20': round(fwd20, 1) if fwd20 is not None else None,
+                'fwd60': round(fwd60, 1) if fwd60 is not None else None,
+                'bounce': round(bounce, 1),
+                'days_to_peak': days_to_peak,
+            })
+            last_s = i
+
+    # 统计摘要
+    stats = {}
+    if similar:
+        fwd20s = [s['fwd20'] for s in similar if s['fwd20'] is not None]
+        fwd60s = [s['fwd60'] for s in similar if s['fwd60'] is not None]
+        bounces = [s['bounce'] for s in similar]
+        days = [s['days_to_peak'] for s in similar if s['days_to_peak'] is not None]
+        def med(xs):
+            s = sorted(xs); n = len(s)
+            return s[n//2] if n % 2 else (s[n//2-1]+s[n//2])/2
+        stats = {
+            'count': len(similar),
+            'fwd20_median': round(med(fwd20s), 1) if fwd20s else None,
+            'fwd20_winrate': round(sum(1 for x in fwd20s if x > 0) / len(fwd20s) * 100, 1) if fwd20s else None,
+            'fwd60_median': round(med(fwd60s), 1) if fwd60s else None,
+            'fwd60_winrate': round(sum(1 for x in fwd60s if x > 0) / len(fwd60s) * 100, 1) if fwd60s else None,
+            'bounce_median': round(med(bounces), 1) if bounces else None,
+            'bounce_avg': round(sum(bounces)/len(bounces), 1) if bounces else None,
+            'days_to_peak_median': round(med(days), 0) if days else None,
+        }
+
+    # 历史类似估值分位区间统计（当前PE/PB/DYR分位 ±10pp 窗口内的历史事件）
+    # 用全历史估值数据 + 全历史K线，统计这些日子的未来20/60日表现
+    val_similar = {}
+    if val_map and hist_dates:
+        # 当前估值分位
+        cur_pe = pe_series[-1] if pe_series else None
+        cur_pb = pb_series[-1] if pb_series else None
+        cur_dyr = dyr_series[-1] if dyr_series else None
+        # 全历史估值（按日期对齐 hist_dates）
+        hist_val_rows = db.execute("""
+            SELECT date, pe_ttm_pct, pb_pct, dyr_pct FROM index_fundamental_daily
+            WHERE stock_code=? AND date>='2016-01-01' ORDER BY date
+        """, (code,)).fetchall()
+        hist_val_map = {r['date']: (r['pe_ttm_pct'], r['pb_pct'], r['dyr_pct']) for r in hist_val_rows}
+        hist_date_idx = {d: i for i, d in enumerate(hist_dates)}
+
+        def _val_window_stats(metric_cur, metric_name):
+            """统计历史估值分位在 [cur-10, cur+10] 区间的日子，未来20/60日表现"""
+            if metric_cur is None:
+                return None
+            lo, hi = max(0, metric_cur - 10), min(100, metric_cur + 10)
+            fwd20s, fwd60s = [], []
+            count = 0
+            for dt, vals in hist_val_map.items():
+                if dt not in hist_date_idx:
+                    continue
+                v = vals[0] if metric_name == 'pe' else (vals[1] if metric_name == 'pb' else vals[2])
+                if v is None:
+                    continue
+                pct = v * 100
+                if lo <= pct <= hi:
+                    count += 1
+                    i = hist_date_idx[dt]
+                    if i + 20 < len(hist_closes):
+                        fwd20s.append((hist_closes[i+20] / hist_closes[i] - 1) * 100)
+                    if i + 60 < len(hist_closes):
+                        fwd60s.append((hist_closes[i+60] / hist_closes[i] - 1) * 100)
+            if not fwd20s:
+                return {'count': count, 'range': [lo, hi]}
+            def _med(xs):
+                s = sorted(xs); n = len(s)
+                return s[n//2] if n % 2 else (s[n//2-1]+s[n//2])/2
+            return {
+                'count': count, 'range': [lo, hi],
+                'fwd20_median': round(_med(fwd20s), 1),
+                'fwd20_winrate': round(sum(1 for x in fwd20s if x > 0) / len(fwd20s) * 100, 1),
+                'fwd60_median': round(_med(fwd60s), 1) if fwd60s else None,
+                'fwd60_winrate': round(sum(1 for x in fwd60s if x > 0) / len(fwd60s) * 100, 1) if fwd60s else None,
+            }
+
+        val_similar = {
+            'pe': _val_window_stats(cur_pe, 'pe'),
+            'pb': _val_window_stats(cur_pb, 'pb'),
+            'dyr': _val_window_stats(cur_dyr, 'dyr'),
+        }
+
+    # 当前建议（复用信号逻辑）
+    adv = None
+    name = code
+    try:
+        import yaml as _yaml
+        _cfg = _yaml.safe_load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'index_style.yaml'), 'r', encoding='utf-8'))
+        for _cat, _items in _cfg.get('categories', {}).items():
+            for _it in _items:
+                if isinstance(_it, dict) and _it.get('code') == code:
+                    name = _it.get('name', code)
+                    break
+            if name != code:
+                break
+    except Exception:
+        pass
+
+    return jsonify({
+        'code': code, 'name': name, 'date': target_date,
+        'dates': dates, 'closes': closes, 'dd_series': dd_series,
+        'pe_series': pe_series, 'pb_series': pb_series, 'dyr_series': dyr_series,
+        'events': events, 'similar': similar, 'stats': stats, 'val_similar': val_similar,
+        'current_dd': round(cur_dd, 1),
+    })
+
 
 # ═══════════════════════════════════════════════
 # API: GET /api/market-scan/capital-flow

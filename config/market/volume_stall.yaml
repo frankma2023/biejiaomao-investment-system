@@ -1,0 +1,8 @@
+# 放量滞涨检测引擎配置
+# 信号: 第1日放量上涨 + 第2日放量下跌
+volume_stall:
+  d1_gain_threshold: 0.02   # 第1日涨幅阈值 (2%)
+  d1_vol_ratio_min: 2.0     # 第1日量比阈值 (成交额/前20日均额)
+  d2_vol_ratio_min: 1.8     # 第2日量比阈值
+  vol_ma_days: 20           # 均额窗口
+  min_history: 30           # 最少K线数

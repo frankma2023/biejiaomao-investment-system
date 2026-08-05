@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>红利指数操作建议详情</title>
+<link rel="stylesheet" href="/shared/css/hanako-glass.css">
+<script src="/shared/js/api-client.js"></script>
+<script src="/shared/js/echarts.min.js"></script>
+<style>
+body{background:var(--bg);color:var(--text-primary);font-family:var(--font-body);font-size:13px;margin:0;padding:24px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--accent);margin:0 0 4px}
+.sub{font-size:0.68rem;color:var(--muted);margin-bottom:20px}
+.back{font-size:0.68rem;color:var(--muted);cursor:pointer;margin-bottom:12px;display:inline-block}
+.back:hover{color:var(--accent)}
+.advice-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.advice-card .lv{font-size:1.1rem;font-weight:700}
+.advice-card .tx{font-size:0.75rem;color:var(--text-secondary);flex:1}
+.advice-card .st{font-size:0.68rem;color:var(--muted)}
+.stat-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.stat-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;flex:1;min-width:110px;text-align:center}
+.stat-box .n{font-family:var(--font-display);font-size:1.2rem;font-weight:600}
+.stat-box .l{font-size:0.58rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.04em}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+.chart-card .ct{font-size:0.75rem;font-weight:600;color:var(--accent);margin-bottom:8px}
+.chart-card .cs{font-size:0.6rem;color:var(--muted);margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:0.68rem}
+th{padding:6px 8px;border-bottom:2px solid var(--border);font-weight:600;color:var(--muted);font-size:0.56rem;text-transform:uppercase;text-align:right;background:var(--card)}
+th:first-child,td:first-child{text-align:left}
+td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono)}
+td:first-child{font-family:var(--font-body)}
+.up{color:#ef4444;font-weight:600}
+.dn{color:#10b981;font-weight:600}
+.mid{color:#f59e0b;font-weight:600}
+.muted{color:var(--muted)}
+.up-line{color:#ef4444}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="./">← 返回大盘扫描</a>
+  <h1 id="title">📌 红利指数操作建议详情</h1>
+  <div class="sub" id="meta">加载中...</div>
+
+  <div id="advice-box"></div>
+  <div id="stats-row"></div>
+  <div id="charts"></div>
+  <div id="events-table"></div>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const code = params.get('code') || '000922';
+const date = params.get('date') || '';
+const DETAIL_API = API_BASE + '/api/market-scan/dividend-advice-detail?code=' + code + (date ? '&date=' + date : '');
+const ADVICE_API = API_BASE + '/api/market-scan/dividend-advice?date=' + (date || '');
+
+let isDark = document.documentElement.dataset.theme === 'dark';
+const tx = isDark ? '#999' : '#6E6E6E';
+const sp = isDark ? 'rgba(200,200,200,0.08)' : 'rgba(128,128,128,0.1)';
+
+async function load() {
+  const [d, a] = await Promise.all([
+    fetch(DETAIL_API).then(r => r.json()),
+    fetch(ADVICE_API).then(r => r.json()).catch(() => null)
+  ]);
+  if (d.error) { document.getElementById('meta').textContent = '无数据'; return; }
+
+  document.getElementById('title').textContent = '📌 ' + d.name + ' · 操作建议详情';
+  document.getElementById('meta').textContent = d.date + ' · 当前250日回撤 ' + d.current_dd + '%';
+
+  // 当前建议（丰富版：结合历史类似估值分位/回撤统计）
+  let advice = null;
+  if (a && a.indices) {
+    advice = a.indices.find(x => x.code === code);
+  }
+  const advHtml = [];
+  if (advice) {
+    const lvMap = {strong_buy:['强买入','#ef4444'],buy:['买入','#ef4444'],reduce:['减仓','#10b981'],caution:['谨慎','#f59e0b'],hold:['观望','#8b8b90']};
+    const lv = lvMap[advice.advice_level] || ['观望','#8b8b90'];
+    const st = d.stats || {};
+    const vs = d.val_similar || {};
+    // 构建历史证据描述
+    let evidence = [];
+    if (st.count) {
+      evidence.push('<b>回撤' + d.current_dd + '%</b>：历史上' + st.count + '次类似回撤，20日胜率<b style="color:#ef4444">' + st.fwd20_winrate + '%</b>，中位收益<b>' + (st.fwd20_median>0?'+':'') + st.fwd20_median + '%</b>；反弹幅度中位<b style="color:#f59e0b">' + st.bounce_median + '%</b>，平均' + st.days_to_peak_median + '日到峰值');
+    }
+    if (vs.pe && vs.pe.count) {
+      evidence.push('PE分位' + (advice.valuation?advice.valuation.pe_pct:'?') + '%（历史区间' + vs.pe.range[0] + '-' + vs.pe.range[1] + '%）：' + vs.pe.count + '次类似估值，20日胜率<b style="color:' + (vs.pe.fwd20_winrate>=50?'#ef4444':'#10b981') + '">' + vs.pe.fwd20_winrate + '%</b>，中位收益<b>' + (vs.pe.fwd20_median>0?'+':'') + vs.pe.fwd20_median + '%</b>，60日胜率' + vs.pe.fwd60_winrate + '%');
+    }
+    if (vs.pb && vs.pb.count) {
+      evidence.push('PB分位' + (advice.valuation?advice.valuation.pb_pct:'?') + '%（区间' + vs.pb.range[0] + '-' + vs.pb.range[1] + '%）：' + vs.pb.count + '次类似估值，20日胜率<b style="color:' + (vs.pb.fwd20_winrate>=50?'#ef4444':'#10b981') + '">' + vs.pb.fwd20_winrate + '%</b>，中位收益<b>' + (vs.pb.fwd20_median>0?'+':'') + vs.pb.fwd20_median + '%</b>');
+    }
+    if (vs.dyr && vs.dyr.count) {
+      evidence.push('股息率分位' + (advice.valuation?advice.valuation.dyr_pct:'?') + '%（区间' + vs.dyr.range[0] + '-' + vs.dyr.range[1] + '%）：' + vs.dyr.count + '次类似估值，20日胜率<b style="color:' + (vs.dyr.fwd20_winrate>=50?'#ef4444':'#10b981') + '">' + vs.dyr.fwd20_winrate + '%</b>，中位收益<b>' + (vs.dyr.fwd20_median>0?'+':'') + vs.dyr.fwd20_median + '%</b>');
+    }
+    advHtml.push('<div class="advice-card" style="display:block">');
+    advHtml.push('<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span><span class="tx">' + advice.advice + '</span><span class="st">' + (advice.signals && advice.signals.length ? advice.signals.join(' · ') : '无信号') + '</span></div>');
+    if (evidence.length) {
+      advHtml.push('<div style="font-size:0.68rem;color:var(--text-secondary);line-height:1.8;border-top:1px solid var(--border);padding-top:8px">📊 历史证据：<br/>' + evidence.join('<br/>') + '</div>');
+    }
+    advHtml.push('</div>');
+  }
+  document.getElementById('advice-box').innerHTML = advHtml.join('');
+
+  // 历史类似统计
+  const st = d.stats || {};
+  const statsHtml = [
+    ['<div class="n" style="color:#ef4444">' + (st.count || 0) + '</div><div class="l">类似回撤次数</div>'],
+    ['<div class="n" style="color:#ef4444">' + (st.fwd20_median != null ? st.fwd20_median + '%' : '—') + '</div><div class="l">20日收益中位</div>'],
+    ['<div class="n" style="color:#ef4444">' + (st.fwd20_winrate != null ? st.fwd20_winrate + '%' : '—') + '</div><div class="l">20日胜率</div>'],
+    ['<div class="n" style="color:#ef4444">' + (st.fwd60_median != null ? st.fwd60_median + '%' : '—') + '</div><div class="l">60日收益中位</div>'],
+    ['<div class="n" style="color:#ef4444">' + (st.fwd60_winrate != null ? st.fwd60_winrate + '%' : '—') + '</div><div class="l">60日胜率</div>'],
+    ['<div class="n" style="color:#f59e0b">' + (st.bounce_median != null ? st.bounce_median + '%' : '—') + '</div><div class="l">反弹幅度中位</div>'],
+    ['<div class="n" style="color:#f59e0b">' + (st.days_to_peak_median != null ? st.days_to_peak_median + '日' : '—') + '</div><div class="l">反弹到峰值天数</div>']
+  ].map(h => '<div class="stat-box">' + h + '</div>').join('');
+  document.getElementById('stats-row').innerHTML = '<div class="stat-row">' + statsHtml + '</div>';
+
+  // 图表
+  const charts = [];
+  // 1. 回撤曲线
+  charts.push({title:'📉 历史回撤曲线（近3年）', el:'chart-dd', h:200, init: el => {
+    const c = echarts.init(el);
+    c.setOption({
+      backgroundColor:'transparent', tooltip:{trigger:'axis', formatter: p => p[0].name + '<br/>回撤: ' + p[0].value + '%'},
+      grid:{left:'8%',right:'4%',top:12,bottom:24},
+      xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
+      yAxis:{type:'value',name:'回撤%',axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
+      dataZoom:[{type:'inside'}],
+      series:[{type:'line',data:d.dd_series,smooth:true,showSymbol:false,
+        lineStyle:{color:'#ef4444',width:1.5},areaStyle:{color:'rgba(239,68,68,.08)'},
+        markLine:{silent:true,symbol:'none',data:[{yAxis:15,lineStyle:{color:'#ef4444',type:'dashed'},label:{formatter:'15%买点线',color:'#ef4444',fontSize:9}}]},
+        markPoint:{data:d.events.map(e=>({coord:[e.date,e.dd],value:'买点',itemStyle:{color:'#ef4444'}})),symbolSize:8}
+      }]
+    });
+    return c;
+  }});
+  // 2. 估值分位
+  charts.push({title:'📊 估值分位走势（PE/PB/股息率，近3年）', el:'chart-val', h:220, init: el => {
+    const c = echarts.init(el);
+    c.setOption({
+      backgroundColor:'transparent', tooltip:{trigger:'axis'},
+      legend:{data:['PE分位','PB分位','股息率分位'],textStyle:{color:tx,fontSize:9},bottom:0},
+      grid:{left:'8%',right:'4%',top:12,bottom:36},
+      xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
+      yAxis:{type:'value',max:100,axisLabel:{color:tx,fontSize:9,formatter:'{value}%'},splitLine:{lineStyle:{color:sp}}},
+      dataZoom:[{type:'inside'}],
+      series:[
+        {name:'PE分位',type:'line',data:d.pe_series,smooth:true,showSymbol:false,lineStyle:{color:'#f59e0b',width:1.5}},
+        {name:'PB分位',type:'line',data:d.pb_series,smooth:true,showSymbol:false,lineStyle:{color:'#539BF5',width:1.5}},
+        {name:'股息率分位',type:'line',data:d.dyr_series,smooth:true,showSymbol:false,lineStyle:{color:'#10b981',width:1.5}}
+      ]
+    });
+    return c;
+  }});
+  // 3. 价格 + 信号时间线
+  charts.push({title:'💹 价格走势 + 买点信号时间线（近3年）', el:'chart-px', h:240, init: el => {
+    const c = echarts.init(el);
+    c.setOption({
+      backgroundColor:'transparent', tooltip:{trigger:'axis'},
+      grid:{left:'8%',right:'4%',top:12,bottom:24},
+      xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
+      yAxis:{type:'value',axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
+      dataZoom:[{type:'inside'}],
+      series:[{type:'line',data:d.closes,smooth:true,showSymbol:false,
+        lineStyle:{color:'#f59e0b',width:1.5},
+        markPoint:{data:d.events.map(e=>({coord:[e.date,e.dd],value:'⚡',itemStyle:{color:'#ef4444'}})),symbol:'pin',symbolSize:36,label:{color:'#fff',fontSize:9}},
+        markLine:{silent:true,symbol:'none',data:[{yAxis:15,lineStyle:{color:'#ef4444',type:'dashed'},label:{formatter:'15%',color:'#ef4444',fontSize:9}}]}
+      }]
+    });
+    return c;
+  }});
+
+  const chartBox = charts.map(ch => '<div class="chart-card"><div class="ct">' + ch.title + '</div><div id="' + ch.el + '" style="height:' + ch.h + 'px"></div></div>').join('');
+  document.getElementById('charts').innerHTML = chartBox;
+  const inst = [];
+  charts.forEach(ch => inst.push(ch.init(document.getElementById(ch.el))));
+  window.addEventListener('resize', () => inst.forEach(c => c.resize()));
+
+  // 4. 信号触发历史表
+  const evHtml = ['<div class="chart-card"><div class="ct">⚡ 历史买点信号时间线（250日回撤≥15%触发）</div>',
+    '<table><thead><tr><th>触发日期</th><th>回撤幅度</th><th>20日收益</th><th>60日收益</th><th>反弹幅度</th><th>到峰值天数</th></tr></thead><tbody>'];
+  (d.similar || []).slice().reverse().forEach(e => {
+    const c20 = e.fwd20 != null ? (e.fwd20 >= 0 ? '<span class="up">' + e.fwd20 + '%</span>' : '<span class="dn">' + e.fwd20 + '%</span>') : '—';
+    const c60 = e.fwd60 != null ? (e.fwd60 >= 0 ? '<span class="up">' + e.fwd60 + '%</span>' : '<span class="dn">' + e.fwd60 + '%</span>') : '—';
+    evHtml.push('<tr><td>' + e.date + '</td><td>' + e.dd + '%</td><td>' + c20 + '</td><td>' + c60 + '</td><td><span class="up-line">' + e.bounce + '%</span></td><td>' + (e.days_to_peak != null ? e.days_to_peak + '日' : '—') + '</td></tr>');
+  });
+  evHtml.push('</tbody></table><div class="cs">仅展示与当前回撤幅度相当的历史事件（回撤≥' + d.current_dd + '%）</div></div>');
+  document.getElementById('events-table').innerHTML = evHtml.join('');
+}
+
+load();
+
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+</script>
+<script src="/shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'📌',brandText:'操作建议',currentPage:'market-scan'})</script>
+</body>
+</html>

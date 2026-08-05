@@ -60,6 +60,8 @@ def ensure_tables():
             ad_ratio_value    REAL,
             ad_ratio_today    REAL,
             ad_ratio_score    INTEGER,
+            limit_up_count    INTEGER,
+            limit_down_count  INTEGER,
             vol_breakout_value REAL,
             vol_breakout_score INTEGER,
             margin_5d_value   REAL,
@@ -124,6 +126,8 @@ def ensure_tables():
     # 迁移已有表：加新列
     for tbl_col in [
         ("market_health_daily", "ad_ratio_today REAL"),
+        ("market_health_daily", "limit_up_count INTEGER"),
+        ("market_health_daily", "limit_down_count INTEGER"),
         ("market_breakout_daily", "vol_ma50 REAL"),
         ("market_breakout_daily", "vol_ratio REAL"),
         ("market_breakout_daily", "break_ma TEXT"),
@@ -180,6 +184,29 @@ def compute_ad_ratio(conn, target_date):
 
 
 def score_ad_ratio(val): return _tier6(val, [2.0, 1.5, 1.0, 0.6, 0.3], [15, 12, 9, 6, 3, 0])
+
+
+# ═══════════════════════════════════════════════
+# 指标 1b: 涨跌停家数（情绪补充，不计分）
+# ═══════════════════════════════════════════════
+
+def compute_limit_counts(conn, target_date):
+    """当日涨停/跌停家数。
+    口径：主板 10%（涨跌幅≥9.9%），创业板/科创板 20%（≥19.9%），
+    不含 ST（5% 档位未计入）、不含北交所（30% 档位未计入）、不含新股无涨跌幅限制。
+    返回 (limit_up, limit_down)
+    """
+    r = conn.execute("""
+        SELECT
+          SUM(CASE WHEN (change_pct >= 0.099 AND (stock_code LIKE '60%' OR stock_code LIKE '00%'))
+                    OR (change_pct >= 0.199 AND (stock_code LIKE '30%' OR stock_code LIKE '68%'))
+                   THEN 1 ELSE 0 END) as up_cnt,
+          SUM(CASE WHEN (change_pct <= -0.099 AND (stock_code LIKE '60%' OR stock_code LIKE '00%'))
+                    OR (change_pct <= -0.199 AND (stock_code LIKE '30%' OR stock_code LIKE '68%'))
+                   THEN 1 ELSE 0 END) as dn_cnt
+        FROM daily_kline WHERE date = ?
+    """, (target_date,)).fetchone()
+    return (r['up_cnt'] or 0, r['dn_cnt'] or 0)
 
 
 # ═══════════════════════════════════════════════
@@ -555,6 +582,10 @@ def compute_all(target_date):
     ad_s = score_ad_ratio(ad)
     logger.info(f"  涨跌家数比: {ad}(5日)/{ad_today}(当日) → {ad_s}分")
 
+    # 1b 涨跌停家数（不计分，仅展示）
+    limit_up, limit_down = compute_limit_counts(conn, target_date)
+    logger.info(f"  涨跌停: {limit_up}涨/{limit_down}跌")
+
     # 2
     hl = compute_hl_ratio(conn, target_date)
     hl_s = score_hl_ratio(hl)
@@ -611,13 +642,16 @@ def compute_all(target_date):
          ma50_above_value, ma50_above_score,
          hl_ratio_value, hl_ratio_score,
          ad_ratio_value, ad_ratio_today, ad_ratio_score,
+         limit_up_count, limit_down_count,
          vol_breakout_value, vol_breakout_score,
          margin_5d_value, margin_5d_score,
          sector_rot_score,
          fear_greed_value, fear_greed_score)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (target_date, total, rating,
-          ma50, ma50_s, hl, hl_s, ad, ad_today, ad_s, vb, vb_s, mg, mg_s,
+          ma50, ma50_s, hl, hl_s, ad, ad_today, ad_s,
+          limit_up, limit_down,
+          vb, vb_s, mg, mg_s,
           sector_score, fg, fg_s))
     conn.commit()
 

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<title>红利指数卖出信号回测</title>
+<link rel="stylesheet" href="/shared/css/hanako-glass.css">
+<style>
+body{background:var(--bg);color:var(--text-primary);font-family:var(--font-body);font-size:13px;margin:0;padding:24px}
+.wrap{max-width:1300px;margin:0 auto}
+h1{font-family:var(--font-display);font-size:1.4rem;font-weight:400;color:var(--accent);margin:0 0 6px}
+.sub{font-size:0.7rem;color:var(--muted);margin-bottom:24px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px}
+.card h2{font-size:0.85rem;font-weight:600;color:var(--text-primary);margin:0 0 12px}
+.card h2 .tag{font-size:0.55rem;background:var(--color-accent-subtle);color:var(--color-accent);padding:2px 8px;border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:0.7rem}
+th{padding:7px 8px;border-bottom:2px solid var(--border);font-weight:600;color:var(--muted);font-size:0.58rem;text-transform:uppercase;letter-spacing:0.04em;text-align:right;background:var(--card)}
+th:first-child,td:first-child{text-align:left}
+td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono)}
+td:first-child{font-family:var(--font-body)}
+tr:hover td{background:var(--color-accent-subtle)}
+.up{color:#ef4444;font-weight:600}
+.dn{color:#10b981;font-weight:600}
+.mid{color:#f59e0b;font-weight:600}
+.muted{color:var(--muted)}
+.warn{background:rgba(245,158,11,.07)!important}
+.alert{background:rgba(239,68,68,.06)!important}
+.badge{font-size:0.55rem;padding:2px 8px;border-radius:8px;font-weight:600}
+.badge-no{background:rgba(139,139,144,.12);color:var(--muted)}
+.conclusion{background:var(--card);border-left:3px solid #f59e0b;border-radius:0 14px 14px 0;padding:16px 20px;margin-bottom:16px}
+.conclusion h3{font-size:0.8rem;color:#f59e0b;margin:0 0 8px}
+.conclusion p{font-size:0.72rem;color:var(--text-secondary);line-height:1.7;margin:6px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>⚠️ 红利指数卖出信号回测报告</h1>
+<div class="sub">2016-2026 全周期 · 信号触发后 60 日内最大回撤 · 次日生效 · 事件合并去重(20日)</div>
+<div class="conclusion"><h3>📌 核心结论（诚实版）</h3>
+<p><b>单一指标对"卖出择时"没有显著预测力。</b>所有信号触发后的平均回撤(7.6-8.4%)、踩雷率(23.9-31.1%)与<b>随机基准日</b>(平均回撤8.4%、踩雷率30.1%)几乎无差异。</p>
+<p>这与买入信号形成鲜明对比：<b>回撤15%买入信号有65.8%胜率（显著优于随机）</b>，而<b>任何跌破类卖出信号都无法区分"后面会跌"和"后面不跌"</b>。红利指数的下跌更像随机游走——跌不跌不由"之前跌破什么"决定。</p>
+<p><b>实操含义</b>：对红利指数，与其用技术指标择时卖出，不如用<b>估值分位区间</b>做仓位管理（如 PE分位>80% 时减仓至半仓），接受"可能卖早"的成本，换取"避开深跌"的保险。</p></div>
+<div class="card"><h2>🎯 全红利池 · 卖出信号回撤矩阵（60日） <span class="tag">基准: 平均8.4% / 踩雷30.1%</span></h2>
+<table><thead><tr><th>信号</th><th>次数</th><th>平均回撤</th><th>踩雷率(>10%)</th><th>深踩率(>15%)</th><th>vs基准</th></tr></thead><tbody>
+<tr><td>跌破MA20</td><td>2003</td><td>8.4%</td><td>29.8%</td><td>7.6%</td><td class="mid">-0.3pp</td></tr>
+<tr><td>跌破MA60</td><td>1279</td><td>8.0%</td><td>28.3%</td><td>7.1%</td><td class="mid">-1.8pp</td></tr>
+<tr><td>PE分位>70%</td><td>821</td><td>7.6%</td><td>24.4%</td><td>6.3%</td><td class="dn">-5.7pp</td></tr>
+<tr><td>PE分位>80%</td><td>617</td><td>7.6%</td><td>25.3%</td><td>5.8%</td><td class="dn">-4.8pp</td></tr>
+<tr><td>PE分位>90%</td><td>426</td><td>7.6%</td><td>23.9%</td><td>5.6%</td><td class="dn">-6.2pp</td></tr>
+<tr><td>PB分位>70%</td><td>607</td><td>8.0%</td><td>27.5%</td><td>7.6%</td><td class="dn">-2.6pp</td></tr>
+<tr><td>PB分位>80%</td><td>454</td><td>8.1%</td><td>28.6%</td><td>9.7%</td><td class="mid">-1.5pp</td></tr>
+<tr><td>PB分位>90%</td><td>296</td><td>8.0%</td><td>26.4%</td><td>9.1%</td><td class="dn">-3.7pp</td></tr>
+<tr><td>股息率分位<10%</td><td>264</td><td>8.1%</td><td>31.1%</td><td>8.7%</td><td class="mid">+1.0pp</td></tr>
+<tr><td>股息率分位<20%</td><td>431</td><td>7.7%</td><td>27.8%</td><td>7.2%</td><td class="dn">-2.3pp</td></tr>
+<tr><td>股息率分位<30%</td><td>614</td><td>7.8%</td><td>28.2%</td><td>7.2%</td><td class="mid">-1.9pp</td></tr>
+</tbody></table><div class="sub" style="margin-top:8px">红色行=踩雷率显著高于基准(≥+5pp) · 黄色=略高(+2pp) · 绿色=低于基准（信号有效）</div></div>
+<div class="card"><h2>🏷️ 纯红利 <span class="tag">11 信号</span></h2>
+<table><thead><tr><th>信号</th><th>次数</th><th>平均回撤</th><th>踩雷率(>10%)</th><th>深踩率(>15%)</th></tr></thead><tbody>
+<tr><td>跌破MA20</td><td>1132</td><td>8.4%</td><td>29.5%</td><td>7.3%</td></tr>
+<tr><td>跌破MA60</td><td>725</td><td>8.0%</td><td>28.1%</td><td>6.6%</td></tr>
+<tr><td>PE分位>70%</td><td>423</td><td>7.4%</td><td>23.6%</td><td>4.5%</td></tr>
+<tr><td>PE分位>80%</td><td>313</td><td>7.4%</td><td>24.0%</td><td>4.5%</td></tr>
+<tr><td>PE分位>90%</td><td>223</td><td>7.5%</td><td>24.2%</td><td>4.9%</td></tr>
+<tr><td>PB分位>70%</td><td>224</td><td>7.9%</td><td>27.2%</td><td>5.4%</td></tr>
+<tr><td>PB分位>80%</td><td>169</td><td>7.7%</td><td>26.6%</td><td>7.1%</td></tr>
+<tr><td>PB分位>90%</td><td>117</td><td>7.3%</td><td>22.2%</td><td>5.1%</td></tr>
+<tr><td>股息率分位<10%</td><td>133</td><td>8.2%</td><td>33.1%</td><td>8.3%</td></tr>
+<tr><td>股息率分位<20%</td><td>241</td><td>7.7%</td><td>27.8%</td><td>6.6%</td></tr>
+<tr><td>股息率分位<30%</td><td>346</td><td>7.7%</td><td>28.0%</td><td>6.1%</td></tr>
+</tbody></table></div>
+<div class="card"><h2>🏷️ 红利低波 <span class="tag">11 信号</span></h2>
+<table><thead><tr><th>信号</th><th>次数</th><th>平均回撤</th><th>踩雷率(>10%)</th><th>深踩率(>15%)</th></tr></thead><tbody>
+<tr><td>跌破MA20</td><td>494</td><td>7.2%</td><td>21.7%</td><td>2.6%</td></tr>
+<tr><td>跌破MA60</td><td>327</td><td>6.9%</td><td>17.4%</td><td>3.1%</td></tr>
+<tr><td>PE分位>70%</td><td>227</td><td>6.5%</td><td>15.4%</td><td>1.8%</td></tr>
+<tr><td>PE分位>80%</td><td>161</td><td>6.4%</td><td>17.4%</td><td>1.9%</td></tr>
+<tr><td>PE分位>90%</td><td>104</td><td>6.1%</td><td>13.5%</td><td>0.0%</td></tr>
+<tr><td>PB分位>70%</td><td>146</td><td>6.4%</td><td>14.4%</td><td>0.7%</td></tr>
+<tr><td>PB分位>80%</td><td>103</td><td>6.6%</td><td>17.5%</td><td>1.9%</td></tr>
+<tr><td>PB分位>90%</td><td>66</td><td>6.5%</td><td>18.2%</td><td>1.5%</td></tr>
+<tr><td>股息率分位<10%</td><td>66</td><td>6.4%</td><td>18.2%</td><td>3.0%</td></tr>
+<tr><td>股息率分位<20%</td><td>101</td><td>6.7%</td><td>21.8%</td><td>2.0%</td></tr>
+<tr><td>股息率分位<30%</td><td>147</td><td>6.7%</td><td>21.1%</td><td>1.4%</td></tr>
+</tbody></table></div>
+<div class="card"><h2>🏷️ 红利质量/成长 <span class="tag">11 信号</span></h2>
+<table><thead><tr><th>信号</th><th>次数</th><th>平均回撤</th><th>踩雷率(>10%)</th><th>深踩率(>15%)</th></tr></thead><tbody>
+<tr><td>跌破MA20</td><td>228</td><td>9.3%</td><td>39.0%</td><td>13.2%</td></tr>
+<tr><td>跌破MA60</td><td>132</td><td>9.4%</td><td>43.9%</td><td>14.4%</td></tr>
+<tr><td>PE分位>70%</td><td>75</td><td>8.5%</td><td>33.3%</td><td>10.7%</td></tr>
+<tr><td>PE分位>80%</td><td>59</td><td>8.4%</td><td>32.2%</td><td>8.5%</td></tr>
+<tr><td>PE分位>90%</td><td>38</td><td>8.4%</td><td>31.6%</td><td>10.5%</td></tr>
+<tr><td>PB分位>70%</td><td>149</td><td>9.1%</td><td>35.6%</td><td>10.1%</td></tr>
+<tr><td>PB分位>80%</td><td>108</td><td>9.2%</td><td>38.9%</td><td>13.0%</td></tr>
+<tr><td>PB分位>90%</td><td>57</td><td>9.7%</td><td>36.8%</td><td>17.5%</td></tr>
+<tr><td>股息率分位<10%</td><td>39</td><td>9.4%</td><td>43.6%</td><td>15.4%</td></tr>
+<tr><td>股息率分位<20%</td><td>54</td><td>8.7%</td><td>35.2%</td><td>14.8%</td></tr>
+<tr><td>股息率分位<30%</td><td>71</td><td>9.2%</td><td>39.4%</td><td>15.5%</td></tr>
+</tbody></table></div>
+<div class="card"><h2>🏷️ 行业/其他 <span class="tag">11 信号</span></h2>
+<table><thead><tr><th>信号</th><th>次数</th><th>平均回撤</th><th>踩雷率(>10%)</th><th>深踩率(>15%)</th></tr></thead><tbody>
+<tr><td>跌破MA20</td><td>149</td><td>10.8%</td><td>45.0%</td><td>18.1%</td></tr>
+<tr><td>跌破MA60</td><td>95</td><td>10.3%</td><td>45.3%</td><td>14.7%</td></tr>
+<tr><td>PE分位>70%</td><td>96</td><td>10.2%</td><td>41.7%</td><td>21.9%</td></tr>
+<tr><td>PE分位>80%</td><td>84</td><td>10.1%</td><td>40.5%</td><td>16.7%</td></tr>
+<tr><td>PE分位>90%</td><td>61</td><td>9.7%</td><td>36.1%</td><td>14.8%</td></tr>
+<tr><td>PB分位>70%</td><td>88</td><td>9.6%</td><td>36.4%</td><td>20.5%</td></tr>
+<tr><td>PB分位>80%</td><td>74</td><td>9.5%</td><td>33.8%</td><td>21.6%</td></tr>
+<tr><td>PB分位>90%</td><td>56</td><td>9.7%</td><td>33.9%</td><td>17.9%</td></tr>
+<tr><td>股息率分位<10%</td><td>26</td><td>9.4%</td><td>34.6%</td><td>15.4%</td></tr>
+<tr><td>股息率分位<20%</td><td>35</td><td>9.4%</td><td>34.3%</td><td>14.3%</td></tr>
+<tr><td>股息率分位<30%</td><td>50</td><td>9.5%</td><td>34.0%</td><td>20.0%</td></tr>
+</tbody></table></div>
+</div></body></html>
