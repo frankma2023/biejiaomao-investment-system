@@ -96,6 +96,9 @@ def detect(daily: List[Dict], params: Optional[Dict] = None) -> List[Dict]:
     active = {}
     # 历史事件（已结束）
     events = []
+    # 已确认跌破的箱体 key -> 失效日索引（strong_sell 后箱体失效：新走势下跌，不再视为箱体破位）
+    # 失效窗口 = max_box_days：超过后视为重新形成的箱体（价格回到同价位但已是新结构）
+    expired = {}
 
     for t in range(params['lookback_days'] + params['local_window'] + 1, n):
         if closes[t] is None:
@@ -150,11 +153,15 @@ def detect(daily: List[Dict], params: Optional[Dict] = None) -> List[Dict]:
             if support is not None and (
                     len([c for c in closes[max(0, t - params['box_min_days']):t] if c is not None])
                     >= params['box_min_days']
-                    and ub['touches'] >= params['min_touches']
-                    and support['touches'] >= params['min_touches']):
+                    and ub['touches'] >= params['min_touches'] * 3  # v1.4：下沿对齐买侧 ×3（弱支撑一碰就破，假信号多）
+                    and support['touches'] >= params['min_touches'] * 3):
                 # 检查是否与已结束事件的下沿重复（同一箱体再次跌破）
                 bottom_val = round(support['level'], 2)
                 key = bottom_val
+                # 箱体已确认跌破过（strong_sell）且在失效窗口内 → 不报（新走势下跌）
+                exp_idx = expired.get(key)
+                if exp_idx is not None and t - exp_idx <= params['max_box_days']:
+                    continue
                 box_start_idx = max(0, t - params['box_min_days'])
                 # 冻结箱体信息暂存到临时变量
                 new_box = {
@@ -206,6 +213,8 @@ def detect(daily: List[Dict], params: Optional[Dict] = None) -> List[Dict]:
             if ev['below_count'] >= params['confirm_days'] and ev['signal_level'] != 'strong_sell':
                 ev['signal_level'] = 'strong_sell'
                 ev['max_level'] = 'strong_sell'
+                # v1.4：跌破确认（连续 confirm_days 日）→ 箱体失效（新走势下跌，不再视为箱体破位）
+                expired[key] = t
             dd = (bottom - closes[t]) / bottom * 100
             if dd > ev.get('max_drop_pct', 0):
                 ev['max_drop_pct'] = round(dd, 2)
