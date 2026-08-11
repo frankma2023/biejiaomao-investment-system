@@ -147,53 +147,49 @@ def detect(daily: List[Dict], params: Optional[Dict] = None) -> List[Dict]:
 
         # 若未匹配且无活跃事件，尝试冻结新箱体（完整性校验）
         if matched_key is None:
-            if support is not None:
-                pre = [c for c in closes[max(0, t - params['box_min_days']):t] if c is not None]
-                if (len(pre) >= params['box_min_days']
-                        and ub['touches'] >= params['min_touches']
-                        and support['touches'] >= params['min_touches']):
-                    # 检查是否与已结束事件的下沿重复（同一箱体再次跌破）
-                    bottom_val = round(support['level'], 2)
-                    key = bottom_val
-                    box_start_idx = max(0, t - params['box_min_days'])
-                    # 冻结箱体信息暂存到临时变量
-                    new_box = {
-                        'top': round(top, 2),
-                        'bottom': bottom_val,
-                        'start_date': dates[box_start_idx],
-                        'top_touches': ub['touches'],
-                        'bottom_touches': support['touches'],
-                        'first_idx': box_start_idx,
-                    }
-                else:
-                    continue
-            else:
-                continue
-
-            # 检查当前价是否跌破新箱体下沿，触发新事件
-            if closes[t] < bottom_val:
-                ev = {
-                    'signal_date': dates[t],
-                    'type': 'bearish',
-                    'pattern': 'box_breakdown',
-                    'signal_level': 'warning',
-                    'band_key': key,
-                    'band_top': new_box['top'],
-                    'band_bottom': new_box['bottom'],
-                    'box_start_date': new_box['start_date'],
-                    'top_touches': new_box['top_touches'],
-                    'bottom_touches': new_box['bottom_touches'],
-                    'box_days': t - new_box['first_idx'],
-                    'below_count': 1,
-                    'close': closes[t],
-                    'drop_pct': round((new_box['bottom'] - closes[t]) / new_box['bottom'] * 100, 2),
-                    'max_drop_pct': round((new_box['bottom'] - closes[t]) / new_box['bottom'] * 100, 2),
-                    'result': 'active',
-                    'max_level': 'warning',
-                    'details': None,
+            if support is not None and (
+                    len([c for c in closes[max(0, t - params['box_min_days']):t] if c is not None])
+                    >= params['box_min_days']
+                    and ub['touches'] >= params['min_touches']
+                    and support['touches'] >= params['min_touches']):
+                # 检查是否与已结束事件的下沿重复（同一箱体再次跌破）
+                bottom_val = round(support['level'], 2)
+                key = bottom_val
+                box_start_idx = max(0, t - params['box_min_days'])
+                # 冻结箱体信息暂存到临时变量
+                new_box = {
+                    'top': round(top, 2),
+                    'bottom': bottom_val,
+                    'start_date': dates[box_start_idx],
+                    'top_touches': ub['touches'],
+                    'bottom_touches': support['touches'],
+                    'first_idx': box_start_idx,
                 }
-                active[key] = ev
-            # 未跌破：箱体已冻结但无事件，继续观察（不创建事件）
+
+                # 检查当前价是否跌破新箱体下沿，触发新事件（在同一分支内，避免跨分支变量引用）
+                if closes[t] < bottom_val:
+                    ev = {
+                        'signal_date': dates[t],
+                        'type': 'bearish',
+                        'pattern': 'box_breakdown',
+                        'signal_level': 'warning',
+                        'band_key': key,
+                        'band_top': new_box['top'],
+                        'band_bottom': new_box['bottom'],
+                        'box_start_date': new_box['start_date'],
+                        'top_touches': new_box['top_touches'],
+                        'bottom_touches': new_box['bottom_touches'],
+                        'box_days': t - new_box['first_idx'],
+                        'below_count': 1,
+                        'close': closes[t],
+                        'drop_pct': round((new_box['bottom'] - closes[t]) / new_box['bottom'] * 100, 2),
+                        'max_drop_pct': round((new_box['bottom'] - closes[t]) / new_box['bottom'] * 100, 2),
+                        'result': 'active',
+                        'max_level': 'warning',
+                        'details': None,
+                    }
+                    active[key] = ev
+                # 未跌破：箱体已冻结但无事件，继续观察（不创建事件）
             continue
 
         # 已匹配活跃箱体 → 检查跌破/站回
