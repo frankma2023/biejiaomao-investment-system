@@ -134,6 +134,12 @@ function buildMaps(engines) {
       state.colorMap[eng.name] = { color: '#FF9800', symbol: 'pin', size: 15 };
     } else if (eng.name === 'mw_signal') {
       state.colorMap[eng.name] = { color: '#a78bfa', symbol: 'diamond', size: 16 };
+    } else if (eng.name === 'volume_stall') {
+      state.colorMap[eng.name] = { color: '#FF6D00', symbol: 'pin', size: 15 };
+    } else if (eng.name === 'box_breakout') {
+      state.colorMap[eng.name] = { color: '#FFD700', symbol: 'star', size: 18 };
+    } else if (eng.name === 'box_breakdown') {
+      state.colorMap[eng.name] = { color: '#10B981', symbol: 'triangle', size: 16, rotate: 180 };
     } else if (eng.category === 'candlestick') {
       state.colorMap[eng.name + '_bullish'] = { color: '#9C27B0', symbol: 'emptyCircle', size: 10 };
       state.colorMap[eng.name + '_bearish'] = { color: '#333333', symbol: 'emptyCircle', size: 10 };
@@ -291,14 +297,27 @@ function renderChart() {
       }
       var style = getSignalStyle(sig);
       var y = k.low - gap * (i + 1);
-      signalPoints.push({
+      var pt = {
         name: name,
         value: [idx, y],
         symbol: style.symbol,
         symbolSize: style.size,
         symbolRotate: style.symbol === 'triangle' ? 180 : 0,
         itemStyle: { color: style.color, borderColor: '#FFF', borderWidth: 0.8 }
-      });
+      };
+      // 箱体突破/跌破信号：附加箱体信息，供 hover 画上下轨虚线
+      if ((sig.source === 'box_breakout' || sig.source === 'box_breakdown') && sig.details) {
+        var startIdx = dateIndex[sig.details.box_start_date];
+        pt.boxInfo = {
+          top: sig.details.band_top,
+          bottom: sig.details.band_bottom,
+          startIdx: startIdx !== undefined ? startIdx : idx,
+          endIdx: idx,
+          lineColor: sig.source === 'box_breakdown' ? 'rgba(16,185,129,0.85)' : 'rgba(255,215,0,0.85)',
+          labelColor: sig.source === 'box_breakdown' ? '#10B981' : '#FFD700'
+        };
+      }
+      signalPoints.push(pt);
     });
   });
 
@@ -401,6 +420,23 @@ function renderChart() {
       }
     });
   }
+
+  // Grid 0 — 箱体突破区间（hover 时显示上下轨虚线，平时空）
+  series.push({
+    id: 'box-mark-series',
+    name: '箱体突破区间',
+    type: 'line',
+    xAxisIndex: 0,
+    yAxisIndex: 0,
+    data: [],
+    silent: true,
+    z: 5,
+    markLine: {
+      silent: true,
+      symbol: ['none', 'none'],
+      data: []
+    }
+  });
 
   // Grid 0 — 布林带（与 K 线同格）
   if (hasBB) {
@@ -637,6 +673,59 @@ function renderChart() {
   };
 
   state.chart.setOption(option, true);
+
+  // ── 箱体突破信号 hover → 画上下轨虚线 ──
+  var boxMarkAdded = false;
+  function addBoxMarks(boxInfo) {
+    if (!boxInfo || boxMarkAdded) return;
+    var markData = [];
+    if (boxInfo.top != null) {
+      markData.push([
+        { coord: [boxInfo.startIdx, boxInfo.top], value: '上沿 ' + boxInfo.top },
+        { coord: [boxInfo.endIdx, boxInfo.top] }
+      ]);
+    }
+    if (boxInfo.bottom != null) {
+      markData.push([
+        { coord: [boxInfo.startIdx, boxInfo.bottom], value: '下沿 ' + boxInfo.bottom },
+        { coord: [boxInfo.endIdx, boxInfo.bottom] }
+      ]);
+    }
+    if (!markData.length) return;
+    state.chart.setOption({
+      series: {
+        id: 'box-mark-series',
+        markLine: {
+          silent: true,
+          symbol: ['none', 'none'],
+          lineStyle: { type: 'dashed', width: 1.2, color: boxInfo.lineColor || 'rgba(255,215,0,0.85)' },
+          label: { show: true, fontSize: 9, color: boxInfo.labelColor || '#FFD700', position: 'end' },
+          data: markData
+        }
+      }
+    });
+    boxMarkAdded = true;
+  }
+  function removeBoxMarks() {
+    if (!boxMarkAdded) return;
+    state.chart.setOption({
+      series: {
+        id: 'box-mark-series',
+        markLine: { silent: true, symbol: ['none', 'none'], data: [] }
+      }
+    });
+    boxMarkAdded = false;
+  }
+  state.chart.off('mouseover');
+  state.chart.on('mouseover', function (params) {
+    if (params.seriesName === '信号标注' && params.data && params.data.boxInfo) {
+      addBoxMarks(params.data.boxInfo);
+    }
+  });
+  state.chart.off('globalout');
+  state.chart.on('globalout', function () {
+    removeBoxMarks();
+  });
 
   // ── 点击信号标注 → 高亮 ──
   state.chart.off('click');

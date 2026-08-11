@@ -1578,6 +1578,14 @@ def api_market_dividend_detail():
 # API: GET /api/market-scan/capital-flow
 # ═══════════════════════════════════════════════
 
+def _stock_name(db, code):
+    """查股票名称，查不到返回原代码"""
+    try:
+        r = db.execute("SELECT name FROM stock_basic WHERE stock_code=?", (code,)).fetchone()
+        return r['name'] if r and r['name'] else code
+    except Exception:
+        return code
+
 @app.route('/api/market-scan/capital-flow')
 def api_market_capital_flow():
     """资金情绪：两融趋势/龙虎榜/大宗交易"""
@@ -1620,7 +1628,11 @@ def api_market_capital_flow():
         'total_amount': round(sum(r['trading_amount'] for r in bt_rows), 2),
         'avg_discount': round(sum(bt_discounts)/len(bt_discounts), 2) if bt_discounts else 0,
         'max_discount': round(min(bt_discounts), 2) if bt_discounts else 0,
-        'details': [{'code': r['stock_code'], 'amount': r['trading_amount'], 'discount': r['discount_rate']} for r in bt_rows],
+        'details': [{
+            'code': r['stock_code'],
+            'name': _stock_name(db, r['stock_code']),
+            'amount': r['trading_amount'], 'discount': r['discount_rate']
+        } for r in bt_rows],
     }
     
     # 龙虎榜Top
@@ -4345,6 +4357,10 @@ def api_pattern_scan():
     else:
         klines_out = klines_full
         signals_out = signals
+
+    # box_breakdown：只输出活跃事件（failed 已清除的事件仅保留在 details 供统计，不上 K 线）
+    signals_out = [s for s in signals_out
+                   if not (s.get('source') == 'box_breakdown' and s.get('signal_level') is None)]
 
     # ── 信号统计 ──
     by_source = {}

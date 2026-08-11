@@ -125,10 +125,12 @@
       </div>
 
       <div class="pg-card">
-        <h3>🔍 形态与信号 <span class="badge" style="background:#E8EAF6;color:#283593">14项</span></h3>
+        <h3>🔍 形态与信号 <span class="badge" style="background:#E8EAF6;color:#283593">16项</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span>📈 基部突破 Layer 1</td><td>/base-breakout/</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>⚠️ 突破失败检测</td><td>/breakout-failure/</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>📦 放量箱体突破 v1.3</td><td>box_breakout.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>🔻 跌破箱体 v1.0</td><td>box_breakdown.py</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>🥏 碟形基部</td><td>/saucer-base-backtest/</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>☕ 杯柄形态</td><td>/cup-handle-backtest/</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>🎯 口袋支点</td><td>/pocket-pivot/</td></tr>
@@ -473,6 +475,9 @@
     <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">86. except: pass 是数据完整性的慢性毒药</div><div class="ld">daily_review.py 原 fetch 函数所有异常被静默吞掉，API 失败即数据永久缺失，且无任何日志可查。本次补拉发现 5 天龙虎榜/大宗数据在 API 里都存在，是拉取时失败被吞了。修复：fetch 加 3 次重试 + 失败日志输出。教训：采集类代码禁止裸 except: pass，至少打日志留痕，否则数据缺口无法溯源。</div></div>
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">87. skill 报告模板的"数据日+口径+validate"三件套值得全站推广</div><div class="ld">对比 quantskills/market-daily-review 后借鉴：每项数据标注实际数据日（T+1 滞后明确写出）、统计口径显式声明（涨跌停 10%/20% 阈值、ST/北交所排除）、生成后 validate 检查必要区块。已落地到 daily_review.py（第6节口径声明 + validate_report 函数）和 market-scan 涨跌停卡片。教训：复盘类输出必须可溯源，数字背后的口径比数字本身重要。</div></div>
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">88. change_pct 小数格式 vs 百分数格式：数据库字段精度必须先验证再直接用</div><div class="ld">daily_kline.change_pct 为小数格式（0.0378=3.78%），但生成 skill 复盘时误当百分数直出 → 半导体行业显示 +0.09%（实际 +8.73%）。指数表 index_daily_kline.change 则是 1% 粒度（0.01=1%），与个股表格式不同。修复：行业聚合值 ×100 转百分数，指数用 close 反推。教训：同一系统内不同表的同一语义字段格式可能不同，聚合前先验证量级。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">89. 箱体上下沿必须用盘中高低点聚类，不能用收盘价——否则真实阻力被吞并</div><div class="ld">600309 案例：6-8 月高点 76.45/76.84/75.94/76.57 是盘中高点连线，但收盘大多收在 72-75，收盘价聚类把 76.84 并进 74.70 带 → 08-10 收 78.01 突破却无信号。改用 highs 聚类后 76.84 带清晰独立（触碰36）。教训：用户画线直觉是"最高点连线/最低点连线"，引擎必须同口径，否则永远差一个影线距离。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">90. 上沿选带是三层陷阱：孤立尖峰/内部平台/历史旧箱体，一维排序都会错</div><div class="ld">① 按最高价选 → 688665 选到孤立尖峰 65.90（触碰7）而非真实上沿 62.84（触碰18）；② 按触碰最多选 → 603259 选到内部平台 100.59（触碰39）而非上沿 113.65（触碰9）；③ 不加"已站上"条件 → 600309 选到历史高位 91.66 而非当前箱体 76.84。最终策略：已站上（≤收盘）的带中选触碰≥min_touches×3 的最高带。教训：形态识别参数的"正确"要拿多个反例互相制衡，单一排序规则必然有盲区。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">91. 突破日必给信号，次日站稳是增强而非门槛——信号消失比假信号更伤人</div><div class="ld">v1.2 曾把"次日跌破"的突破事件标记 failed 后整体过滤，导致 600309 @ 08-10 突破（收78.01≥76.84）在 08-11 收 75.65 跌破后 pattern-scan 完全看不到任何突破尝试。用户语义：突破日收盘≥上沿就该给出 weak 信号，次日站稳→增强 confirmed，次日跌破→保留 weak 并标注"突破未确认"。教训：事件驱动引擎宁可多输出可标注的尝试，也不要把事实吞掉。</div></div>
 
 </div>
 <script>

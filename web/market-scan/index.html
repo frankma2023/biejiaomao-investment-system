@@ -828,7 +828,7 @@
       h2+='</div>';
       if(dt.length){
         h2+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th style="text-align:left;padding:3px 6px;background:rgba(255,255,255,.04);color:var(--muted);font-size:10px">股票</th><th style="text-align:right;padding:3px 6px;background:rgba(255,255,255,.04);color:var(--muted);font-size:10px">成交额</th><th style="text-align:right;padding:3px 6px;background:rgba(255,255,255,.04);color:var(--muted);font-size:10px">折价率</th></tr></thead><tbody>';
-        dt.forEach(function(r){h2+='<tr><td style="padding:2px 6px;color:var(--text-primary)">'+r.code+'</td><td style="padding:2px 6px;text-align:right">'+(r.amount/1e4).toFixed(0)+'万</td><td style="padding:2px 6px;text-align:right">'+r.discount+'%</td></tr>';});
+        dt.forEach(function(r){h2+='<tr><td style="padding:2px 6px;color:var(--text-primary)">'+(r.name?r.name+' ('+r.code+')':r.code)+'</td><td style="padding:2px 6px;text-align:right">'+(r.amount/1e4).toFixed(0)+'万</td><td style="padding:2px 6px;text-align:right">'+r.discount+'%</td></tr>';});
         h2+='</tbody></table>';
       }
       ed2.innerHTML=h2;

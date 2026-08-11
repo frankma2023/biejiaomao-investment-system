@@ -1,0 +1,17 @@
+# 放量箱体突破检测引擎配置
+# 参数说明见 docs/product/放量箱体突破引擎_产品需求书.md
+box_breakout:
+  lookback_days: 300       # 箱体识别窗口（交易日）
+  band_tol: 0.03           # 带容差 ±3%（聚类）
+  touch_tol: 0.03          # 触碰容差：收盘 ∈ [上沿×(1-touch_tol), 上沿] 算触碰
+  break_tol: 0.00          # 突破容差：收盘 ≥ 上沿×(1+break_tol) 算突破尝试（0=严格站上）
+  min_touches: 3           # 触碰最少天数
+  box_min_days: 40         # 箱体最小跨度（交易日）
+  max_box_days: 250        # 箱体最大跨度（超过降级 weak）
+  max_depth: 0.35          # 箱体最大深度（下沿距上沿比例）
+  min_depth: 0.03          # 箱体最小深度（上下沿差 ≥3%，排除窄平台）
+  vol_ma_n: 20             # 量均线窗口
+  vol_ratio: 1.5           # 放量倍数（突破日量 / 20日均量）
+  hold_days: 1             # 确认天数（v1.3：次日收盘站稳即突破成功）
+  local_window: 10         # 局部极值窗口
+  min_lookback_days: 60    # 最少数据天数

@@ -146,6 +146,13 @@ def run_all_engines(klines, indicators=None, silent=False, whitelist=None):
                 except Exception:
                     pass
 
+            if 'stock_code' in params and klines and isinstance(klines[0], dict):
+                sc = klines[0].get('stock_code')
+                if sc:
+                    kwargs['stock_code'] = sc
+                else:
+                    kwargs['stock_code'] = ''
+
             raw_signals = eng['detect'](**kwargs)
             # 引擎可能返回 dict（含 signals 键）或直接返回 list
             if isinstance(raw_signals, dict):

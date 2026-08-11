@@ -383,12 +383,16 @@ def _detect_double_top(
     min_retrace = params['dt_min_retrace']
     max_price_diff = params['dt_max_price_diff']
     min_days_between = params['dt_min_days_between']
+    max_lookback = params.get('max_lookback_days', 200)
 
     # 从后向前遍历谷（优先最新形态）
     for trough in reversed(troughs):
         # 谷必须在 as_of_idx 之前
         if trough['idx'] >= as_of_idx:
             continue
+        # 谷距离当前超过 max_lookback 的形态无指导意义，直接终止（谷从新到旧遍历）
+        if as_of_idx - trough['idx'] > max_lookback:
+            break
 
         # === 按需动态计算 retrace_pct ===
         # 用该谷左侧 window 内的最高峰作为参照
@@ -438,6 +442,10 @@ def _detect_double_top(
             closes, neckline, right_peak['price'], as_of_idx, params
         )
 
+        # 形态失败（价格突破右顶创新高）→ 清除信号，不输出
+        if status == 'failed':
+            return None
+
         return {
             'type': 'bearish',
             'pattern': 'double_top',
@@ -480,12 +488,16 @@ def _detect_triple_top(
     max_price_diff = params['tt_max_price_diff']
     min_days_between = params['tt_min_days_between']
     min_trough_gap = params['tt_min_trough_gap']
+    max_lookback = params.get('max_lookback_days', 200)
 
     # 从后向前收集两个有效深谷
     valid_troughs = []
     for trough in reversed(troughs):
         if trough['idx'] >= as_of_idx:
             continue
+        # 谷距离当前超过 max_lookback 的形态无指导意义，直接终止（谷从新到旧遍历）
+        if as_of_idx - trough['idx'] > max_lookback:
+            break
 
         # 按需动态计算 retrace_pct
         left_candidate = find_highest_peak_before(peaks, trough['idx'], peak_window)
@@ -550,6 +562,10 @@ def _detect_triple_top(
         closes, neckline, right_peak['price'], as_of_idx, params
     )
 
+    # 形态失败（价格突破右顶创新高）→ 清除信号，不输出
+    if status == 'failed':
+        return None
+
     return {
         'type': 'bearish',
         'pattern': 'triple_top',
@@ -580,6 +596,7 @@ def _detect_head_shoulders(
     深谷分隔法增强版：从后向前找2个有效深谷 → 配对三峰 → 验证头肩关系。
     """
     peak_window = params['peak_window_days']
+    max_lookback = params.get('max_lookback_days', 200)
     
     # 获取头肩顶参数（根据 freq 自动选 daily/weekly）
     freq = params.get('_freq', 'D')
@@ -597,6 +614,9 @@ def _detect_head_shoulders(
     for trough in reversed(troughs):
         if trough['idx'] >= as_of_idx:
             continue
+        # 谷距离当前超过 max_lookback 的形态无指导意义，直接终止（谷从新到旧遍历）
+        if as_of_idx - trough['idx'] > max_lookback:
+            break
         
         left_candidate = find_highest_peak_before(peaks, trough['idx'], peak_window)
         if not left_candidate:
@@ -667,6 +687,10 @@ def _detect_head_shoulders(
     status, signal_level = _judge_confirmation(
         closes, neckline, right_shoulder['price'], as_of_idx, params
     )
+
+    # 形态失败（价格突破右肩创新高）→ 清除信号，不输出
+    if status == 'failed':
+        return None
     
     return {
         'type': 'bearish',
