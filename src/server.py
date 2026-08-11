@@ -4398,8 +4398,9 @@ def api_pattern_scan():
         ).fetchall()
         for r in ts_rows:
             mw_ts[r['b1_date']] = r['tech_score']
-    except:
-        pass
+    except Exception as e:
+        # 表不存在/字段变更时不阻塞扫描，但留痕（review W4：禁止静默吞错）
+        print(f"[pattern-scan] mw_ts fetch failed for {code}: {type(e).__name__}: {e}", flush=True)
     
     for s in signals_out:
         if s.get('source') == 'mw_signal' and s.get('type') == 'bullish':

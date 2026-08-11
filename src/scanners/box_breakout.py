@@ -27,7 +27,6 @@ from typing import Optional, Dict, List
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, PROJECT_DIR)
-os.chdir(PROJECT_DIR)  # 已知导入副作用（全站引擎统一模式）；engine_registry 加载时 cwd 已是项目根，幂等无害
 
 DB_PATH = os.path.join(PROJECT_DIR, "data", "lixinger.db")
 
@@ -35,6 +34,8 @@ ENGINE_META = {
     "name": "box_breakout",
     "display_name": "放量箱体突破",
     "category": "layer1",
+    "type": "bullish",
+    "pattern": "box_breakout",
     "version": "1.3",
     "description": "水平箱体识别 + 放量突破：盘中高低点上下沿/触碰次数/失败尝试累计/次日确认",
 }
@@ -148,6 +149,22 @@ def _find_bands(values: List, end_idx: int, is_high: bool, params: Dict, start_i
     return [b for b in bands if b['touches'] >= min_touch]
 
 
+def _pick_support(cands, ub, band_start, params):
+    """同期性约束后取最低支撑带（模块级，box_breakdown 复用）。
+    双侧约束：下沿核心日与上沿核心日差距 ≤ sync_window（box_min_days × 2）。
+    允许下行-横盘模式（上沿先形成、下沿后确认），同时拦截跨期配对
+    （如 688665：上沿触碰 2025-08~10，下沿 2026-03 相差 >120 天）。"""
+    if not cands:
+        return None
+    top_mid = ub.get('mid_idx', band_start)
+    sync_window = params['box_min_days'] * 2
+    synced = [lb for lb in cands
+              if abs(lb.get('first_idx', band_start) - top_mid) <= sync_window]
+    if not synced:
+        return None
+    return min(synced, key=lambda x: x['level'])
+
+
 # ══════════════════════════════════════════════
 # 主检测
 # ══════════════════════════════════════════════
@@ -208,21 +225,6 @@ def detect(daily: List[Dict], params: Optional[Dict] = None) -> List[Dict]:
                 done.append(pc)
         for pc in done:
             pending_confirm.remove(pc)
-
-    def _pick_support(cands, ub, band_start, params):
-        """同期性约束后取最低支撑带。
-        双侧约束：下沿核心日与上沿核心日差距 ≤ sync_window（box_min_days × 2）。
-        允许下行-横盘模式（上沿先形成、下沿后确认），同时拦截跨期配对
-        （如 688665：上沿触碰 2025-08~10，下沿 2026-03 相差 >120 天）。"""
-        if not cands:
-            return None
-        top_mid = ub.get('mid_idx', band_start)
-        sync_window = params['box_min_days'] * 2
-        synced = [lb for lb in cands
-                  if abs(lb.get('first_idx', band_start) - top_mid) <= sync_window]
-        if not synced:
-            return None
-        return min(synced, key=lambda x: x['level'])
 
     for t in range(params['lookback_days'] + params['local_window'] + 1, n):
         if closes[t] is None:
@@ -455,6 +457,7 @@ def detect(daily: List[Dict], params: Optional[Dict] = None) -> List[Dict]:
 # ══════════════════════════════════════════════
 
 if __name__ == '__main__':
+    os.chdir(PROJECT_DIR)  # CLI 调试时方便（模块导入不改变 cwd，review B1）
     parser = argparse.ArgumentParser(description='放量箱体突破检测')
     parser.add_argument('--stock', type=str, default='603259')
     parser.add_argument('--date', type=str, default=datetime.now().strftime('%Y-%m-%d'))

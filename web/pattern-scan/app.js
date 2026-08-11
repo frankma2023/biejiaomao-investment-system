@@ -139,7 +139,7 @@ function buildMaps(engines) {
     } else if (eng.name === 'box_breakout') {
       state.colorMap[eng.name] = { color: '#FFD700', symbol: 'star', size: 18 };
     } else if (eng.name === 'box_breakdown') {
-      state.colorMap[eng.name] = { color: '#10B981', symbol: 'triangle', size: 16, rotate: 180 };
+      state.colorMap[eng.name] = { color: '#10B981', symbol: 'triangle', size: 16 };  # rotate 由渲染处硬编码 symbolRotate:180
     } else if (eng.category === 'candlestick') {
       state.colorMap[eng.name + '_bullish'] = { color: '#9C27B0', symbol: 'emptyCircle', size: 10 };
       state.colorMap[eng.name + '_bearish'] = { color: '#333333', symbol: 'emptyCircle', size: 10 };

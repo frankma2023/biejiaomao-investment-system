@@ -96,6 +96,8 @@ def get_engine_list():
             'name': eng['meta']['name'],
             'display_name': eng['meta']['display_name'],
             'category': eng['meta'].get('category', 'misc'),
+            'type': eng['meta'].get('type', ''),
+            'pattern': eng['meta'].get('pattern', ''),
             'version': eng['meta'].get('version', '0.0'),
             'description': eng['meta'].get('description', ''),
         }

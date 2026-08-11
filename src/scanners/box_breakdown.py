@@ -26,7 +26,6 @@ from typing import Optional, Dict, List
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, PROJECT_DIR)
-os.chdir(PROJECT_DIR)
 
 DB_PATH = os.path.join(PROJECT_DIR, "data", "lixinger.db")
 
@@ -34,6 +33,8 @@ ENGINE_META = {
     "name": "box_breakdown",
     "display_name": "跌破箱体",
     "category": "sell_signal",
+    "type": "bearish",
+    "pattern": "box_breakdown",
     "version": "1.0",
     "description": "跌破箱体下沿检测：箱体完整形成后收盘跌破下沿，事件生命周期 warning→strong_sell→站回清除",
 }
@@ -42,9 +43,9 @@ ENGINE_META = {
 # 共享函数（硬性约定：直接复用 box_breakout，不复制代码）
 # ══════════════════════════════════════════════
 try:
-    from scanners.box_breakout import _find_bands, _adj_prices
+    from scanners.box_breakout import _find_bands, _adj_prices, _pick_support
 except ImportError:
-    from .box_breakout import _find_bands, _adj_prices
+    from .box_breakout import _find_bands, _adj_prices, _pick_support
 
 
 # ══════════════════════════════════════════════
@@ -124,15 +125,8 @@ def detect(daily: List[Dict], params: Optional[Dict] = None) -> List[Dict]:
         candidates = [lb for lb in lower_bands
                       if lb['level'] < top
                       and params['min_depth'] <= (top - lb['level']) / top <= params['max_depth']]
-        # 同期性约束（与 box_breakout v1.3 对齐）：下沿核心日与上沿核心日差距 ≤ box_min_days×2
-        # 允许下行-横盘模式（上沿先形成、下沿后确认），同时拦截跨期配对
-        if candidates:
-            top_mid = ub.get('mid_idx', band_start)
-            sync_window = params['box_min_days'] * 2
-            synced = [lb for lb in candidates
-                      if abs(lb.get('first_idx', band_start) - top_mid) <= sync_window]
-            if synced:
-                support = min(synced, key=lambda x: x['level'])
+        # 同期性约束（复用 box_breakout._pick_support，双侧 ±box_min_days×2）
+        support = _pick_support(candidates, ub, band_start, params)
 
         # 匹配已冻结的活跃箱体：用当前 support 带与活跃事件的下沿比较
         matched_key = None
@@ -264,6 +258,7 @@ def detect(daily: List[Dict], params: Optional[Dict] = None) -> List[Dict]:
 # ══════════════════════════════════════════════
 
 if __name__ == '__main__':
+    os.chdir(PROJECT_DIR)  # CLI 调试时方便（模块导入不改变 cwd，review B1）
     parser = argparse.ArgumentParser(description='跌破箱体检测')
     parser.add_argument('--stock', type=str, default='603259')
     parser.add_argument('--date', type=str, default=datetime.now().strftime('%Y-%m-%d'))
