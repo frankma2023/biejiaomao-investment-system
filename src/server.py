@@ -1652,6 +1652,218 @@ def api_market_capital_flow():
         'block_trade': bt_summary,
     })
 
+
+# ═══════════════════════════════════════════════
+# API: GET /api/market-scan/fcf-advice（自由现金流指数操作建议）
+# ═══════════════════════════════════════════════
+
+FCF_INDEX = ('980092', '国证自由现金流')
+FCF_DATA_NOTE = '估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考'
+
+
+def _fcf_signals_and_advice(val):
+    """估值分位三层规则（PRD §5.1）：返回 (signals, advice, level)"""
+    signals = []
+    if val:
+        pe_p = val['pe_pct'] if val['pe_pct'] is not None else None
+        pb_p = val['pb_pct'] if val['pb_pct'] is not None else None
+        dy_p = val['dyr_pct'] if val['dyr_pct'] is not None else None
+        # fcf_buy：任一指标进入买入区
+        if (pe_p is not None and pe_p < 33) or (pb_p is not None and pb_p < 33) \
+                or (dy_p is not None and dy_p > 66):
+            signals.append('fcf_buy')
+        # fcf_strong：≥2 指标同向
+        n_buy = sum([pe_p is not None and pe_p < 33,
+                     pb_p is not None and pb_p < 33,
+                     dy_p is not None and dy_p > 66])
+        if n_buy >= 2:
+            signals.append('fcf_strong')
+        # fcf_warn：PE/PB 双高
+        if pe_p is not None and pb_p is not None and pe_p > 66 and pb_p > 66:
+            signals.append('fcf_warn')
+    advice, level = '持有/观望', 'hold'
+    if 'fcf_strong' in signals:
+        advice, level = '分批买入（估值双确认）', 'strong_buy'
+    elif 'fcf_buy' in signals:
+        advice, level = '观察买入（估值单信号触发）', 'buy'
+    elif 'fcf_warn' in signals:
+        advice, level = '估值偏高（PE/PB双高），谨慎', 'caution'
+    return signals, advice, level
+
+
+@app.route('/api/market-scan/fcf-advice')
+def api_market_fcf_advice():
+    """自由现金流指数操作建议：估值分位信号检测+建议合成（支持历史回看）"""
+    target_date = request.args.get('date', '')
+    db = get_db()
+    if not target_date:
+        r = db.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
+        target_date = r[0]
+
+    code, name = FCF_INDEX
+    # K线 300 日窗口
+    rows = db.execute("""
+        SELECT date, close FROM index_daily_kline
+        WHERE stock_code=? AND kline_type='normal' AND date<=?
+        ORDER BY date DESC LIMIT 300
+    """, (code, target_date)).fetchall()
+    rows = list(reversed(rows))
+    if len(rows) < 250:
+        return jsonify({'error': 'no data', 'date': target_date})
+    closes = [r['close'] for r in rows]
+    current = closes[-1]
+    high250 = max(closes[-250:])
+    dd_250 = (high250 - current) / high250 * 100
+
+    # 估值
+    v = db.execute("""
+        SELECT pe_ttm, pe_ttm_pct, pb, pb_pct, dyr, dyr_pct
+        FROM index_fundamental_daily
+        WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1
+    """, (code, target_date)).fetchone()
+    val = None
+    if v:
+        val = {
+            'pe': round(v['pe_ttm'], 1) if v['pe_ttm'] else None,
+            'pe_pct': round(v['pe_ttm_pct'] * 100) if v['pe_ttm_pct'] is not None else None,
+            'pb': round(v['pb'], 2) if v['pb'] else None,
+            'pb_pct': round(v['pb_pct'] * 100) if v['pb_pct'] is not None else None,
+            'dyr': round(v['dyr'] * 100, 2) if v['dyr'] else None,
+            'dyr_pct': round(v['dyr_pct'] * 100) if v['dyr_pct'] is not None else None,
+        }
+
+    signals, advice, level = _fcf_signals_and_advice(val)
+    return jsonify({
+        'date': target_date, 'code': code, 'name': name,
+        'close': round(current, 2), 'dd_250': round(dd_250, 1),
+        'high_250': round(high250, 2),
+        'valuation': val,
+        'signals': signals, 'advice': advice, 'advice_level': level,
+        'data_note': FCF_DATA_NOTE,
+    })
+
+
+@app.route('/api/market-scan/fcf-advice-detail')
+def api_market_fcf_detail():
+    """自由现金流指数详情：净值回撤曲线/估值分位走势/信号时间线/历史类似情况统计"""
+    target_date = request.args.get('date', '')
+    db = get_db()
+    if not target_date:
+        r = db.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
+        target_date = r[0]
+    code, name = FCF_INDEX
+
+    # 近3年K线
+    rows = db.execute("""
+        SELECT date, close FROM index_daily_kline
+        WHERE stock_code=? AND kline_type='normal' AND date>=date(?,'-3 years') AND date<=?
+        ORDER BY date
+    """, (code, target_date, target_date)).fetchall()
+    dates = [r['date'] for r in rows]
+    closes = [r['close'] for r in rows]
+    if not dates:
+        return jsonify({'error': 'no data'})
+
+    # 回撤曲线（250日滚动最高）
+    dd_series = []
+    for i in range(len(closes)):
+        w = closes[max(0, i-249):i+1]
+        hi = max(w)
+        dd_series.append(round((hi - closes[i]) / hi * 100, 2))
+
+    # 估值分位（近3年，数据从 2024-09 起自然截断）
+    val_rows = db.execute("""
+        SELECT date, pe_ttm_pct, pb_pct, dyr_pct FROM index_fundamental_daily
+        WHERE stock_code=? AND date>=date(?,'-3 years') AND date<=?
+        ORDER BY date
+    """, (code, target_date, target_date)).fetchall()
+    val_map = {r['date']: r for r in val_rows}
+    pe_series = [round(val_map[d]['pe_ttm_pct']*100) if d in val_map and val_map[d]['pe_ttm_pct'] is not None else None for d in dates]
+    pb_series = [round(val_map[d]['pb_pct']*100) if d in val_map and val_map[d]['pb_pct'] is not None else None for d in dates]
+    dyr_series = [round(val_map[d]['dyr_pct']*100) if d in val_map and val_map[d]['dyr_pct'] is not None else None for d in dates]
+
+    # 信号时间线：估值分位触发点（近2年，20日去重）
+    events = []
+    last_trig = -999
+    for i, d in enumerate(dates):
+        if d not in val_map:
+            continue
+        vm = val_map[d]
+        pe_p = vm['pe_ttm_pct'] if vm['pe_ttm_pct'] is not None else None
+        pb_p = vm['pb_pct'] if vm['pb_pct'] is not None else None
+        dy_p = vm['dyr_pct'] if vm['dyr_pct'] is not None else None
+        n_buy = sum([pe_p is not None and pe_p < 0.33,
+                     pb_p is not None and pb_p < 0.33,
+                     dy_p is not None and dy_p > 0.66])
+        if n_buy >= 1 and i - last_trig >= 20:
+            events.append({'date': d, 'signal': 'fcf_strong' if n_buy >= 2 else 'fcf_buy',
+                           'pe_pct': round(pe_p*100) if pe_p is not None else None,
+                           'pb_pct': round(pb_p*100) if pb_p is not None else None,
+                           'dyr_pct': round(dy_p*100) if dy_p is not None else None})
+            last_trig = i
+
+    # 历史类似情况统计：满足 fcf_buy 条件的交易日（全窗口 2024-09 起，20日去重）
+    similar = []
+    last_s = -999
+    for i, d in enumerate(dates):
+        if d not in val_map:
+            continue
+        vm = val_map[d]
+        pe_p = vm['pe_ttm_pct'] if vm['pe_ttm_pct'] is not None else None
+        pb_p = vm['pb_pct'] if vm['pb_pct'] is not None else None
+        dy_p = vm['dyr_pct'] if vm['dyr_pct'] is not None else None
+        n_buy = sum([pe_p is not None and pe_p < 0.33,
+                     pb_p is not None and pb_p < 0.33,
+                     dy_p is not None and dy_p > 0.66])
+        if n_buy < 1 or i - last_s < 20:
+            continue
+        last_s = i
+        # 次日开盘买入，20/60日收益
+        entry = None
+        fwd20 = fwd60 = None
+        if i + 1 < len(closes):
+            entry = closes[i + 1]
+        if entry and entry > 0:
+            if i + 1 + 20 < len(closes):
+                fwd20 = (closes[i + 1 + 20] / entry - 1) * 100
+            if i + 1 + 60 < len(closes):
+                fwd60 = (closes[i + 1 + 60] / entry - 1) * 100
+        similar.append({
+            'date': d,
+            'pe_pct': round(pe_p*100) if pe_p is not None else None,
+            'pb_pct': round(pb_p*100) if pb_p is not None else None,
+            'dyr_pct': round(dy_p*100) if dy_p is not None else None,
+            'fwd20': round(fwd20, 1) if fwd20 is not None else None,
+            'fwd60': round(fwd60, 1) if fwd60 is not None else None,
+        })
+
+    # 统计摘要
+    stats = {}
+    if similar:
+        def _med(xs):
+            s = sorted(xs); n = len(s)
+            return s[n//2] if n % 2 else (s[n//2-1]+s[n//2])/2
+        fwd20s = [s['fwd20'] for s in similar if s['fwd20'] is not None]
+        fwd60s = [s['fwd60'] for s in similar if s['fwd60'] is not None]
+        stats = {
+            'count': len(similar),
+            'fwd20_median': round(_med(fwd20s), 1) if fwd20s else None,
+            'fwd20_winrate': round(sum(1 for x in fwd20s if x > 0) / len(fwd20s) * 100, 1) if fwd20s else None,
+            'fwd60_median': round(_med(fwd60s), 1) if fwd60s else None,
+            'fwd60_winrate': round(sum(1 for x in fwd60s if x > 0) / len(fwd60s) * 100, 1) if fwd60s else None,
+        }
+
+    current_dd = dd_series[-1] if dd_series else 0
+    return jsonify({
+        'code': code, 'name': name, 'date': target_date,
+        'dates': dates, 'closes': closes, 'dd_series': dd_series,
+        'pe_pct_series': pe_series, 'pb_pct_series': pb_series, 'dyr_pct_series': dyr_series,
+        'events': events, 'similar': similar, 'stats': stats,
+        'current_dd': current_dd,
+        'data_note': FCF_DATA_NOTE,
+    })
+
+
 @app.route('/api/strongest-index')
 def api_strongest_index():
     target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
