@@ -455,6 +455,7 @@
         var dyrV=fx.valuation&&fx.valuation.dyr_pct!=null?fx.valuation.dyr_pct:'—';
         var sigText=fx.signals&&fx.signals.length?fx.signals.join('·'):'—';
         html+='<div class="section-hdr" style="margin-top:14px">🧲 自由现金流指数 <span style="font-size:9px;color:var(--muted);font-weight:400">估值驱动 · 非回撤驱动</span></div>';
+        html+='<div style="font-size:9px;color:#f59e0b;margin-bottom:8px">⚠️ '+(fx.data_note||'估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考')+'</div>';
         html+='<div style="font-size:9px;color:var(--muted);margin-bottom:8px">'+fx.advice+' · 点击卡片查看净值回撤/估值分位/信号详情</div>';
         html+='<div class="sector-grid">';
         html+='<div class="sector-card" style="background:'+fxBg.bg+';border:1px solid '+fxBg.bd+'" onclick="window.open(\'fcf-advice-detail.html?date='+fx.date+'\')">';

@@ -1278,10 +1278,6 @@ def api_market_breakouts():
     return jsonify({'date': rows[0]['date'] if rows else target_date, 'count': len(stocks), 'stocks': stocks})
 
 # ═══════════════════════════════════════════════
-# API: GET /api/strongest-index
-# ═══════════════════════════════════════════════
-
-# ═══════════════════════════════════════════════
 # API: GET /api/market-scan/dividend-advice
 # ═══════════════════════════════════════════════
 
@@ -1684,6 +1680,7 @@ def _fcf_signals_and_advice(val):
     advice, level = '持有/观望', 'hold'
     if 'fcf_strong' in signals:
         advice, level = '分批买入（估值双确认）', 'strong_buy'
+        signals = [s for s in signals if s != 'fcf_buy']  # 只保留最高级信号（Spec W-3）
     elif 'fcf_buy' in signals:
         advice, level = '观察买入（估值单信号触发）', 'buy'
     elif 'fcf_warn' in signals:
@@ -1698,6 +1695,8 @@ def api_market_fcf_advice():
     db = get_db()
     if not target_date:
         r = db.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
+        if r is None or r[0] is None:
+            return jsonify({'error': 'no data', 'date': ''})
         target_date = r[0]
 
     code, name = FCF_INDEX
@@ -1750,6 +1749,8 @@ def api_market_fcf_detail():
     db = get_db()
     if not target_date:
         r = db.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
+        if r is None or r[0] is None:
+            return jsonify({'error': 'no data', 'date': ''})
         target_date = r[0]
     code, name = FCF_INDEX
 
@@ -1764,17 +1765,17 @@ def api_market_fcf_detail():
     if not dates:
         return jsonify({'error': 'no data'})
 
-    # 回撤曲线（250日滚动最高）
+    # 回撤曲线（250日滚动最高 · 仅展示，不参与信号生成；2年窗口回测无统计规律，供人工参考）
     dd_series = []
     for i in range(len(closes)):
         w = closes[max(0, i-249):i+1]
         hi = max(w)
         dd_series.append(round((hi - closes[i]) / hi * 100, 2))
 
-    # 估值分位（近3年，数据从 2024-09 起自然截断）
+    # 估值分位（近2年窗口：数据从 2024-09 起自然截断，与图表标题"数据自2024-09起"一致；Spec O-4）
     val_rows = db.execute("""
         SELECT date, pe_ttm_pct, pb_pct, dyr_pct FROM index_fundamental_daily
-        WHERE stock_code=? AND date>=date(?,'-3 years') AND date<=?
+        WHERE stock_code=? AND date>=date(?,'-2 years') AND date<=?
         ORDER BY date
     """, (code, target_date, target_date)).fetchall()
     val_map = {r['date']: r for r in val_rows}
@@ -1818,7 +1819,7 @@ def api_market_fcf_detail():
         if n_buy < 1 or i - last_s < 20:
             continue
         last_s = i
-        # 次日开盘买入，20/60日收益
+        # 次日收盘买入，20/60日收益（与红利 detail 口径一致；回测矩阵用次日开盘，两者差异小）
         entry = None
         fwd20 = fwd60 = None
         if i + 1 < len(closes):
@@ -1863,6 +1864,9 @@ def api_market_fcf_detail():
         'data_note': FCF_DATA_NOTE,
     })
 
+# ═══════════════════════════════════════════════
+# API: GET /api/strongest-index
+# ═══════════════════════════════════════════════
 
 @app.route('/api/strongest-index')
 def api_strongest_index():

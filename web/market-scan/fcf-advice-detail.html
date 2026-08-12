@@ -62,13 +62,17 @@ const sp = isDark ? 'rgba(200,200,200,0.08)' : 'rgba(128,128,128,0.1)';
 
 async function load() {
   const [d, a] = await Promise.all([
-    fetch(DETAIL_API).then(r => r.json()),
+    fetch(DETAIL_API).then(r => r.json()).catch(() => null),
     fetch(ADVICE_API).then(r => r.json()).catch(() => null)
   ]);
-  if (d.error) { document.getElementById('meta').textContent = '无数据'; return; }
+  if (!d || d.error) { document.getElementById('meta').textContent = '无数据或加载失败'; document.getElementById('meta').style.color = '#ef4444'; return; }
 
   document.getElementById('title').textContent = '🧲 ' + d.name + ' · 操作建议详情';
   document.getElementById('meta').textContent = d.date + ' · 当前250日回撤 ' + d.current_dd + '%';
+
+  // 数据声明：优先用 API 返回的 data_note（诚实铁律，与后端文案单一来源）
+  const note = d.data_note || (a && a.data_note) || '估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考';
+  document.getElementById('note-banner').textContent = '⚠️ 数据声明：' + note + '。净值回撤仅展示，不触发信号（2年窗口未验证出统计规律，供人工判断参考）。';
 
   // 当前建议
   const advHtml = [];
@@ -151,7 +155,11 @@ async function load() {
       dataZoom:[{type:'inside'}],
       series:[{type:'line',data:d.closes,smooth:true,showSymbol:false,
         lineStyle:{color:'#539BF5',width:1.5},
-        markPoint:{data:(d.events||[]).map(e=>({coord:[e.date, d.closes[d.dates.indexOf(e.date)] != null ? d.closes[d.dates.indexOf(e.date)] : 0], value:e.signal==='fcf_strong'?'⚡':'🔶', itemStyle:{color:e.signal==='fcf_strong'?'#ef4444':'#f59e0b'}})),symbol:'pin',symbolSize:30,label:{color:'#fff',fontSize:8}}
+        markPoint:{data:(d.events||[]).map(e => {
+            const idx = d.dates.indexOf(e.date);
+            if (idx === -1) return null;
+            return {coord:[e.date, d.closes[idx]], value:e.signal==='fcf_strong'?'⚡':'🔶', itemStyle:{color:e.signal==='fcf_strong'?'#ef4444':'#f59e0b'}};
+          }).filter(Boolean),symbol:'pin',symbolSize:30,label:{color:'#fff',fontSize:8}}
       }]
     });
     return c;
