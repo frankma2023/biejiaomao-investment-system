@@ -130,7 +130,7 @@
           <tr><td><span class="pg-dot dot-done"></span>📈 基部突破 Layer 1</td><td>/base-breakout/</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>⚠️ 突破失败检测</td><td>/breakout-failure/</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>📦 放量箱体突破 v1.3</td><td>box_breakout.py</td></tr>
-          <tr><td><span class="pg-dot dot-done"></span>🔻 跌破箱体 v1.0</td><td>box_breakdown.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>🔻 跌破箱体 v1.5</td><td>box_breakdown.py</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>🥏 碟形基部</td><td>/saucer-base-backtest/</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>☕ 杯柄形态</td><td>/cup-handle-backtest/</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>🎯 口袋支点</td><td>/pocket-pivot/</td></tr>
@@ -478,6 +478,8 @@
     <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">89. 箱体上下沿必须用盘中高低点聚类，不能用收盘价——否则真实阻力被吞并</div><div class="ld">600309 案例：6-8 月高点 76.45/76.84/75.94/76.57 是盘中高点连线，但收盘大多收在 72-75，收盘价聚类把 76.84 并进 74.70 带 → 08-10 收 78.01 突破却无信号。改用 highs 聚类后 76.84 带清晰独立（触碰36）。教训：用户画线直觉是"最高点连线/最低点连线"，引擎必须同口径，否则永远差一个影线距离。</div></div>
     <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">90. 上沿选带是三层陷阱：孤立尖峰/内部平台/历史旧箱体，一维排序都会错</div><div class="ld">① 按最高价选 → 688665 选到孤立尖峰 65.90（触碰7）而非真实上沿 62.84（触碰18）；② 按触碰最多选 → 603259 选到内部平台 100.59（触碰39）而非上沿 113.65（触碰9）；③ 不加"已站上"条件 → 600309 选到历史高位 91.66 而非当前箱体 76.84。最终策略：已站上（≤收盘）的带中选触碰≥min_touches×3 的最高带。教训：形态识别参数的"正确"要拿多个反例互相制衡，单一排序规则必然有盲区。</div></div>
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">91. 突破日必给信号，次日站稳是增强而非门槛——信号消失比假信号更伤人</div><div class="ld">v1.2 曾把"次日跌破"的突破事件标记 failed 后整体过滤，导致 600309 @ 08-10 突破（收78.01≥76.84）在 08-11 收 75.65 跌破后 pattern-scan 完全看不到任何突破尝试。用户语义：突破日收盘≥上沿就该给出 weak 信号，次日站稳→增强 confirmed，次日跌破→保留 weak 并标注"突破未确认"。教训：事件驱动引擎宁可多输出可标注的尝试，也不要把事实吞掉。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">92. 跌破确认语义：收盘跌破下沿1% + 次日未收回 = 箱体失效，与突破镜像对称</div><div class="ld">301004 案例：8-11 报跌破 52.86（收盘 35.68，-32.5%）——箱体当天才形成（触碰≥9 冻结），股价早已远离下沿，这是"迟到触发"。修复：① 跌破容差 1%（贴线不触发）② 次日未收回（收盘≤下沿）→ strong_sell + 箱体失效 ③ 失效容差 band_tol×2（同箱体带演化 50.27→52.86 也拦截）④ 次日收回 → failed 箱体保留。与 box_breakout 完全镜像：突破日 weak→次日站稳 confirmed；跌破日 warning→次日未收回 strong_sell。教训：买卖两侧的确认语义必须对称，单侧设计必然有盲区。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">93. 事件失效的 key 匹配必须容差化——箱体带随数据演化，精确 key 会漏拦</div><div class="ld">v1.4 的 expired 用精确下沿价位做 key（50.27），8-11 识别出 52.86 带（同箱体演化值）时匹配不上 → 失效机制形同虚设，重复信号照报。修复：expired 匹配改 band_tol×2（6%）容差遍历。教训：任何"记录历史状态并按标识符匹配"的机制，标识符若来自动态聚类值就必须容差匹配，否则就是假失效。</div></div>
 
 </div>
 <script>
