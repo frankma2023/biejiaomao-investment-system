@@ -151,7 +151,7 @@ async function load() {
       backgroundColor:'transparent', tooltip:{trigger:'axis'},
       grid:{left:'8%',right:'4%',top:12,bottom:24},
       xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
-      yAxis:{type:'value',axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
+      yAxis:{type:'value',min:function(v){return Math.round(v.min*0.7)},axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
       dataZoom:[{type:'inside'}],
       series:[{type:'line',data:d.closes,smooth:true,showSymbol:false,
         lineStyle:{color:'#539BF5',width:1.5},
