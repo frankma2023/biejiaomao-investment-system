@@ -1,6 +1,0 @@
-{
-  "scanned": 800,
-  "violations": 0,
-  "violation_list": [],
-  "notes": "violations = strong_sell 后 250 天内同价位再次跌破仍被报出（v1.4 失效机制应拦截，出现即 bug）"
-}
