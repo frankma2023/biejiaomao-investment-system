@@ -55,8 +55,6 @@ Thumbs.db
 # Temporary
 tmp/
 data/backups/
-\".codegraph/\" 
-\"web2/ web4/ web.backup/ batch_migrate.py fix_styles.py audit.py web/*/build.py web/*/rebuild*.py web/*/fix_*.py web/*/insert_*.py web/*/add_*.py\" 
 
 # Dev artifacts (not for repo)
 web2/
@@ -87,5 +85,8 @@ data/reports/
 [0-9]*
 '*'
 
-# ���ļ���>100MB��GitHub���ƣ�
+# 大文件（>100MB，GitHub限制）
 analysis/volume_reversal_stats.json
+
+# 每日扫描产物（自动生成，不入库）
+web/daily-pattern-scan/data.json
