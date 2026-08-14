@@ -1493,7 +1493,7 @@ def api_market_dividend_detail():
     pb_series = [round(val_map[d]['pb_pct']*100) if d in val_map and val_map[d]['pb_pct'] is not None else None for d in dates]
     dyr_series = [round(val_map[d]['dyr_pct']*100) if d in val_map and val_map[d]['dyr_pct'] is not None else None for d in dates]
 
-    # 信号时间线：历史上 250日回撤>=15% 的事件（合并20日，全收益口径）
+    # 信号时间线：历史上 250日回撤>=10% 的事件（合并20日，全收益口径）
     events = []
     last_trig = -999
     for i in range(250, len(dd_series)):
@@ -1640,22 +1640,20 @@ def api_market_dividend_detail():
         tri_norm = [round(c / base_t * 100, 1) for c in tri_closes]
         tri_diff = [round(t - p, 1) for p, t in zip(price_norm, tri_norm)]
 
-    # ── 年度最大回撤（PRD §2.2 展示用，非规则）──
+    # ── 年度最大回撤（PRD §2.2 展示用，非规则；用全历史 H00922 近8年，Ticket 03）──
     annual_dd = []
-    if tri_rows and len(tri_rows) >= 250:
-        tri_closes = [r['close'] for r in tri_rows]
-        tri_dates = [r['date'] for r in tri_rows]
+    if hist_tri and hist_tri_dates:
         cur_year = None
         year_hi = None
         year_map = {}
-        for i in range(len(tri_dates)):
-            y = tri_dates[i][:4]
+        for i in range(len(hist_tri_dates)):
+            y = hist_tri_dates[i][:4]
             if y != cur_year:
                 cur_year = y
-                year_hi = tri_closes[i]
-            if tri_closes[i] > year_hi:
-                year_hi = tri_closes[i]
-            dd = (year_hi - tri_closes[i]) / year_hi * 100
+                year_hi = hist_tri[i]
+            if hist_tri[i] > year_hi:
+                year_hi = hist_tri[i]
+            dd = (year_hi - hist_tri[i]) / year_hi * 100
             year_map.setdefault(y, 0)
             year_map[y] = max(year_map[y], dd)
         annual_dd = [{'year': y, 'dd': round(d, 1)} for y, d in sorted(year_map.items())]
@@ -1668,7 +1666,7 @@ def api_market_dividend_detail():
         'current_dd': round(cur_dd, 1),
         'price_norm': price_norm, 'tri_norm': tri_norm, 'tri_diff': tri_diff,
         'annual_dd': annual_dd,
-        'dd_source': 'full_return' if hist_tri else 'price',
+        'dd_source': 'full_return' if (tri_rows and len(tri_rows) >= 250) else 'price',
     })
 
 
@@ -1975,7 +1973,14 @@ def api_market_dividend_lab():
     """回撤实验室：口径切换（250日滚动/年度）+ 阈值可调，全收益口径统计触发点收益。
     参数：mode=250|annual（默认250）、threshold=0.10（默认0.10，回测最优）"""
     mode = request.args.get('mode', '250')
-    threshold = float(request.args.get('threshold', '0.10'))
+    try:
+        threshold = float(request.args.get('threshold', '0.10'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'threshold 必须为数字'}), 400
+    if not 0 < threshold <= 1:
+        return jsonify({'error': 'threshold 必须在 (0,1] 区间'}), 400
+    if mode not in ('250', 'annual'):
+        return jsonify({'error': 'mode 必须为 250 或 annual'}), 400
     db = get_db()
 
     # 全收益数据（H00922，2018 起）

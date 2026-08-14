@@ -51,7 +51,8 @@ def main():
             r = conn.execute("SELECT MAX(date) FROM index_full_return_daily WHERE stock_code=?", (SYMBOL,)).fetchone()
             if r and r[0]:
                 start = r[0].replace('-', '')
-                print(f'[增量模式] 表内已有数据至 {r[0]}，从 {start} 拉取')
+                # 从 MAX(date) 当天起重拉（INSERT OR REPLACE 幂等），可顺带修复最后一天脏数据；比 MAX+1 更稳
+                print(f'[增量模式] 表内已有数据至 {r[0]}，从 {start} 拉取（幂等覆盖）')
             else:
                 start = FULL_START
                 print(f'[增量模式] 表为空，回退全量 {FULL_START}')
@@ -67,9 +68,8 @@ def main():
         # 字段映射
         rows = []
         for _, r in df.iterrows():
-            # 日期转标准格式 2026-08-13（与 index_daily_kline 一致）
-            date = str(r['日期']).replace('-', '')
-            date = '%s-%s-%s' % (date[0:4], date[4:6], date[6:8])
+            # 日期转标准格式 2026-08-13（与 index_daily_kline 一致；strptime 兼容多种输入格式）
+            date = datetime.strptime(str(r['日期']).strip()[:10], '%Y-%m-%d').strftime('%Y-%m-%d')
             close = float(r['收盘']) if r['收盘'] == r['收盘'] else None
             chg = float(r['涨跌幅']) / 100 if r['涨跌幅'] == r['涨跌幅'] else None
             pe = float(r['滚动市盈率']) if r['滚动市盈率'] == r['滚动市盈率'] else None
