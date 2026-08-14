@@ -35,19 +35,53 @@ td:first-child{font-family:var(--font-body)}
 .dn{color:#10b981;font-weight:600}
 .mid{color:#f59e0b;font-weight:600}
 .muted{color:var(--muted)}
+.tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.tab{padding:7px 16px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--muted);cursor:pointer;font-family:var(--font-display);font-size:0.72rem;font-weight:600;transition:all .2s}
+.tab:hover{color:#d4d4d8;border-color:var(--border-hover)}
+.tab.active{background:var(--accent-subtle);color:var(--accent);border-color:var(--accent-border)}
+html[data-theme="light"] .tab{background:rgba(255,255,255,.7);border-color:var(--divider)}
+html[data-theme="light"] .tab.active{background:var(--accent-subtle);color:var(--accent)}
+.analysis-text{font-size:0.66rem;color:var(--text-secondary);line-height:1.8;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.analysis-text b{color:var(--text-primary)}
+.val-stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;flex:1;min-width:110px;text-align:center}
+.val-stat .n{font-family:var(--font-display);font-size:1.15rem;font-weight:600}
+.val-stat .l{font-size:0.58rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.04em}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <a class="back" href="./">← 返回大盘扫描</a>
+  <a class="back" href="red-dividend/">← 返回红利投资</a>
   <h1 id="title">🧲 自由现金流指数操作建议详情</h1>
   <div class="sub" id="meta">加载中...</div>
   <div class="note-banner" id="note-banner">⚠️ 数据声明：估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考。净值回撤仅展示，不触发信号（2年窗口未验证出统计规律，供人工判断参考）。</div>
 
-  <div id="advice-box"></div>
-  <div id="stats-row"></div>
-  <div id="charts"></div>
-  <div id="events-table"></div>
+  <div class="tabs">
+    <div class="tab active" id="tab-advice" onclick="switchTab('advice')">📌 操作建议</div>
+    <div class="tab" id="tab-valuation" onclick="switchTab('valuation')">📊 估值全景</div>
+  </div>
+
+  <div id="pane-advice">
+    <div id="advice-box"></div>
+    <div id="stats-row"></div>
+    <div id="charts"></div>
+    <div id="events-table"></div>
+  </div>
+  <div id="pane-valuation" style="display:none">
+    <div id="val-stats" class="stat-row"></div>
+    <div class="chart-card"><div class="ct">📊 PE-TTM 走势与十年分位</div><div id="val-chart-pe" style="height:320px"></div><div id="val-text-pe" class="analysis-text"></div></div>
+    <div class="chart-card"><div class="ct">📊 PB 走势与十年分位</div><div id="val-chart-pb" style="height:320px"></div><div id="val-text-pb" class="analysis-text"></div></div>
+    <div class="chart-card"><div class="ct">📊 股息率 走势与十年分位</div><div id="val-chart-dyr" style="height:280px"></div><div id="val-text-dyr" class="analysis-text"></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="chart-card"><div class="ct">📊 ROE（%）</div><div id="val-chart-roe" style="height:240px"></div><div id="val-text-roe" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 EPS（元/股）</div><div id="val-chart-eps" style="height:240px"></div><div id="val-text-eps" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 营业收入（亿）</div><div id="val-chart-revenue" style="height:240px"></div><div id="val-text-revenue" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 净利润（亿）</div><div id="val-chart-np" style="height:240px"></div><div id="val-text-np" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 净利润率（%）</div><div id="val-chart-npm" style="height:240px"></div><div id="val-text-npm" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 营业利润率（%）</div><div id="val-chart-opm" style="height:240px"></div><div id="val-text-opm" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 A股分红金额（亿）</div><div id="val-chart-div" style="height:240px"></div><div id="val-text-div" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 税金及附加（亿）</div><div id="val-chart-tax" style="height:240px"></div></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -181,6 +215,163 @@ async function load() {
   });
   evHtml.push('</tbody><div class="cs">20日去重合并的独立低估区间 · 次日收盘买入口径 · 数据窗口 2024-09 起</div></div>');
   document.getElementById('events-table').innerHTML = evHtml.join('');
+}
+
+// ═══ 估值全景 Tab（移植自 index-valuation，980092 数据 2024-09 起）═══
+let valLoaded = false;
+function switchTab(tab) {
+  document.getElementById('tab-advice').classList.toggle('active', tab === 'advice');
+  document.getElementById('tab-valuation').classList.toggle('active', tab === 'valuation');
+  document.getElementById('pane-advice').style.display = tab === 'advice' ? '' : 'none';
+  document.getElementById('pane-valuation').style.display = tab === 'valuation' ? '' : 'none';
+  if (tab === 'valuation' && !valLoaded) { valLoaded = true; loadValuation(); }
+}
+
+async function loadValuation() {
+  const vcode = '980092';
+  const sy = '2024', ey = new Date().getFullYear();
+  const endDate = ey + '-12-31';
+  try {
+    const data = await fetch(API_BASE + '/api/valuation?code=' + vcode + '&start=' + sy + '-01-01&end=' + endDate).then(r => r.json());
+    if (!data.dates || !data.dates.length) { document.getElementById('val-stats').innerHTML = '<div class="val-stat"><div class="n">—</div><div class="l">无数据</div></div>'; return; }
+
+    const last = data.dates.length - 1;
+    const pe = data.pe[last], pePct = data.pe_pct[last], pb = data.pb[last], pbPct = data.pb_pct[last], dyr = data.dyr[last], dyrPct = data.dyr_pct[last];
+    function clr(p) { if (p == null) return 'var(--muted)'; if (p >= 0.8) return 'var(--rise)'; if (p >= 0.6) return 'var(--muted)'; if (p <= 0.3) return 'var(--fall)'; return 'var(--text-secondary)'; }
+    document.getElementById('val-stats').innerHTML =
+      '<div class="val-stat"><div class="n">' + (pe ? pe.toFixed(1) : '—') + '</div><div class="l">PE-TTM</div></div>' +
+      '<div class="val-stat"><div class="n" style="color:' + clr(pePct) + '">' + (pePct != null ? (pePct * 100).toFixed(0) + '%' : '—') + '</div><div class="l">PE 十年分位</div></div>' +
+      '<div class="val-stat"><div class="n">' + (pb ? pb.toFixed(2) : '—') + '</div><div class="l">PB</div></div>' +
+      '<div class="val-stat"><div class="n" style="color:' + clr(pbPct) + '">' + (pbPct != null ? (pbPct * 100).toFixed(0) + '%' : '—') + '</div><div class="l">PB 十年分位</div></div>' +
+      '<div class="val-stat"><div class="n">' + (dyr ? (dyr * 100).toFixed(2) + '%' : '—') + '</div><div class="l">股息率</div></div>' +
+      '<div class="val-stat"><div class="n" style="color:' + clr(dyrPct) + '">' + (dyrPct != null ? (dyrPct * 100).toFixed(0) + '%' : '—') + '</div><div class="l">股息率 十年分位</div></div>';
+
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    const peColor = isDark ? '#FF6B6B' : '#E8553D', pbColor = isDark ? '#539BF5' : '#3568B8', dyrColor = isDark ? '#4ECDC4' : '#2D9D5A';
+    const tx2 = isDark ? '#999' : '#6E6E6E', sp2 = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
+
+    buildValChart('val-chart-pe', 'PE-TTM', data.dates, data.pe, data.pe_pct, null, peColor, tx2, sp2);
+    buildValChart('val-chart-pb', 'PB', data.dates, data.pb, data.pb_pct, null, pbColor, tx2, sp2);
+    buildValChart('val-chart-dyr', '股息率%', data.dates,
+      data.dyr && data.dyr.map(v => v != null ? (v * 100).toFixed(2) : null),
+      data.dyr_pct, null, dyrColor, tx2, sp2);
+    genValText('val-text-pe', 'PE-TTM', data.pe, data.pe_pct, null, '倍', clr(pePct));
+    genValText('val-text-pb', 'PB', data.pb, data.pb_pct, null, '倍', clr(pbPct));
+    const dyrPctInv = data.dyr_pct && data.dyr_pct.map(v => v != null ? (1 - v) : null);
+    const dyrPctInvLast = dyrPctInv && dyrPctInv.length ? dyrPctInv[dyrPctInv.length - 1] : null;
+    if (data.dyr && data.dyr.length) genValText('val-text-dyr', '股息率', data.dyr.map(v => v != null ? v * 100 : null), dyrPctInv, null, '%', clr(dyrPctInvLast));
+    loadValFS(vcode);
+  } catch (e) { document.getElementById('val-stats').innerHTML = '<div class="val-stat"><div class="n">—</div><div class="l">加载失败</div></div>'; }
+}
+
+async function loadValFS(c) {
+  try {
+    const resp = await fetch(API_BASE + '/api/valuation/fs?code=' + c);
+    const fs = await resp.json();
+    if (!fs.dates || !fs.dates.length) return;
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    const up = isDark ? '#FF6B6B' : '#E8553D', dn = isDark ? '#4ECDC4' : '#2D9D5A';
+    buildValBar('val-chart-roe', 'ROE %', fs.dates, fs.roe, dn, false); genValFsText('val-text-roe', 'ROE', fs.roe, '%', fs.dates);
+    buildValBar('val-chart-eps', 'EPS', fs.dates, fs.eps, up, false); genValFsText('val-text-eps', 'EPS', fs.eps, '元', fs.dates);
+    buildValBar('val-chart-revenue', '营业收入', fs.dates, fs.revenue, '#539BF5', true); genValFsText('val-text-revenue', '营业收入', fs.revenue, '亿', fs.dates);
+    buildValBar('val-chart-np', '净利润', fs.dates, fs.net_profit, '#539BF5', true); genValFsText('val-text-np', '净利润', fs.net_profit, '亿', fs.dates);
+    buildValBar('val-chart-npm', '净利润率 %', fs.dates, fs.net_margin, up, false); genValFsText('val-text-npm', '净利润率', fs.net_margin, '%', fs.dates);
+    buildValBar('val-chart-opm', '营业利润率 %', fs.dates, fs.op_margin, dn, false); genValFsText('val-text-opm', '营业利润率', fs.op_margin, '%', fs.dates);
+    buildValBar('val-chart-div', 'A股分红', fs.dates, fs.dividend, '#539BF5', true); genValFsText('val-text-div', 'A股分红金额', fs.dividend, '亿', fs.dates);
+    buildValBar('val-chart-tax', '税金及附加', fs.dates, fs.tax, '#539BF5', true);
+  } catch (e) { /* 财务数据可能不全，静默 */ }
+}
+
+function buildValChart(id, name, dates, vals, pcts, hsVals, lineColor, tx, sp) {
+  const dom = document.getElementById(id); if (!dom) return;
+  if (dom._echart) dom._echart.dispose();
+  const ch = echarts.init(dom);
+  const pctVals = (pcts || []).map(v => v != null ? (v * 100).toFixed(0) : null);
+  ch.setOption({
+    backgroundColor: 'transparent', tooltip: {trigger: 'axis'},
+    legend: {data: hsVals ? [name, '沪深300', '十年分位%'] : [name, '十年分位%'], bottom: 18, textStyle: {color: tx, fontSize: 10}},
+    grid: {left: '8%', right: '4%', top: 12, bottom: 54},
+    xAxis: {type: 'category', data: dates, axisLabel: {color: tx, fontSize: 9, formatter: v => v.slice(0, 7)}, axisLine: {lineStyle: {color: sp}}},
+    dataZoom: [{type: 'inside', start: 50, end: 100}, {type: 'slider', start: 50, end: 100, height: 16, bottom: 2}],
+    yAxis: [
+      {type: 'value', name: name, axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
+      {type: 'value', name: '分位%', min: 0, max: 100, axisLabel: {color: tx, fontSize: 9, formatter: v => v + '%'}, splitLine: {show: false}}
+    ],
+    series: [
+      {name: name, type: 'line', data: vals, smooth: true, symbol: 'none', lineStyle: {color: lineColor, width: 1.5}, yAxisIndex: 0}
+    ].concat(hsVals ? [{name: '沪深300', type: 'line', data: hsVals, smooth: true, symbol: 'none', lineStyle: {color: '#AAA', width: 1, type: 'dotted'}, yAxisIndex: 0}] : []).concat([
+      {name: '十年分位%', type: 'line', data: pctVals, smooth: true, symbol: 'none', lineStyle: {color: '#E8A838', width: 1.5, type: 'dashed'}, yAxisIndex: 1,
+        markLine: {silent: true, data: [{yAxis: 70, label: {formatter: '偏高', color: tx, fontSize: 9}, lineStyle: {color: '#FFB347', type: 'dotted'}}, {yAxis: 30, label: {formatter: '偏低', color: tx, fontSize: 9}, lineStyle: {color: '#26C6DA', type: 'dotted'}}]}}
+    ])
+  });
+  dom._echart = ch;
+}
+
+function genValText(id, name, vals, pcts, hsVals, unit, pctClr) {
+  if (!vals || !vals.length) return;
+  const last = vals.length - 1, cur = vals[last], curPct = pcts && pcts[last];
+  const vv = vals.filter(v => v != null);
+  if (!vv.length) return;
+  const avg = vv.reduce((a, b) => a + b, 0) / vv.length;
+  const mx = Math.max.apply(null, vv), mn = Math.min.apply(null, vv);
+  const hsCur = hsVals && hsVals[last];
+  const pctText = curPct != null ? (curPct * 100).toFixed(0) + '%' : '未知';
+  let level = '', advice = '';
+  if (curPct == null) { level = '无法判断'; advice = '数据不足'; }
+  else if (curPct >= 0.8) { level = '严重偏高'; advice = '处于近十年高位区间，安全边际极低，应考虑减仓或回避'; }
+  else if (curPct >= 0.6) { level = '偏高'; advice = '高于历史中位数，需警惕估值回调风险，不宜追高加仓'; }
+  else if (curPct >= 0.4) { level = '中性'; advice = '估值处于合理区间，可正常操作'; }
+  else if (curPct >= 0.2) { level = '偏低'; advice = '低于历史均值，具备一定安全边际，可逐步建仓'; }
+  else { level = '严重低估'; advice = '处于近十年低位，往往是逆向投资的最佳时机，建议小仓位试探'; }
+  let h = '<b>当前' + name + '：</b>' + cur.toFixed(2) + unit + '，十年分位 <b style="color:' + pctClr + '">' + pctText + '</b>（' + level + '）。';
+  h += '窗口均值 ' + avg.toFixed(2) + unit + '，最高 ' + mx.toFixed(2) + unit + '，最低 ' + mn.toFixed(2) + unit + '。';
+  h += '<b>建议：</b>' + advice + '。';
+  const el = document.getElementById(id); if (el) el.innerHTML = h;
+}
+
+function buildValBar(id, name, dates, vals, color, isBig) {
+  const dom = document.getElementById(id); if (!dom) return;
+  if (dom._echart) dom._echart.dispose();
+  const ch = echarts.init(dom);
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  const tx = isDark ? '#999' : '#6E6E6E', sp = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+  const vv = (vals || []).filter(v => v != null);
+  if (!vv.length) return;
+  const avg = vv.reduce((a, b) => a + b, 0) / vv.length;
+  const d1 = isBig ? vals.map(v => v != null ? (v / 1e8).toFixed(1) : null) : vals.map(v => v != null ? v : null);
+  const d2 = vals.map(() => (isBig ? avg / 1e8 : avg).toFixed(2));
+  const unit = isBig ? '亿' : '';
+  ch.setOption({
+    backgroundColor: 'transparent', tooltip: {trigger: 'axis'},
+    grid: {left: '10%', right: '4%', top: 12, bottom: 32},
+    xAxis: {type: 'category', data: dates, axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp}}},
+    yAxis: {type: 'value', axisLabel: {color: tx, fontSize: 9, formatter: v => v + unit}, splitLine: {lineStyle: {color: sp}}},
+    series: [
+      {name: name, type: 'bar', data: d1, itemStyle: {color: color, borderRadius: [4, 4, 0, 0]}, barWidth: '50%',
+        label: {show: true, position: 'top', fontSize: 9, color: tx, formatter: p => p.value != null ? (name.indexOf('%') >= 0 ? (p.value * 100).toFixed(1) + '%' : p.value + unit) : ''}},
+      {name: '均值', type: 'line', data: d2, smooth: false, symbol: 'none', lineStyle: {color: '#E8A838', width: 1, type: 'dashed'}}
+    ]
+  });
+  dom._echart = ch;
+}
+
+function genValFsText(id, name, vals, unit, dates) {
+  const vv = (vals || []).filter(v => v != null);
+  const el = document.getElementById(id); if (!el) return;
+  if (!vv.length) { el.innerHTML = '数据不足'; return; }
+  const cur = vv[vv.length - 1], prev = vv.length > 1 ? vv[vv.length - 2] : null;
+  const avg = vv.reduce((a, b) => a + b, 0) / vv.length;
+  const mx = Math.max.apply(null, vv), mn = Math.min.apply(null, vv);
+  const yoy = prev && prev > 0 ? ((cur / prev - 1) * 100).toFixed(1) + '%' : '—';
+  const trend = cur > avg ? '高于' : '低于';
+  const curDisp = unit === '亿' ? (cur / 1e8).toFixed(1) : cur.toFixed(2);
+  const avgDisp = unit === '亿' ? (avg / 1e8).toFixed(1) : avg.toFixed(2);
+  const mxDisp = unit === '亿' ? (mx / 1e8).toFixed(1) : mx.toFixed(2);
+  const mnDisp = unit === '亿' ? (mn / 1e8).toFixed(1) : mn.toFixed(2);
+  const latestYr = dates[dates.length - 1];
+  let h = '<b>' + latestYr + '年：</b>' + name + ' ' + curDisp + unit + '，同比 ' + (yoy.indexOf('-') >= 0 ? '' : '+') + yoy + '。';
+  h += '窗口均值 ' + avgDisp + unit + '，当前' + trend + '均值。最高 ' + mxDisp + unit + '（' + dates[vv.indexOf(mx)] + '年），最低 ' + mnDisp + unit + '（' + dates[vv.indexOf(mn)] + '年）。';
+  el.innerHTML = h;
 }
 
 load();
