@@ -405,9 +405,13 @@ function buildValBar(id, name, dates, vals, color, isBig) {
   const vv = (vals || []).filter(v => v != null);
   if (!vv.length) return;
   const avg = vv.reduce((a, b) => a + b, 0) / vv.length;
-  const d1 = isBig ? vals.map(v => v != null ? (v / 1e8).toFixed(1) : null) : vals.map(v => v != null ? v : null);
-  const d2 = vals.map(() => (isBig ? avg / 1e8 : avg).toFixed(2));
-  const unit = isBig ? '亿' : '';
+  const isPct = name.indexOf('%') >= 0;
+  // % 单位（ROE/净利率）：小数值 ×100 显示；亿单位：÷1e8
+  const toDisp = v => isPct ? (v * 100).toFixed(1) : (isBig ? (v / 1e8).toFixed(1) : v);
+  const d1 = vals.map(v => v != null ? toDisp(v) : null);
+  const avgDisp = isPct ? (avg * 100).toFixed(1) : (isBig ? (avg / 1e8).toFixed(1) : avg.toFixed(2));
+  const d2 = vals.map(() => avgDisp);
+  const unit = isBig ? '亿' : (isPct ? '%' : '');
   ch.setOption({
     backgroundColor: 'transparent', tooltip: {trigger: 'axis'},
     grid: {left: '10%', right: '4%', top: 12, bottom: 32},
@@ -415,7 +419,7 @@ function buildValBar(id, name, dates, vals, color, isBig) {
     yAxis: {type: 'value', axisLabel: {color: tx, fontSize: 9, formatter: v => v + unit}, splitLine: {lineStyle: {color: sp}}},
     series: [
       {name: name, type: 'bar', data: d1, itemStyle: {color: color, borderRadius: [4, 4, 0, 0]}, barWidth: '50%',
-        label: {show: true, position: 'top', fontSize: 9, color: tx, formatter: p => p.value != null ? (name.indexOf('%') >= 0 ? (p.value * 100).toFixed(1) + '%' : p.value + unit) : ''}},
+        label: {show: true, position: 'top', fontSize: 9, color: tx, formatter: p => p.value != null ? p.value + unit : ''}},
       {name: '均值', type: 'line', data: d2, smooth: false, symbol: 'none', lineStyle: {color: '#E8A838', width: 1, type: 'dashed'}}
     ]
   });
@@ -426,15 +430,14 @@ function genValFsText(id, name, vals, unit, dates) {
   const vv = (vals || []).filter(v => v != null);
   const el = document.getElementById(id); if (!el) return;
   if (!vv.length) { el.innerHTML = '数据不足'; return; }
+  // 显示转换：% 单位（ROE/净利率/营业利润率，小数值 ×100）；亿 单位（营收/净利/分红/税，÷1e8）
+  const disp = v => unit === '亿' ? (v / 1e8).toFixed(1) : unit === '%' ? (v * 100).toFixed(1) : v.toFixed(2);
   const cur = vv[vv.length - 1], prev = vv.length > 1 ? vv[vv.length - 2] : null;
   const avg = vv.reduce((a, b) => a + b, 0) / vv.length;
   const mx = Math.max.apply(null, vv), mn = Math.min.apply(null, vv);
   const yoy = prev && prev > 0 ? ((cur / prev - 1) * 100).toFixed(1) + '%' : '—';
   const trend = cur > avg ? '高于' : '低于';
-  const curDisp = unit === '亿' ? (cur / 1e8).toFixed(1) : cur.toFixed(2);
-  const avgDisp = unit === '亿' ? (avg / 1e8).toFixed(1) : avg.toFixed(2);
-  const mxDisp = unit === '亿' ? (mx / 1e8).toFixed(1) : mx.toFixed(2);
-  const mnDisp = unit === '亿' ? (mn / 1e8).toFixed(1) : mn.toFixed(2);
+  const curDisp = disp(cur), avgDisp = disp(avg), mxDisp = disp(mx), mnDisp = disp(mn);
   const latestYr = dates[dates.length - 1];
   let h = '<b>' + latestYr + '年：</b>' + name + ' ' + curDisp + unit + '，同比 ' + (yoy.indexOf('-') >= 0 ? '' : '+') + yoy + '。';
   h += '近十年均值 ' + avgDisp + unit + '，当前' + trend + '均值。最高 ' + mxDisp + unit + '（' + dates[vv.indexOf(mx)] + '年），最低 ' + mnDisp + unit + '（' + dates[vv.indexOf(mn)] + '年）。';
