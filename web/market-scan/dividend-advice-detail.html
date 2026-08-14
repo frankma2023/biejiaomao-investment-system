@@ -68,7 +68,7 @@ async function load() {
   if (d.error) { document.getElementById('meta').textContent = '无数据'; return; }
 
   document.getElementById('title').textContent = '📌 ' + d.name + ' · 操作建议详情';
-  document.getElementById('meta').textContent = d.date + ' · 当前250日回撤 ' + d.current_dd + '%' + (d.dd_source === 'full_return' ? '（全收益口径，H00922 自2018起）' : '（价格指数口径）');
+  document.getElementById('meta').textContent = d.date + ' · 当前250日回撤 ' + d.current_dd + '%' + (d.dd_source === 'full_return' ? '（全收益口径，H00922 自2018起）' : '（价格指数口径）') + ' · 估值分位为10年滚动口径';
 
   // 当前建议（丰富版：结合历史类似估值分位/回撤统计）
   let advice = null;
@@ -188,7 +188,7 @@ async function load() {
     return c;
   }});
   // 2. 估值分位
-  charts.push({title:'📊 估值分位走势（PE/PB/股息率，近3年）', el:'chart-val', h:220, init: el => {
+  charts.push({title:'📊 估值分位走势（PE/PB/股息率，近3年 · 10年滚动分位）', el:'chart-val', h:220, init: el => {
     const c = echarts.init(el);
     c.setOption({
       backgroundColor:'transparent', tooltip:{trigger:'axis'},
