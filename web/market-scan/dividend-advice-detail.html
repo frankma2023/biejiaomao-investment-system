@@ -84,7 +84,7 @@ async function load() {
     // 构建历史证据描述
     let evidence = [];
     if (st.count) {
-      evidence.push('<b>回撤' + d.current_dd + '%</b>：历史上' + st.count + '次类似回撤，20日胜率<b style="color:#ef4444">' + st.fwd20_winrate + '%</b>，中位收益<b>' + (st.fwd20_median>0?'+':'') + st.fwd20_median + '%</b>；反弹幅度中位<b style="color:#f59e0b">' + st.bounce_median + '%</b>，平均' + st.days_to_peak_median + '日到峰值');
+      evidence.push('<b>回撤' + d.current_dd + '%</b>：历史上' + st.count + '次类似回撤，20日胜率<b style="color:#ef4444">' + (st.fwd20_winrate != null ? st.fwd20_winrate + '%' : '—') + '</b>，中位收益<b>' + (st.fwd20_median != null ? (st.fwd20_median>0?'+':'') + st.fwd20_median + '%' : '—') + '</b>；反弹幅度中位<b style="color:#f59e0b">' + (st.bounce_median != null ? st.bounce_median + '%' : '—') + '</b>，平均' + (st.days_to_peak_median != null ? st.days_to_peak_median + '日' : '—') + '到峰值');
     }
     if (vs.pe && vs.pe.count) {
       evidence.push('PE分位' + (advice.valuation?advice.valuation.pe_pct:'?') + '%（历史区间' + vs.pe.range[0] + '-' + vs.pe.range[1] + '%）：' + vs.pe.count + '次类似估值，20日胜率<b style="color:' + (vs.pe.fwd20_winrate>=50?'#ef4444':'#10b981') + '">' + vs.pe.fwd20_winrate + '%</b>，中位收益<b>' + (vs.pe.fwd20_median>0?'+':'') + vs.pe.fwd20_median + '%</b>，60日胜率' + vs.pe.fwd60_winrate + '%');

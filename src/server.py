@@ -1520,13 +1520,12 @@ def api_market_dividend_detail():
         if ddv >= cur_dd and cur_dd > 0 and i - last_s >= 20:
             fwd20 = (hist_base[min(i+20, len(hist_base)-1)] - hist_base[i]) / hist_base[i] * 100 if i+20 < len(hist_base) else None
             fwd60 = (hist_base[min(i+60, len(hist_base)-1)] - hist_base[i]) / hist_base[i] * 100 if i+60 < len(hist_base) else None
-            peak = max(hist_base[i:min(i+120, len(hist_base))]) if i < len(hist_base) else hist_base[i]
+            peak = max(hist_base[i:min(i+120, len(hist_base))])
             bounce = (peak - hist_base[i]) / hist_base[i] * 100
             days_to_peak = None
-            if i < len(hist_base):
-                seg = hist_base[i:min(i+120, len(hist_base))]
-                if seg:
-                    days_to_peak = seg.index(max(seg))
+            seg = hist_base[i:min(i+120, len(hist_base))]
+            if seg:
+                days_to_peak = seg.index(max(seg))
             similar.append({
                 'date': (hist_tri_dates[i] if hist_tri_dates else hist_dates[i]), 'dd': round(ddv, 1),
                 'fwd20': round(fwd20, 1) if fwd20 is not None else None,

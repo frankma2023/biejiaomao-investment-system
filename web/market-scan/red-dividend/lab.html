@@ -107,7 +107,12 @@ async function load() {
 }
 
 document.getElementById('mode').addEventListener('change', load);
-document.getElementById('th').addEventListener('input', load);
+// 滑块防抖（Obs 13：快速拖动避免高频请求）
+let _thTimer = null;
+document.getElementById('th').addEventListener('input', function () {
+  clearTimeout(_thTimer);
+  _thTimer = setTimeout(load, 200);
+});
 load();
 window.addEventListener('resize', () => { if (chartInst) chartInst.resize(); });
 
