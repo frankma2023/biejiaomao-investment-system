@@ -12,6 +12,11 @@
 import sys, os, sqlite3, argparse
 from datetime import datetime
 
+# Windows 重定向时避免 emoji/中文 stdout 编码崩溃（仓库先例）
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_DIR)
 
@@ -32,8 +37,9 @@ def main():
     parser.add_argument('--full', action='store_true', help='全量拉取（2018-01-01 起），默认增量')
     args = parser.parse_args()
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = None
     try:
+        conn = sqlite3.connect(DB_PATH)
         conn.execute("""CREATE TABLE IF NOT EXISTS index_full_return_daily (
             stock_code TEXT NOT NULL,
             date TEXT NOT NULL,
@@ -88,7 +94,8 @@ def main():
             (SYMBOL,)).fetchone()
         print(f'✅ 入库完成：表内共 {total} 条，最新 {latest[0]} 收盘 {latest[1]}')
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 if __name__ == '__main__':

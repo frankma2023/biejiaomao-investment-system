@@ -29,6 +29,7 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
 </style>
 </head>
 <body>
+<nav id="top-nav"></nav>
 <div class="wrap">
   <a class="back" href="./">← 返回红利投资</a>
   <h1>🔬 回撤实验室</h1>
@@ -96,7 +97,7 @@ async function load() {
       ],
       dataZoom:[{type:'inside'}],
       series:[
-        {name:'回撤%',type:'bar',data:dds,barWidth:'40%',itemStyle:{color:p => p.value >= 15 ? '#ef4444' : (p.value >= 10 ? '#f59e0b' : '#8b8b90')},label:{show:true,position:'top',fontSize:9,color:tx,formatter:'{c}%'}},
+        {name:'回撤%',type:'bar',data:dds,barWidth:'40%',itemStyle:{color:p => p.value >= Math.max(15, threshold*100) ? '#ef4444' : (p.value >= threshold*100 ? '#f59e0b' : '#8b8b90')},label:{show:true,position:'top',fontSize:9,color:tx,formatter:'{c}%'}},
         {name:'收盘',type:'line',yAxisIndex:1,data:closes,smooth:true,showSymbol:false,lineStyle:{color:'#539BF5',width:1.5}}
       ]
     });
@@ -114,6 +115,6 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 </script>
 <script src="/shared/js/nav.js"></script>
-<script>Nav.init({brandIcon:'🔬',brandText:'回撤实验室',currentPage:'red-dividend'})</script>
+<script>window.NAV_PREFIX='../..';Nav.init({brandIcon:'🔬',brandText:'回撤实验室',currentPage:'red-dividend'})</script>
 </body>
 </html>

@@ -24,10 +24,11 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
 .note{font-size:0.62rem;color:#f59e0b;margin-top:14px;line-height:1.7}
 .toolbar{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
 .toolbar a{font-size:0.68rem;color:var(--accent);text-decoration:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px}
-.toolbar a:hover{background:var(--color-accent-subtle)}
+.toolbar a:hover{background:var(--accent-subtle)}
 </style>
 </head>
 <body>
+<nav id="top-nav"></nav>
 <div class="wrap">
   <h1>🧧 红利投资</h1>
   <div class="sub" id="meta">红利/自由现金流指数操作建议 · 回撤买点 + 估值分位 · 点击卡片查看详情</div>
@@ -103,6 +104,6 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 </script>
 <script src="/shared/js/nav.js"></script>
-<script>Nav.init({brandIcon:'🧧',brandText:'红利投资',currentPage:'red-dividend'})</script>
+<script>window.NAV_PREFIX='../..';Nav.init({brandIcon:'🧧',brandText:'红利投资',currentPage:'red-dividend'})</script>
 </body>
 </html>

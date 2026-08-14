@@ -1294,6 +1294,9 @@ FULL_RETURN_MAP = {
     '000922': 'H00922',  # 中证红利 -> 中证红利全收益
 }
 
+# 红利 250日回撤买点阈值（%）：回测 32 次触发/20日胜率75% vs 15% 仅9次小样本假象（PRD §2.1 v1.1）
+DD_BUY_THRESHOLD = 10
+
 
 def _dd_from_full_return(db, code, target_date, days=300, window=250):
     """250日回撤计算：优先用全收益指数（index_full_return_daily），无数据时回退价格指数。
@@ -1367,11 +1370,11 @@ def api_market_dividend_advice():
 
         # 信号（v1.1：250日回撤买点阈值 15%→10%，回测 32 次触发/20日胜率75% vs 15% 仅9次小样本）
         signals = []
-        if dd_250 >= 10:
+        if dd_250 >= DD_BUY_THRESHOLD:
             signals.append('gold_buy')
         if val and val['dyr_pct'] is not None and val['dyr_pct'] > 90:
             signals.append('high_div')
-        if dd_250 >= 10 and val and val['dyr_pct'] is not None and val['dyr_pct'] > 80:
+        if dd_250 >= DD_BUY_THRESHOLD and val and val['dyr_pct'] is not None and val['dyr_pct'] > 80:
             signals.append('double_confirm')
         if val and val['pe_pct'] is not None and val['pe_pct'] > 80:
             signals.append('pe_warn')
@@ -1455,6 +1458,8 @@ def api_market_dividend_detail():
             SELECT date, close FROM index_full_return_daily
             WHERE stock_code=? ORDER BY date
         """, (tri_code,)).fetchall()
+        # 注意：故意不含 date<=target_date——类似事件统计需要事件后的实际收益（回测式统计，非信号检测），
+        # 回看历史日期时用全历史可得到"当时触发后实际涨了没"，避免幸存者偏差（与 hist_rows 同理）
         if len(hist_tri_rows) >= 250:
             hist_tri = [r['close'] for r in hist_tri_rows]
             hist_tri_dates = [r['date'] for r in hist_tri_rows]
@@ -1474,11 +1479,8 @@ def api_market_dividend_detail():
         w = dd_base[max(0, i-249):i+1]
         hi = max(w)
         dd_series.append(round((hi - dd_base[i]) / hi * 100, 2))
-    # 回撤曲线按价格日期对齐（全收益与价格交易日一致，直接映射）
-    if len(dd_dates) == len(dates):
-        dd_series = dd_series
-    else:
-        # 全收益缺失日（如 2018 前）用 None 占位
+    # 回撤曲线按价格日期对齐（全收益与价格交易日一致；全收益缺失日如 2018 前用 None 占位）
+    if len(dd_dates) != len(dates):
         dd_map = dict(zip(dd_dates, dd_series))
         dd_series = [dd_map.get(d) for d in dates]
 
@@ -1497,7 +1499,7 @@ def api_market_dividend_detail():
     events = []
     last_trig = -999
     for i in range(250, len(dd_series)):
-        if dd_series[i] is not None and dd_series[i] >= 10:  # v1.1：买点阈值 15%→10%
+        if dd_series[i] is not None and dd_series[i] >= DD_BUY_THRESHOLD:  # v1.1：买点阈值 15%→10%
             if i - last_trig >= 20:
                 events.append({'date': dates[i], 'dd': dd_series[i]})
                 last_trig = i
@@ -1517,7 +1519,7 @@ def api_market_dividend_detail():
         ddv = hist_dd[i]
         if ddv >= cur_dd and cur_dd > 0 and i - last_s >= 20:
             fwd20 = (hist_base[min(i+20, len(hist_base)-1)] - hist_base[i]) / hist_base[i] * 100 if i+20 < len(hist_base) else None
-            fwd60 = (hist_closes[min(i+60, len(hist_closes)-1)] - hist_closes[i]) / hist_closes[i] * 100 if i+60 < len(hist_closes) else None
+            fwd60 = (hist_base[min(i+60, len(hist_base)-1)] - hist_base[i]) / hist_base[i] * 100 if i+60 < len(hist_base) else None
             peak = max(hist_base[i:min(i+120, len(hist_base))]) if i < len(hist_base) else hist_base[i]
             bounce = (peak - hist_base[i]) / hist_base[i] * 100
             days_to_peak = None
@@ -1563,7 +1565,8 @@ def api_market_dividend_detail():
         cur_pe = pe_series[-1] if pe_series else None
         cur_pb = pb_series[-1] if pb_series else None
         cur_dyr = dyr_series[-1] if dyr_series else None
-        # 全历史估值（按日期对齐 hist_dates）
+        # 全历史估值（按日期对齐 hist_dates；注意：val_similar 用价格指数口径统计估值区间收益，
+        # 与 similar 的全收益回撤口径是两套独立统计，各有用途——估值分位来自价格指数基本面）
         hist_val_rows = db.execute("""
             SELECT date, pe_ttm_pct, pb_pct, dyr_pct FROM index_fundamental_daily
             WHERE stock_code=? AND date>='2016-01-01' ORDER BY date
@@ -1611,12 +1614,11 @@ def api_market_dividend_detail():
             'dyr': _val_window_stats(cur_dyr, 'dyr'),
         }
 
-    # 当前建议（复用信号逻辑）
-    adv = None
     name = code
     try:
         import yaml as _yaml
-        _cfg = _yaml.safe_load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'index_style.yaml'), 'r', encoding='utf-8'))
+        with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config', 'index_style.yaml'), 'r', encoding='utf-8') as _f:
+            _cfg = _yaml.safe_load(_f)
         for _cat, _items in _cfg.get('categories', {}).items():
             for _it in _items:
                 if isinstance(_it, dict) and _it.get('code') == code:
@@ -1624,8 +1626,8 @@ def api_market_dividend_detail():
                     break
             if name != code:
                 break
-    except Exception:
-        pass
+    except Exception as _e:
+        print(f'[dividend-detail] index_style 名称查找失败 {code}: {type(_e).__name__}: {_e}', flush=True)
 
     # ── 价格 vs 全收益 对比线（PRD Ticket 03）──
     # 归一化：近3年起点=100（dates/closes 为价格，tri_rows 为全收益，日期对齐）

@@ -76,6 +76,10 @@
     { href: '../cockpit/',             label: '驾驶舱',           page: 'cockpit' },
   ];
 
+  // 深目录页面前缀：web/market-scan/red-dividend/ 等深两层页面在 Nav.init 前设 window.NAV_PREFIX='../..'
+  var P = window.NAV_PREFIX || '';
+  function H(h) { return P + h.substring(2); }  // '../xxx' → P + '/xxx'
+
   function render() {
     var el = document.getElementById('top-nav');
     if (!el) return;
@@ -87,14 +91,14 @@
     var html = '<div class="nav-brand">' + (icon ? '<span>' + icon + '</span>' : '') + '<span>' + (config.brandText || '') + '</span></div><div class="nav-links">';
 
     // Home
-    html += '<a href="../" class="nav-item' + (cp === 'home' ? ' active' : '') + '">看板</a>';
+    html += '<a href="' + H('../') + '" class="nav-item' + (cp === 'home' ? ' active' : '') + '">看板</a>';
 
     // 形态分析 dropdown
     var isPattern = PATTERN_ITEMS.some(function (p) { return p.page === cp; });
     html += '<div class="nav-dropdown"><a href="javascript:void(0)" class="nav-item' + (isPattern ? ' active' : '') + '">形态分析</a><div class="nav-dropdown-menu">';
     for (var k = 0; k < PATTERN_ITEMS.length; k++) {
       var pt = PATTERN_ITEMS[k];
-      html += '<a href="' + pt.href + '" class="' + (pt.page === cp ? 'active' : '') + '">' + pt.label + '</a>';
+      html += '<a href="' + H(pt.href) + '" class="' + (pt.page === cp ? 'active' : '') + '">' + pt.label + '</a>';
     }
     html += '</div></div>';
 
@@ -103,7 +107,7 @@
     html += '<div class="nav-dropdown"><a href="javascript:void(0)" class="nav-item' + (isBacktest ? ' active' : '') + '">回测</a><div class="nav-dropdown-menu">';
     for (var i = 0; i < BACKTEST_ITEMS.length; i++) {
       var b = BACKTEST_ITEMS[i];
-      html += '<a href="' + b.href + '" class="' + (b.page === cp ? 'active' : '') + '">' + b.label + '</a>';
+      html += '<a href="' + H(b.href) + '" class="' + (b.page === cp ? 'active' : '') + '">' + b.label + '</a>';
     }
     html += '</div></div>';
 
@@ -112,7 +116,7 @@
     html += '<div class="nav-dropdown"><a href="javascript:void(0)" class="nav-item' + (isDiscipline ? ' active' : '') + '">知行</a><div class="nav-dropdown-menu">';
     for (var d = 0; d < DISCIPLINE_ITEMS.length; d++) {
       var di = DISCIPLINE_ITEMS[d];
-      html += '<a href="' + di.href + '" class="' + (di.page === cp ? 'active' : '') + '">' + di.label + '</a>';
+      html += '<a href="' + H(di.href) + '" class="' + (di.page === cp ? 'active' : '') + '">' + di.label + '</a>';
     }
     html += '</div></div>';
 
@@ -121,14 +125,14 @@
     html += '<div class="nav-dropdown"><a href="javascript:void(0)" class="nav-item' + (isChanlun ? ' active' : '') + '">缠论</a><div class="nav-dropdown-menu">';
     for (var c = 0; c < CHANLUN_ITEMS.length; c++) {
       var cl = CHANLUN_ITEMS[c];
-      html += '<a href="' + cl.href + '" class="' + (cl.page === cp ? 'active' : '') + '">' + cl.label + '</a>';
+      html += '<a href="' + H(cl.href) + '" class="' + (cl.page === cp ? 'active' : '') + '">' + cl.label + '</a>';
     }
     html += '</div></div>';
 
     // Main items
     for (var j = 0; j < MAIN_ITEMS.length; j++) {
       var m = MAIN_ITEMS[j];
-      html += '<a href="' + m.href + '" class="nav-item' + (m.page === cp ? ' active' : '') + '">' + m.label + '</a>';
+      html += '<a href="' + H(m.href) + '" class="nav-item' + (m.page === cp ? ' active' : '') + '">' + m.label + '</a>';
     }
 
     // Theme toggle
