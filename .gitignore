@@ -90,3 +90,6 @@ analysis/volume_reversal_stats.json
 
 # 每日扫描产物（自动生成，不入库）
 web/daily-pattern-scan/data.json
+
+# 备份文件（历史误提交，已清理）
+*.bak
