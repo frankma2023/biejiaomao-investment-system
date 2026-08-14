@@ -1289,6 +1289,45 @@ DIVIDEND_INDICES = [
     ('931848', '800红利低波', 'lowvol'),
 ]
 
+# 全收益指数映射：价格指数代码 -> 全收益代码（回撤计算优先用全收益，分红再投资更真实）
+FULL_RETURN_MAP = {
+    '000922': 'H00922',  # 中证红利 -> 中证红利全收益
+}
+
+
+def _dd_from_full_return(db, code, target_date, days=300, window=250):
+    """250日回撤计算：优先用全收益指数（index_full_return_daily），无数据时回退价格指数。
+    返回 (dd_250, high_250, current, source) 或 None。"""
+    tri_code = FULL_RETURN_MAP.get(code)
+    source = 'price'
+    rows = None
+    if tri_code:
+        tri_rows = db.execute("""
+            SELECT date, close FROM index_full_return_daily
+            WHERE stock_code=? AND date<=?
+            ORDER BY date DESC LIMIT ?
+        """, (tri_code, target_date, days)).fetchall()
+        tri_rows = list(reversed(tri_rows))
+        if len(tri_rows) >= window:
+            rows = tri_rows
+            source = 'full_return'
+    if rows is None:
+        rows = db.execute("""
+            SELECT date, close FROM index_daily_kline
+            WHERE stock_code=? AND kline_type='normal' AND date<=?
+            ORDER BY date DESC LIMIT ?
+        """, (code, target_date, days)).fetchall()
+        rows = list(reversed(rows))
+    if len(rows) < window:
+        return None
+    closes = [r['close'] for r in rows]
+    current = closes[-1]
+    high = max(closes[-window:])
+    dd = (high - current) / high * 100
+    return {'dd_250': round(dd, 1), 'high_250': round(high, 2), 'current': round(current, 2),
+            'source': source, 'date': rows[-1]['date']}
+
+
 
 @app.route('/api/market-scan/dividend-advice')
 def api_market_dividend_advice():
@@ -1301,19 +1340,13 @@ def api_market_dividend_advice():
 
     results = []
     for code, name, cat in DIVIDEND_INDICES:
-        # K线 300 日窗口
-        rows = db.execute("""
-            SELECT date, close FROM index_daily_kline
-            WHERE stock_code=? AND kline_type='normal' AND date<=?
-            ORDER BY date DESC LIMIT 300
-        """, (code, target_date)).fetchall()
-        rows = list(reversed(rows))
-        if len(rows) < 250:
+        # 250日回撤：优先全收益（H00922），回退价格（000922）—— PRD §3.2
+        ddinfo = _dd_from_full_return(db, code, target_date)
+        if ddinfo is None:
             continue
-        closes = [r['close'] for r in rows]
-        current = closes[-1]
-        high250 = max(closes[-250:])
-        dd_250 = (high250 - current) / high250 * 100
+        dd_250 = ddinfo['dd_250']
+        high250 = ddinfo['high_250']
+        current = ddinfo['current']
 
         # 估值
         v = db.execute("""
@@ -1358,9 +1391,9 @@ def api_market_dividend_advice():
 
         results.append({
             'code': code, 'name': name, 'cat': cat,
-            'close': round(current, 2), 'date': rows[-1]['date'],
-            'dd_250': round(dd_250, 1),
-            'high_250': round(high250, 2),
+            'close': ddinfo['current'], 'date': ddinfo['date'], 'dd_source': ddinfo['source'],
+            'dd_250': dd_250,
+            'high_250': high250,
             'valuation': val,
             'signals': signals,
             'advice': advice,
@@ -1401,6 +1434,31 @@ def api_market_dividend_detail():
     if not dates:
         return jsonify({'error': 'no data'})
 
+    # 全收益数据（回撤曲线/类似事件统计优先用全收益；PRD §3.2）
+    tri_code = FULL_RETURN_MAP.get(code)
+    tri_rows = None
+    if tri_code:
+        tri_rows = db.execute("""
+            SELECT date, close FROM index_full_return_daily
+            WHERE stock_code=? AND date>=date(?,'-3 years') AND date<=?
+            ORDER BY date
+        """, (tri_code, target_date, target_date)).fetchall()
+    # 回撤计算基准：有全收益用全收益，否则价格
+    dd_base = [r['close'] for r in tri_rows] if tri_rows and len(tri_rows) >= 250 else closes
+    dd_dates = [r['date'] for r in tri_rows] if tri_rows and len(tri_rows) >= 250 else dates
+
+    # 全历史全收益（类似事件统计用，防未来截断）
+    hist_tri = None
+    hist_tri_dates = None
+    if tri_code:
+        hist_tri_rows = db.execute("""
+            SELECT date, close FROM index_full_return_daily
+            WHERE stock_code=? ORDER BY date
+        """, (tri_code,)).fetchall()
+        if len(hist_tri_rows) >= 250:
+            hist_tri = [r['close'] for r in hist_tri_rows]
+            hist_tri_dates = [r['date'] for r in hist_tri_rows]
+
     # 全历史K线（用于类似事件统计，避免目标日期截断造成幸存者偏差）
     hist_rows = db.execute("""
         SELECT date, close FROM index_daily_kline
@@ -1410,12 +1468,19 @@ def api_market_dividend_detail():
     hist_dates = [r['date'] for r in hist_rows]
     hist_closes = [r['close'] for r in hist_rows]
 
-    # 回撤曲线（250日滚动最高）
+    # 回撤曲线（250日滚动最高 · 优先全收益口径，PRD §3.2）
     dd_series = []
-    for i in range(len(closes)):
-        w = closes[max(0, i-249):i+1]
+    for i in range(len(dd_base)):
+        w = dd_base[max(0, i-249):i+1]
         hi = max(w)
-        dd_series.append(round((hi - closes[i]) / hi * 100, 2))
+        dd_series.append(round((hi - dd_base[i]) / hi * 100, 2))
+    # 回撤曲线按价格日期对齐（全收益与价格交易日一致，直接映射）
+    if len(dd_dates) == len(dates):
+        dd_series = dd_series
+    else:
+        # 全收益缺失日（如 2018 前）用 None 占位
+        dd_map = dict(zip(dd_dates, dd_series))
+        dd_series = [dd_map.get(d) for d in dates]
 
     # 估值分位（近3年，按K线日期对齐）
     val_rows = db.execute("""
@@ -1428,39 +1493,40 @@ def api_market_dividend_detail():
     pb_series = [round(val_map[d]['pb_pct']*100) if d in val_map and val_map[d]['pb_pct'] is not None else None for d in dates]
     dyr_series = [round(val_map[d]['dyr_pct']*100) if d in val_map and val_map[d]['dyr_pct'] is not None else None for d in dates]
 
-    # 信号时间线：历史上 250日回撤>=15% 的事件（合并20日）
+    # 信号时间线：历史上 250日回撤>=15% 的事件（合并20日，全收益口径）
     events = []
     last_trig = -999
-    for i in range(250, len(closes)):
-        if dd_series[i] >= 15:
+    for i in range(250, len(dd_series)):
+        if dd_series[i] is not None and dd_series[i] >= 15:
             if i - last_trig >= 20:
                 events.append({'date': dates[i], 'dd': dd_series[i]})
                 last_trig = i
 
-    # 历史类似情况统计：当前回撤幅度下的所有事件（用全历史数据）
-    cur_dd = dd_series[-1] if dd_series else 0
+    # 历史类似情况统计：当前回撤幅度下的所有事件（全收益优先，回退价格）
+    cur_dd = dd_series[-1] if dd_series and dd_series[-1] is not None else 0
     # 全历史回撤序列
+    hist_base = hist_tri if hist_tri else hist_closes
     hist_dd = []
-    for i in range(len(hist_closes)):
-        w = hist_closes[max(0, i-249):i+1]
+    for i in range(len(hist_base)):
+        w = hist_base[max(0, i-249):i+1]
         hi = max(w)
-        hist_dd.append((hi - hist_closes[i]) / hi * 100)
+        hist_dd.append((hi - hist_base[i]) / hi * 100)
     similar = []
     last_s = -999
-    for i in range(250, len(hist_closes)):
+    for i in range(250, len(hist_base)):
         ddv = hist_dd[i]
         if ddv >= cur_dd and cur_dd > 0 and i - last_s >= 20:
-            fwd20 = (hist_closes[min(i+20, len(hist_closes)-1)] - hist_closes[i]) / hist_closes[i] * 100 if i+20 < len(hist_closes) else None
+            fwd20 = (hist_base[min(i+20, len(hist_base)-1)] - hist_base[i]) / hist_base[i] * 100 if i+20 < len(hist_base) else None
             fwd60 = (hist_closes[min(i+60, len(hist_closes)-1)] - hist_closes[i]) / hist_closes[i] * 100 if i+60 < len(hist_closes) else None
-            peak = max(hist_closes[i:min(i+120, len(hist_closes))]) if i < len(hist_closes) else hist_closes[i]
-            bounce = (peak - hist_closes[i]) / hist_closes[i] * 100
+            peak = max(hist_base[i:min(i+120, len(hist_base))]) if i < len(hist_base) else hist_base[i]
+            bounce = (peak - hist_base[i]) / hist_base[i] * 100
             days_to_peak = None
-            if i < len(hist_closes):
-                seg = hist_closes[i:min(i+120, len(hist_closes))]
+            if i < len(hist_base):
+                seg = hist_base[i:min(i+120, len(hist_base))]
                 if seg:
                     days_to_peak = seg.index(max(seg))
             similar.append({
-                'date': hist_dates[i], 'dd': round(ddv, 1),
+                'date': (hist_tri_dates[i] if hist_tri_dates else hist_dates[i]), 'dd': round(ddv, 1),
                 'fwd20': round(fwd20, 1) if fwd20 is not None else None,
                 'fwd60': round(fwd60, 1) if fwd60 is not None else None,
                 'bounce': round(bounce, 1),
