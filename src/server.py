@@ -1627,12 +1627,48 @@ def api_market_dividend_detail():
     except Exception:
         pass
 
+    # ── 价格 vs 全收益 对比线（PRD Ticket 03）──
+    # 归一化：近3年起点=100（dates/closes 为价格，tri_rows 为全收益，日期对齐）
+    price_norm = None
+    tri_norm = None
+    tri_diff = None
+    if tri_rows and len(tri_rows) >= 2 and len(tri_rows) == len(dates):
+        tri_closes = [r['close'] for r in tri_rows]
+        base_p = closes[0] if closes[0] else 1
+        base_t = tri_closes[0] if tri_closes[0] else 1
+        price_norm = [round(c / base_p * 100, 1) for c in closes]
+        tri_norm = [round(c / base_t * 100, 1) for c in tri_closes]
+        tri_diff = [round(t - p, 1) for p, t in zip(price_norm, tri_norm)]
+
+    # ── 年度最大回撤（PRD §2.2 展示用，非规则）──
+    annual_dd = []
+    if tri_rows and len(tri_rows) >= 250:
+        tri_closes = [r['close'] for r in tri_rows]
+        tri_dates = [r['date'] for r in tri_rows]
+        cur_year = None
+        year_hi = None
+        year_map = {}
+        for i in range(len(tri_dates)):
+            y = tri_dates[i][:4]
+            if y != cur_year:
+                cur_year = y
+                year_hi = tri_closes[i]
+            if tri_closes[i] > year_hi:
+                year_hi = tri_closes[i]
+            dd = (year_hi - tri_closes[i]) / year_hi * 100
+            year_map.setdefault(y, 0)
+            year_map[y] = max(year_map[y], dd)
+        annual_dd = [{'year': y, 'dd': round(d, 1)} for y, d in sorted(year_map.items())]
+
     return jsonify({
         'code': code, 'name': name, 'date': target_date,
         'dates': dates, 'closes': closes, 'dd_series': dd_series,
         'pe_series': pe_series, 'pb_series': pb_series, 'dyr_series': dyr_series,
         'events': events, 'similar': similar, 'stats': stats, 'val_similar': val_similar,
         'current_dd': round(cur_dd, 1),
+        'price_norm': price_norm, 'tri_norm': tri_norm, 'tri_diff': tri_diff,
+        'annual_dd': annual_dd,
+        'dd_source': 'full_return' if hist_tri else 'price',
     })
 
 
