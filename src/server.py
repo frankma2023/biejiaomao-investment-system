@@ -1368,7 +1368,7 @@ def api_market_dividend_advice():
                 'dyr_pct': round(v['dyr_pct'] * 100) if v['dyr_pct'] is not None else None,
             }
 
-        # 信号（v1.1：250日回撤买点阈值 15%→10%，回测 32 次触发/20日胜率75% vs 15% 仅9次小样本）
+        # 信号（v1.1：250日回撤买点阈值 15%→10%；v1.2：卖出警示规则）
         signals = []
         if dd_250 >= DD_BUY_THRESHOLD:
             signals.append('gold_buy')
@@ -1381,9 +1381,34 @@ def api_market_dividend_advice():
         if val and val['dyr_pct'] is not None and val['dyr_pct'] < 10:
             signals.append('low_div')
 
-        # 建议
+        # v1.2 卖出警示信号（卖点研究，PRD §5.4）
+        # 涨幅基于全收益收盘（与回撤同口径）；ddinfo 已含全收益 closes 派生数据，需额外取涨幅
+        chg20 = chg60 = None
+        if ddinfo:
+            # 从全收益表取 20/60 日涨幅（ddinfo 内部数据不可得，直接查）
+            tri_rows_adv = db.execute("""
+                SELECT close FROM index_full_return_daily
+                WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 61
+            """, (FULL_RETURN_MAP.get(code, code), target_date)).fetchall()
+            tri_rows_adv = list(reversed(tri_rows_adv))
+            if len(tri_rows_adv) >= 21:
+                chg20 = (tri_rows_adv[-1]['close'] / tri_rows_adv[-21]['close'] - 1) * 100
+            if len(tri_rows_adv) >= 61:
+                chg60 = (tri_rows_adv[-1]['close'] / tri_rows_adv[-61]['close'] - 1) * 100
+        if chg20 is not None and chg20 > 10 or chg60 is not None and chg60 > 15:
+            signals.append('surge_sell')
+        if val and val['pe_pct'] is not None and val['pe_pct'] > 80:
+            signals.append('pe_high_sell')
+
+        # 建议（v1.2：卖出警示优先于买入）
         advice, level = '持有/观望', 'hold'
-        if 'double_confirm' in signals:
+        if 'pe_high_sell' in signals and 'surge_sell' in signals:
+            advice, level = '估值高位+涨幅过大双确认，建议强减仓', 'strong_reduce'
+        elif 'pe_high_sell' in signals:
+            advice, level = '估值高位（10年PE分位>80%），建议减仓', 'reduce'
+        elif 'surge_sell' in signals:
+            advice, level = '短期涨幅过大（20日>10%/60日>15%），建议减仓', 'reduce'
+        elif 'double_confirm' in signals:
             advice, level = '分批买入（回撤+高息双确认）', 'strong_buy'
         elif 'gold_buy' in signals or 'high_div' in signals:
             advice, level = '观察买入（单信号触发）', 'buy'
@@ -1403,13 +1428,13 @@ def api_market_dividend_advice():
             'advice_level': level,
         })
 
-    # 整体汇总
+    # 整体汇总（v1.2：含 strong_reduce）
     buy_count = sum(1 for r in results if r['advice_level'] in ('strong_buy', 'buy'))
-    reduce_count = sum(1 for r in results if r['advice_level'] == 'reduce')
+    reduce_count = sum(1 for r in results if r['advice_level'] in ('reduce', 'strong_reduce'))
     if buy_count >= 3:
         summary = f"{buy_count}/5 指数处于买入区，红利整体低估"
     elif reduce_count >= 3:
-        summary = f"{reduce_count}/5 指数估值偏高，建议减仓"
+        summary = f"{reduce_count}/5 指数建议减仓，警惕高位回落"
     else:
         summary = f"买入区 {buy_count}/5 · 减仓区 {reduce_count}/5，整体中性"
 

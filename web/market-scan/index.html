@@ -416,9 +416,9 @@
         html+='<div class="section-hdr" style="margin-top:18px">📌 大盘操作建议 <span style="font-size:9px;color:var(--muted);font-weight:400">红利指数规则引擎 · 回测验证</span></div>';
         html+='<div style="font-size:9px;color:var(--muted);margin-bottom:8px">'+da.summary+' · 点击卡片查看历史回撤/估值/信号详情</div>';
         html+='<div class="sector-grid">';
-        var daColorMap={'strong_buy':'#ef4444','buy':'#ef4444','reduce':'#10b981','caution':'#f59e0b','hold':'#8b8b90'};
-        var daBgMap={'strong_buy':{'bg':'rgba(239,68,68,.08)','bd':'rgba(239,68,68,.25)'},'buy':{'bg':'rgba(239,68,68,.06)','bd':'rgba(239,68,68,.2)'},'reduce':{'bg':'rgba(16,185,129,.08)','bd':'rgba(16,185,129,.25)'},'caution':{'bg':'rgba(245,158,11,.08)','bd':'rgba(245,158,11,.25)'},'hold':{'bg':'rgba(139,139,144,.06)','bd':'rgba(139,139,144,.2)'}};
-        var daLevelText={'strong_buy':'强买入','buy':'买入','reduce':'减仓','caution':'谨慎','hold':'观望'};
+        var daColorMap={'strong_buy':'#ef4444','buy':'#ef4444','strong_reduce':'#059669','reduce':'#10b981','caution':'#f59e0b','hold':'#8b8b90'};
+        var daBgMap={'strong_buy':{'bg':'rgba(239,68,68,.08)','bd':'rgba(239,68,68,.25)'},'buy':{'bg':'rgba(239,68,68,.06)','bd':'rgba(239,68,68,.2)'},'strong_reduce':{'bg':'rgba(5,150,105,.1)','bd':'rgba(5,150,105,.3)'},'reduce':{'bg':'rgba(16,185,129,.08)','bd':'rgba(16,185,129,.25)'},'caution':{'bg':'rgba(245,158,11,.08)','bd':'rgba(245,158,11,.25)'},'hold':{'bg':'rgba(139,139,144,.06)','bd':'rgba(139,139,144,.2)'}};
+        var daLevelText={'strong_buy':'强买入','buy':'买入','strong_reduce':'强减仓','reduce':'减仓','caution':'谨慎','hold':'观望'};
         for(var dai=0;dai<da.indices.length;dai++){
           var dax=da.indices[dai];
           var daColor=daColorMap[dax.advice_level]||'#8b8b90';

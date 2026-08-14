@@ -77,7 +77,7 @@ async function load() {
   }
   const advHtml = [];
   if (advice) {
-    const lvMap = {strong_buy:['强买入','#ef4444'],buy:['买入','#ef4444'],reduce:['减仓','#10b981'],caution:['谨慎','#f59e0b'],hold:['观望','#8b8b90']};
+    const lvMap = {strong_buy:['强买入','#ef4444'],buy:['买入','#ef4444'],strong_reduce:['强减仓','#059669'],reduce:['减仓','#10b981'],caution:['谨慎','#f59e0b'],hold:['观望','#8b8b90']};
     const lv = lvMap[advice.advice_level] || ['观望','#8b8b90'];
     const st = d.stats || {};
     const vs = d.val_similar || {};
