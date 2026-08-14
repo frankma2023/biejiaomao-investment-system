@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>红利投资 · 总览</title>
+<link rel="stylesheet" href="/shared/css/hanako-glass.css">
+<script src="/shared/js/api-client.js"></script>
+<style>
+body{background:var(--bg);color:var(--text-primary);font-family:var(--font-body);font-size:13px;margin:0;padding:24px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--accent);margin:0 0 4px}
+.sub{font-size:0.68rem;color:var(--muted);margin-bottom:20px}
+.section-hdr{font-family:var(--font-display);font-size:0.75rem;font-weight:700;color:var(--text-secondary);margin:18px 0 8px;letter-spacing:0.05em}
+.sector-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.sector-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;transition:transform .15s,box-shadow .15s;display:flex;flex-direction:column;min-height:130px}
+.sector-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.08)}
+.sc-title{font-family:var(--font-display);font-size:0.78rem;font-weight:700}
+.sc-title .code{font-size:0.62rem;color:var(--muted);font-family:var(--font-mono);font-weight:400}
+.lv{font-size:0.95rem;font-weight:700}
+.tx{font-size:0.7rem;color:var(--text-secondary);margin-top:2px}
+.meta{font-size:0.66rem;color:var(--muted);margin-top:6px}
+.sig{font-size:0.64rem;color:var(--muted);margin-top:4px;border-top:1px solid var(--border);padding-top:6px}
+.note{font-size:0.62rem;color:#f59e0b;margin-top:14px;line-height:1.7}
+.toolbar{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.toolbar a{font-size:0.68rem;color:var(--accent);text-decoration:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px}
+.toolbar a:hover{background:var(--color-accent-subtle)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🧧 红利投资</h1>
+  <div class="sub" id="meta">红利/自由现金流指数操作建议 · 回撤买点 + 估值分位 · 点击卡片查看详情</div>
+  <div class="toolbar">
+    <a href="lab.html">🔬 回撤实验室</a>
+    <a href="../dividend-advice-detail.html?code=000922">📈 中证红利详情</a>
+    <a href="../fcf-advice-detail.html">🧲 自由现金流详情</a>
+  </div>
+  <div id="content">加载中...</div>
+</div>
+
+<script>
+const LV = {
+  strong_buy:['强买入','#ef4444',{bg:'rgba(239,68,68,.08)',bd:'rgba(239,68,68,.25)'}],
+  buy:['买入','#ef4444',{bg:'rgba(239,68,68,.06)',bd:'rgba(239,68,68,.2)'}],
+  reduce:['减仓','#10b981',{bg:'rgba(16,185,129,.08)',bd:'rgba(16,185,129,.25)'}],
+  caution:['谨慎','#f59e0b',{bg:'rgba(245,158,11,.08)',bd:'rgba(245,158,11,.25)'}],
+  hold:['观望','#8b8b90',{bg:'rgba(139,139,144,.06)',bd:'rgba(139,139,144,.2)'}]
+};
+
+async function load() {
+  try {
+    const [da, fa] = await Promise.all([
+      fetch(API_BASE + '/api/market-scan/dividend-advice').then(r => r.json()).catch(() => ({indices:[]})),
+      fetch(API_BASE + '/api/market-scan/fcf-advice').then(r => r.json()).catch(() => ({}))
+    ]);
+    const date = da.date || fa.date || '';
+    document.getElementById('meta').textContent = '红利/自由现金流指数操作建议 · ' + date + ' · 点击卡片查看详情';
+
+    let html = '';
+    // 红利指数
+    html += '<div class="section-hdr">📌 红利指数（回撤+估值规则）</div><div class="sector-grid">';
+    (da.indices || []).forEach(x => {
+      const lv = LV[x.advice_level] || LV.hold;
+      const peV = x.valuation && x.valuation.pe_pct != null ? x.valuation.pe_pct + '%' : '—';
+      const dyV = x.valuation && x.valuation.dyr_pct != null ? x.valuation.dyr_pct + '%' : '—';
+      html += '<div class="sector-card" style="background:' + lv[2].bg + ';border-color:' + lv[2].bd + '" onclick="window.open(\'../dividend-advice-detail.html?code=' + x.code + '&date=' + date + '\')">';
+      html += '<div class="sc-title">' + x.name + ' <span class="code">' + x.code + '</span></div>';
+      html += '<div style="margin-top:6px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span></div>';
+      html += '<div class="tx">' + x.advice + '</div>';
+      html += '<div class="meta">回撤 ' + x.dd_250 + '%' + (x.dd_source === 'full_return' ? '（全收益）' : '') + ' · PE分位 ' + peV + ' · 股息率分位 ' + dyV + '</div>';
+      html += '<div class="sig">信号: ' + (x.signals && x.signals.length ? x.signals.join(' · ') : '—') + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    // 自由现金流
+    if (fa && fa.code) {
+      const lv = LV[fa.advice_level] || LV.hold;
+      const peV = fa.valuation && fa.valuation.pe_pct != null ? fa.valuation.pe_pct + '%' : '—';
+      const pbV = fa.valuation && fa.valuation.pb_pct != null ? fa.valuation.pb_pct + '%' : '—';
+      const dyV = fa.valuation && fa.valuation.dyr_pct != null ? fa.valuation.dyr_pct + '%' : '—';
+      html += '<div class="section-hdr">🧲 自由现金流（估值分位规则）</div><div class="sector-grid">';
+      html += '<div class="sector-card" style="background:' + lv[2].bg + ';border-color:' + lv[2].bd + '" onclick="window.open(\'../fcf-advice-detail.html?date=' + date + '\')">';
+      html += '<div class="sc-title">' + fa.name + ' <span class="code">' + fa.code + '</span></div>';
+      html += '<div style="margin-top:6px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span></div>';
+      html += '<div class="tx">' + fa.advice + '</div>';
+      html += '<div class="meta">PE分位 ' + peV + ' · PB分位 ' + pbV + ' · 股息率分位 ' + dyV + '</div>';
+      html += '<div class="sig">信号: ' + (fa.signals && fa.signals.length ? fa.signals.join(' · ') : '—') + '</div>';
+      html += '</div></div>';
+      html += '<div class="note">⚠️ 自由现金流估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考。</div>';
+    }
+
+    html += '<div class="note">📊 回撤口径说明：红利指数回撤计算使用中证红利全收益（H00922，含分红再投资，2018起），比价格指数更真实。买点规则：250日回撤≥10%（回测32次触发，20日胜率75%）。</div>';
+    document.getElementById('content').innerHTML = html;
+  } catch(e) {
+    document.getElementById('content').innerHTML = '加载失败: ' + e.message;
+  }
+}
+load();
+
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+</script>
+<script src="/shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'🧧',brandText:'红利投资',currentPage:'red-dividend'})</script>
+</body>
+</html>
