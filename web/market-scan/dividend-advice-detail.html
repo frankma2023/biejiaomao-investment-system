@@ -181,7 +181,7 @@ async function load() {
       dataZoom:[{type:'inside'}],
       series:[{type:'line',data:d.dd_series,smooth:true,showSymbol:false,
         lineStyle:{color:'#ef4444',width:1.5},areaStyle:{color:'rgba(239,68,68,.08)'},
-        markLine:{silent:true,symbol:'none',data:[{yAxis:15,lineStyle:{color:'#ef4444',type:'dashed'},label:{formatter:'15%买点线',color:'#ef4444',fontSize:9}}]},
+        markLine:{silent:true,symbol:'none',data:[{yAxis:10,lineStyle:{color:'#ef4444',type:'dashed'},label:{formatter:'10%买点线',color:'#ef4444',fontSize:9}}]},
         markPoint:{data:d.events.map(e=>({coord:[e.date,e.dd],value:'买点',itemStyle:{color:'#ef4444'}})),symbolSize:8}
       }]
     });
@@ -217,7 +217,7 @@ async function load() {
       series:[{type:'line',data:d.closes,smooth:true,showSymbol:false,
         lineStyle:{color:'#f59e0b',width:1.5},
         markPoint:{data:d.events.map(e=>({coord:[e.date,e.dd],value:'⚡',itemStyle:{color:'#ef4444'}})),symbol:'pin',symbolSize:36,label:{color:'#fff',fontSize:9}},
-        markLine:{silent:true,symbol:'none',data:[{yAxis:15,lineStyle:{color:'#ef4444',type:'dashed'},label:{formatter:'15%',color:'#ef4444',fontSize:9}}]}
+        markLine:{silent:true,symbol:'none',data:[{yAxis:10,lineStyle:{color:'#ef4444',type:'dashed'},label:{formatter:'10%',color:'#ef4444',fontSize:9}}]}
       }]
     });
     return c;
@@ -230,7 +230,7 @@ async function load() {
   window.addEventListener('resize', () => inst.forEach(c => c.resize()));
 
   // 4. 信号触发历史表
-  const evHtml = ['<div class="chart-card"><div class="ct">⚡ 历史买点信号时间线（250日回撤≥15%触发）</div>',
+  const evHtml = ['<div class="chart-card"><div class="ct">⚡ 历史买点信号时间线（250日回撤≥10%触发）</div>',
     '<table><thead><tr><th>触发日期</th><th>回撤幅度</th><th>20日收益</th><th>60日收益</th><th>反弹幅度</th><th>到峰值天数</th></tr></thead><tbody>'];
   (d.similar || []).slice().reverse().forEach(e => {
     const c20 = e.fwd20 != null ? (e.fwd20 >= 0 ? '<span class="up">' + e.fwd20 + '%</span>' : '<span class="dn">' + e.fwd20 + '%</span>') : '—';

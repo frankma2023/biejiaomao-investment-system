@@ -1365,13 +1365,13 @@ def api_market_dividend_advice():
                 'dyr_pct': round(v['dyr_pct'] * 100) if v['dyr_pct'] is not None else None,
             }
 
-        # 信号
+        # 信号（v1.1：250日回撤买点阈值 15%→10%，回测 32 次触发/20日胜率75% vs 15% 仅9次小样本）
         signals = []
-        if dd_250 >= 15:
+        if dd_250 >= 10:
             signals.append('gold_buy')
         if val and val['dyr_pct'] is not None and val['dyr_pct'] > 90:
             signals.append('high_div')
-        if dd_250 >= 15 and val and val['dyr_pct'] is not None and val['dyr_pct'] > 80:
+        if dd_250 >= 10 and val and val['dyr_pct'] is not None and val['dyr_pct'] > 80:
             signals.append('double_confirm')
         if val and val['pe_pct'] is not None and val['pe_pct'] > 80:
             signals.append('pe_warn')
@@ -1497,7 +1497,7 @@ def api_market_dividend_detail():
     events = []
     last_trig = -999
     for i in range(250, len(dd_series)):
-        if dd_series[i] is not None and dd_series[i] >= 15:
+        if dd_series[i] is not None and dd_series[i] >= 10:  # v1.1：买点阈值 15%→10%
             if i - last_trig >= 20:
                 events.append({'date': dates[i], 'dd': dd_series[i]})
                 last_trig = i
@@ -1965,6 +1965,85 @@ def api_market_fcf_detail():
         'current_dd': current_dd,
         'data_note': FCF_DATA_NOTE,
     })
+
+# ═══════════════════════════════════════════════
+# API: GET /api/market-scan/dividend-lab（回撤实验室）
+# ═══════════════════════════════════════════════
+
+@app.route('/api/market-scan/dividend-lab')
+def api_market_dividend_lab():
+    """回撤实验室：口径切换（250日滚动/年度）+ 阈值可调，全收益口径统计触发点收益。
+    参数：mode=250|annual（默认250）、threshold=0.10（默认0.10，回测最优）"""
+    mode = request.args.get('mode', '250')
+    threshold = float(request.args.get('threshold', '0.10'))
+    db = get_db()
+
+    # 全收益数据（H00922，2018 起）
+    rows = db.execute("""
+        SELECT date, close FROM index_full_return_daily
+        WHERE stock_code='H00922' ORDER BY date
+    """).fetchall()
+    if len(rows) < 260:
+        return jsonify({'error': 'no data'})
+    dates = [r['date'] for r in rows]
+    closes = [r['close'] for r in rows]
+
+    # 回撤序列
+    dds = []
+    if mode == 'annual':
+        cur_year = None
+        year_hi = None
+        for i in range(len(closes)):
+            y = dates[i][:4]
+            if y != cur_year:
+                cur_year = y
+                year_hi = closes[i]
+            if closes[i] > year_hi:
+                year_hi = closes[i]
+            dds.append((year_hi - closes[i]) / year_hi * 100)
+        start_i = 0
+    else:
+        for i in range(len(closes)):
+            w = closes[max(0, i-249):i+1]
+            hi = max(w)
+            dds.append((hi - closes[i]) / hi * 100)
+        start_i = 250
+
+    # 触发事件（20日去重）
+    events = []
+    last = -999
+    for i in range(start_i, len(closes)):
+        if dds[i] >= threshold * 100 and i - last >= 20:
+            events.append({'date': dates[i], 'dd': round(dds[i], 1), 'close': round(closes[i], 2)})
+            last = i
+
+    # 20/60 日收益（次日收盘买入）
+    def _med(xs):
+        s = sorted(xs); n = len(s)
+        return s[n//2] if n % 2 else (s[n//2-1]+s[n//2])/2
+    stats = {}
+    for w in (20, 60):
+        rets = []
+        for ev in events:
+            i = dates.index(ev['date'])
+            if i + 1 + w >= len(closes):
+                continue
+            entry = closes[i+1]
+            rets.append((closes[i+1+w] / entry - 1) * 100)
+        if rets:
+            stats[w] = {
+                'n': len(rets),
+                'winrate': round(sum(1 for r in rets if r > 0) / len(rets) * 100, 1),
+                'median': round(_med(rets), 2),
+                'avg': round(sum(rets) / len(rets), 2),
+            }
+
+    return jsonify({
+        'mode': mode, 'threshold': threshold,
+        'data_range': [dates[0], dates[-1]],
+        'events': events, 'stats': stats,
+    })
+
 
 # ═══════════════════════════════════════════════
 # API: GET /api/strongest-index
