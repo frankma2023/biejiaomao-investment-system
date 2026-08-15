@@ -340,7 +340,7 @@ function buildValBar(id, name, dates, vals, color, isBig) {
   const avg = vv.reduce((a, b) => a + b, 0) / vv.length;
   const isPct = name.indexOf('%') >= 0;
   // % 单位（ROE/净利率）：小数值 ×100 显示；亿单位：÷1e8
-  const toDisp = v => isPct ? (v * 100).toFixed(1) : (isBig ? (v / 1e8).toFixed(1) : v);
+  const toDisp = v => isPct ? (v * 100).toFixed(1) : (isBig ? (v / 1e8).toFixed(1) : v.toFixed(2));
   const d1 = vals.map(v => v != null ? toDisp(v) : null);
   const avgDisp = isPct ? (avg * 100).toFixed(1) : (isBig ? (avg / 1e8).toFixed(1) : avg.toFixed(2));
   const d2 = vals.map(() => avgDisp);
