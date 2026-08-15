@@ -141,7 +141,16 @@ async function loadFS(code){
   try{
     var resp=await fetch(API+'/api/valuation/fs?code='+code);
     var fs=await resp.json();
-    if(!fs.dates||!fs.dates.length)return;
+    if(!fs.dates||!fs.dates.length){
+      // 数据源无该指数财务数据：清空旧图表（防止残留上一指数数据误导）
+      ['roe','eps','revenue','np','npm','opm','div','tax'].forEach(function(id){
+        var dom=document.getElementById('chart-'+id);
+        if(dom){if(dom._echart)dom._echart.dispose();dom._echart=null;}
+        var tx=document.getElementById('text-'+id);
+        if(tx)tx.innerHTML='该指数暂无理杏仁年报财务数据';
+      });
+      return;
+    }
     var isDark=document.documentElement.dataset.theme==='dark';
     var up=isDark?'#FF6B6B':'#E8553D',dn=isDark?'#4ECDC4':'#2D9D5A';
     buildBar('chart-roe','ROE %',fs.dates,fs.roe,dn);genFsText('text-roe','ROE',fs.roe,'%',fs.dates);
