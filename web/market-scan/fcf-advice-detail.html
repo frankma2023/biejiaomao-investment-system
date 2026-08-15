@@ -87,7 +87,8 @@ html[data-theme="light"] .tab.active{background:var(--accent-subtle);color:var(-
 <script>
 const params = new URLSearchParams(window.location.search);
 const date = params.get('date') || '';
-const DETAIL_API = API_BASE + '/api/market-scan/fcf-advice-detail' + (date ? '?date=' + date : '');
+const code = params.get('code') || '980092';
+const DETAIL_API = API_BASE + '/api/market-scan/fcf-advice-detail?code=' + code + (date ? '&date=' + date : '');
 const ADVICE_API = API_BASE + '/api/market-scan/fcf-advice' + (date ? '?date=' + date : '');
 
 let isDark = document.documentElement.dataset.theme === 'dark';
@@ -105,15 +106,16 @@ async function load() {
   document.getElementById('meta').textContent = d.date + ' · 当前250日回撤 ' + d.current_dd + '%';
 
   // 数据声明：优先用 API 返回的 data_note（诚实铁律，与后端文案单一来源）
-  const note = d.data_note || (a && a.data_note) || '估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考';
+  const advItem = a && a.indices && a.indices.length ? (a.indices.find(x => x.code === code) || a.indices[0]) : a;
+  const note = d.data_note || (advItem && advItem.data_note) || '估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考';
   document.getElementById('note-banner').textContent = '⚠️ 数据声明：' + note + '。净值回撤仅展示，不触发信号（2年窗口未验证出统计规律，供人工判断参考）。估值分位为理杏仁10年滚动口径（y10.cvpos）。';
 
   // 当前建议
   const advHtml = [];
-  if (a && a.advice_level) {
+  if (advItem && advItem.advice_level) {
     const lvMap = {strong_buy:['强买入','#ef4444'],buy:['买入','#ef4444'],caution:['谨慎','#f59e0b'],hold:['观望','#8b8b90']};
-    const lv = lvMap[a.advice_level] || ['观望','#8b8b90'];
-    const v = a.valuation || {};
+    const lv = lvMap[advItem.advice_level] || ['观望','#8b8b90'];
+    const v = advItem.valuation || {};
     const st = d.stats || {};
     let evidence = [];
     if (st.count) {
@@ -121,7 +123,7 @@ async function load() {
     }
     evidence.push('当前估值：PE ' + (v.pe!=null?v.pe:'—') + '（分位' + (v.pe_pct!=null?v.pe_pct+'%':'—') + '）· PB ' + (v.pb!=null?v.pb:'—') + '（分位' + (v.pb_pct!=null?v.pb_pct+'%':'—') + '）· 股息率 ' + (v.dyr!=null?v.dyr+'%':'—') + '（分位' + (v.dyr_pct!=null?v.dyr_pct+'%':'—') + '）');
     advHtml.push('<div class="advice-card">');
-    advHtml.push('<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span><span class="tx">' + a.advice + '</span><span class="st">' + (a.signals && a.signals.length ? a.signals.join(' · ') : '无信号') + '</span></div>');
+    advHtml.push('<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span><span class="tx">' + advItem.advice + '</span><span class="st">' + (advItem.signals && advItem.signals.length ? advItem.signals.join(' · ') : '无信号') + '</span></div>');
     if (evidence.length) {
       advHtml.push('<div style="font-size:0.68rem;color:var(--text-secondary);line-height:1.8;border-top:1px solid var(--border);padding-top:8px">📊 依据：<br/>' + evidence.join('<br/>') + '</div>');
     }
@@ -228,7 +230,7 @@ function switchTab(tab) {
 }
 
 async function loadValuation() {
-  const vcode = '980092';
+  const vcode = code;
   const sy = '2024', ey = new Date().getFullYear();
   const endDate = ey + '-12-31';
   try {

@@ -76,21 +76,25 @@ async function load() {
     });
     html += '</div>';
 
-    // 自由现金流
-    if (fa && fa.code) {
-      const lv = LV[fa.advice_level] || LV.hold;
-      const peV = fa.valuation && fa.valuation.pe_pct != null ? fa.valuation.pe_pct + '%' : '—';
-      const pbV = fa.valuation && fa.valuation.pb_pct != null ? fa.valuation.pb_pct + '%' : '—';
-      const dyV = fa.valuation && fa.valuation.dyr_pct != null ? fa.valuation.dyr_pct + '%' : '—';
+    // 自由现金流（多指数：980092 + 932365）
+    const fcfList = (fa && fa.indices && fa.indices.length) ? fa.indices : (fa && fa.code ? [fa] : []);
+    if (fcfList.length) {
       html += '<div class="section-hdr">🧲 自由现金流（估值分位规则）</div><div class="sector-grid">';
-      html += '<div class="sector-card" style="background:' + lv[2].bg + ';border-color:' + lv[2].bd + '" onclick="window.open(\'../fcf-advice-detail.html?date=' + date + '\')">';
-      html += '<div class="sc-title">' + fa.name + ' <span class="code">' + fa.code + '</span></div>';
-      html += '<div style="margin-top:6px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span></div>';
-      html += '<div class="tx">' + fa.advice + '</div>';
-      html += '<div class="meta">PE分位 ' + peV + ' · PB分位 ' + pbV + ' · 股息率分位 ' + dyV + '</div>';
-      html += '<div class="sig">信号: ' + (fa.signals && fa.signals.length ? fa.signals.join(' · ') : '—') + '</div>';
-      html += '</div></div>';
-      html += '<div class="note">⚠️ ' + (fa.data_note || '自由现金流估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考。') + '</div>';
+      fcfList.forEach(fx => {
+        const lv = LV[fx.advice_level] || LV.hold;
+        const peV = fx.valuation && fx.valuation.pe_pct != null ? fx.valuation.pe_pct + '%' : '—';
+        const pbV = fx.valuation && fx.valuation.pb_pct != null ? fx.valuation.pb_pct + '%' : '—';
+        const dyV = fx.valuation && fx.valuation.dyr_pct != null ? fx.valuation.dyr_pct + '%' : '—';
+        html += '<div class="sector-card" style="background:' + lv[2].bg + ';border-color:' + lv[2].bd + '" onclick="window.open(\'../fcf-advice-detail.html?code=' + fx.code + '&date=' + date + '\')">';
+        html += '<div class="sc-title">' + fx.name + ' <span class="code">' + fx.code + '</span></div>';
+        html += '<div style="margin-top:6px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span></div>';
+        html += '<div class="tx">' + fx.advice + '</div>';
+        html += '<div class="meta">回撤 ' + fx.dd_250 + '% · PE分位 ' + peV + ' · PB分位 ' + pbV + ' · 股息率分位 ' + dyV + '</div>';
+        html += '<div class="sig">信号: ' + (fx.signals && fx.signals.length ? fx.signals.join(' · ') : '—') + '</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+      html += '<div class="note">⚠️ ' + (fcfList[0].data_note || '自由现金流估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考。') + '</div>';
     }
 
     html += '<div class="note">📊 口径说明：① 回撤：中证红利（000922）用全收益 H00922（含分红再投资，2018起），其余红利指数暂用价格口径；买点规则 250日回撤≥10%（回测32次触发/20日胜率75%）。② 估值分位：PE/PB/股息率分位为<b>10年滚动口径</b>（理杏仁 y10.cvpos），非全历史——红利 PE 分位极少>85%、PB 分位极少>55%、股息率分位从未<20%，属数据特性非异常。</div>';

@@ -443,32 +443,33 @@
       }
 
       // ═══ 大盘操作建议（自由现金流指数）═══
-      if(h.fcf_advice&&h.fcf_advice.code&&h.fcf_advice.advice_level){
-        var fx=h.fcf_advice;
+      var fcfList = (h.fcf_advice && h.fcf_advice.indices && h.fcf_advice.indices.length) ? h.fcf_advice.indices : (h.fcf_advice && h.fcf_advice.code ? [h.fcf_advice] : []);
+      if(fcfList.length){
         var daColorMap2={'strong_buy':'#ef4444','buy':'#ef4444','caution':'#f59e0b','hold':'#8b8b90'};
         var daBgMap2={'strong_buy':{'bg':'rgba(239,68,68,.08)','bd':'rgba(239,68,68,.25)'},'buy':{'bg':'rgba(239,68,68,.06)','bd':'rgba(239,68,68,.2)'},'caution':{'bg':'rgba(245,158,11,.08)','bd':'rgba(245,158,11,.25)'},'hold':{'bg':'rgba(139,139,144,.06)','bd':'rgba(139,139,144,.2)'}};
         var daLevelText2={'strong_buy':'强买入','buy':'买入','caution':'谨慎','hold':'观望'};
-        var fxColor=daColorMap2[fx.advice_level]||'#8b8b90';
-        var fxBg=daBgMap2[fx.advice_level]||{'bg':'rgba(139,139,144,.06)','bd':'rgba(139,139,144,.2)'};
-        var peV=fx.valuation&&fx.valuation.pe_pct!=null?fx.valuation.pe_pct:'—';
-        var pbV=fx.valuation&&fx.valuation.pb_pct!=null?fx.valuation.pb_pct:'—';
-        var dyrV=fx.valuation&&fx.valuation.dyr_pct!=null?fx.valuation.dyr_pct:'—';
-        var sigText=fx.signals&&fx.signals.length?fx.signals.join('·'):'—';
         html+='<div class="section-hdr" style="margin-top:14px">🧲 自由现金流指数 <span style="font-size:9px;color:var(--muted);font-weight:400">估值驱动 · 非回撤驱动</span></div>';
-        html+='<div style="font-size:9px;color:#f59e0b;margin-bottom:8px">⚠️ '+(fx.data_note||'估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考')+'</div>';
-        html+='<div style="font-size:9px;color:var(--muted);margin-bottom:8px">'+fx.advice+' · 点击卡片查看净值回撤/估值分位/信号详情</div>';
+        html+='<div style="font-size:9px;color:#f59e0b;margin-bottom:8px">⚠️ '+(fcfList[0].data_note||'估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考')+'</div>';
         html+='<div class="sector-grid">';
-        html+='<div class="sector-card" style="background:'+fxBg.bg+';border:1px solid '+fxBg.bd+'" onclick="window.open(\'fcf-advice-detail.html?date='+fx.date+'\')">';
-        html+='<div class="sc-title">'+fx.name+' <span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">'+fx.code+'</span></div>';
-        html+='<div style="display:flex;align-items:baseline;gap:6px;margin:4px 0">';
-        html+='<span style="font-size:11px;font-weight:600;color:'+fxColor+'">'+daLevelText2[fx.advice_level]+'</span>';
-        html+='<span style="font-size:10px;color:var(--muted)">'+fx.advice+'</span>';
-        html+='</div>';
-        html+='<div style="font-size:10px;color:var(--muted)">回撤 '+fx.dd_250+'%（仅展示）</div>';
-        html+='<div style="margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">';
-        html+='<div style="font-size:9px;color:var(--muted)">PE分位 '+peV+'% · PB分位 '+pbV+'% · 股息率分位 '+dyrV+'%</div>';
-        html+='<div style="font-size:9px;color:var(--muted);margin-top:2px">信号: '+sigText+'</div>';
-        html+='</div></div>';
+        fcfList.forEach(function(fx){
+          var fxColor=daColorMap2[fx.advice_level]||'#8b8b90';
+          var fxBg=daBgMap2[fx.advice_level]||{'bg':'rgba(139,139,144,.06)','bd':'rgba(139,139,144,.2)'};
+          var peV=fx.valuation&&fx.valuation.pe_pct!=null?fx.valuation.pe_pct:'—';
+          var pbV=fx.valuation&&fx.valuation.pb_pct!=null?fx.valuation.pb_pct:'—';
+          var dyrV=fx.valuation&&fx.valuation.dyr_pct!=null?fx.valuation.dyr_pct:'—';
+          var sigText=fx.signals&&fx.signals.length?fx.signals.join('·'):'—';
+          html+='<div class="sector-card" style="background:'+fxBg.bg+';border:1px solid '+fxBg.bd+'" onclick="window.open(\'fcf-advice-detail.html?code='+fx.code+'&date='+fx.date+'\')">';
+          html+='<div class="sc-title">'+fx.name+' <span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">'+fx.code+'</span></div>';
+          html+='<div style="display:flex;align-items:baseline;gap:6px;margin:4px 0">';
+          html+='<span style="font-size:11px;font-weight:600;color:'+fxColor+'">'+daLevelText2[fx.advice_level]+'</span>';
+          html+='<span style="font-size:10px;color:var(--muted)">'+fx.advice+'</span>';
+          html+='</div>';
+          html+='<div style="font-size:10px;color:var(--muted)">回撤 '+fx.dd_250+'%（仅展示）</div>';
+          html+='<div style="margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">';
+          html+='<div style="font-size:9px;color:var(--muted)">PE分位 '+peV+'% · PB分位 '+pbV+'% · 股息率分位 '+dyrV+'%</div>';
+          html+='<div style="font-size:9px;color:var(--muted);margin-top:2px">信号: '+sigText+'</div>';
+          html+='</div></div>';
+        });
         html+='</div>';
       }
       if(h.capital_flow){

@@ -1779,7 +1779,10 @@ def api_market_capital_flow():
 # API: GET /api/market-scan/fcf-advice（自由现金流指数操作建议）
 # ═══════════════════════════════════════════════
 
-FCF_INDEX = ('980092', '国证自由现金流')
+FCF_INDICES = [
+    ('980092', '国证自由现金流'),
+    ('932365', '中证现金流'),
+]
 FCF_DATA_NOTE = '估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考'
 
 
@@ -1816,7 +1819,7 @@ def _fcf_signals_and_advice(val):
 
 @app.route('/api/market-scan/fcf-advice')
 def api_market_fcf_advice():
-    """自由现金流指数操作建议：估值分位信号检测+建议合成（支持历史回看）"""
+    """自由现金流指数操作建议：估值分位信号检测+建议合成（支持历史回看，多指数）"""
     target_date = request.args.get('date', '')
     db = get_db()
     if not target_date:
@@ -1825,60 +1828,64 @@ def api_market_fcf_advice():
             return jsonify({'error': 'no data', 'date': ''})
         target_date = r[0]
 
-    code, name = FCF_INDEX
-    # K线 300 日窗口
-    rows = db.execute("""
-        SELECT date, close FROM index_daily_kline
-        WHERE stock_code=? AND kline_type='normal' AND date<=?
-        ORDER BY date DESC LIMIT 300
-    """, (code, target_date)).fetchall()
-    rows = list(reversed(rows))
-    if len(rows) < 250:
-        return jsonify({'error': 'no data', 'date': target_date})
-    closes = [r['close'] for r in rows]
-    current = closes[-1]
-    high250 = max(closes[-250:])
-    dd_250 = (high250 - current) / high250 * 100
+    results = []
+    for code, name in FCF_INDICES:
+        # K线 300 日窗口
+        rows = db.execute("""
+            SELECT date, close FROM index_daily_kline
+            WHERE stock_code=? AND kline_type='normal' AND date<=?
+            ORDER BY date DESC LIMIT 300
+        """, (code, target_date)).fetchall()
+        rows = list(reversed(rows))
+        if len(rows) < 250:
+            continue
+        closes = [r['close'] for r in rows]
+        current = closes[-1]
+        high250 = max(closes[-250:])
+        dd_250 = (high250 - current) / high250 * 100
 
-    # 估值
-    v = db.execute("""
-        SELECT pe_ttm, pe_ttm_pct, pb, pb_pct, dyr, dyr_pct
-        FROM index_fundamental_daily
-        WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1
-    """, (code, target_date)).fetchone()
-    val = None
-    if v:
-        val = {
-            'pe': round(v['pe_ttm'], 1) if v['pe_ttm'] else None,
-            'pe_pct': round(v['pe_ttm_pct'] * 100) if v['pe_ttm_pct'] is not None else None,
-            'pb': round(v['pb'], 2) if v['pb'] else None,
-            'pb_pct': round(v['pb_pct'] * 100) if v['pb_pct'] is not None else None,
-            'dyr': round(v['dyr'] * 100, 2) if v['dyr'] else None,
-            'dyr_pct': round(v['dyr_pct'] * 100) if v['dyr_pct'] is not None else None,
-        }
+        # 估值
+        v = db.execute("""
+            SELECT pe_ttm, pe_ttm_pct, pb, pb_pct, dyr, dyr_pct
+            FROM index_fundamental_daily
+            WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1
+        """, (code, target_date)).fetchone()
+        val = None
+        if v:
+            val = {
+                'pe': round(v['pe_ttm'], 1) if v['pe_ttm'] else None,
+                'pe_pct': round(v['pe_ttm_pct'] * 100) if v['pe_ttm_pct'] is not None else None,
+                'pb': round(v['pb'], 2) if v['pb'] else None,
+                'pb_pct': round(v['pb_pct'] * 100) if v['pb_pct'] is not None else None,
+                'dyr': round(v['dyr'] * 100, 2) if v['dyr'] else None,
+                'dyr_pct': round(v['dyr_pct'] * 100) if v['dyr_pct'] is not None else None,
+            }
 
-    signals, advice, level = _fcf_signals_and_advice(val)
-    return jsonify({
-        'date': target_date, 'code': code, 'name': name,
-        'close': round(current, 2), 'dd_250': round(dd_250, 1),
-        'high_250': round(high250, 2),
-        'valuation': val,
-        'signals': signals, 'advice': advice, 'advice_level': level,
-        'data_note': FCF_DATA_NOTE,
-    })
+        signals, advice, level = _fcf_signals_and_advice(val)
+        results.append({
+            'code': code, 'name': name,
+            'close': round(current, 2), 'dd_250': round(dd_250, 1),
+            'high_250': round(high250, 2),
+            'valuation': val,
+            'signals': signals, 'advice': advice, 'advice_level': level,
+            'data_note': FCF_DATA_NOTE,
+        })
+
+    return jsonify({'date': target_date, 'indices': results})
 
 
 @app.route('/api/market-scan/fcf-advice-detail')
 def api_market_fcf_detail():
     """自由现金流指数详情：净值回撤曲线/估值分位走势/信号时间线/历史类似情况统计"""
     target_date = request.args.get('date', '')
+    code = request.args.get('code', FCF_INDICES[0][0])
+    name = next((n for c, n in FCF_INDICES if c == code), code)
     db = get_db()
     if not target_date:
         r = db.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
         if r is None or r[0] is None:
             return jsonify({'error': 'no data', 'date': ''})
         target_date = r[0]
-    code, name = FCF_INDEX
 
     # 近3年K线
     rows = db.execute("""
