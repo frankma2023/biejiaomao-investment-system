@@ -1684,6 +1684,24 @@ def api_market_dividend_detail():
             year_map[y] = max(year_map[y], dd)
         annual_dd = [{'year': y, 'dd': round(d, 1)} for y, d in sorted(year_map.items())]
 
+    # ── 近10年K线（价格走势长图用；其他图保持近3年 dates/closes）──
+    dates_long = []
+    closes_long = []
+    tri_long = []
+    rows_long = db.execute("""
+        SELECT date, close FROM index_daily_kline
+        WHERE stock_code=? AND kline_type='normal' AND date>=date(?,'-10 years') AND date<=?
+        ORDER BY date
+    """, (code, target_date, target_date)).fetchall()
+    if rows_long:
+        dates_long = [r['date'] for r in rows_long]
+        closes_long = [r['close'] for r in rows_long]
+        if tri_code:
+            tri_map = dict((r['date'], r['close']) for r in db.execute(
+                "SELECT date, close FROM index_full_return_daily WHERE stock_code=? AND date<=?",
+                (tri_code, target_date)).fetchall())
+            tri_long = [tri_map.get(d) for d in dates_long]
+
     return jsonify({
         'code': code, 'name': name, 'date': target_date,
         'dates': dates, 'closes': closes, 'dd_series': dd_series,
@@ -1692,6 +1710,7 @@ def api_market_dividend_detail():
         'current_dd': round(cur_dd, 1),
         'price_norm': price_norm, 'tri_norm': tri_norm, 'tri_diff': tri_diff,
         'annual_dd': annual_dd,
+        'dates_long': dates_long, 'closes_long': closes_long, 'tri_long': tri_long,
         'dd_source': 'full_return' if (tri_rows and len(tri_rows) >= 250) else 'price',
     })
 

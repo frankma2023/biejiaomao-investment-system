@@ -239,23 +239,32 @@ async function load() {
     });
     return c;
   }});
-  // 3. 价格 + 信号时间线
-  charts.push({title:'💹 价格走势 + 买点信号时间线（近3年）', el:'chart-px', h:240, init: el => {
+  // 3. 价格 + 信号时间线（近10年，Y轴起点=最低价×0.85 留15%差值）
+  charts.push({title:'💹 价格走势 + 买点信号时间线（近10年）', el:'chart-px', h:240, init: el => {
     const c = echarts.init(el);
+    const pxDates = d.dates_long && d.dates_long.length ? d.dates_long : d.dates;
+    const pxCloses = d.closes_long && d.closes_long.length ? d.closes_long : d.closes;
+    const pxTri = (d.tri_long && d.tri_long.length) ? d.tri_long : null;
+    const series = [
+      {name:'价格',type:'line',data:pxCloses,smooth:true,showSymbol:false,lineStyle:{color:'#f59e0b',width:1.5},
+        markPoint:{data:(d.events||[]).map(e => {
+          const idx = pxDates.indexOf(e.date);
+          if (idx === -1) return null;
+          return {coord:[e.date, pxCloses[idx]], value:'⚡', itemStyle:{color:'#ef4444'}};
+        }).filter(Boolean),symbol:'pin',symbolSize:36,label:{color:'#fff',fontSize:9}}
+      }
+    ];
+    if (pxTri) {
+      series.push({name:'全收益',type:'line',data:pxTri,smooth:true,showSymbol:false,lineStyle:{color:'#ef4444',width:1,type:'dotted'}});
+    }
     c.setOption({
       backgroundColor:'transparent', tooltip:{trigger:'axis'},
-      grid:{left:'8%',right:'4%',top:12,bottom:24},
-      xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
-      yAxis:{type:'value',min:function(v){return Math.round(v.min*0.7)},axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
-      dataZoom:[{type:'inside'}],
-      series:[{type:'line',data:d.closes,smooth:true,showSymbol:false,
-        lineStyle:{color:'#f59e0b',width:1.5},
-        markPoint:{data:(d.events||[]).map(e => {
-          const idx = d.dates.indexOf(e.date);
-          if (idx === -1) return null;
-          return {coord:[e.date, d.closes[idx]], value:'⚡', itemStyle:{color:'#ef4444'}};
-        }).filter(Boolean),symbol:'pin',symbolSize:36,label:{color:'#fff',fontSize:9}}
-      }]
+      legend:{data:pxTri?['价格','全收益']:['价格'],bottom:2,textStyle:{color:tx,fontSize:9}},
+      grid:{left:'8%',right:'4%',top:12,bottom:34},
+      xAxis:{type:'category',data:pxDates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
+      yAxis:{type:'value',min:function(v){return Math.round(v.min*0.85)},axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
+      dataZoom:[{type:'inside'},{type:'slider',height:14,bottom:0}],
+      series:series
     });
     return c;
   }});
