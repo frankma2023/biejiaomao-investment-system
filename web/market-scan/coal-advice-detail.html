@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>中证煤炭网格投资法详情</title>
+<link rel="stylesheet" href="/shared/css/hanako-glass.css">
+<script src="/shared/js/api-client.js"></script>
+<script src="/shared/js/echarts.min.js"></script>
+<style>
+body{background:var(--bg);color:var(--text-primary);font-family:var(--font-body);font-size:13px;margin:0;padding:24px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--accent);margin:0 0 4px}
+.sub{font-size:0.68rem;color:var(--muted);margin-bottom:20px}
+.back{font-size:0.68rem;color:var(--muted);cursor:pointer;margin-bottom:12px;display:inline-block}
+.back:hover{color:var(--accent)}
+.advice-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.advice-card .lv{font-size:1.1rem;font-weight:700}
+.advice-card .tx{font-size:0.75rem;color:var(--text-secondary);line-height:1.7;margin-top:6px}
+.stat-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.stat-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;flex:1;min-width:110px;text-align:center}
+.stat-box .n{font-family:var(--font-display);font-size:1.2rem;font-weight:600}
+.stat-box .l{font-size:0.58rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.04em}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+.chart-card .ct{font-size:0.75rem;font-weight:600;color:var(--accent);margin-bottom:8px}
+.chart-card .cs{font-size:0.6rem;color:var(--muted);margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:0.68rem}
+th{padding:6px 8px;border-bottom:2px solid var(--border);font-weight:600;color:var(--muted);font-size:0.56rem;text-transform:uppercase;text-align:right;background:var(--card)}
+th:first-child,td:first-child{text-align:left}
+td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono)}
+td:first-child{font-family:var(--font-body)}
+.up{color:#ef4444;font-weight:600}
+.dn{color:#10b981;font-weight:600}
+.mid{color:#f59e0b;font-weight:600}
+.muted{color:var(--muted)}
+.banner{font-size:0.66rem;color:#f59e0b;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="red-dividend/">← 返回指数投资</a>
+  <h1 id="title">⛏ 中证煤炭 · 网格投资法详情</h1>
+  <div class="sub" id="meta">加载中...</div>
+
+  <div id="advice-box"></div>
+  <div id="stats-row"></div>
+  <div id="charts"></div>
+  <div id="tables"></div>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const date = params.get('date') || '';
+const API = API_BASE + '/api/market-scan/coal-advice-detail' + (date ? '?date=' + date : '');
+
+let isDark = document.documentElement.dataset.theme === 'dark';
+const tx = isDark ? '#999' : '#6E6E6E';
+const sp = isDark ? 'rgba(200,200,200,0.08)' : 'rgba(128,128,128,0.1)';
+
+async function load() {
+  try {
+    const d = await fetch(API).then(r => r.json());
+    if (d.error) { document.getElementById('meta').textContent = '无数据'; return; }
+
+    document.getElementById('title').textContent = '⛏ ' + d.name + ' · 网格投资法详情';
+    document.getElementById('meta').textContent = d.date + ' · 网格间距 ' + d.grid_step + '%（回测最优） · 年化波动 ' + d.stats.ann_vol + '% · 网格回测未计滑点/手续费';
+
+    // 当前建议卡
+    const cur = d.closes_long[d.closes_long.length - 1];
+    const high250 = Math.max(...d.closes_long.slice(-250));
+    const dd250 = (high250 - cur) / high250 * 100;
+    const low250 = Math.min(...d.closes_long.slice(-250));
+    const pos250 = (cur - low250) / (high250 - low250) * 100;
+    let lvl = 'hold', lvlText = '观望';
+    if (pos250 >= 75) { lvl = 'reduce'; lvlText = '高位区'; }
+    else if (pos250 <= 35 || dd250 >= 15) { lvl = 'buy'; lvlText = '低位区'; }
+    const lvMap = {buy:['#ef4444','rgba(239,68,68,.06)'],reduce:['#10b981','rgba(16,185,129,.08)'],hold:['#8b8b90','rgba(139,139,144,.06)']};
+    const lv = lvMap[lvl];
+    const g = d.stats;
+    document.getElementById('advice-box').innerHTML =
+      '<div class="advice-card"><span class="lv" style="color:' + lv[0] + '">' + lvlText + '</span>' +
+      '<div class="tx">当前价 ' + cur + '，250日位置 ' + pos250.toFixed(0) + '%（回撤 ' + dd250.toFixed(1) + '%）。' +
+      (pos250 >= 75 ? '接近年内高位，网格处于卖出档区，适合逐步减仓兑现波段利润，不宜新增买入。' :
+       pos250 <= 35 || dd250 >= 15 ? '处于年内低位区，网格买入档触发，可按间距分批加仓，接受继续下探的浮亏。' :
+       '位于区间中部，网格正常运转，按 ' + d.grid_step + '% 间距机械执行跌买涨卖即可。') + '</div></div>';
+
+    // 状态统计
+    const st = d.stats;
+    document.getElementById('stats-row').innerHTML =
+      stat('当前价', cur) +
+      stat('250日位置', pos250.toFixed(0) + '%') +
+      stat('250日回撤', dd250.toFixed(1) + '%') +
+      stat('年化波动', st.ann_vol + '%') +
+      stat('2018起网格', (st.grid_ret_2018 != null ? (st.grid_ret_2018 > 0 ? '+' : '') + st.grid_ret_2018 + '%' : '—')) +
+      stat('2018起持有', (st.hold_2018 != null ? (st.hold_2018 > 0 ? '+' : '') + st.hold_2018 + '%' : '—')) +
+      stat('超额', (st.grid_ret_2018 != null && st.hold_2018 != null ? ((st.grid_ret_2018 - st.hold_2018) > 0 ? '+' : '') + (st.grid_ret_2018 - st.hold_2018).toFixed(1) + 'pp' : '—'));
+
+    // 图表
+    const charts = [];
+    // 1. 价格 + 网格线（近10年）
+    charts.push({title:'💹 价格走势 + 8% 网格线（近10年）', cs:'灰线为 8% 间距档位（10年最低×0.95 为基准），当前档位橙色高亮', el:'chart-px', h:300, init: el => {
+      const c = echarts.init(el);
+      const gl = d.grid_lines || [];
+      const activeLine = gl.filter(x => x.active);
+      const lines = gl.map(x => ({yAxis: x.value, lineStyle:{color: x.active ? '#f59e0b' : 'rgba(139,139,144,.28)', width: x.active ? 1.5 : 1, type: x.active ? 'solid' : 'dashed'}, label:{show:true, position:'insideEndTop', formatter: x.value.toFixed(0), color: x.active ? '#f59e0b' : 'rgba(139,139,144,.5)', fontSize:9}}));
+      c.setOption({
+        backgroundColor:'transparent', tooltip:{trigger:'axis'},
+        grid:{left:'8%',right:'4%',top:12,bottom:24},
+        xAxis:{type:'category',data:d.dates_long,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
+        yAxis:{type:'value',min:function(v){return Math.round(v.min*0.85)},axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
+        dataZoom:[{type:'inside'},{type:'slider',height:14,bottom:0}],
+        series:[{type:'line',data:d.closes_long,smooth:true,showSymbol:false,
+          lineStyle:{color:'#f59e0b',width:1.5},
+          markLine:{symbol:'none',data:lines}
+        }]
+      });
+      return c;
+    }});
+    // 2. 年度：网格 vs 持有
+    charts.push({title:'📊 分年度收益：网格 vs 持有', cs:'正超额=网格跑赢持有；横盘/下跌年网格占优，大涨年网格跑输（趋势踏空）', el:'chart-annual', h:260, init: el => {
+      const c = echarts.init(el);
+      const years = (d.annual||[]).map(x => x.year);
+      c.setOption({
+        backgroundColor:'transparent', tooltip:{trigger:'axis', valueFormatter:v => v + '%'},
+        legend:{data:['网格','持有'],bottom:2,textStyle:{color:tx,fontSize:9}},
+        grid:{left:'8%',right:'4%',top:12,bottom:34},
+        xAxis:{type:'category',data:years,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
+        yAxis:{type:'value',axisLabel:{color:tx,fontSize:9,formatter:'{value}%'},splitLine:{lineStyle:{color:sp}}},
+        series:[
+          {name:'网格',type:'bar',data:(d.annual||[]).map(x => x.grid_ret),itemStyle:{color:'#f59e0b'},barWidth:10},
+          {name:'持有',type:'bar',data:(d.annual||[]).map(x => x.idx_ret),itemStyle:{color:'rgba(139,139,144,.5)'},barWidth:10}
+        ]
+      });
+      return c;
+    }});
+
+    const chartEls = charts.map(x => '<div class="chart-card"><div class="ct">' + x.title + '</div><div id="' + x.el + '" style="height:' + x.h + 'px"></div>' + (x.cs ? '<div class="cs">' + x.cs + '</div>' : '') + '</div>').join('');
+    document.getElementById('charts').innerHTML = chartEls;
+    charts.forEach(x => { const c = x.init(document.getElementById(x.el)); window['_c_' + x.el] = c; });
+
+    // 表格
+    let tbl = '<div class="chart-card"><div class="ct">📋 分年度明细（网格 vs 持有）</div><table><tr><th>年份</th><th>指数涨跌</th><th>网格收益</th><th>持有收益</th><th>超额</th><th>交易次数</th><th>档位穿越</th></tr>';
+    (d.annual||[]).forEach(x => {
+      const cls = x.idx_ret >= 0 ? 'up' : 'dn';
+      const exCls = x.excess >= 0 ? 'up' : 'dn';
+      tbl += '<tr><td>' + x.year + '</td><td class="' + cls + '">' + (x.idx_ret>0?'+':'') + x.idx_ret + '%</td><td>' + (x.grid_ret>0?'+':'') + x.grid_ret + '%</td><td>' + (x.hold_ret>0?'+':'') + x.hold_ret + '%</td><td class="' + exCls + '">' + (x.excess>0?'+':'') + x.excess + 'pp</td><td>' + x.trades + '</td><td>' + x.crosses + '</td></tr>';
+    });
+    tbl += '</table></div>';
+
+    tbl += '<div class="chart-card"><div class="ct">📐 网格间距敏感性（2018起）</div><table><tr><th>间距</th><th>网格收益</th><th>持有收益</th><th>超额</th><th>交易次数</th></tr>';
+    (d.step_sens||[]).forEach(x => {
+      const exCls = x.excess >= 0 ? 'up' : 'dn';
+      tbl += '<tr><td>' + x.step + '%' + (x.step === d.grid_step ? ' <span class="mid">←当前</span>' : '') + '</td><td>' + (x.grid_ret>0?'+':'') + x.grid_ret + '%</td><td>' + (x.hold_ret>0?'+':'') + x.hold_ret + '%</td><td class="' + exCls + '">' + (x.excess>0?'+':'') + x.excess + 'pp</td><td>' + x.trades + '</td></tr>';
+    });
+    tbl += '</table></div>';
+    document.getElementById('tables').innerHTML = tbl;
+  } catch(e) {
+    document.getElementById('meta').textContent = '加载失败: ' + e.message;
+  }
+}
+load();
+
+function stat(n, l) { return '<div class="stat-box"><div class="n">' + l + '</div><div class="l">' + n + '</div></div>'; }
+
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
+</script>
+<script src="/shared/js/nav.js"></script>
+<script>window.NAV_PREFIX='../..';Nav.init({brandIcon:'🧭',brandText:'指数投资',currentPage:'red-dividend'})</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>红利投资 · 总览</title>
+<title>指数投资 · 总览</title>
 <link rel="stylesheet" href="/shared/css/hanako-glass.css">
 <script src="/shared/js/api-client.js"></script>
 <style>
@@ -30,12 +30,13 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
 <body>
 <nav id="top-nav"></nav>
 <div class="wrap">
-  <h1>🧧 红利投资</h1>
-  <div class="sub" id="meta">红利/自由现金流指数操作建议 · 回撤买点 + 估值分位 · 点击卡片查看详情</div>
+  <h1>🧭 指数投资</h1>
+  <div class="sub" id="meta">红利/自由现金流/中证煤炭指数操作建议 · 回撤买点 + 估值分位 + 网格 · 点击卡片查看详情</div>
   <div class="toolbar">
     <a href="lab.html">🔬 回撤实验室</a>
     <a href="../dividend-advice-detail.html?code=000922">📈 中证红利详情</a>
     <a href="../fcf-advice-detail.html">🧲 自由现金流详情</a>
+    <a href="../coal-advice-detail.html">⛏ 中证煤炭详情</a>
   </div>
   <div id="content">加载中...</div>
 </div>
@@ -52,12 +53,13 @@ const LV = {
 
 async function load() {
   try {
-    const [da, fa] = await Promise.all([
+    const [da, fa, ca] = await Promise.all([
       fetch(API_BASE + '/api/market-scan/dividend-advice').then(r => r.json()).catch(() => ({indices:[]})),
-      fetch(API_BASE + '/api/market-scan/fcf-advice').then(r => r.json()).catch(() => ({}))
+      fetch(API_BASE + '/api/market-scan/fcf-advice').then(r => r.json()).catch(() => ({})),
+      fetch(API_BASE + '/api/market-scan/coal-advice').then(r => r.json()).catch(() => ({error:'no data'}))
     ]);
-    const date = da.date || fa.date || '';
-    document.getElementById('meta').textContent = '红利/自由现金流指数操作建议 · ' + date + ' · 点击卡片查看详情';
+    const date = da.date || fa.date || ca.date || '';
+    document.getElementById('meta').textContent = '红利/自由现金流/中证煤炭指数操作建议 · ' + date + ' · 点击卡片查看详情';
 
     let html = '';
     // 红利指数
@@ -97,7 +99,23 @@ async function load() {
       html += '<div class="note">⚠️ ' + (fcfList[0].data_note || '自由现金流估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考。') + '</div>';
     }
 
-    html += '<div class="note">📊 口径说明：① 回撤：中证红利（000922）用全收益 H00922（含分红再投资，2018起），其余红利指数暂用价格口径；买点规则 250日回撤≥10%（回测32次触发/20日胜率75%）。② 估值分位：PE/PB/股息率分位为<b>10年滚动口径</b>（理杏仁 y10.cvpos），非全历史——红利 PE 分位极少>85%、PB 分位极少>55%、股息率分位从未<20%，属数据特性非异常。</div>';
+    // 中证煤炭（网格规则）
+    if (ca && !ca.error) {
+      const clv = LV[ca.advice_level] || LV.hold;
+      const g = ca.grid || {};
+      html += '<div class="section-hdr">⛏ 中证煤炭（网格规则）</div><div class="sector-grid">';
+      html += '<div class="sector-card" style="background:' + clv[2].bg + ';border-color:' + clv[2].bd + '" onclick="window.open(\'../coal-advice-detail.html?date=' + ca.date + '\')">';
+      html += '<div class="sc-title">' + ca.name + ' <span class="code">' + ca.code + '</span></div>';
+      html += '<div style="margin-top:6px"><span class="lv" style="color:' + clv[1] + '">' + clv[0] + '</span></div>';
+      html += '<div class="tx">' + ca.advice + '</div>';
+      html += '<div class="meta">当前档位 ' + (g.grid_low != null ? g.grid_low + '~' + g.grid_high : '—') + ' · 250日位置 ' + ca.pos_250 + '% · 回撤 ' + ca.dd_250 + '%</div>';
+      html += '<div class="sig">2018起网格 +' + (g.ret_2018 != null ? g.ret_2018 + '%' : '—') + ' vs 持有 +' + (g.hold_2018 != null ? g.hold_2018 + '%' : '—') + ' · 间距 ' + g.step_pct + '%</div>';
+      html += '</div>';
+      html += '</div>';
+      html += '<div class="note">⚠️ ' + (ca.data_note || '网格回测未计滑点/手续费') + '</div>';
+    }
+
+    html += '<div class="note">📊 口径说明：① 回撤：中证红利（000922）用全收益 H00922（含分红再投资，2018起），其余红利指数暂用价格口径；买点规则 250日回撤≥10%（回测32次触发/20日胜率75%）。② 估值分位：PE/PB/股息率分位为<b>10年滚动口径</b>（理杏仁 y10.cvpos），非全历史——红利 PE 分位极少>85%、PB 分位极少>55%、股息率分位从未<20%，属数据特性非异常。③ 网格：中证煤炭用 8% 间距（回测最优），回撤实验室同页可用。</div>';
     document.getElementById('content').innerHTML = html;
   } catch(e) {
     document.getElementById('content').innerHTML = '加载失败: ' + e.message;
@@ -109,6 +127,6 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 </script>
 <script src="/shared/js/nav.js"></script>
-<script>window.NAV_PREFIX='../..';Nav.init({brandIcon:'🧧',brandText:'红利投资',currentPage:'red-dividend'})</script>
+<script>window.NAV_PREFIX='../..';Nav.init({brandIcon:'🧭',brandText:'指数投资',currentPage:'red-dividend'})</script>
 </body>
 </html>

@@ -71,7 +71,7 @@
     { href: '../index-valuation/',      label: '指数估值',         page: 'index-valuation' },
     { href: '../stock-valuation/',      label: '个股扫描',         page: 'stock-valuation' },
     { href: '../market-scan/',          label: '大盘扫描',         page: 'market-scan' },
-    { href: '../market-scan/red-dividend/', label: '🧧 红利投资', page: 'red-dividend' },
+    { href: '../market-scan/red-dividend/', label: '🧭 指数投资', page: 'red-dividend' },
     { href: '../canslim-scores/',       label: 'CAN SLIM',          page: 'canslim-scores' },
     { href: '../cockpit/',             label: '驾驶舱',           page: 'cockpit' },
   ];

@@ -2016,6 +2016,224 @@ def api_market_fcf_detail():
         'data_note': FCF_DATA_NOTE,
     })
 
+
+# ═══════════════════════════════════════════════
+# API: GET /api/market-scan/coal-advice（中证煤炭网格投资建议）
+# ═══════════════════════════════════════════════
+
+COAL_INDEX = ('399998', '中证煤炭')
+COAL_GRID_STEP = 8  # 网格间距 %（回测最优，analysis/grid_step_sens.py）
+COAL_DATA_NOTE = '网格回测未计滑点/手续费（8%间距约700次交易）；超额与趋势强度负相关，煤炭若开启大牛市网格将跑输持有'
+
+
+def _grid_backtest(closes, step_pct, cash=100000):
+    """百分比间距网格回测：每 step_pct% 一档，初始买1/3，档位跌买涨卖，返回(总资产, 交易次数)"""
+    if len(closes) < 10:
+        return None
+    c, s = cash, 0.0
+    low = min(closes) * 0.95
+    if low <= 0:
+        return None
+    s = (cash / 3) / closes[0]
+    c -= cash / 3
+    cg = round((closes[0] - low) / (low * step_pct / 100))
+    trades = 0
+    per = cash / 10
+    for i in range(1, len(closes)):
+        p = closes[i]
+        g = round((p - low) / (low * step_pct / 100))
+        if g < cg:
+            for _ in range(cg - g):
+                if c > per:
+                    s += per / p
+                    c -= per
+                    trades += 1
+            cg = g
+        elif g > cg:
+            for _ in range(g - cg):
+                if s > 0:
+                    amt = min(s * p, per)
+                    s -= amt / p
+                    c += amt
+                    trades += 1
+            cg = g
+    return c + s * closes[-1], trades
+
+
+@app.route('/api/market-scan/coal-advice')
+def api_market_coal_advice():
+    """中证煤炭网格投资建议：网格档位位置 + 网格回测摘要（支持历史回看）"""
+    target_date = request.args.get('date', '')
+    db = get_db()
+    if not target_date:
+        r = db.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
+        if r is None or r[0] is None:
+            return jsonify({'error': 'no data', 'date': ''})
+        target_date = r[0]
+
+    code, name = COAL_INDEX
+    rows = db.execute("""
+        SELECT date, close FROM index_daily_kline
+        WHERE stock_code=? AND kline_type='normal' AND date<=?
+        ORDER BY date DESC LIMIT 300
+    """, (code, target_date)).fetchall()
+    rows = list(reversed(rows))
+    if len(rows) < 250:
+        return jsonify({'error': 'no data', 'date': target_date})
+    closes = [r['close'] for r in rows]
+    current = closes[-1]
+    high250 = max(closes[-250:])
+    dd_250 = (high250 - current) / high250 * 100
+    pos_250 = (current - min(closes[-250:])) / (max(closes[-250:]) - min(closes[-250:])) * 100 if max(closes[-250:]) > min(closes[-250:]) else 50
+
+    # 8% 网格当前档位（以近250日最低*0.95为基准）
+    base = min(closes[-250:]) * 0.95
+    step = base * COAL_GRID_STEP / 100
+    level = round((current - base) / step)
+    grid_low = base + level * step
+    grid_high = grid_low + step
+
+    # 2018 起网格回测摘要
+    rows8 = db.execute("""
+        SELECT close FROM index_daily_kline
+        WHERE stock_code=? AND kline_type='normal' AND date>=? AND date<=?
+        ORDER BY date
+    """, (code, '2018-01-01', target_date)).fetchall()
+    closes8 = [r['close'] for r in rows8]
+    g_ret = None
+    h_ret = None
+    trades = None
+    if len(closes8) >= 300:
+        r = _grid_backtest(closes8, COAL_GRID_STEP)
+        if r:
+            g_ret = round((r[0] / 100000 - 1) * 100, 1)
+            trades = r[1]
+        h_ret = round((closes8[-1] / closes8[0] - 1) * 100, 1)
+
+    # 建议（网格法：250日位置 + 回撤）
+    if pos_250 >= 75:
+        advice, level = '网格高位区（250日位置' + str(round(pos_250)) + '%），留意减仓档，谨慎新增', 'reduce'
+    elif pos_250 <= 35 or dd_250 >= 15:
+        advice, level = '网格低位区，可执行加仓档，分批买入', 'buy'
+    else:
+        advice, level = '网格中位区，按既定间距运转', 'hold'
+
+    return jsonify({
+        'date': target_date, 'code': code, 'name': name,
+        'close': round(current, 2), 'dd_250': round(dd_250, 1), 'pos_250': round(pos_250),
+        'grid': {
+            'step_pct': COAL_GRID_STEP, 'level': level,
+            'grid_low': round(grid_low, 2), 'grid_high': round(grid_high, 2),
+            'ret_2018': g_ret, 'hold_2018': h_ret,
+            'excess_2018': round((g_ret - h_ret) / (1 + h_ret / 100), 1) if g_ret is not None and h_ret is not None else None,
+            'trades': trades,
+        },
+        'advice': advice, 'advice_level': level,
+        'data_note': COAL_DATA_NOTE,
+    })
+
+
+@app.route('/api/market-scan/coal-advice-detail')
+def api_market_coal_detail():
+    """中证煤炭网格详情：近10年K线 + 网格线 + 年度网格vs持有 + 间距敏感性"""
+    target_date = request.args.get('date', '')
+    db = get_db()
+    if not target_date:
+        r = db.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
+        if r is None or r[0] is None:
+            return jsonify({'error': 'no data', 'date': ''})
+        target_date = r[0]
+
+    code, name = COAL_INDEX
+    rows = db.execute("""
+        SELECT date, close FROM index_daily_kline
+        WHERE stock_code=? AND kline_type='normal' AND date>=date(?,'-10 years') AND date<=?
+        ORDER BY date
+    """, (code, target_date, target_date)).fetchall()
+    dates = [r['date'] for r in rows]
+    closes = [r['close'] for r in rows]
+    if len(dates) < 300:
+        return jsonify({'error': 'no data'})
+    current = closes[-1]
+
+    # 网格线（10年最低*0.95 为基准，8% 一档）
+    base = min(closes) * 0.95
+    step = base * COAL_GRID_STEP / 100
+    lvl0 = round((current - base) / step)
+    grid_lines = []
+    for lv in range(max(0, lvl0 - 15), lvl0 + 16):
+        v = base + lv * step
+        if v <= max(closes) * 1.02 and v >= min(closes) * 0.98:
+            grid_lines.append({'value': round(v, 1), 'level': lv, 'active': lv == lvl0})
+
+    # 年度：指数涨跌 / 网格 / 持有 / 超额 / 交易次数
+    annual = []
+    years = sorted(set(d[:4] for d in dates))
+    low_all = min(closes) * 0.95
+    for y in years:
+        idx = [i for i, d in enumerate(dates) if d.startswith(y)]
+        if len(idx) < 80:
+            continue
+        seg = closes[idx[0]:idx[-1] + 1]
+        r = _grid_backtest(seg, COAL_GRID_STEP)
+        if not r:
+            continue
+        hold = 100000 / seg[0] * seg[-1]
+        crosses = 0
+        cg = round((seg[0] - low_all) / (low_all * COAL_GRID_STEP / 100))
+        for p in seg[1:]:
+            g = round((p - low_all) / (low_all * COAL_GRID_STEP / 100))
+            crosses += abs(g - cg)
+            cg = g
+        annual.append({
+            'year': y,
+            'idx_ret': round((seg[-1] / seg[0] - 1) * 100, 1),
+            'grid_ret': round((r[0] / 100000 - 1) * 100, 1),
+            'hold_ret': round((hold / 100000 - 1) * 100, 1),
+            'excess': round((r[0] / hold - 1) * 100, 1),
+            'trades': r[1], 'crosses': crosses,
+        })
+
+    # 间距敏感性（2018起）
+    rows8 = db.execute("""
+        SELECT close FROM index_daily_kline
+        WHERE stock_code=? AND kline_type='normal' AND date>=? AND date<=?
+        ORDER BY date
+    """, (code, '2018-01-01', target_date)).fetchall()
+    closes8 = [r['close'] for r in rows8]
+    step_sens = []
+    hold8 = 100000 / closes8[0] * closes8[-1] if closes8 else 0
+    for st in (5, 8, 10):
+        r = _grid_backtest(closes8, st) if len(closes8) >= 300 else None
+        if r:
+            step_sens.append({
+                'step': st,
+                'grid_ret': round((r[0] / 100000 - 1) * 100, 1),
+                'hold_ret': round((hold8 / 100000 - 1) * 100, 1),
+                'excess': round((r[0] / hold8 - 1) * 100, 1),
+                'trades': r[1],
+            })
+
+    # 波动特征
+    rets = [closes[i] / closes[i - 1] - 1 for i in range(1, len(closes))]
+    import math
+    mean_r = sum(rets) / len(rets) if rets else 0
+    ann_vol = (sum((r - mean_r) ** 2 for r in rets) / (len(rets) - 1)) ** 0.5 * math.sqrt(252) * 100
+
+    return jsonify({
+        'code': code, 'name': name, 'date': target_date,
+        'close': round(current, 2),
+        'dates_long': dates, 'closes_long': closes,
+        'grid_lines': grid_lines, 'grid_step': COAL_GRID_STEP,
+        'annual': annual, 'step_sens': step_sens,
+        'stats': {
+            'ann_vol': round(ann_vol, 1),
+            'grid_ret_2018': round((_grid_backtest(closes8, COAL_GRID_STEP)[0] / 100000 - 1) * 100, 1) if len(closes8) >= 300 and _grid_backtest(closes8, COAL_GRID_STEP) else None,
+            'hold_2018': round((hold8 / 100000 - 1) * 100, 1) if closes8 else None,
+        },
+        'data_note': COAL_DATA_NOTE,
+    })
+
 # ═══════════════════════════════════════════════
 # API: GET /api/market-scan/dividend-lab（回撤实验室）
 # ═══════════════════════════════════════════════
