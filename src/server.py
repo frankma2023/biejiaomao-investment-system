@@ -2086,10 +2086,10 @@ def api_market_coal_advice():
     dd_250 = (high250 - current) / high250 * 100
     pos_250 = (current - min(closes[-250:])) / (max(closes[-250:]) - min(closes[-250:])) * 100 if max(closes[-250:]) > min(closes[-250:]) else 50
 
-    # 8% 网格当前档位（以近250日最低*0.95为基准）
+    # 8% 网格当前档位（以近250日最低*0.95为基准；floor 保证现价落在档位区间内）
     base = min(closes[-250:]) * 0.95
     step = base * COAL_GRID_STEP / 100
-    level = round((current - base) / step)
+    level = int((current - base) / step)
     grid_low = base + level * step
     grid_high = grid_low + step
 
@@ -2156,10 +2156,10 @@ def api_market_coal_detail():
         return jsonify({'error': 'no data'})
     current = closes[-1]
 
-    # 网格线（10年最低*0.95 为基准，8% 一档）
+    # 网格线（10年最低*0.95 为基准，8% 一档；当前档位 floor 保证在现价下方）
     base = min(closes) * 0.95
     step = base * COAL_GRID_STEP / 100
-    lvl0 = round((current - base) / step)
+    lvl0 = int((current - base) / step)
     grid_lines = []
     for lv in range(max(0, lvl0 - 15), lvl0 + 16):
         v = base + lv * step
