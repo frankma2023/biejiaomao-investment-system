@@ -52,7 +52,7 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
 </div>
 
 <script>
-const API = API_BASE + '/api/market-scan/dividend-lab';
+const LAB_API = API_BASE + '/api/market-scan/dividend-lab';
 let isDark = document.documentElement.dataset.theme === 'dark';
 const tx = isDark ? '#999' : '#6E6E6E';
 const sp = isDark ? 'rgba(200,200,200,0.08)' : 'rgba(128,128,128,0.1)';
@@ -63,7 +63,7 @@ async function load() {
   const threshold = parseInt(document.getElementById('th').value) / 100;
   document.getElementById('th-val').textContent = Math.round(threshold * 100) + '%';
   try {
-    const d = await fetch(API + '?mode=' + mode + '&threshold=' + threshold).then(r => r.json());
+    const d = await fetch(LAB_API + '?mode=' + mode + '&threshold=' + threshold).then(r => r.json());
     if (d.error) { document.getElementById('meta').textContent = '无数据'; return; }
 
     // 统计数字行
