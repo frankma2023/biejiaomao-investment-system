@@ -61,6 +61,7 @@ html[data-theme="light"] .tab.active{background:var(--accent-subtle);color:var(-
 
   <div id="pane-advice">
     <div id="advice-box"></div>
+    <div id="temp-box"></div>
     <div id="stats-row"></div>
     <div id="charts"></div>
     <div id="events-table"></div>
@@ -138,6 +139,11 @@ async function load() {
     advHtml.push('</div>');
   }
   document.getElementById('advice-box').innerHTML = advHtml.join('');
+
+  // 红利温度计（拥挤度/恐慌贪婪/股债息差）
+  fetch(API_BASE + '/api/market-scan/red-metrics?code=' + code + (date ? '&date=' + date : '')).then(r => r.json()).then(m => {
+    if (m && m.spread) renderTemp(m);
+  }).catch(() => {});
 
   // 历史类似统计
   const st = d.stats || {};
@@ -463,6 +469,45 @@ function genValFsText(id, name, vals, unit, dates) {
 }
 
 load();
+
+// ═══ 红利温度计：拥挤度 / 恐慌贪婪 / 股债息差 ═══
+let tempChart = null;
+function renderTemp(m) {
+  const cw = m.crowding || {}, fg = m.fear_greed || {}, sp = m.spread || {}, tp = m.temperature || {};
+  const sp2 = isDark ? 'rgba(200,200,200,0.08)' : 'rgba(128,128,128,0.1)';
+  function tone(v) { return v >= 70 ? '#ef4444' : (v >= 55 ? '#f59e0b' : (v <= 30 ? '#3b82f6' : '#8b8b90')); }
+  const stat = (l, n, c) => '<div class="stat-box"><div class="n" style="color:' + c + '">' + n + '</div><div class="l">' + l + '</div></div>';
+  let html = '<div class="chart-card"><div class="ct">🌡 红利温度计</div>';
+  html += '<div class="stat-row" style="margin-bottom:10px">';
+  html += stat('拥挤度', cw.score != null ? cw.score + '·' + (cw.level || '') : '—', tone(cw.score));
+  html += stat('恐慌贪婪', fg.score != null ? fg.score + '·' + (fg.level || '') : '—', tone(fg.score));
+  html += stat('股债息差', sp.value != null ? sp.value + '%' : '—', tone(100 - sp.pct_all));
+  html += stat('温度计', tp.value != null ? tp.value + '°' : '—', tone(tp.value));
+  html += '</div>';
+  html += '<div class="cs">' + (m.data_note || '') + '</div>';
+  html += '<div id="temp-chart" style="height:240px"></div>';
+  html += '<div style="font-size:0.6rem;color:var(--muted);margin-top:6px">📈 息差 = 股息率 − 10年国债收益率（中债估值，akshare）。拥挤度语义：避险资金涌入压低股息率 → 股息率分位低=拥挤高。</div>';
+  html += '</div>';
+  document.getElementById('temp-box').innerHTML = html;
+
+  const s = sp.series || [];
+  if (!s.length) return;
+  if (tempChart) tempChart.dispose();
+  tempChart = echarts.init(document.getElementById('temp-chart'));
+  tempChart.setOption({
+    backgroundColor: chartBg, tooltip: {trigger: 'axis'},
+    legend: {data: ['股息率', '10年国债', '息差'], bottom: 2, textStyle: {color: tx, fontSize: 9}},
+    grid: {left: '8%', right: '4%', top: 12, bottom: 34},
+    xAxis: {type: 'category', data: s.map(x => x.date), axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp2}}},
+    yAxis: {type: 'value', axisLabel: {color: tx, fontSize: 9, formatter: '{value}%'}, splitLine: {lineStyle: {color: sp2}}},
+    dataZoom: [{type: 'inside'}, {type: 'slider', height: 14, bottom: 0}],
+    series: [
+      {name: '股息率', type: 'line', data: s.map(x => x.dyr), showSymbol: false, lineStyle: {color: '#f59e0b', width: 1.5}},
+      {name: '10年国债', type: 'line', data: s.map(x => x.bond), showSymbol: false, lineStyle: {color: '#3b82f6', width: 1.2}},
+      {name: '息差', type: 'line', data: s.map(x => x.spread), showSymbol: false, areaStyle: {color: 'rgba(245,158,11,.15)'}, lineStyle: {color: '#ef4444', width: 1, type: 'dashed'}}
+    ]
+  });
+}
 
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();

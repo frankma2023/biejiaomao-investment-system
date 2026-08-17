@@ -2378,6 +2378,30 @@ def api_market_coal_detail():
     })
 
 # ═══════════════════════════════════════════════
+# API: GET /api/market-scan/red-metrics（红利指数温度计：拥挤度/恐慌贪婪/股债息差）
+# ═══════════════════════════════════════════════
+
+@app.route('/api/market-scan/red-metrics')
+def api_market_red_metrics():
+    """红利指数三维指标 + 温度计：拥挤度 / 恐慌贪婪 / 股债息差（实时计算，支持历史回看）"""
+    code = request.args.get('code', '000922')
+    target_date = request.args.get('date', '')
+    if not target_date:
+        r = get_db().execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
+        if r is None or r[0] is None:
+            return jsonify({'error': 'no data', 'date': ''})
+        target_date = r[0]
+    try:
+        from src.scanners.red_dividend_metrics import compute_all
+        result = compute_all(code, target_date)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    if not result.get('spread'):
+        return jsonify({'error': '数据不足', 'code': code, 'date': target_date})
+    return jsonify(result)
+
+
+# ═══════════════════════════════════════════════
 # API: GET /api/market-scan/dividend-lab（回撤实验室）
 # ═══════════════════════════════════════════════
 

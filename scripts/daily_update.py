@@ -155,6 +155,8 @@ TASKS = [
     ("📈 5.个股日K线",       [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py"]),
     # 5.5 中证全收益指数（H00922 红利全收益，回撤买点基准）
     ("🧧 5.5全收益指数",     [PYTHON_EXE, "scripts/fetch_full_return_index.py"]),
+    # 5.6 国债收益率（红利温度计股债息差用）
+    ("🏦 5.6国债收益率",     [PYTHON_EXE, "scripts/fetch_bond_yield.py"]),
 ]
 
 # 步骤 6~8：市场环境层（依赖 K 线数据就位）
