@@ -22,7 +22,6 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
 .stat-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;flex:1;min-width:110px;text-align:center}
 .stat-box .n{font-family:var(--font-display);font-size:1.2rem;font-weight:600}
 .stat-box .l{font-size:0.58rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.04em}
-.chart-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
 .chart-card .ct{font-size:0.75rem;font-weight:600;color:var(--accent);margin-bottom:8px}
 .chart-card .cs{font-size:0.6rem;color:var(--muted);margin-top:4px}
 table{width:100%;border-collapse:collapse;font-size:0.68rem}
@@ -94,6 +93,7 @@ const ADVICE_API = API_BASE + '/api/market-scan/dividend-advice?date=' + (date |
 let isDark = document.documentElement.dataset.theme === 'dark';
 const tx = isDark ? '#999' : '#6E6E6E';
 const sp = isDark ? 'rgba(200,200,200,0.08)' : 'rgba(128,128,128,0.1)';
+const chartBg = isDark ? 'rgba(26,26,31,.6)' : 'rgba(255,255,255,.75)';
 
 async function load() {
   const [d, a] = await Promise.all([
@@ -159,7 +159,7 @@ async function load() {
     charts.push({title:'📈 价格 vs 全收益（分红再投资价值 · 近3年起点=100 · H00922 自2018起）', el:'chart-tri', h:220, init: el => {
       const c = echarts.init(el);
       c.setOption({
-        backgroundColor:'transparent', tooltip:{trigger:'axis', formatter: p => p[0].name + '<br/>' + p.map(x => x.seriesName + ': ' + x.value).join('<br/>')},
+        backgroundColor:chartBg, tooltip:{trigger:'axis', formatter: p => p[0].name + '<br/>' + p.map(x => x.seriesName + ': ' + x.value).join('<br/>')},
         legend:{data:['中证红利(价格)','中证红利全收益'],textStyle:{color:tx,fontSize:9},bottom:0},
         grid:{left:'8%',right:'4%',top:12,bottom:36},
         xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
@@ -177,7 +177,7 @@ async function load() {
       charts.push({title:'🧧 分红再投资累计超额（全收益-价格，百分点）', el:'chart-tridiff', h:140, init: el => {
         const c = echarts.init(el);
         c.setOption({
-          backgroundColor:'transparent', tooltip:{trigger:'axis', formatter: p => p[0].name + '<br/>超额: +' + p[0].value + 'pp'},
+          backgroundColor:chartBg, tooltip:{trigger:'axis', formatter: p => p[0].name + '<br/>超额: +' + p[0].value + 'pp'},
           grid:{left:'8%',right:'4%',top:12,bottom:24},
           xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
           yAxis:{type:'value',axisLabel:{color:tx,fontSize:9,formatter:'+{value}'},splitLine:{lineStyle:{color:sp}}},
@@ -193,7 +193,7 @@ async function load() {
     charts.push({title:'📉 年度最大回撤（每年初清零 · 展示用）', el:'chart-annualdd', h:160, init: el => {
       const c = echarts.init(el);
       c.setOption({
-        backgroundColor:'transparent', tooltip:{trigger:'axis', formatter: p => p[0].name + '年<br/>最大回撤: ' + p[0].value + '%'},
+        backgroundColor:chartBg, tooltip:{trigger:'axis', formatter: p => p[0].name + '年<br/>最大回撤: ' + p[0].value + '%'},
         grid:{left:'8%',right:'4%',top:12,bottom:24},
         xAxis:{type:'category',data:d.annual_dd.map(x => x.year),axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
         yAxis:{type:'value',name:'回撤%',axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
@@ -209,7 +209,7 @@ async function load() {
   charts.push({title:'📉 历史回撤曲线（近3年）', el:'chart-dd', h:200, init: el => {
     const c = echarts.init(el);
     c.setOption({
-      backgroundColor:'transparent', tooltip:{trigger:'axis', formatter: p => p[0].name + '<br/>回撤: ' + p[0].value + '%'},
+      backgroundColor:chartBg, tooltip:{trigger:'axis', formatter: p => p[0].name + '<br/>回撤: ' + p[0].value + '%'},
       grid:{left:'8%',right:'4%',top:12,bottom:24},
       xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
       yAxis:{type:'value',name:'回撤%',axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
@@ -226,7 +226,7 @@ async function load() {
   charts.push({title:'📊 估值分位走势（PE/PB/股息率，近3年 · 10年滚动分位）', el:'chart-val', h:220, init: el => {
     const c = echarts.init(el);
     c.setOption({
-      backgroundColor:'transparent', tooltip:{trigger:'axis'},
+      backgroundColor:chartBg, tooltip:{trigger:'axis'},
       legend:{data:['PE分位','PB分位','股息率分位'],textStyle:{color:tx,fontSize:9},bottom:0},
       grid:{left:'8%',right:'4%',top:12,bottom:36},
       xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
@@ -259,7 +259,7 @@ async function load() {
       series.push({name:'全收益',type:'line',data:pxTri,smooth:true,showSymbol:false,lineStyle:{color:'#ef4444',width:1,type:'dotted'}});
     }
     c.setOption({
-      backgroundColor:'transparent', tooltip:{trigger:'axis'},
+      backgroundColor:chartBg, tooltip:{trigger:'axis'},
       legend:{data:pxTri?['价格','全收益']:['价格'],bottom:2,textStyle:{color:tx,fontSize:9}},
       grid:{left:'8%',right:'4%',top:12,bottom:34},
       xAxis:{type:'category',data:pxDates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
@@ -371,7 +371,7 @@ function buildValChart(id, name, dates, vals, pcts, hsVals, lineColor, tx, sp) {
   const ch = echarts.init(dom);
   const pctVals = (pcts || []).map(v => v != null ? (v * 100).toFixed(0) : null);
   ch.setOption({
-    backgroundColor: 'transparent', tooltip: {trigger: 'axis'},
+    backgroundColor: chartBg, tooltip: {trigger: 'axis'},
     legend: {data: [name, '沪深300', '十年分位%'], bottom: 18, textStyle: {color: tx, fontSize: 10}},
     grid: {left: '8%', right: '4%', top: 12, bottom: 54},
     xAxis: {type: 'category', data: dates, axisLabel: {color: tx, fontSize: 9, formatter: v => v.slice(0, 7)}, axisLine: {lineStyle: {color: sp}}},
@@ -431,7 +431,7 @@ function buildValBar(id, name, dates, vals, color, isBig) {
   const d2 = vals.map(() => avgDisp);
   const unit = isBig ? '亿' : (isPct ? '%' : '');
   ch.setOption({
-    backgroundColor: 'transparent', tooltip: {trigger: 'axis'},
+    backgroundColor: chartBg, tooltip: {trigger: 'axis'},
     grid: {left: '10%', right: '4%', top: 12, bottom: 32},
     xAxis: {type: 'category', data: dates, axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp}}},
     yAxis: {type: 'value', axisLabel: {color: tx, fontSize: 9, formatter: v => v + unit}, splitLine: {lineStyle: {color: sp}}},

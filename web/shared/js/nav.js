@@ -77,8 +77,8 @@
   ];
 
   // 深目录页面前缀：web/market-scan/red-dividend/ 等深两层页面在 Nav.init 前设 window.NAV_PREFIX='../..'
-  var P = window.NAV_PREFIX || '';
-  function H(h) { return P + h.substring(2); }  // '../xxx' → P + '/xxx'
+  // W3 修复：H() 实时读取 window.NAV_PREFIX（原 var P 在加载时捕获，页面后赋值永远不生效）
+  function H(h) { return (window.NAV_PREFIX || '') + h.substring(2); }  // '../xxx' → P + '/xxx'
 
   function render() {
     var el = document.getElementById('top-nav');

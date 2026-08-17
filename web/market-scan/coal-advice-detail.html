@@ -21,7 +21,6 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
 .stat-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;flex:1;min-width:110px;text-align:center}
 .stat-box .n{font-family:var(--font-display);font-size:1.2rem;font-weight:600}
 .stat-box .l{font-size:0.58rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.04em}
-.chart-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
 .chart-card .ct{font-size:0.75rem;font-weight:600;color:var(--accent);margin-bottom:8px}
 .chart-card .cs{font-size:0.6rem;color:var(--muted);margin-top:4px}
 table{width:100%;border-collapse:collapse;font-size:0.68rem}
@@ -37,6 +36,7 @@ td:first-child{font-family:var(--font-body)}
 </style>
 </head>
 <body>
+<nav id="top-nav"></nav>
 <div class="wrap">
   <a class="back" href="red-dividend/">← 返回指数投资</a>
   <h1 id="title">⛏ 中证煤炭 · 网格投资法详情</h1>
@@ -56,6 +56,7 @@ const DETAIL_API = API_BASE + '/api/market-scan/coal-advice-detail' + (date ? '?
 let isDark = document.documentElement.dataset.theme === 'dark';
 const tx = isDark ? '#999' : '#6E6E6E';
 const sp = isDark ? 'rgba(200,200,200,0.08)' : 'rgba(128,128,128,0.1)';
+const chartBg = isDark ? 'rgba(26,26,31,.6)' : 'rgba(255,255,255,.75)';
 
 async function load() {
   try {
@@ -104,7 +105,7 @@ async function load() {
       const activeLine = gl.filter(x => x.active);
       const lines = gl.map(x => ({yAxis: x.value, lineStyle:{color: x.active ? '#f59e0b' : 'rgba(139,139,144,.28)', width: x.active ? 1.5 : 1, type: x.active ? 'solid' : 'dashed'}, label:{show:true, position:'insideEndTop', formatter: x.value.toFixed(0), color: x.active ? '#f59e0b' : 'rgba(139,139,144,.5)', fontSize:9}}));
       c.setOption({
-        backgroundColor:'transparent', tooltip:{trigger:'axis'},
+        backgroundColor:chartBg, tooltip:{trigger:'axis'},
         grid:{left:'8%',right:'4%',top:12,bottom:24},
         xAxis:{type:'category',data:d.dates_long,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
         yAxis:{type:'value',min:function(v){return Math.round(v.min*0.85)},axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
@@ -121,7 +122,7 @@ async function load() {
       const c = echarts.init(el);
       const years = (d.annual||[]).map(x => x.year);
       c.setOption({
-        backgroundColor:'transparent', tooltip:{trigger:'axis', valueFormatter:v => v + '%'},
+        backgroundColor:chartBg, tooltip:{trigger:'axis', valueFormatter:v => v + '%'},
         legend:{data:['网格','持有'],bottom:2,textStyle:{color:tx,fontSize:9}},
         grid:{left:'8%',right:'4%',top:12,bottom:34},
         xAxis:{type:'category',data:years,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
