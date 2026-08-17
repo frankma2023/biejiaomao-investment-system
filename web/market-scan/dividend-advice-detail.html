@@ -507,7 +507,8 @@ function renderTemp(m) {
     series: [
       {name: '股息率', type: 'line', data: s.map(x => x.dyr), showSymbol: false, lineStyle: {color: '#f59e0b', width: 1.5}},
       {name: '10年国债', type: 'line', data: s.map(x => x.bond), showSymbol: false, lineStyle: {color: '#3b82f6', width: 1.2}},
-      {name: '息差', type: 'line', data: s.map(x => x.spread), showSymbol: false, areaStyle: {color: 'rgba(245,158,11,.15)'}, lineStyle: {color: '#ef4444', width: 1, type: 'dashed'}}
+      {name: '息差', type: 'line', data: s.map(x => x.spread), showSymbol: false, areaStyle: {color: 'rgba(245,158,11,.15)'}, lineStyle: {color: '#ef4444', width: 1, type: 'dashed'},
+        markLine: {symbol: 'none', data: [{yAxis: 0}], lineStyle: {color: 'rgba(139,139,144,.5)', type: 'dashed'}, label: {show: true, formatter: '0轴', position: 'insideEndTop', color: '#8b8b90', fontSize: 9}}}
     ]
   });
 }

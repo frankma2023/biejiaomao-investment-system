@@ -106,6 +106,19 @@ def compute_crowding(db, code, target_date):
     valuation = pe_pct * 0.3 + pb_pct * 0.3 + dyr_pct_inv * 0.4
 
     score = heat * 0.5 + valuation * 0.5
+    # O8：数据质量标记（heat/valuation 内部缺失时已 fallback 50）
+    missing = []
+    if not amt_ratio:
+        missing.append('成交额占比')
+    if not to_rs:
+        missing.append('换手率')
+    if f[-1]['pe_ttm_pct'] is None:
+        missing.append('PE分位')
+    if f[-1]['pb_pct'] is None:
+        missing.append('PB分位')
+    if f[-1]['dyr_pct'] is None:
+        missing.append('股息率分位')
+    data_quality = 'partial(' + ','.join(missing) + ')' if missing else 'full'
     if score < 30:
         level = '低拥挤'
     elif score < 60:
@@ -116,25 +129,30 @@ def compute_crowding(db, code, target_date):
         level = '高拥挤'
     return {'score': round(score, 1), 'level': level,
             'heat_score': round(heat, 1), 'valuation_score': round(valuation, 1),
-            'dyr_pct_inv': round(dyr_pct_inv, 1)}
+            'dyr_pct_inv': round(dyr_pct_inv, 1), 'data_quality': data_quality}
 
 
 # ───────────────────────────────
 # ② 恐慌贪婪
 # ───────────────────────────────
 def compute_fear_greed(db, code, target_date):
-    k = _load_kline(db, code, target_date, 300)
-    if len(k) < 60:
+    k = _load_kline(db, code, target_date, 600)  # 600条：252日回撤分位需要 252+250 样本（B1 修复）
+    if len(k) < 300:
         return None
     closes = [r['close'] for r in k]
 
-    # 子指标1：ATR(20)/close 252日百分位
+    # 子指标1：ATR(20)/close 的 252 日百分位（W1 修复：分位基准用滚动 ATR20 序列）
     ranges = []
     for r in k[-252:]:
         if r['high'] and r['low'] and r['close']:
             ranges.append((r['high'] - r['low']) / r['close'] * 100)
-    atr20 = sum(ranges[-20:]) / min(20, len(ranges)) if ranges else 0
-    vol_pct = _pct_rank(ranges, atr20) * 100
+    atr_series = []
+    for i in range(19, len(ranges)):
+        atr_series.append(sum(ranges[i - 19:i + 1]) / 20)
+    if not atr_series:
+        return None
+    atr20 = atr_series[-1]
+    vol_pct = _pct_rank(atr_series, atr20) * 100
 
     # 子指标2：250日回撤深度 252日百分位
     seg = closes[-250:]
@@ -167,7 +185,7 @@ def compute_fear_greed(db, code, target_date):
 # ③ 股债息差 + 序列
 # ───────────────────────────────
 def compute_spread(db, code, target_date):
-    f = _load_fund(db, code, target_date, 2000)
+    f = _load_fund(db, code, target_date, 2600)
     if len(f) < 40:
         return None
     bond_date, y10 = _load_bond_y10(db, target_date)
@@ -200,7 +218,7 @@ def compute_spread(db, code, target_date):
 
     return {'value': cur['spread'], 'dyr': cur['dyr'], 'bond_yield': cur['bond'],
             'bond_date': cur['date'], 'pct_250': round(pct_250, 1), 'pct_all': round(pct_all, 1),
-            'series': series[-600:]}
+            'series': series}  # W2 修复：全量输出（约2100点）
 
 
 # ───────────────────────────────

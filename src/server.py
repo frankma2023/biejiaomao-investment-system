@@ -2398,6 +2398,19 @@ def api_market_red_metrics():
         return jsonify({'error': str(e)}), 500
     if not result.get('spread'):
         return jsonify({'error': '数据不足', 'code': code, 'date': target_date})
+    # 指数名称（index_style.yaml，与 grid-advice 同源）
+    name = code
+    try:
+        import yaml
+        style = yaml.safe_load(open(INDEX_RS_CONFIG, encoding='utf-8'))
+        for cat, items in style.get('categories', {}).items():
+            for it in items:
+                if it.get('code') == code:
+                    name = it.get('name', code)
+                    break
+    except Exception:
+        pass
+    result['name'] = name
     return jsonify(result)
 
 
