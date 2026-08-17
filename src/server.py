@@ -2060,6 +2060,139 @@ def _grid_backtest(closes, step_pct, cash=100000):
     return c + s * closes[-1], trades
 
 
+@app.route('/api/market-scan/grid-advice')
+def api_market_grid_advice():
+    """网格策略自动回测推荐：输入指数代码 → 间距扫描(3/5/8/10/12%) + 箱体检测 + 适配性判断"""
+    code = request.args.get('code', '399998')
+    target_date = request.args.get('date', '')
+    db = get_db()
+
+    # 指数身份（yaml：名称 + 分类，etf 分类数据不可靠）
+    try:
+        import yaml
+        style = yaml.safe_load(open(INDEX_RS_CONFIG, encoding='utf-8'))
+        name, category = code, ''
+        for cat, items in style.get('categories', {}).items():
+            for it in items:
+                if it.get('code') == code:
+                    name = it.get('name', code)
+                    category = cat
+    except Exception:
+        name, category = code, ''
+    if category == 'etf':
+        return jsonify({'error': 'ETF 数据不可靠（index_daily_kline 中 ETF 价格字段量级错误），请输入对应指数代码（如 515220→399998 中证煤炭）', 'code': code})
+
+    if not target_date:
+        r = db.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
+        if r is None or r[0] is None:
+            return jsonify({'error': 'no data', 'date': ''})
+        target_date = r[0]
+
+    rows = db.execute("""
+        SELECT date, close FROM index_daily_kline
+        WHERE stock_code=? AND kline_type='normal' AND date<=?
+        ORDER BY date
+    """, (code, target_date)).fetchall()
+    if len(rows) < 120:
+        return jsonify({'error': '数据不足（<120天）', 'code': code})
+    dates = [r['date'] for r in rows]
+    closes = [r['close'] for r in rows]
+    cur = closes[-1]
+
+    # 回测窗口：优先 2018 起（与煤炭研究一致），不足则用全部数据并标注
+    start8 = '2018-01-01'
+    idx8 = [i for i, d in enumerate(dates) if d >= start8]
+    if len(idx8) >= 300:
+        closes_bt = closes[idx8[0]:]
+        window = '2018-01-01 ~ ' + dates[-1]
+        short = False
+    else:
+        closes_bt = closes
+        window = dates[0] + ' ~ ' + dates[-1]
+        short = True
+
+    # 间距扫描
+    import math
+    scan = []
+    best = None
+    hold_bt = 100000 / closes_bt[0] * closes_bt[-1]
+    for st in (3, 5, 8, 10, 12):
+        r = _grid_backtest(closes_bt, st)
+        if not r:
+            continue
+        excess = (r[0] / hold_bt - 1) * 100
+        scan.append({
+            'step': st,
+            'grid_ret': round((r[0] / 100000 - 1) * 100, 1),
+            'hold_ret': round((hold_bt / 100000 - 1) * 100, 1),
+            'excess': round(excess, 1),
+            'trades': r[1],
+        })
+        if best is None or (excess > best['excess'] and r[1] >= 20):
+            best = {'step': st, 'excess': round(excess, 1), 'trades': r[1]}
+    if best is None:
+        best = {'step': 8, 'excess': 0, 'trades': 0}
+
+    # 箱体：下沿=近250日最低×0.95（网格回测基准），上沿=近3年最高
+    seg250 = closes[-250:]
+    lo250 = min(seg250)
+    hi250 = max(seg250)
+    seg3 = [c for c, d in zip(closes, dates) if d >= dates[-1][:4] + '-01-01']
+    lo3, hi3 = min(seg3), max(seg3)
+    base = lo250 * 0.95
+    top = hi3
+    pos = (cur - lo250) / (hi250 - lo250) * 100 if hi250 > lo250 else 50
+
+    # 适配性判断
+    max_ex = max(s['excess'] for s in scan) if scan else 0
+    if max_ex > 10:
+        fit = 'good'
+        fit_note = '高波动/横盘特征明显，网格大概率赚取正超额（%s起 %s%%间距 %+.1fpp）' % (window[:4], best['step'], best['excess'])
+    elif max_ex > 0:
+        fit = 'neutral'
+        fit_note = '超额有限（最高 %+.1fpp），网格可做但利润薄，需控制仓位' % max_ex
+    else:
+        fit = 'bad'
+        fit_note = '所有间距超额≤0（最高 %+.1fpp），趋势太强，网格会大幅跑输持有，不建议' % max_ex
+
+    # 分年度（推荐间距）
+    annual = []
+    for y in sorted(set(d[:4] for d in dates)):
+        idx = [i for i, d in enumerate(dates) if d.startswith(y)]
+        if len(idx) < 80:
+            continue
+        seg = closes[idx[0]:idx[-1] + 1]
+        r = _grid_backtest(seg, best['step'])
+        if not r:
+            continue
+        hold = 100000 / seg[0] * seg[-1]
+        annual.append({'year': y, 'idx_ret': round((seg[-1] / seg[0] - 1) * 100, 1),
+                       'grid_ret': round((r[0] / 100000 - 1) * 100, 1),
+                       'excess': round((r[0] / hold - 1) * 100, 1)})
+
+    # 波动特征
+    rets = [closes[i] / closes[i - 1] - 1 for i in range(1, len(closes))]
+    mean_r = sum(rets) / len(rets) if rets else 0
+    ann_vol = (sum((r - mean_r) ** 2 for r in rets) / (len(rets) - 1)) ** 0.5 * math.sqrt(252) * 100
+
+    return jsonify({
+        'code': code, 'name': name, 'date': target_date,
+        'cur': round(cur, 2),
+        'window': window, 'short_window': short,
+        'range': {'lo250': round(lo250, 2), 'hi250': round(hi250, 2),
+                  'lo3y': round(lo3, 2), 'hi3y': round(hi3, 2), 'pos_250': round(pos)},
+        'suggest': {'step': best['step'], 'base': round(base, 2), 'top': round(top, 2),
+                    'excess': best['excess'], 'trades': best['trades']},
+        'scan': scan,
+        'fit': fit, 'fit_note': fit_note,
+        'annual': annual[-8:],
+        'stats': {'ann_vol': round(ann_vol, 1),
+                  'grid_ret': round((_grid_backtest(closes_bt, best['step'])[0] / 100000 - 1) * 100, 1) if _grid_backtest(closes_bt, best['step']) else None,
+                  'hold_ret': round((hold_bt / 100000 - 1) * 100, 1)},
+        'data_note': '回测未计滑点/手续费；网格超额与趋势强度负相关，趋势市会跑输持有' + ('；本指数数据窗口较短，结论仅供参考' if short else ''),
+    })
+
+
 @app.route('/api/market-scan/coal-advice')
 def api_market_coal_advice():
     """中证煤炭网格投资建议：网格档位位置 + 网格回测摘要（支持历史回看）"""

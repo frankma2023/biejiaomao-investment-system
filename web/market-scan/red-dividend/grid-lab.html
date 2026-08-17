@@ -46,15 +46,24 @@ td:first-child{font-family:var(--font-body)}
   <div class="sub">对称网格：跌一档买一笔、涨一档卖一笔 · 以 ETF 实时价格执行 · 触发信号可对照指数点位</div>
 
   <div class="ctrl">
-    <div><label>当前价</label><br><input id="p-cur" type="number" step="0.01" value="1.26"></div>
-    <div><label>箱体下沿</label><br><input id="p-base" type="number" step="0.01" value="0.96"></div>
-    <div><label>箱体上沿</label><br><input id="p-top" type="number" step="0.01" value="1.47"></div>
+    <div><label>指数代码</label><br><input id="p-code" type="text" value="399998" style="width:80px"></div>
+    <button class="btn" onclick="fetchAdvice()">📡 回测推荐</button>
+    <div class="hint">输入指数代码（如 399998 中证煤炭 / 000015 红利指数 / 931238 黄金股票），按历史数据自动扫描间距并推荐网格参数。ETF 代码数据不可靠，请用对应指数。</div>
+  </div>
+
+  <div id="advice-out"></div>
+
+  <div class="ctrl">
+    <div><label>当前价</label><br><input id="p-cur" type="number" step="0.01" value="2381"></div>
+    <div><label>箱体下沿</label><br><input id="p-base" type="number" step="0.01" value="1826"></div>
+    <div><label>箱体上沿</label><br><input id="p-top" type="number" step="0.01" value="2773"></div>
     <div><label>间距 %</label><br><input id="p-step" type="number" step="0.5" value="8"></div>
     <div><label>总资金</label><br><input id="p-cash" type="number" step="1000" value="60000"></div>
     <div><label>底仓 %</label><br><input id="p-base-ratio" type="number" step="5" value="33"></div>
     <div><label>每档 %</label><br><input id="p-per-ratio" type="number" step="1" value="10"></div>
+    <div><label>ETF现价(选填)</label><br><input id="p-etf" type="number" step="0.01" value="" placeholder="填了显示ETF档位"></div>
     <button class="btn" onclick="calc()">生成档位表</button>
-    <div class="hint">默认参数=煤炭ETF(515220)当前值：现价 1.26、箱体 0.96~1.47（对应指数 1805~2773，2022 以来）。底仓在首档买入，之后每跌一档买「每档金额」，每涨一档卖「每档金额」。</div>
+    <div class="hint">默认=中证煤炭(399998)回测推荐值。若交易 ETF，填 ETF 现价后档位表增加 ETF 触发价列（按比例换算）。</div>
   </div>
 
   <div id="banner"></div>
@@ -68,6 +77,51 @@ const $ = id => document.getElementById(id);
 
 function fmt(x, d) { return x.toFixed(d === undefined ? 2 : d); }
 
+async function fetchAdvice() {
+  const code = $('p-code').value.trim();
+  $('advice-out').innerHTML = '<div class="card">⏳ 回测中...</div>';
+  try {
+    const r = await fetch(API_BASE + '/api/market-scan/grid-advice?code=' + code).then(r => r.json());
+    if (r.error) {
+      $('advice-out').innerHTML = '<div class="card"><div class="ct">❌ ' + r.error + '</div></div>';
+      return;
+    }
+    const fitCls = r.fit === 'good' ? 'buy' : (r.fit === 'bad' ? 'warn' : '');
+    const rg = r.range, sg = r.suggest;
+    let html = '<div class="card"><div class="ct">📡 ' + r.name + ' (' + r.code + ') · 回测推荐</div>';
+    html += '<div style="font-size:0.68rem;color:var(--text-secondary);line-height:1.9">';
+    html += '窗口 ' + r.window + ' · 现价 <b>' + r.cur + '</b> · 250日区间 ' + rg.lo250 + '~' + rg.hi250 + '（位置 ' + rg.pos_250 + '%） · 近3年高 ' + rg.hi3y + '<br>';
+    html += '适配性：<b class="' + fitCls + '">' + (r.fit === 'good' ? '✅ 适合网格' : r.fit === 'neutral' ? '⚠️ 中性' : '❌ 不适合') + '</b> ' + r.fit_note + '<br>';
+    html += '推荐：<b>间距 ' + sg.step + '%</b> · 下沿基准 ' + sg.base + ' · 上沿警戒 ' + sg.top + ' · 超额 ' + (sg.excess > 0 ? '+' : '') + sg.excess + 'pp（' + sg.trades + '次交易）</div>';
+    html += '<table style="margin-top:10px"><tr><th>间距</th><th>网格收益</th><th>持有收益</th><th>超额</th><th>交易次数</th></tr>';
+    r.scan.forEach(s => {
+      html += '<tr><td>' + s.step + '%' + (s.step === sg.step ? ' <span class="warn">←推荐</span>' : '') + '</td><td>' + (s.grid_ret > 0 ? '+' : '') + s.grid_ret + '%</td><td>' + (s.hold_ret > 0 ? '+' : '') + s.hold_ret + '%</td><td class="' + (s.excess >= 0 ? 'buy' : 'sell') + '">' + (s.excess > 0 ? '+' : '') + s.excess + 'pp</td><td>' + s.trades + '</td></tr>';
+    });
+    html += '</table>';
+    if (r.annual && r.annual.length) {
+      html += '<table style="margin-top:10px"><tr><th>年份</th><th>指数涨跌</th><th>网格收益</th><th>超额</th></tr>';
+      r.annual.forEach(a => {
+        html += '<tr><td>' + a.year + '</td><td class="' + (a.idx_ret >= 0 ? 'buy' : 'sell') + '">' + (a.idx_ret > 0 ? '+' : '') + a.idx_ret + '%</td><td>' + (a.grid_ret > 0 ? '+' : '') + a.grid_ret + '%</td><td class="' + (a.excess >= 0 ? 'buy' : 'sell') + '">' + (a.excess > 0 ? '+' : '') + a.excess + 'pp</td></tr>';
+      });
+      html += '</table>';
+    }
+    html += '<div style="font-size:0.6rem;color:var(--muted);margin-top:8px">⚠️ ' + r.data_note + '</div>';
+    html += '<div style="margin-top:12px"><button class="btn" onclick="applyAdvice(' + r.cur + ',' + sg.base + ',' + sg.top + ',' + sg.step + ')">✅ 采用推荐参数</button></div></div>';
+    $('advice-out').innerHTML = html;
+  } catch (e) {
+    $('advice-out').innerHTML = '<div class="card">请求失败: ' + e.message + '</div>';
+  }
+}
+
+function applyAdvice(cur, base, top, step) {
+  $('p-cur').value = cur;
+  $('p-base').value = base;
+  $('p-top').value = top;
+  $('p-step').value = step;
+  calc();
+  window.scrollTo({top: document.getElementById('tables').offsetTop - 20, behavior: 'smooth'});
+}
+
 function calc() {
   const cur = parseFloat($('p-cur').value);
   const base = parseFloat($('p-base').value);
@@ -76,6 +130,8 @@ function calc() {
   const cashTotal = parseFloat($('p-cash').value);
   const baseRatio = parseFloat($('p-base-ratio').value) / 100;
   const perRatio = parseFloat($('p-per-ratio').value) / 100;
+  const etfCur = parseFloat($('p-etf').value);
+  const k = (etfCur > 0 && cur > 0) ? etfCur / cur : null;  // 指数→ETF 换算系数
   if (!(cur > 0 && base > 0 && base < cur && cashTotal > 0)) {
     $('tables').innerHTML = '<div class="card">参数不合法：下沿必须 &lt; 当前价</div>';
     return;
@@ -106,12 +162,12 @@ function calc() {
     const profit = amt * (nextUp / price - 1);
     buys.push({l, price, amt, shares, profit, isBase: l === lvl});
   }
-  let html = '<div class="card"><div class="ct">🛒 买入档（下跌触发 · 从空仓开始）</div><table><tr><th>档位</th><th>触发价</th><th>距现价</th><th>动作</th><th>买入金额</th><th>份额</th><th>累计投入</th><th>若涨回上一档</th></tr>';
+  let html = '<div class="card"><div class="ct">🛒 买入档（下跌触发 · 从空仓开始）</div><table><tr><th>档位</th><th>触发价' + (k ? '</th><th>ETF价' : '') + '</th><th>距现价</th><th>动作</th><th>买入金额</th><th>份额</th><th>累计投入</th><th>若涨回上一档</th></tr>';
   let cum = 0;
   buys.forEach(b => {
     cum += b.amt;
     const dist = (cur - b.price) / cur * 100;
-    html += '<tr' + (b.isBase ? ' class="cur-row"' : '') + '><td>档' + b.l + (b.isBase ? ' ⭐底仓' : '') + '</td><td class="buy">' + fmt(b.price) + '</td><td>' + (dist >= 0 ? '-' : '+') + fmt(Math.abs(dist), 1) + '%</td><td class="buy">买入</td><td>' + fmt(b.amt, 0) + '</td><td>' + fmt(b.shares, 0) + '</td><td>' + fmt(cum, 0) + '</td><td class="sell">+' + fmt(b.profit, 0) + '</td></tr>';
+    html += '<tr' + (b.isBase ? ' class="cur-row"' : '') + '><td>档' + b.l + (b.isBase ? ' ⭐底仓' : '') + '</td><td class="buy">' + fmt(b.price) + '</td>' + (k ? '<td class="muted">' + fmt(b.price * k) + '</td>' : '') + '<td>' + (dist >= 0 ? '-' : '+') + fmt(Math.abs(dist), 1) + '%</td><td class="buy">买入</td><td>' + fmt(b.amt, 0) + '</td><td>' + fmt(b.shares, 0) + '</td><td>' + fmt(cum, 0) + '</td><td class="sell">+' + fmt(b.profit, 0) + '</td></tr>';
   });
   html += '</table><div style="font-size:0.6rem;color:var(--muted);margin-top:6px">⭐ 底仓档 = 第一买入档；其后每档金额 = 总资金 × ' + fmt(perRatio * 100, 0) + '% = ' + fmt(per, 0) + ' 元。最后一列：该档买入后涨回上一档卖出可实现的利润。</div></div>';
 
@@ -122,12 +178,12 @@ function calc() {
     const down = l - 1;  // 对应买入档
     sells.push({l, price, down});
   }
-  html += '<div class="card"><div class="ct">🛒 卖出档（上涨触发 · 每涨一档卖一档金额）</div><table><tr><th>档位</th><th>触发价</th><th>距现价</th><th>动作</th><th>卖出金额</th><th>对应买入档</th><th>该笔盈利</th></tr>';
+  html += '<div class="card"><div class="ct">🛒 卖出档（上涨触发 · 每涨一档卖一档金额）</div><table><tr><th>档位</th><th>触发价' + (k ? '</th><th>ETF价' : '') + '</th><th>距现价</th><th>动作</th><th>卖出金额</th><th>对应买入档</th><th>该笔盈利</th></tr>';
   sells.forEach(s => {
     const dist = (s.price - cur) / cur * 100;
     const bAmt = (s.down === lvl) ? baseAmt : per;
     const profit = bAmt * (s.price / (base + s.down * step) - 1);
-    html += '<tr><td>档' + s.l + '</td><td class="sell">' + fmt(s.price) + '</td><td>+' + fmt(dist, 1) + '%</td><td class="sell">卖出</td><td>' + fmt(Math.min(per, (baseAmt + per * Math.max(0, s.down - lvl + 1))), 0) + '</td><td>档' + s.down + (s.down === lvl ? '（底仓）' : '') + '</td><td class="buy">+' + fmt(profit, 0) + '</td></tr>';
+    html += '<tr><td>档' + s.l + '</td><td class="sell">' + fmt(s.price) + '</td>' + (k ? '<td class="muted">' + fmt(s.price * k) + '</td>' : '') + '<td>+' + fmt(dist, 1) + '%</td><td class="sell">卖出</td><td>' + fmt(Math.min(per, (baseAmt + per * Math.max(0, s.down - lvl + 1))), 0) + '</td><td>档' + s.down + (s.down === lvl ? '（底仓）' : '') + '</td><td class="buy">+' + fmt(profit, 0) + '</td></tr>';
   });
   html += '</table><div style="font-size:0.6rem;color:var(--muted);margin-top:6px">卖出金额 = 每档金额（' + fmt(per, 0) + ' 元）；底仓在上涨中逐步卖出（这是网格趋势踏空的来源，属设计属性）。突破上沿 ' + fmt(top) + ' 后停止卖出。</div></div>';
   $('tables').innerHTML = html;
