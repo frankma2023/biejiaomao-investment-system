@@ -109,7 +109,7 @@ async function load() {
       html += '<div class="sc-title">' + ca.name + ' <span class="code">' + ca.code + '</span></div>';
       html += '<div style="margin-top:6px"><span class="lv" style="color:' + clv[1] + '">' + clv[0] + '</span></div>';
       html += '<div class="tx">' + ca.advice + '</div>';
-      html += '<div class="meta">当前档位 ' + (g.grid_low != null ? g.grid_low + '~' + g.grid_high : '—') + ' · 250日位置 ' + ca.pos_250 + '% · 回撤 ' + ca.dd_250 + '%</div>';
+      html += '<div class="meta">第' + (g.level != null ? g.level : '—') + '档 ' + (g.grid_low != null ? g.grid_low + '~' + g.grid_high : '—') + ' · 250日位置 ' + ca.pos_250 + '% · 回撤 ' + ca.dd_250 + '%</div>';
       html += '<div class="sig">2018起网格 +' + (g.ret_2018 != null ? g.ret_2018 + '%' : '—') + ' vs 持有 +' + (g.hold_2018 != null ? g.hold_2018 + '%' : '—') + ' · 间距 ' + g.step_pct + '%</div>';
       html += '</div>';
       html += '</div>';

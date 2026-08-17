@@ -17,12 +17,12 @@ def grid_with_step(closes, step_pct, cash=100000):
     base = closes[0]
     # 初始买入 1/3
     s = (cash/3) / closes[0]; c -= cash/3
-    cg = round((closes[0]-low)/(low*step_pct/100))
+    cg = int((closes[0]-low)/(low*step_pct/100))
     trades = 0
     per = cash/10
     for i in range(1, len(closes)):
         p = closes[i]
-        g = round((p-low)/(low*step_pct/100))
+        g = int((p-low)/(low*step_pct/100))
         if g < cg:
             for _ in range(cg-g):
                 if c > per: s += per/p; c -= per; trades += 1

@@ -31,7 +31,7 @@ def pure_grid(closes, low, high, n=10, cash=100000):
     if step <= 0: return None
     per = cash/(n+1)
     c, s = cash, 0.0
-    def g(p): return max(0, min(n, round((p-low)/step)))
+    def g(p): return max(0, min(n, int((p-low)/step)))
     cg = g(closes[0])
     s = per*(n//3+1)/closes[0]; c -= per*(n//3+1)
     trades = 0

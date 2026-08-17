@@ -170,7 +170,7 @@ function calc() {
     const dist = (cur - b.price) / cur * 100;
     html += '<tr' + (b.isBase ? ' class="cur-row"' : '') + '><td>档' + b.l + (b.isBase ? ' ⭐底仓' : '') + '</td><td class="buy">' + fmt(b.price) + '</td>' + (k ? '<td class="muted">' + fmt(b.price * k) + '</td>' : '') + '<td>' + (dist >= 0 ? '-' : '+') + fmt(Math.abs(dist), 1) + '%</td><td class="buy">买入</td><td>' + fmt(b.amt, 0) + '</td><td>' + fmt(b.shares, 0) + '</td><td>' + fmt(cum, 0) + '</td><td class="sell">+' + fmt(b.profit, 0) + '</td></tr>';
   });
-  html += '</table><div style="font-size:0.6rem;color:var(--muted);margin-top:6px">⭐ 底仓档 = 第一买入档；其后每档金额 = 总资金 × ' + fmt(perRatio * 100, 0) + '% = ' + fmt(per, 0) + ' 元。最后一列：该档买入后涨回上一档卖出可实现的利润。</div></div>';
+  html += '</table><div style="font-size:0.6rem;color:var(--muted);margin-top:6px">⭐ 底仓档 = 第一买入档；其后每档金额 = 总资金 × ' + fmt(perRatio * 100, 0) + '% = ' + fmt(per, 0) + ' 元。最后一列：该档买入后涨回上一档卖出可实现的利润。' + (k ? ' <span class="warn">⚠️ ETF 价为按现价比例推算，下单以软件实时价为准</span>' : '') + '</div></div>';
 
   // ── 卖出档表（当前档往上 5 档）──
   const sells = [];
@@ -186,7 +186,7 @@ function calc() {
     const profit = bAmt * (s.price / (base + s.down * step) - 1);
     html += '<tr><td>档' + s.l + '</td><td class="sell">' + fmt(s.price) + '</td>' + (k ? '<td class="muted">' + fmt(s.price * k) + '</td>' : '') + '<td>+' + fmt(dist, 1) + '%</td><td class="sell">卖出</td><td>' + fmt(Math.min(per, (baseAmt + per * Math.max(0, s.down - lvl + 1))), 0) + '</td><td>档' + s.down + (s.down === lvl ? '（底仓）' : '') + '</td><td class="buy">+' + fmt(profit, 0) + '</td></tr>';
   });
-  html += '</table><div style="font-size:0.6rem;color:var(--muted);margin-top:6px">卖出金额 = 每档金额（' + fmt(per, 0) + ' 元）；底仓在上涨中逐步卖出（这是网格趋势踏空的来源，属设计属性）。突破上沿 ' + fmt(top) + ' 后停止卖出。</div></div>';
+  html += '</table><div style="font-size:0.6rem;color:var(--muted);margin-top:6px">卖出金额 = 每档金额（' + fmt(per, 0) + ' 元）；底仓在上涨中逐步卖出（这是网格趋势踏空的来源，属设计属性）。突破上沿 ' + fmt(top) + ' 后停止卖出。' + (k ? ' <span class="warn">⚠️ ETF 价为推算值</span>' : '') + '</div></div>';
   $('tables').innerHTML = html;
 
   // ── 模拟器 ──

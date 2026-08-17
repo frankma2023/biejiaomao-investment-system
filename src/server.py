@@ -2022,8 +2022,8 @@ def api_market_fcf_detail():
 # ═══════════════════════════════════════════════
 
 COAL_INDEX = ('399998', '中证煤炭')
-COAL_GRID_STEP = 8  # 网格间距 %（回测最优，analysis/grid_step_sens.py）
-COAL_DATA_NOTE = '网格回测未计滑点/手续费（8%间距约700次交易）；超额与趋势强度负相关，煤炭若开启大牛市网格将跑输持有'
+COAL_GRID_STEP = 10  # 网格间距 %（int/floor 档位语义回测最优 10% +31.6pp，analysis/grid_step_sens.py）
+COAL_DATA_NOTE = '网格回测未计滑点/手续费（10%间距约500次交易）；超额与趋势强度负相关，煤炭若开启大牛市网格将跑输持有'
 
 
 def _grid_backtest(closes, step_pct, cash=100000):
@@ -2036,12 +2036,12 @@ def _grid_backtest(closes, step_pct, cash=100000):
         return None
     s = (cash / 3) / closes[0]
     c -= cash / 3
-    cg = round((closes[0] - low) / (low * step_pct / 100))
+    cg = int((closes[0] - low) / (low * step_pct / 100))
     trades = 0
     per = cash / 10
     for i in range(1, len(closes)):
         p = closes[i]
-        g = round((p - low) / (low * step_pct / 100))
+        g = int((p - low) / (low * step_pct / 100))
         if g < cg:
             for _ in range(cg - g):
                 if c > per:
@@ -2128,16 +2128,21 @@ def api_market_grid_advice():
             'excess': round(excess, 1),
             'trades': r[1],
         })
-        if best is None or (excess > best['excess'] and r[1] >= 20):
+        if r[1] >= 20 and (best is None or excess > best['excess']):
             best = {'step': st, 'excess': round(excess, 1), 'trades': r[1]}
     if best is None:
-        best = {'step': 8, 'excess': 0, 'trades': 0}
+        best = {'step': 8, 'excess': 0, 'trades': 0, 'trades_ok': False}
+    else:
+        best['trades_ok'] = True
 
     # 箱体：下沿=近250日最低×0.95（网格回测基准），上沿=近3年最高
     seg250 = closes[-250:]
     lo250 = min(seg250)
     hi250 = max(seg250)
-    seg3 = [c for c, d in zip(closes, dates) if d >= dates[-1][:4] + '-01-01']
+    # 近3年窗口（B2 修复：原实现误用当年年初至今）
+    from datetime import datetime as _dt, timedelta as _td
+    d3 = (_dt.strptime(dates[-1], '%Y-%m-%d') - _td(days=3 * 365)).strftime('%Y-%m-%d')
+    seg3 = [c for c, d in zip(closes, dates) if d >= d3]
     lo3, hi3 = min(seg3), max(seg3)
     base = lo250 * 0.95
     top = hi3
@@ -2182,7 +2187,7 @@ def api_market_grid_advice():
         'range': {'lo250': round(lo250, 2), 'hi250': round(hi250, 2),
                   'lo3y': round(lo3, 2), 'hi3y': round(hi3, 2), 'pos_250': round(pos)},
         'suggest': {'step': best['step'], 'base': round(base, 2), 'top': round(top, 2),
-                    'excess': best['excess'], 'trades': best['trades']},
+                    'excess': best['excess'], 'trades': best['trades'], 'trades_ok': best.get('trades_ok', True)},
         'scan': scan,
         'fit': fit, 'fit_note': fit_note,
         'annual': annual[-8:],
@@ -2243,13 +2248,16 @@ def api_market_coal_advice():
             trades = r[1]
         h_ret = round((closes8[-1] / closes8[0] - 1) * 100, 1)
 
-    # 建议（网格法：250日位置 + 回撤）
+    # 建议（网格法：250日位置 + 回撤）；level 保留档位整数，建议等级用 advice_lvl（B1 修复）
+    advice_lvl = 'hold'
     if pos_250 >= 75:
-        advice, level = '网格高位区（250日位置' + str(round(pos_250)) + '%），留意减仓档，谨慎新增', 'reduce'
+        advice = '网格高位区（250日位置' + str(round(pos_250)) + '%），留意减仓档，谨慎新增'
+        advice_lvl = 'reduce'
     elif pos_250 <= 35 or dd_250 >= 15:
-        advice, level = '网格低位区，可执行加仓档，分批买入', 'buy'
+        advice = '网格低位区，可执行加仓档，分批买入'
+        advice_lvl = 'buy'
     else:
-        advice, level = '网格中位区，按既定间距运转', 'hold'
+        advice = '网格中位区，按既定间距运转'
 
     return jsonify({
         'date': target_date, 'code': code, 'name': name,
@@ -2261,7 +2269,7 @@ def api_market_coal_advice():
             'excess_2018': round((g_ret - h_ret) / (1 + h_ret / 100), 1) if g_ret is not None and h_ret is not None else None,
             'trades': trades,
         },
-        'advice': advice, 'advice_level': level,
+        'advice': advice, 'advice_level': advice_lvl,
         'data_note': COAL_DATA_NOTE,
     })
 
@@ -2313,7 +2321,7 @@ def api_market_coal_detail():
             continue
         hold = 100000 / seg[0] * seg[-1]
         crosses = 0
-        cg = round((seg[0] - low_all) / (low_all * COAL_GRID_STEP / 100))
+        cg = int((seg[0] - low_all) / (low_all * COAL_GRID_STEP / 100))
         for p in seg[1:]:
             g = round((p - low_all) / (low_all * COAL_GRID_STEP / 100))
             crosses += abs(g - cg)
@@ -2336,7 +2344,7 @@ def api_market_coal_detail():
     closes8 = [r['close'] for r in rows8]
     step_sens = []
     hold8 = 100000 / closes8[0] * closes8[-1] if closes8 else 0
-    for st in (5, 8, 10):
+    for st in (5, 8, 10, 12):
         r = _grid_backtest(closes8, st) if len(closes8) >= 300 else None
         if r:
             step_sens.append({

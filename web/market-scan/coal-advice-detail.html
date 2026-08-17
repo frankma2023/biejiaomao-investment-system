@@ -63,7 +63,7 @@ async function load() {
     if (d.error) { document.getElementById('meta').textContent = '无数据'; return; }
 
     document.getElementById('title').textContent = '⛏ ' + d.name + ' · 网格投资法详情';
-    document.getElementById('meta').textContent = d.date + ' · 网格间距 ' + d.grid_step + '%（回测最优） · 年化波动 ' + d.stats.ann_vol + '% · 网格回测未计滑点/手续费';
+    document.getElementById('meta').textContent = d.date + ' · 网格间距 ' + d.grid_step + '%（回测最优） · 年化波动 ' + d.stats.ann_vol + '% · ' + (d.data_note || '网格回测未计滑点/手续费');
 
     // 当前建议卡
     const cur = d.closes_long[d.closes_long.length - 1];
