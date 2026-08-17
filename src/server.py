@@ -2392,7 +2392,7 @@ def api_market_red_metrics():
             return jsonify({'error': 'no data', 'date': ''})
         target_date = r[0]
     try:
-        from src.scanners.red_dividend_metrics import compute_all
+        from scanners.red_dividend_metrics import compute_all
         result = compute_all(code, target_date)
     except Exception as e:
         return jsonify({'error': str(e)}), 500

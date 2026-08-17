@@ -199,7 +199,7 @@ def compute_spread(db, code, target_date):
     pct_250 = _pct_rank(spreads_250, cur['spread']) * 100
 
     return {'value': cur['spread'], 'dyr': cur['dyr'], 'bond_yield': cur['bond'],
-            'bond_date': bond_date, 'pct_250': round(pct_250, 1), 'pct_all': round(pct_all, 1),
+            'bond_date': cur['date'], 'pct_250': round(pct_250, 1), 'pct_all': round(pct_all, 1),
             'series': series[-600:]}
 
 
@@ -236,7 +236,7 @@ def compute_all(code, target_date):
             'code': code, 'date': target_date,
             'crowding': crowd, 'fear_greed': fg, 'spread': spread,
             'temperature': temp,
-            'data_note': '拥挤度=避险资金涌入（股息率被买低→拥挤高）；恐慌贪婪=波动/回撤/动量三维；息差=股息率−10年国债（中债估值）；温度计为启发式权重（0.35/0.25/0.40）未经回测',
+            'data_note': '口径：拥挤度=交易热度50%(成交额占比+换手率,120日分位)+估值水位50%(PE0.3+PB0.3+股息率分位取反0.4)；恐慌贪婪=ATR252日百分位+250日回撤252日百分位+5日动量(等权)；息差=股息率−10年国债(中债估值,akshare,序列2018起),含250日/全历史分位；温度计为启发式合成(0.35/0.25/0.40)未经回测，非买卖信号',
         }
     finally:
         db.close()
