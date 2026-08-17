@@ -2115,6 +2115,7 @@ def api_market_grid_advice():
     import math
     scan = []
     best = None
+    best_bt = None
     hold_bt = 100000 / closes_bt[0] * closes_bt[-1]
     for st in (3, 5, 8, 10, 12):
         r = _grid_backtest(closes_bt, st)
@@ -2130,6 +2131,7 @@ def api_market_grid_advice():
         })
         if r[1] >= 20 and (best is None or excess > best['excess']):
             best = {'step': st, 'excess': round(excess, 1), 'trades': r[1]}
+            best_bt = r
     if best is None:
         best = {'step': 8, 'excess': 0, 'trades': 0, 'trades_ok': False}
     else:
@@ -2192,7 +2194,7 @@ def api_market_grid_advice():
         'fit': fit, 'fit_note': fit_note,
         'annual': annual[-8:],
         'stats': {'ann_vol': round(ann_vol, 1),
-                  'grid_ret': round((_grid_backtest(closes_bt, best['step'])[0] / 100000 - 1) * 100, 1) if _grid_backtest(closes_bt, best['step']) else None,
+                  'grid_ret': round((best_bt[0] / 100000 - 1) * 100, 1) if best_bt else None,
                   'hold_ret': round((hold_bt / 100000 - 1) * 100, 1)},
         'data_note': '回测未计滑点/手续费；网格超额与趋势强度负相关，趋势市会跑输持有' + ('；本指数数据窗口较短，结论仅供参考' if short else ''),
     })

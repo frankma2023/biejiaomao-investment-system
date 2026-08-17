@@ -83,7 +83,7 @@ async function load() {
     const dds = d.events.map(e => e.dd);
     const closes = d.events.map(e => e.close);
     const box = '<div class="chart-card"><div class="ct">⚡ 触发点（' + (mode === 'annual' ? '年度' : '250日') + '回撤 ≥' + Math.round(threshold*100) + '% · ' + s20.n + ' 次）</div><div id="chart-lab" style="height:300px"></div>' +
-      '<div class="note">⚠️ 数据 2018-01 起（约 8.5 年）。15%/20% 高阈值触发次数少（≤9次），胜率可能失真。</div></div>';
+      '<div class="note">⚠️ 数据 2018-01 起（约 8.5 年）。15%/20% 高阈值触发次数少（≤9次），胜率可能失真。柱色：红=深回撤(≥max(15%,阈值))、橙=触发回撤、灰=未触发——回撤为跌幅，红为"深跌警示"语义，非价格涨跌配色。</div></div>';
     document.getElementById('charts').innerHTML = box;
     if (chartInst) chartInst.dispose();
     chartInst = echarts.init(document.getElementById('chart-lab'));

@@ -49,6 +49,7 @@ html[data-theme="light"] .tab.active{background:var(--accent-subtle);color:var(-
 </style>
 </head>
 <body>
+<nav id="top-nav"></nav>
 <div class="wrap">
   <a class="back" href="red-dividend/">← 返回指数投资</a>
   <h1 id="title">📌 红利指数操作建议详情</h1>
@@ -309,7 +310,7 @@ async function loadValuation() {
 
     const last = data.dates.length - 1;
     const pe = data.pe[last], pePct = data.pe_pct[last], pb = data.pb[last], pbPct = data.pb_pct[last], dyr = data.dyr[last], dyrPct = data.dyr_pct[last];
-    function clr(p) { if (p == null) return 'var(--muted)'; if (p >= 0.8) return 'var(--rise)'; if (p >= 0.6) return 'var(--muted)'; if (p <= 0.3) return 'var(--fall)'; return 'var(--text-secondary)'; }
+    function clr(p) { if (p == null) return 'var(--muted)'; if (p >= 0.8) return '#ef4444'; if (p >= 0.6) return 'var(--muted)'; if (p <= 0.3) return '#10b981'; return 'var(--text-secondary)'; }
     document.getElementById('val-stats').innerHTML =
       '<div class="val-stat"><div class="n">' + (pe ? pe.toFixed(1) : '—') + '</div><div class="l">PE-TTM</div></div>' +
       '<div class="val-stat"><div class="n" style="color:' + clr(pePct) + '">' + (pePct != null ? (pePct * 100).toFixed(0) + '%' : '—') + '</div><div class="l">PE 十年分位</div></div>' +

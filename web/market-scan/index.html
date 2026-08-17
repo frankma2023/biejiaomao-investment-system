@@ -239,7 +239,7 @@
         var prev=kl.length>1?kl[kl.length-2]:null;
         var price=last?last.close:'—';
         var chg=last&&prev?((last.close-prev.close)/prev.close*100):0;
-        var chgCls=chg>0?'var(--fall)':(chg<0?'var(--rise)':'var(--muted)');
+        var chgCls=chg>0?'#ef4444':(chg<0?'#10b981':'var(--muted)');
         html+='<div class="idx-card"><div class="idx-name">'+idx.name+'</div>';
         html+='<div class="idx-price">'+(typeof price==='number'?price.toFixed(2):price)+'</div>';
         html+='<div class="idx-chg" style="color:'+chgCls+'">'+(chg>0?'+':'')+chg.toFixed(2)+'%</div>';
