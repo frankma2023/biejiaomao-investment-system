@@ -66,12 +66,16 @@
     { href: '../chanlun-backtest-compare/',  label: '缠论vs欧奈尔',     page: 'chanlun-backtest-compare' },
   ];
 
+  var INDEX_ITEMS = [
+    { href: '../index-scan/',         label: '指数全景',   page: 'index-scan' },
+    { href: '../index-valuation/',    label: '指数估值',   page: 'index-valuation' },
+    { href: '../market-scan/red-dividend/', label: '指数投资', page: 'red-dividend' },
+    { href: '../index-scan/grid-lab.html',  label: '网格模拟器', page: 'grid-lab' },
+  ];
+
   var MAIN_ITEMS = [
-    { href: '../index-scan/',           label: '指数扫描',         page: 'index-scan' },
-    { href: '../index-valuation/',      label: '指数估值',         page: 'index-valuation' },
     { href: '../stock-valuation/',      label: '个股扫描',         page: 'stock-valuation' },
     { href: '../market-scan/',          label: '大盘扫描',         page: 'market-scan' },
-    { href: '../market-scan/red-dividend/', label: '🧭 指数投资', page: 'red-dividend' },
     { href: '../canslim-scores/',       label: 'CAN SLIM',          page: 'canslim-scores' },
     { href: '../cockpit/',             label: '驾驶舱',           page: 'cockpit' },
   ];
@@ -126,6 +130,15 @@
     for (var c = 0; c < CHANLUN_ITEMS.length; c++) {
       var cl = CHANLUN_ITEMS[c];
       html += '<a href="' + H(cl.href) + '" class="' + (cl.page === cp ? 'active' : '') + '">' + cl.label + '</a>';
+    }
+    html += '</div></div>';
+
+    // 指数扫描 dropdown（指数全景/指数估值/指数投资/网格模拟器）
+    var isIndex = INDEX_ITEMS.some(function (x) { return x.page === cp; });
+    html += '<div class="nav-dropdown"><a href="javascript:void(0)" class="nav-item' + (isIndex ? ' active' : '') + '">指数扫描</a><div class="nav-dropdown-menu">';
+    for (var ix = 0; ix < INDEX_ITEMS.length; ix++) {
+      var xi = INDEX_ITEMS[ix];
+      html += '<a href="' + H(xi.href) + '" class="' + (xi.page === cp ? 'active' : '') + '">' + xi.label + '</a>';
     }
     html += '</div></div>';
 

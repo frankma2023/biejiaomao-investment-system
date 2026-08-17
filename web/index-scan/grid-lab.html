@@ -42,7 +42,7 @@ td:first-child{font-family:var(--font-body)}
 <body>
 <nav id="top-nav"></nav>
 <div class="wrap">
-  <a class="back" href="./">← 返回指数投资</a>
+  <a class="back" href="index.html">← 返回指数全景</a>
   <h1>🕸 网格模拟器</h1>
   <div class="sub">对称网格：跌一档买一笔、涨一档卖一笔 · 以 ETF 实时价格执行 · 触发信号可对照指数点位</div>
 
@@ -243,6 +243,6 @@ calc();
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
 </script>
 <script src="/shared/js/nav.js"></script>
-<script>window.NAV_PREFIX='../..';Nav.init({brandIcon:'🧭',brandText:'指数投资',currentPage:'red-dividend'})</script>
+<script>Nav.init({brandIcon:'🕸',brandText:'网格模拟器',currentPage:'grid-lab'})</script>
 </body>
 </html>

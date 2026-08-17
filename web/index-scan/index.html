@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>指数扫描</title>
+<title>指数全景</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -29,7 +29,7 @@
   html[data-theme="light"] .tab{background:rgba(255,255,255,.6);border-color:var(--divider);color:var(--muted)}
   html[data-theme="light"] .tab:hover{border-color:rgba(0,0,0,.15);color:#374151}
   html[data-theme="light"] .tab.active{background:var(--accent-subtle);color:var(--accent);border-color:var(--accent-border)}
-/* ── 指数扫描 · 小红书风格 ── */
+/* ── 指数全景 · 小红书风格 ── */
 .scan-stats { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
 .scan-stat { flex:1; min-width:110px; background:var(--card-bg); border:1px solid var(--divider); border-radius:var(--radius-md); padding:10px 12px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
 .scan-stat .val { font-family:var(--font-display); font-size:1.3rem; font-weight:900; color:var(--text-primary); }
@@ -70,7 +70,7 @@
 /* 导航下拉 */
 .nav-dropdown:hover .nav-dropdown-menu { display:block; }
 
-/* ── 指数扫描 · 小红书风格 ── */
+/* ── 指数全景 · 小红书风格 ── */
 .scan-stats { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
 .scan-stat { flex:1; min-width:110px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 12px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
 .scan-stat .val { font-family:var(--font-display); font-size:1.3rem; font-weight:900; color:var(--text-primary); }
@@ -347,7 +347,7 @@ function sortBy(col){if(sortCol===col)sortDir=sortDir==='asc'?'desc':'asc';else{
 function today(){var d=new Date();return d.toISOString().slice(0,10)}
 </script>
   <script src="../shared/js/nav.js"></script>
-  <script>Nav.init({brandIcon:"🔬",brandText:"指数扫描",currentPage:"index-scan"})
+  <script>Nav.init({brandIcon:"🔬",brandText:"指数全景",currentPage:"index-scan"})
 // Theme toggle for hanako-glass
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
