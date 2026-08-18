@@ -85,6 +85,7 @@ html[data-theme="light"] .tab.active{background:var(--accent-subtle);color:var(-
 </div>
 
 <script>
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 const params = new URLSearchParams(window.location.search);
 const date = params.get('date') || '';
 const code = params.get('code') || '980092';
@@ -391,7 +392,6 @@ function genValFsText(id, name, vals, unit, dates) {
 load();
 
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
-(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 </script>
 <script src="/shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:'🧲',brandText:'自由现金流',currentPage:'market-scan'})</script>

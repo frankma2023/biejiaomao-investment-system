@@ -49,6 +49,7 @@ td:first-child{font-family:var(--font-body)}
 </div>
 
 <script>
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 const params = new URLSearchParams(window.location.search);
 const date = params.get('date') || '';
 const DETAIL_API = API_BASE + '/api/market-scan/coal-advice-detail' + (date ? '?date=' + date : '');

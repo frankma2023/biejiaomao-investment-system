@@ -51,6 +51,7 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
 </div>
 
 <script>
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 const LAB_API = API_BASE + '/api/market-scan/dividend-lab';
 let isDark = document.documentElement.dataset.theme === 'dark';
 const tx = isDark ? '#999' : '#6E6E6E';
@@ -117,7 +118,6 @@ load();
 window.addEventListener('resize', () => { if (chartInst) chartInst.resize(); });
 
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
-(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 </script>
 <script src="/shared/js/nav.js"></script>
 <script>window.NAV_PREFIX='../..';Nav.init({brandIcon:'🔬',brandText:'回撤实验室',currentPage:'red-dividend'})</script>
