@@ -109,6 +109,17 @@ async function load() {
       html += '<div class="note">⚠️ ' + (fcfList[0].data_note || '自由现金流估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考。') + '</div>';
     }
 
+    // 自由现金流决策框架（回测 2012-2026 价格 + 2024-09 起估值短窗口）
+    if (fcfList.length) {
+      html += '<div class="section-hdr">📋 自由现金流决策框架（怎么买怎么卖）</div>';
+      html += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
+      html += '<div style="font-weight:600;color:#ef4444">🟢 买点：深回撤 ≥20% → 分批买入 <span style="font-weight:400;color:var(--muted)">（60日67% · 27次 · 趋势指数深回调才是上车点）</span></div>';
+      html += '<div style="padding-left:16px;color:var(--muted)">增强：估值双低 PE+PB分位&lt;33%（60日100%，短窗口观察级）｜ 长期最优 = 定投/持有（年化13%）</div>';
+      html += '<div style="font-weight:600;color:#10b981">🔴 卖点：20日涨幅&gt;10% → 减仓 <span style="font-weight:400;color:var(--muted)">（未来60日仅30%胜率/-3.0%）</span> ｜ 60日涨幅&gt;15% → 减仓（44%/-4.3%）</div>';
+      html += '<div style="color:var(--muted)">⚠️ 浅回撤 ≥10% 无效（59% &lt; 随机67% = 接飞刀，与红利相反）；股息率分位择时不可用（短窗口噪声）</div>';
+      html += '</div>';
+    }
+
     // 中证煤炭（网格规则）
     if (ca && !ca.error) {
       const clv = LV[ca.advice_level] || LV.hold;
