@@ -62,6 +62,16 @@ async function load() {
     document.getElementById('meta').textContent = '红利/自由现金流/中证煤炭指数操作建议 · ' + date + ' · 点击卡片查看详情';
 
     let html = '';
+    // 📋 决策框架（回测验证 2018-2026，H00922 全收益口径）
+    html += '<div class="section-hdr">📋 红利决策框架（怎么买怎么卖）</div>';
+    html += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
+    html += '<div style="font-weight:600;color:#ef4444">🟢 买点（主信号）：250日回撤 ≥10% → 分批买入 <span style="font-weight:400;color:var(--muted)">（74%胜率 · 32次验证 · 全收益口径）</span></div>';
+    html += '<div style="padding-left:16px;color:var(--muted)">加码条件：息差 ≥3%（60日74%）或 温度计 ≤30 冷区（60日64%）→ 买得更重</div>';
+    html += '<div style="font-weight:600;color:#10b981;margin-top:4px">🔴 卖点（三个预警，出现即减仓）<span style="font-weight:400;color:var(--muted)">：PE分位&gt;80% ｜ 20日涨幅&gt;10% ｜ 60日涨幅&gt;15%（下跌概率80%，样本6-10次偏小）</span></div>';
+    html += '<div style="font-weight:600;color:#f59e0b;margin-top:4px">🟡 辅助尺度（各管各的时间尺度）</div>';
+    html += '<div style="padding-left:16px;color:var(--muted)">估值分位 = 定投加权（短线择时无效）｜ 温度计 ≥65 热区 = 回避/减仓（60日43%）｜ 拥挤度 = 状态监控</div>';
+    html += '<div style="color:var(--muted);margin-top:4px">⚠️ 无效信号：PB分位择时（53%≈随机）、息差 &lt;2.5% 买入（51%≈随机）、估值分位短线择时——别用</div>';
+    html += '</div>';
     // 红利指数
     html += '<div class="section-hdr">📌 红利指数（回撤+估值规则）</div><div class="sector-grid">';
     (da.indices || []).forEach(x => {
