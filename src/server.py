@@ -1666,6 +1666,20 @@ def api_market_dividend_detail():
         tri_norm = [round(c / base_t * 100, 1) for c in tri_closes]
         tri_diff = [round(t - p, 1) for p, t in zip(price_norm, tri_norm)]
 
+    # 沪深300 对比线（近3年，与 dates 对齐，归一化起点=100）
+    hs300_norm = None
+    hs_rows = db.execute("""
+        SELECT date, close FROM index_daily_kline
+        WHERE stock_code='000300' AND kline_type='normal' AND date>=? AND date<=?
+        ORDER BY date
+    """, (dates[0], target_date)).fetchall()
+    if hs_rows:
+        hs_map = {r['date']: r['close'] for r in hs_rows}
+        hs_closes = [hs_map.get(d) for d in dates]
+        if hs_closes[0]:
+            base_h = hs_closes[0]
+            hs300_norm = [round(c / base_h * 100, 1) if c else None for c in hs_closes]
+
     # ── 年度最大回撤（PRD §2.2 展示用，非规则；用全历史 H00922 近8年，Ticket 03）──
     annual_dd = []
     if hist_tri and hist_tri_dates:
@@ -1708,7 +1722,7 @@ def api_market_dividend_detail():
         'pe_series': pe_series, 'pb_series': pb_series, 'dyr_series': dyr_series,
         'events': events, 'similar': similar, 'stats': stats, 'val_similar': val_similar,
         'current_dd': round(cur_dd, 1),
-        'price_norm': price_norm, 'tri_norm': tri_norm, 'tri_diff': tri_diff,
+        'price_norm': price_norm, 'tri_norm': tri_norm, 'tri_diff': tri_diff, 'hs300_norm': hs300_norm,
         'annual_dd': annual_dd,
         'dates_long': dates_long, 'closes_long': closes_long, 'tri_long': tri_long,
         'dd_source': 'full_return' if (tri_rows and len(tri_rows) >= 250) else 'price',

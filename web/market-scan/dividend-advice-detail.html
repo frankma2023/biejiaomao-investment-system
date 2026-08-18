@@ -165,21 +165,25 @@ async function load() {
 
   // 图表
   const charts = [];
-  // 0a. 价格 vs 全收益对比线（归一化，近3年起点=100）
+  // 0a. 价格 vs 全收益对比线（归一化，近3年起点=100）+ 沪深300 对比
   if (d.price_norm && d.tri_norm) {
-    charts.push({title:'📈 价格 vs 全收益（分红再投资价值 · 近3年起点=100 · H00922 自2018起）', el:'chart-tri', h:330, init: el => {
+    charts.push({title:'📈 价格 vs 全收益 vs 沪深300（分红再投资价值 · 近3年起点=100 · H00922 自2018起）', el:'chart-tri', h:330, init: el => {
       const c = echarts.init(el);
+      const series = [
+        {name:'中证红利(价格)',type:'line',data:d.price_norm,smooth:true,showSymbol:false,lineStyle:{color:'#8b8b90',width:1.5}},
+        {name:'中证红利全收益',type:'line',data:d.tri_norm,smooth:true,showSymbol:false,lineStyle:{color:'#ef4444',width:2}},
+      ];
+      if (d.hs300_norm) {
+        series.push({name:'沪深300',type:'line',data:d.hs300_norm,smooth:true,showSymbol:false,lineStyle:{color:'#3b82f6',width:1.2,type:'dotted'}});
+      }
       c.setOption({
         backgroundColor:chartBg, tooltip:{trigger:'axis', formatter: p => p[0].name + '<br/>' + p.map(x => x.seriesName + ': ' + x.value).join('<br/>')},
-        legend:{data:['中证红利(价格)','中证红利全收益'],textStyle:{color:tx,fontSize:9},bottom:0},
+        legend:{data:d.hs300_norm ? ['中证红利(价格)','中证红利全收益','沪深300'] : ['中证红利(价格)','中证红利全收益'],textStyle:{color:tx,fontSize:9},bottom:0},
         grid:{left:'8%',right:'4%',top:12,bottom:36},
         xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
         yAxis:{type:'value',min:60,name:'归一化(起点=100)',axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
         dataZoom:[{type:'inside'}],
-        series:[
-          {name:'中证红利(价格)',type:'line',data:d.price_norm,smooth:true,showSymbol:false,lineStyle:{color:'#8b8b90',width:1.5}},
-          {name:'中证红利全收益',type:'line',data:d.tri_norm,smooth:true,showSymbol:false,lineStyle:{color:'#ef4444',width:2}},
-        ]
+        series:series
       });
       return c;
     }});
