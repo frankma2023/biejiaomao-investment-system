@@ -222,14 +222,15 @@ def compute_spread(db, code, target_date):
 
 
 # ───────────────────────────────
-# ④ 温度计合成
+# ④ 温度计合成（v1.1 标定：pct_250 + 权重 0.40/0.20/0.40）
 # ───────────────────────────────
 def compose_temperature(crowd, fg, spread):
     if not crowd or not fg or not spread:
         return None
-    t = 50 + (crowd['score'] - 50) * 0.35 \
-          + (100 - fg['score'] - 50) * 0.25 \
-          + (100 - spread['pct_all'] - 50) * 0.40
+    # v1.1：息差分位用 250 日滚动（pct_250），权重 0.40/0.20/0.40（实验标定，analysis/red_temp_calibrate.py）
+    t = 50 + (crowd['score'] - 50) * 0.40 \
+          + (100 - fg['score'] - 50) * 0.20 \
+          + (100 - spread['pct_250'] - 50) * 0.40
     t = round(max(0, min(100, t)), 1)
     if t >= 70:
         label = '偏热区（警惕拥挤/性价比下降）'
@@ -254,7 +255,7 @@ def compute_all(code, target_date):
             'code': code, 'date': target_date,
             'crowding': crowd, 'fear_greed': fg, 'spread': spread,
             'temperature': temp,
-            'data_note': '口径：拥挤度=交易热度50%(成交额占比+换手率,120日分位)+估值水位50%(PE0.3+PB0.3+股息率分位取反0.4)；恐慌贪婪=ATR252日百分位+250日回撤252日百分位+5日动量(等权)；息差=股息率−10年国债(中债估值,akshare,序列2018起),含250日/全历史分位；温度计为启发式合成(0.35/0.25/0.40)未经回测，非买卖信号',
+            'data_note': '口径：拥挤度=交易热度50%(成交额占比+换手率,120日分位)+估值水位50%(PE0.3+PB0.3+股息率分位取反0.4)；恐慌贪婪=ATR252日百分位+250日回撤252日百分位+5日动量(等权)；息差=股息率−10年国债(中债估值,akshare,序列2018起),含250日/全历史分位；温度计v1.1权重(拥挤0.40/恐慌0.20/息差0.40,息差用250日滚动分位,实验标定2026-08-17)：冷≤30=买入增强区(60日胜率64%)、热≥65=回避区(60日胜率43%,20日36%)，非独立买卖信号',
         }
     finally:
         db.close()
