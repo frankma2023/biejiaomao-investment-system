@@ -2,14 +2,15 @@
 """
 src/scanners/red_dividend_metrics.py — 红利指数温度计引擎（实时计算）
 =====================================================================
-三维指标：拥挤度 / 恐慌贪婪 / 股债性价比息差 → 温度计合成（v1.0 启发式权重）
+三维指标：拥挤度 / 恐慌贪婪 / 股债性价比息差 → 温度计合成（v1.1 标定权重）
 
 ① 拥挤度（0-100）：交易热度 50%（成交额占比120日分位×0.5 + 换手率120日分位×0.5）
                     + 估值水位 50%（PE×0.3 + PB×0.3 + dyr_pct取反×0.4）
    —— 红利语义：拥挤 = 避险资金涌入压低股息率（dyr_pct 低 → 拥挤高）
 ② 恐慌贪婪（0=恐慌/100=贪婪）：ATR(20)252日百分位 + 250日回撤252日百分位 + 5日动量倒数
 ③ 股债息差：dyr×100 − 10年国债收益率（bond_yield_daily，中债估值）
-④ 温度计 = 50 + (拥挤度−50)×0.35 + (100−恐慌贪婪−50)×0.25 + (100−息差分位×100−50)×0.40
+④ 温度计 v1.1 = 50 + (拥挤度−50)×0.40 + (100−恐慌贪婪−50)×0.20 + (100−息差250日分位−50)×0.40
+   权重由实验标定（2026-08-17，analysis/red_temp_calibrate.py）：冷≤30=买入增强、热≥65=回避区
 
 口径：全部实时计算（支持任意 date 回看），不存表。
 """
@@ -169,7 +170,7 @@ def compute_fear_greed(db, code, target_date):
     momentum_pct = max(0, -ret_5d) / 10 * 100
 
     fear_raw = (vol_pct + dd_pct + momentum_pct) / 3
-    composite = round(100 - fear_raw, 1)
+    composite = round(max(0.0, min(100.0, 100 - fear_raw)), 1)  # W2：clamp 防极端动量击穿 0-100
     if composite >= 80:
         level = '贪婪区'
     elif composite <= 20:
@@ -213,7 +214,7 @@ def compute_spread(db, code, target_date):
     cur = series[-1]
     spreads = [s['spread'] for s in series]
     pct_all = _pct_rank(spreads, cur['spread']) * 100
-    spreads_250 = spreads[-250:]
+    spreads_250 = spreads[-250:]  # O7：最近 250 个有效样本点（交易日交集序列，非严格自然日；国债缺口时窗口微漂移，量级可忽略）
     pct_250 = _pct_rank(spreads_250, cur['spread']) * 100
 
     return {'value': cur['spread'], 'dyr': cur['dyr'], 'bond_yield': cur['bond'],
@@ -232,12 +233,12 @@ def compose_temperature(crowd, fg, spread):
           + (100 - fg['score'] - 50) * 0.20 \
           + (100 - spread['pct_250'] - 50) * 0.40
     t = round(max(0, min(100, t)), 1)
-    if t >= 70:
-        label = '偏热区（警惕拥挤/性价比下降）'
+    if t >= 65:  # W4：阈值对齐实验口径（≥65=回避区，60日胜率43%/20日36%）
+        label = '偏热区（回避/减仓区）'
     elif t >= 55:
         label = '微热区（定投不追高）'
     elif t <= 30:
-        label = '偏冷区（性价比凸显）'
+        label = '偏冷区（买入增强区）'
     else:
         label = '中性区'
     return {'value': t, 'label': label}
@@ -255,7 +256,7 @@ def compute_all(code, target_date):
             'code': code, 'date': target_date,
             'crowding': crowd, 'fear_greed': fg, 'spread': spread,
             'temperature': temp,
-            'data_note': '口径：拥挤度=交易热度50%(成交额占比+换手率,120日分位)+估值水位50%(PE0.3+PB0.3+股息率分位取反0.4)；恐慌贪婪=ATR252日百分位+250日回撤252日百分位+5日动量(等权)；息差=股息率−10年国债(中债估值,akshare,序列2018起),含250日/全历史分位；温度计v1.1权重(拥挤0.40/恐慌0.20/息差0.40,息差用250日滚动分位,实验标定2026-08-17)：冷≤30=买入增强区(60日胜率64%)、热≥65=回避区(60日胜率43%,20日36%)，非独立买卖信号',
+            'data_note': '口径：拥挤度=交易热度50%(成交额占比+换手率,120日分位)+估值水位50%(PE0.3+PB0.3+股息率分位取反0.4)；恐慌贪婪=ATR252日百分位+250日回撤252日百分位+5日动量(等权)；息差=股息率−10年国债(中债估值,akshare,序列2018起),含250日/全历史分位；温度计v1.1权重(拥挤0.40/恐慌0.20/息差0.40,息差用250日滚动分位,实验标定2026-08-17,2018-07起回测)：冷≤30=买入增强区(60日胜率64%)、热≥65=回避区(60日胜率43%,20日36%)，非独立买卖信号',
         }
     finally:
         db.close()

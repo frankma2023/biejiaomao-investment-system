@@ -7,8 +7,10 @@
 目标：高温区(≥65)样本≥15 且 60日胜率<50%；低温区(≤30) 60日胜率≥65%；单调性
 """
 import sys, os, sqlite3, statistics
-sys.path.insert(0, r'D:\hanako\investment-system')
-os.chdir(r'D:\hanako\investment-system')
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+os.chdir(PROJECT_ROOT)
 from src.scanners.red_dividend_metrics import compute_all
 
 db = sqlite3.connect(r'data\lixinger.db')
@@ -26,11 +28,15 @@ tri_map = {r['date']: r['close'] for r in tri}
 # 预计算三维指标序列（每 3 天）
 print('预计算三维指标...')
 seq = []
+fail = 0
 for i in range(0, n, 3):
     d = dates[i]
     try:
         r = compute_all('000922', d)
-    except Exception:
+    except Exception as e:
+        fail += 1
+        if fail <= 3:
+            print(f'  警告 {d}: {e}')
         continue
     cw = r.get('crowding') or {}
     fg = r.get('fear_greed') or {}
@@ -40,7 +46,7 @@ for i in range(0, n, 3):
     seq.append({'d': d, 'i': i,
                 'crowd': cw['score'], 'fg': fg['score'],
                 'pct_250': sp['pct_250'], 'pct_all': sp['pct_all']})
-print('序列:', len(seq))
+print('序列:', len(seq), '失败:', fail)
 
 COMBOS = {
     'A 0.35/0.25/0.40+pct250': (0.35, 0.25, 0.40, 'pct_250'),
