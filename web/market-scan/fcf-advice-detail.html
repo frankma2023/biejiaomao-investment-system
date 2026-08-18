@@ -68,18 +68,18 @@ html[data-theme="light"] .tab.active{background:var(--accent-subtle);color:var(-
   </div>
   <div id="pane-valuation" style="display:none">
     <div id="val-stats" class="stat-row"></div>
-    <div class="chart-card"><div class="ct">📊 PE-TTM 走势与十年分位</div><div id="val-chart-pe" style="height:320px"></div><div id="val-text-pe" class="analysis-text"></div></div>
-    <div class="chart-card"><div class="ct">📊 PB 走势与十年分位</div><div id="val-chart-pb" style="height:320px"></div><div id="val-text-pb" class="analysis-text"></div></div>
-    <div class="chart-card"><div class="ct">📊 股息率 走势与十年分位</div><div id="val-chart-dyr" style="height:280px"></div><div id="val-text-dyr" class="analysis-text"></div></div>
+    <div class="chart-card"><div class="ct">📊 PE-TTM 走势与十年分位</div><div id="val-chart-pe" style="height:480px"></div><div id="val-text-pe" class="analysis-text"></div></div>
+    <div class="chart-card"><div class="ct">📊 PB 走势与十年分位</div><div id="val-chart-pb" style="height:480px"></div><div id="val-text-pb" class="analysis-text"></div></div>
+    <div class="chart-card"><div class="ct">📊 股息率 走势与十年分位</div><div id="val-chart-dyr" style="height:420px"></div><div id="val-text-dyr" class="analysis-text"></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-      <div class="chart-card"><div class="ct">📊 ROE（%）</div><div id="val-chart-roe" style="height:240px"></div><div id="val-text-roe" class="analysis-text"></div></div>
-      <div class="chart-card"><div class="ct">📊 EPS（元/股）</div><div id="val-chart-eps" style="height:240px"></div><div id="val-text-eps" class="analysis-text"></div></div>
-      <div class="chart-card"><div class="ct">📊 营业收入（亿）</div><div id="val-chart-revenue" style="height:240px"></div><div id="val-text-revenue" class="analysis-text"></div></div>
-      <div class="chart-card"><div class="ct">📊 净利润（亿）</div><div id="val-chart-np" style="height:240px"></div><div id="val-text-np" class="analysis-text"></div></div>
-      <div class="chart-card"><div class="ct">📊 净利润率（%）</div><div id="val-chart-npm" style="height:240px"></div><div id="val-text-npm" class="analysis-text"></div></div>
-      <div class="chart-card"><div class="ct">📊 营业利润率（%）</div><div id="val-chart-opm" style="height:240px"></div><div id="val-text-opm" class="analysis-text"></div></div>
-      <div class="chart-card"><div class="ct">📊 A股分红金额（亿）</div><div id="val-chart-div" style="height:240px"></div><div id="val-text-div" class="analysis-text"></div></div>
-      <div class="chart-card"><div class="ct">📊 税金及附加（亿）</div><div id="val-chart-tax" style="height:240px"></div></div>
+      <div class="chart-card"><div class="ct">📊 ROE（%）</div><div id="val-chart-roe" style="height:360px"></div><div id="val-text-roe" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 EPS（元/股）</div><div id="val-chart-eps" style="height:360px"></div><div id="val-text-eps" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 营业收入（亿）</div><div id="val-chart-revenue" style="height:360px"></div><div id="val-text-revenue" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 净利润（亿）</div><div id="val-chart-np" style="height:360px"></div><div id="val-text-np" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 净利润率（%）</div><div id="val-chart-npm" style="height:360px"></div><div id="val-text-npm" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 营业利润率（%）</div><div id="val-chart-opm" style="height:360px"></div><div id="val-text-opm" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 A股分红金额（亿）</div><div id="val-chart-div" style="height:360px"></div><div id="val-text-div" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 税金及附加（亿）</div><div id="val-chart-tax" style="height:360px"></div></div>
     </div>
   </div>
 </div>
@@ -147,7 +147,7 @@ async function load() {
   // 图表
   const charts = [];
   // 1. 回撤曲线（仅展示）
-  charts.push({title:'📉 净值回撤曲线（近3年 · 仅展示，不触发信号）', el:'chart-dd', h:200, init: el => {
+  charts.push({title:'📉 净值回撤曲线（近3年 · 仅展示，不触发信号）', el:'chart-dd', h:300, init: el => {
     const c = echarts.init(el);
     c.setOption({
       backgroundColor:chartBg, tooltip:{trigger:'axis', formatter: p => p[0].name + '<br/>回撤: ' + p[0].value + '%'},
@@ -163,7 +163,7 @@ async function load() {
     return c;
   }});
   // 2. 估值分位走势（核心）
-  charts.push({title:'📊 估值分位走势（PE/PB/股息率 · 数据自2024-09起）', el:'chart-val', h:220, init: el => {
+  charts.push({title:'📊 估值分位走势（PE/PB/股息率 · 数据自2024-09起）', el:'chart-val', h:330, init: el => {
     const c = echarts.init(el);
     c.setOption({
       backgroundColor:chartBg, tooltip:{trigger:'axis'},
@@ -183,7 +183,7 @@ async function load() {
     return c;
   }});
   // 3. 价格 + 信号时间线
-  charts.push({title:'💹 价格走势 + 估值买点信号时间线（近2年）', el:'chart-px', h:240, init: el => {
+  charts.push({title:'💹 价格走势 + 估值买点信号时间线（近2年）', el:'chart-px', h:360, init: el => {
     const c = echarts.init(el);
     c.setOption({
       backgroundColor:chartBg, tooltip:{trigger:'axis'},
