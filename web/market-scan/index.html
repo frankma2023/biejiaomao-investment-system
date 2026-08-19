@@ -336,6 +336,7 @@
       // ═══ 行业分组健康分（v3.0）═══
       if(h.groups&&h.groups.length){
         html+='<div class="section-hdr" style="margin-top:18px">🏭 行业分组健康分</div>';
+        html+='<div style="font-size:9px;color:var(--muted);margin-bottom:8px;line-height:1.7">💡 分数(0-100)=该组健康分 · 字母=评级(≥80 A/≥65 B/≥50 C/≥35 D/≥20 E/其余F) · 打分=成分股技术面4因子(MA50上方占比+涨跌家数比+新高新低比+放量突破数)+全市场3因子(融资余额5日+板块轮动+恐慌贪婪) · 评级=组强度环境过滤，买卖点仍用回撤/估值规则</div>';
         html+='<div class="sector-grid">';
         var colorMap={'A':'#ef4444','B':'#ef4444','C':'#f59e0b','D':'#f59e0b','E':'#10b981','F':'#10b981'};
         var bgMap={'A':{'bg':'rgba(239,68,68,.06)','bd':'rgba(239,68,68,.2)'},'B':{'bg':'rgba(239,68,68,.06)','bd':'rgba(239,68,68,.2)'},'C':{'bg':'rgba(245,158,11,.06)','bd':'rgba(245,158,11,.2)'},'D':{'bg':'rgba(245,158,11,.06)','bd':'rgba(245,158,11,.2)'},'E':{'bg':'rgba(16,185,129,.06)','bd':'rgba(16,185,129,.2)'},'F':{'bg':'rgba(16,185,129,.06)','bd':'rgba(16,185,129,.2)'}};
