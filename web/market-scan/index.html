@@ -462,7 +462,7 @@
           var pbV=fx.valuation&&fx.valuation.pb_pct!=null?fx.valuation.pb_pct:'—';
           var dyrV=fx.valuation&&fx.valuation.dyr_pct!=null?fx.valuation.dyr_pct:'—';
           var sigText=fx.signals&&fx.signals.length?fx.signals.join('·'):'—';
-          html+='<div class="sector-card" style="background:'+fxBg.bg+';border:1px solid '+fxBg.bd+'" onclick="window.open(\'fcf-advice-detail.html?code='+fx.code+'&date='+(fx.date||fa.date||'')+'\')">';
+          html+='<div class="sector-card" style="background:'+fxBg.bg+';border:1px solid '+fxBg.bd+'" onclick="window.open(\'fcf-advice-detail.html?code='+fx.code+'&date='+(fx.date||h.date||'')+'\')">';
           html+='<div class="sc-title">'+fx.name+' <span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">'+fx.code+'</span></div>';
           html+='<div style="display:flex;align-items:baseline;gap:6px;margin:4px 0">';
           html+='<span style="font-size:11px;font-weight:600;color:'+fxColor+'">'+daLevelText2[fx.advice_level]+'</span>';
