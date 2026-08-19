@@ -664,6 +664,16 @@ def api_market_health():
                     continue
                 avg_chg = sum(r['change'] for r in grp) / len(grp)
                 up = sum(1 for r in grp if r['change'] > 0)
+                # tech：MA50 上方数 + RS_20 均值（与 groups 区块同口径，当日组 vs 20日RS对照）
+                codes_in = [r['stock_code'] for r in grp]
+                ph2 = ','.join('?' * len(codes_in))
+                irs = db.execute(f"""
+                    SELECT rs_20, ma50, close FROM index_rs_daily
+                    WHERE date = ? AND stock_code IN ({ph2})
+                """, (target_date, *codes_in)).fetchall()
+                above_ma50 = sum(1 for r in irs if r['ma50'] and r['close'] and r['close'] > r['ma50'])
+                rs_vals = [r['rs_20'] for r in irs if r['rs_20'] is not None]
+                avg_rs_20 = round(sum(rs_vals) / len(rs_vals), 1) if rs_vals else 0
                 result.append({
                     'group_name': f'{pool_key}_{suffix}_d1',
                     'group_label': f'{pool_label}{label_suffix}·当日',
@@ -671,6 +681,7 @@ def api_market_health():
                     'avg_change': round(avg_chg * 100, 2),
                     'up_count': up,
                     'down_count': len(grp) - up,
+                    'tech': {'above_ma50': above_ma50, 'avg_rs_20': avg_rs_20},
                 })
         return result
 

@@ -404,6 +404,9 @@
           html+='<span style="font-family:var(--font-display);font-size:1.8rem;font-weight:400;color:'+chgCls+'">'+chgSign+dg.avg_change.toFixed(2)+'%</span>';
           html+='</div>';
           html+='<div style="font-size:10px;color:var(--muted)">'+dg.indices_count+'指数</div>';
+          if(dg.tech){
+            html+='<div style="font-size:9px;color:var(--muted);margin-top:3px">MA50↑'+dg.tech.above_ma50+'/'+dg.indices_count+' · RS_20均'+dg.tech.avg_rs_20+'</div>';
+          }
           html+='<div style="margin-top:auto;padding-top:8px;border-top:1px solid var(--border)">';
           html+='<div style="font-size:11px;font-weight:500;color:var(--text-secondary)"><span style="color:#ef4444">'+dg.up_count+'涨</span> · <span style="color:#10b981">'+dg.down_count+'跌</span></div>';
           html+='</div></div>';
