@@ -301,10 +301,10 @@ function buildValChart(id, name, dates, vals, pcts, hsVals, lineColor, tx, sp) {
   const pctVals = (pcts || []).map(v => v != null ? (v * 100).toFixed(0) : null);
   ch.setOption({
     backgroundColor: chartBg, tooltip: {trigger: 'axis'},
-    legend: {data: hsVals ? [name, '沪深300', '十年分位%'] : [name, '十年分位%'], bottom: 18, textStyle: {color: tx, fontSize: 10}},
-    grid: {left: '8%', right: '4%', top: 12, bottom: 54},
+    legend: {data: hsVals ? [name, '沪深300', '十年分位%'] : [name, '十年分位%'], bottom: 0, textStyle: {color: tx, fontSize: 10}},
+    grid: {left: '8%', right: '4%', top: 12, bottom: 92},
     xAxis: {type: 'category', data: dates, axisLabel: {color: tx, fontSize: 9, formatter: v => v.slice(0, 7)}, axisLine: {lineStyle: {color: sp}}},
-    dataZoom: [{type: 'inside', start: 50, end: 100}, {type: 'slider', start: 50, end: 100, height: 16, bottom: 2}],
+    dataZoom: [{type: 'inside', start: 50, end: 100}, {type: 'slider', start: 50, end: 100, height: 10, bottom: 52,dataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},selectedDataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},borderColor: 'rgba(139,139,144,.25)', fillerColor: 'rgba(139,139,144,.12)',handleSize: '80%', showDetail: false}],
     yAxis: [
       {type: 'value', name: name, axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
       {type: 'value', name: '分位%', min: 0, max: 100, axisLabel: {color: tx, fontSize: 9, formatter: v => v + '%'}, splitLine: {show: false}}
