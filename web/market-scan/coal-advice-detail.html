@@ -107,10 +107,10 @@ async function load() {
       const lines = gl.map(x => ({yAxis: x.value, lineStyle:{color: x.active ? '#f59e0b' : 'rgba(139,139,144,.28)', width: x.active ? 1.5 : 1, type: x.active ? 'solid' : 'dashed'}, label:{show:true, position:'insideEndTop', formatter: x.value.toFixed(0), color: x.active ? '#f59e0b' : 'rgba(139,139,144,.5)', fontSize:9}}));
       c.setOption({
         backgroundColor:chartBg, tooltip:{trigger:'axis'},
-        grid:{left:'8%',right:'4%',top:12,bottom:24},
+        grid:{left:'8%',right:'4%',top:12,bottom:50},
         xAxis:{type:'category',data:d.dates_long,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
         yAxis:{type:'value',min:function(v){return Math.round(v.min*0.85)},axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
-        dataZoom:[{type:'inside'},{type:'slider',height:14,bottom:0}],
+        dataZoom:[{type:'inside'},{type:'slider',height:10,bottom:26,dataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},selectedDataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},borderColor:'rgba(139,139,144,.25)',fillerColor:'rgba(139,139,144,.12)',handleSize:'80%',showDetail:false}],
         series:[{type:'line',data:d.closes_long,smooth:true,showSymbol:false,
           lineStyle:{color:'#f59e0b',width:1.5},
           markLine:{symbol:'none',data:lines}
