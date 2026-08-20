@@ -2356,33 +2356,45 @@ def api_market_div_sustainability():
             payout = round(r['payout_ratio'] * 100, 1)
             break
 
-    # 现金流覆盖：最新年度经营现金流 ÷ 当年分红总额（W5：字段名 ocf_div_coverage）
+    # 现金流覆盖（W4 修复：报告期取 ex_date 之前最近年报，避免错配一年）
     ocf_coverage = None
     div_amount = None
+    div_year = None
     for r in reversed(rows):
         if r['total_amount']:
             div_amount = r['total_amount']
+            div_year = r['ex_date'][:4]
             break
-    latest_year = years[-1] if years else ''
-    f = db.execute("""SELECT operating_cash_flow FROM stock_financials_annual
-        WHERE stock_code=? AND report_date LIKE ? ORDER BY report_date DESC LIMIT 1""", (code, latest_year + '%')).fetchone()
+    f = None
+    if div_year:
+        f = db.execute("""SELECT operating_cash_flow FROM stock_financials_annual
+            WHERE stock_code=? AND report_date<=? ORDER BY report_date DESC LIMIT 1""", (code, div_year + '-12-31')).fetchone()
     if f and div_amount and div_amount > 0:
         ocf = f['operating_cash_flow'] or 0
         ocf_coverage = round(ocf / div_amount, 2) if ocf else None
 
-    # 股息增长（O7：全区间 CAGR，非近5年；注释与实现一致）
+    # 股息增长（W2 修复：近 5 个年度区间 CAGR）
     div_growth = None
-    if len(years) >= 2:
-        y0, y1 = years[0], years[-1]
+    if len(years) >= 6:
+        y0, y1 = years[-6], years[-1]
         d0, d1 = year_map[y0], year_map[y1]
         n = int(y1) - int(y0)
         if d0 > 0 and d1 > 0 and n > 0:
             div_growth = round(((d1 / d0) ** (1 / n) - 1) * 100, 1)
 
+    # 分红贡献度（W3：tr_dri 已入库，息 vs 涨）
+    dri = db.execute("SELECT cagr_y10, cagr_fs, p_r_fs FROM stock_dri_metrics WHERE stock_code=?", (code,)).fetchone()
+    contribution = None
+    if dri and dri['cagr_y10'] is not None:
+        contribution = {'cagr_y10': round(dri['cagr_y10'] * 100, 2),
+                        'cagr_fs': round(dri['cagr_fs'] * 100, 2) if dri['cagr_fs'] is not None else None,
+                        'p_r_fs': round(dri['p_r_fs'] * 100, 1) if dri['p_r_fs'] is not None else None}
+
     return jsonify({
         'code': code, 'dividend_count': len(rows),
         'streak_years': streak, 'payout_ratio': payout,
         'ocf_coverage': ocf_coverage, 'div_growth': div_growth,
+        'contribution': contribution,
         'yearly': [{'year': y, 'dividend': round(year_map[y], 4)} for y in years],
         'note': '派息率/FCF覆盖率仅个股（理杏仁+本地财务）；ETF/基金无派息率概念',
     })

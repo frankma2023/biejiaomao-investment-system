@@ -105,8 +105,11 @@ def fetch_fund_etf(code):
             if prev is not None and abs(ratio - prev) > 0.002 and prev_d in r_ and r_[d]:
                 # 每股分红 ≈ 复权跳变 × 当日raw价（无送转时近似）
                 div = round((ratio - prev) * r_[d], 4)
-                if div > 0.0005:
+                # W8：合理性过滤——送转 10送10 会被误判为"每股分红≈股价"，超 raw价×30% 视为疑似送转跳过
+                if 0.0005 < div < r_[d] * 0.30:
                     rows.append((code, 'fund_etf', d, div, None, None, 'implemented', 'tx_reverse'))
+                elif div >= r_[d] * 0.30:
+                    print(f'⚠️ {code} {d}: 疑似送转（跳变 {div:.4f} ≈ raw价 {r_[d]:.4f} 的{div/r_[d]*100:.0f}%），已跳过')
             prev = ratio
             prev_d = d
     return rows
@@ -114,6 +117,7 @@ def fetch_fund_etf(code):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument('--full', action='store_true', help='全量（默认增量）')
     ap.add_argument('--kind', choices=['stock', 'fund_off', 'fund_etf'], help='只拉某类')
     args = ap.parse_args()
 
@@ -142,8 +146,13 @@ def main():
         except Exception as e:
             print(f'❌ {code} ({kind}): {str(e)[:80]}')
             continue
+        # W1: 默认增量（ex_date > MAX），--full 全量
+        if not args.full:
+            r = db.execute("SELECT MAX(ex_date) FROM dividend_records WHERE code=? AND kind=?", (code, kind)).fetchone()
+            last = r[0] if r and r[0] else '0000-00-00'
+            rows = [x for x in rows if x[1] > last]
         if not rows:
-            print(f'{code} ({kind}): 无数据')
+            print(f'{code} ({kind}): 无新数据')
             continue
         db.executemany("""INSERT OR REPLACE INTO dividend_records
             (code, kind, ex_date, dividend, payout_ratio, total_amount, status, source)

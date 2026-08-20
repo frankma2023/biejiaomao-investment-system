@@ -126,18 +126,15 @@ def main():
             cnt = db.execute("SELECT COUNT(*) FROM hk_etf_daily WHERE stock_code=?", (code,)).fetchone()[0]
             print(f'✅ {code} {name}: 日线入库 {len(rows)} 条（累计 {cnt}）')
 
-        # 全收益（后复权）增量
+        # 全收益（后复权）——W7 修复：全量 DELETE+INSERT（后复权价随每次分红全历史重算，增量会新旧口径混；数据量小成本可忽略）
         try:
             fr = fetch_tx_hfq(code)
             if fr:
-                r = db.execute("SELECT MAX(date) FROM hk_etf_full_return WHERE stock_code=?", (code,)).fetchone()
-                last = r[0] if r and r[0] else '0000-00-00'
-                fr = [x for x in fr if x[1] > last]
-                if fr:
-                    db.executemany("INSERT OR REPLACE INTO hk_etf_full_return (stock_code, date, close) VALUES (?,?,?)", fr)
-                    db.commit()
-                    cnt2 = db.execute("SELECT COUNT(*) FROM hk_etf_full_return WHERE stock_code=?", (code,)).fetchone()[0]
-                    print(f'✅ {code} {name}: 全收益入库 {len(fr)} 条（累计 {cnt2}）')
+                db.execute("DELETE FROM hk_etf_full_return WHERE stock_code=?", (code,))
+                db.executemany("INSERT OR REPLACE INTO hk_etf_full_return (stock_code, date, close) VALUES (?,?,?)", fr)
+                db.commit()
+                cnt2 = db.execute("SELECT COUNT(*) FROM hk_etf_full_return WHERE stock_code=?", (code,)).fetchone()[0]
+                print(f'✅ {code} {name}: 全收益全量刷新 {len(fr)} 条（累计 {cnt2}）')
         except Exception as e:
             print(f'⚠️ {code} 全收益拉取失败: {str(e)[:60]}')
 
