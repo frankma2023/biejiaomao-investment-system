@@ -43,6 +43,13 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
 </div>
 
 <script>
+// B1 修复：图表所需主题变量（echarts 图用，与 lab.html 同构）
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+const isDark = document.documentElement.dataset.theme === 'dark';
+const tx = isDark ? '#999' : '#6E6E6E';
+const sp = isDark ? 'rgba(200,200,200,0.08)' : 'rgba(128,128,128,0.1)';
+const chartBg = isDark ? 'rgba(26,26,31,.6)' : 'rgba(255,255,255,.75)';
+
 const LV = {
   strong_buy:['强买入','#ef4444',{bg:'rgba(239,68,68,.08)',bd:'rgba(239,68,68,.25)'}],
   buy:['买入','#ef4444',{bg:'rgba(239,68,68,.06)',bd:'rgba(239,68,68,.2)'}],
@@ -176,8 +183,11 @@ function renderFR(fr) {
   if (frChart) frChart.dispose();
   frChart = echarts.init(el);
   const colors = ['#ef4444', '#8b8b90', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+  // B3 修复：time 轴 + [date, value] 对，不同起点序列自动对齐（category 轴按索引会错位）
   const series = fr.series.map((s, i) => ({
-    name: s.name, type: 'line', data: s.values, smooth: true, showSymbol: false,
+    name: s.name, type: 'line',
+    data: s.dates.map((d, j) => [d, s.values[j]]),
+    smooth: true, showSymbol: false,
     lineStyle: {width: s.type === 'index' ? 1.2 : 1.8, color: colors[i % colors.length], type: s.code === '000922' ? 'dashed' : 'solid'},
     itemStyle: {color: colors[i % colors.length]},
     emphasis: {focus: 'series'}
@@ -186,7 +196,7 @@ function renderFR(fr) {
     backgroundColor: chartBg, tooltip: {trigger: 'axis', valueFormatter: v => v + ''},
     legend: {type: 'scroll', bottom: 0, textStyle: {color: tx, fontSize: 9}},
     grid: {left: '6%', right: '4%', top: 12, bottom: 40},
-    xAxis: {type: 'category', data: fr.series[0].dates, axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp}}},
+    xAxis: {type: 'time', axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp}}},
     yAxis: {type: 'value', axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
     dataZoom: [{type: 'inside'}, {type: 'slider', height: 14, bottom: 18}],
     series: series
@@ -195,7 +205,6 @@ function renderFR(fr) {
 }
 
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
-(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 </script>
 <script src="/shared/js/nav.js"></script>
 <script>window.NAV_PREFIX='../..';Nav.init({brandIcon:'🧭',brandText:'指数投资',currentPage:'red-dividend'})</script>

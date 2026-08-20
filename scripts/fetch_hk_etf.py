@@ -58,8 +58,6 @@ def sina_symbol(code):
 def fetch_sina(code):
     import akshare as ak
     df = ak.fund_etf_hist_sina(symbol=sina_symbol(code))
-    df = df.rename(columns={'date': 'date', 'open': 'open', 'high': 'high', 'low': 'low',
-                            'close': 'close', 'volume': 'volume'})
     rows = []
     for _, r in df.iterrows():
         d = str(r['date'])[:10]
@@ -84,7 +82,8 @@ def fetch_tx_hfq(code):
     import requests
     sym = ('sh' if code.startswith('5') else 'sz') + code
     url = 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get'
-    params = {'param': f'{sym},day,2010-01-01,2026-08-20,2000,hfq'}
+    end_d = datetime.now().strftime('%Y-%m-%d')
+    params = {'param': f'{sym},day,2010-01-01,{end_d},2000,hfq'}
     r = requests.get(url, params=params, timeout=20, headers={'User-Agent': 'Mozilla/5.0'})
     j = r.json()
     data = j.get('data', {}).get(sym, {})

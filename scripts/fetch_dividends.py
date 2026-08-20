@@ -47,8 +47,11 @@ def fetch_stock(code):
     }, timeout=60)
     rows = []
     for d in data:
-        rows.append((code, 'stock', str(d.get('exDate') or d.get('date') or '')[:10],
-                     d.get('dividend'), d.get('annualNetProfitDividendRatio'),
+        ex_date = str(d.get('exDate') or d.get('date') or '')[:10]
+        if not ex_date:  # W3：空日期跳过，避免主键污染
+            continue
+        rows.append((code, 'stock', ex_date,
+                     d.get('dividend'), d.get('annualNetProfitDividendRatio'),  # W4: 派息率为0-1小数（实测0.519），展示时×100
                      d.get('dividendAmount'), d.get('status'), 'lixinger'))
     return rows
 
@@ -61,22 +64,26 @@ def fetch_fund_off(code):
     rows = []
     if df is not None and len(df):
         for _, r in df.iterrows():
-            d = str(r.get('权益登记日') or '')[:10]
+            d = str(r.get('除息日') or r.get('权益登记日') or '')[:10]  # O3：优先除息日
             raw = str(r.get('每10份分红') or '')
             m = re.search(r'派现金([0-9.]+)元', raw)
-            if m and d:
+            if not m:
+                print(f'⚠️ {code} 分红格式未匹配: {raw}')
+                continue
+            if d:
                 rows.append((code, 'fund_off', d, float(m.group(1)) / 10, None, None, 'implemented', 'akshare'))
     return rows
 
 
 def fetch_fund_etf(code):
-    """场内ETF分红：腾讯 raw vs hfq 差异反推（东财 fhsp 接口已废，2026-08-20 实测）"""
+    """场内ETF分红：腾讯 raw vs hfq 差异反推（东财 fhsp 接口已废，datetime.now().strftime('%Y-%m-%d') 实测）"""
     import requests
     sym = ('sh' if code.startswith('5') else 'sz') + code
 
     def tx(fq):
         url = 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get'
-        params = {'param': f'{sym},day,2010-01-01,2026-08-20,2000,{fq}'}
+        end_d = datetime.now().strftime('%Y-%m-%d')
+        params = {'param': f'{sym},day,2010-01-01,{end_d},2000,{fq}'}
         r = requests.get(url, params=params, timeout=20, headers={'User-Agent': 'Mozilla/5.0'})
         j = r.json()
         data = j.get('data', {}).get(sym, {})
@@ -107,7 +114,6 @@ def fetch_fund_etf(code):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--full', action='store_true', help='全量（忽略增量）')
     ap.add_argument('--kind', choices=['stock', 'fund_off', 'fund_etf'], help='只拉某类')
     args = ap.parse_args()
 

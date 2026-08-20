@@ -159,6 +159,8 @@ TASKS = [
     ("🏦 5.6国债收益率",     [PYTHON_EXE, "scripts/fetch_bond_yield.py"]),
     # 5.7 港股红利ETF（每日行情，akshare 新浪源）
     ("🇭🇰 5.7港股红利ETF",   [PYTHON_EXE, "scripts/fetch_hk_etf.py"]),
+    # 5.8 分红记录（理杏仁个股+akshare场外+腾讯ETF反推）
+    ("💰 5.8分红记录",       [PYTHON_EXE, "scripts/fetch_dividends.py"]),
 ]
 
 # 步骤 6~8：市场环境层（依赖 K 线数据就位）

@@ -2340,15 +2340,14 @@ def api_market_div_sustainability():
         year_map[y] = year_map.get(y, 0) + (r['dividend'] or 0)
     years = sorted(year_map.keys())
 
-    # 连续分红年限（最近一年有分红起往前连续）
-    import datetime as _dt
-    cur_year = _dt.date.today().year
+    # 连续分红年限（W1 修复：从最大有分红年份回推，避免当年未分红时误判为 0）
     streak = 0
-    for y in range(cur_year, cur_year - 20, -1):
-        if str(y) in year_map:
-            streak += 1
-        else:
-            break
+    if years:
+        for y in range(int(years[-1]), int(years[-1]) - 20, -1):
+            if str(y) in year_map:
+                streak += 1
+            else:
+                break
 
     # 最新派息率（最后一次有值的）
     payout = None
@@ -2357,23 +2356,23 @@ def api_market_div_sustainability():
             payout = round(r['payout_ratio'] * 100, 1)
             break
 
-    # FCF 覆盖率：最新年度经营现金流 ÷ 当年分红总额
-    latest_year = years[-1] if years else ''
-    f = db.execute("""SELECT operating_cash_flow, free_cash_flow, net_profit FROM stock_financials_annual
-        WHERE stock_code=? AND report_date LIKE ? ORDER BY report_date DESC LIMIT 1""", (code, latest_year + '%')).fetchone()
-    fcf_cov = None
+    # 现金流覆盖：最新年度经营现金流 ÷ 当年分红总额（W5：字段名 ocf_div_coverage）
+    ocf_coverage = None
     div_amount = None
     for r in reversed(rows):
         if r['total_amount']:
             div_amount = r['total_amount']
             break
+    latest_year = years[-1] if years else ''
+    f = db.execute("""SELECT operating_cash_flow FROM stock_financials_annual
+        WHERE stock_code=? AND report_date LIKE ? ORDER BY report_date DESC LIMIT 1""", (code, latest_year + '%')).fetchone()
     if f and div_amount and div_amount > 0:
         ocf = f['operating_cash_flow'] or 0
-        fcf_cov = round(ocf / div_amount, 2) if ocf else None
+        ocf_coverage = round(ocf / div_amount, 2) if ocf else None
 
-    # 股息增长（每股分红近5年 CAGR）
+    # 股息增长（O7：全区间 CAGR，非近5年；注释与实现一致）
     div_growth = None
-    if len(years) >= 6:
+    if len(years) >= 2:
         y0, y1 = years[0], years[-1]
         d0, d1 = year_map[y0], year_map[y1]
         n = int(y1) - int(y0)
@@ -2383,7 +2382,7 @@ def api_market_div_sustainability():
     return jsonify({
         'code': code, 'dividend_count': len(rows),
         'streak_years': streak, 'payout_ratio': payout,
-        'fcf_coverage': fcf_cov, 'div_growth': div_growth,
+        'ocf_coverage': ocf_coverage, 'div_growth': div_growth,
         'yearly': [{'year': y, 'dividend': round(year_map[y], 4)} for y in years],
         'note': '派息率/FCF覆盖率仅个股（理杏仁+本地财务）；ETF/基金无派息率概念',
     })
