@@ -198,7 +198,11 @@ function renderFR(fr) {
     grid: {left: '6%', right: '4%', top: 12, bottom: 92},
     xAxis: {type: 'time', axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp}}},
     yAxis: {type: 'value', axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
-    dataZoom: [{type: 'inside'}, {type: 'slider', height: 14, bottom: 54}],
+    dataZoom: [{type: 'inside'}, {type: 'slider', height: 10, bottom: 56,
+      dataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},
+      selectedDataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},
+      borderColor: 'rgba(139,139,144,.25)', fillerColor: 'rgba(139,139,144,.12)',
+      handleSize: '80%', showDetail: false}],
     series: series
   });
   document.getElementById('fr-note').textContent = fr.note || '';
