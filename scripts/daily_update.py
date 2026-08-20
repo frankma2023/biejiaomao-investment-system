@@ -157,6 +157,8 @@ TASKS = [
     ("🧧 5.5全收益指数",     [PYTHON_EXE, "scripts/fetch_full_return_index.py"]),
     # 5.6 国债收益率（红利温度计股债息差用）
     ("🏦 5.6国债收益率",     [PYTHON_EXE, "scripts/fetch_bond_yield.py"]),
+    # 5.7 港股红利ETF（每日行情，akshare 新浪源）
+    ("🇭🇰 5.7港股红利ETF",   [PYTHON_EXE, "scripts/fetch_hk_etf.py"]),
 ]
 
 # 步骤 6~8：市场环境层（依赖 K 线数据就位）

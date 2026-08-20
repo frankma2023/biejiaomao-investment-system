@@ -2225,6 +2225,50 @@ def api_market_grid_advice():
     })
 
 
+# ═══════════════════════════════════════════════
+# API: GET /api/market-scan/hk-etf（港股红利ETF 观察）
+# ═══════════════════════════════════════════════
+
+HK_ETFS = [
+    ('513820', '港股通高股息', 0.60, '中证港股通高股息', '汇添富'),
+    ('159691', '港股通高股息精选', 0.52, '中证港股通高股息精选', '工银瑞信'),
+    ('513630', '标普港股红利低波', 0.60, '标普港股通低波红利', '摩根'),
+    ('159545', '恒生港股通高息低波', 0.20, '恒生港股通高股息低波动', '易方达'),
+]
+
+
+@app.route('/api/market-scan/hk-etf')
+def api_market_hk_etf():
+    """港股红利ETF 观察：最新行情/涨跌/成立来年化/费率（静态信息在配置）"""
+    db = get_db()
+    result = []
+    for code, name, fee, index_name, mgr in HK_ETFS:
+        rows = db.execute("""
+            SELECT date, close FROM hk_etf_daily
+            WHERE stock_code=? ORDER BY date
+        """, (code,)).fetchall()
+        if len(rows) < 2:
+            continue
+        dates = [r['date'] for r in rows]
+        closes = [r['close'] for r in rows]
+        cur = closes[-1]
+        prev = closes[-2]
+        chg = (cur / prev - 1) * 100 if prev else 0
+        # 成立以来年化（自然日）
+        from datetime import datetime as _dt
+        y0 = (_dt.strptime(dates[-1], '%Y-%m-%d') - _dt.strptime(dates[0], '%Y-%m-%d')).days / 365.25
+        total = cur / closes[0] - 1
+        ann = (1 + total) ** (1 / y0) - 1 if total > -1 else -1
+        result.append({
+            'code': code, 'name': name,
+            'fee': fee, 'index_name': index_name, 'mgr': mgr,
+            'date': dates[-1], 'close': round(cur, 3), 'chg': round(chg, 2),
+            'ann': round(ann * 100, 2), 'total': round(total * 100, 1),
+            'start_date': dates[0], 'days': len(dates),
+        })
+    return jsonify({'date': result[0]['date'] if result else '', 'etfs': result})
+
+
 @app.route('/api/market-scan/coal-advice')
 def api_market_coal_advice():
     """中证煤炭网格投资建议：网格档位位置 + 网格回测摘要（支持历史回看）"""
