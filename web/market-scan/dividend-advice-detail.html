@@ -387,10 +387,10 @@ function buildValChart(id, name, dates, vals, pcts, hsVals, lineColor, tx, sp) {
   const pctVals = (pcts || []).map(v => v != null ? (v * 100).toFixed(0) : null);
   ch.setOption({
     backgroundColor: chartBg, tooltip: {trigger: 'axis'},
-    legend: {data: [name, '沪深300', '十年分位%'], bottom: 18, textStyle: {color: tx, fontSize: 10}},
-    grid: {left: '8%', right: '4%', top: 12, bottom: 54},
+    legend: {data: [name, '沪深300', '十年分位%'], bottom: 0, textStyle: {color: tx, fontSize: 10}},
+    grid: {left: '8%', right: '4%', top: 12, bottom: 92},
     xAxis: {type: 'category', data: dates, axisLabel: {color: tx, fontSize: 9, formatter: v => v.slice(0, 7)}, axisLine: {lineStyle: {color: sp}}},
-    dataZoom: [{type: 'inside', start: 50, end: 100}, {type: 'slider', start: 50, end: 100, height: 16, bottom: 2}],
+    dataZoom: [{type: 'inside', start: 50, end: 100}, {type: 'slider', start: 50, end: 100, height: 10, bottom: 52,dataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},selectedDataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},borderColor: 'rgba(139,139,144,.25)', fillerColor: 'rgba(139,139,144,.12)',handleSize: '80%', showDetail: false}],
     yAxis: [
       {type: 'value', name: name, axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
       {type: 'value', name: '分位%', min: 0, max: 100, axisLabel: {color: tx, fontSize: 9, formatter: v => v + '%'}, splitLine: {show: false}}
@@ -504,11 +504,11 @@ function renderTemp(m) {
   tempChart = echarts.init(document.getElementById('temp-chart'));
   tempChart.setOption({
     backgroundColor: chartBg, tooltip: {trigger: 'axis'},
-    legend: {data: ['股息率', '10年国债', '息差'], bottom: 14, textStyle: {color: tx, fontSize: 9}},
-    grid: {left: '8%', right: '4%', top: 12, bottom: 62},
+    legend: {data: ['股息率', '10年国债', '息差'], bottom: 0, textStyle: {color: tx, fontSize: 9}},
+    grid: {left: '8%', right: '4%', top: 12, bottom: 92},
     xAxis: {type: 'category', data: s.map(x => x.date), axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp2}}},
     yAxis: {type: 'value', axisLabel: {color: tx, fontSize: 9, formatter: '{value}%'}, splitLine: {lineStyle: {color: sp2}}},
-    dataZoom: [{type: 'inside'}, {type: 'slider', height: 10, bottom: 38,
+    dataZoom: [{type: 'inside'}, {type: 'slider', height: 10, bottom: 52,
       dataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},
       selectedDataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},
       borderColor: 'rgba(139,139,144,.25)', fillerColor: 'rgba(139,139,144,.12)',
