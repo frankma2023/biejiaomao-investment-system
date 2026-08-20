@@ -41,6 +41,15 @@ CREATE_SQL = """CREATE TABLE IF NOT EXISTS hk_etf_daily (
     PRIMARY KEY (stock_code, date)
 )"""
 
+# 全收益（后复权）K线表——分红再投后的真实收益序列（腾讯 hfq 源）
+CREATE_FR_SQL = """CREATE TABLE IF NOT EXISTS hk_etf_full_return (
+    stock_code TEXT NOT NULL,
+    date       TEXT NOT NULL,
+    close      REAL,
+    updated_at TEXT DEFAULT (datetime('now','localtime')),
+    PRIMARY KEY (stock_code, date)
+)"""
+
 
 def sina_symbol(code):
     return ('sh' if code.startswith('5') else 'sz') + code
@@ -70,6 +79,20 @@ def fetch_em(code):
     return rows
 
 
+def fetch_tx_hfq(code):
+    """腾讯后复权（全收益口径，含分红再投）"""
+    import requests
+    sym = ('sh' if code.startswith('5') else 'sz') + code
+    url = 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get'
+    params = {'param': f'{sym},day,2010-01-01,2026-08-20,2000,hfq'}
+    r = requests.get(url, params=params, timeout=20, headers={'User-Agent': 'Mozilla/5.0'})
+    j = r.json()
+    data = j.get('data', {}).get(sym, {})
+    key = 'hfq' if 'hfq' in data else 'hfqday'
+    klines = data.get(key) or []
+    return [(code, k[0], float(k[2])) for k in klines]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--full', action='store_true', help='全量拉取（忽略表内已有）')
@@ -77,6 +100,7 @@ def main():
 
     db = sqlite3.connect(DB_PATH)
     db.execute(CREATE_SQL)
+    db.execute(CREATE_FR_SQL)
 
     for code, name, fee, index_name, mgr in HK_ETFS:
         try:
@@ -96,15 +120,27 @@ def main():
             last = r[0] if r and r[0] else '0000-00-00'
             rows = [x for x in rows if x[1] > last]
 
-        if not rows:
-            print(f'{code} {name}: 无新数据')
-            continue
+        if rows:
+            db.executemany("""INSERT OR REPLACE INTO hk_etf_daily
+                (stock_code, date, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)""", rows)
+            db.commit()
+            cnt = db.execute("SELECT COUNT(*) FROM hk_etf_daily WHERE stock_code=?", (code,)).fetchone()[0]
+            print(f'✅ {code} {name}: 日线入库 {len(rows)} 条（累计 {cnt}）')
 
-        db.executemany("""INSERT OR REPLACE INTO hk_etf_daily
-            (stock_code, date, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)""", rows)
-        db.commit()
-        cnt = db.execute("SELECT COUNT(*) FROM hk_etf_daily WHERE stock_code=?", (code,)).fetchone()[0]
-        print(f'✅ {code} {name}: 入库 {len(rows)} 条（累计 {cnt}）')
+        # 全收益（后复权）增量
+        try:
+            fr = fetch_tx_hfq(code)
+            if fr:
+                r = db.execute("SELECT MAX(date) FROM hk_etf_full_return WHERE stock_code=?", (code,)).fetchone()
+                last = r[0] if r and r[0] else '0000-00-00'
+                fr = [x for x in fr if x[1] > last]
+                if fr:
+                    db.executemany("INSERT OR REPLACE INTO hk_etf_full_return (stock_code, date, close) VALUES (?,?,?)", fr)
+                    db.commit()
+                    cnt2 = db.execute("SELECT COUNT(*) FROM hk_etf_full_return WHERE stock_code=?", (code,)).fetchone()[0]
+                    print(f'✅ {code} {name}: 全收益入库 {len(fr)} 条（累计 {cnt2}）')
+        except Exception as e:
+            print(f'⚠️ {code} 全收益拉取失败: {str(e)[:60]}')
 
     db.close()
 

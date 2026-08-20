@@ -2269,6 +2269,126 @@ def api_market_hk_etf():
     return jsonify({'date': result[0]['date'] if result else '', 'etfs': result})
 
 
+# ═══════════════════════════════════════════════
+# API: GET /api/market-scan/full-return-compare（红利标的全收益对比）
+# ═══════════════════════════════════════════════
+
+@app.route('/api/market-scan/full-return-compare')
+def api_market_full_return_compare():
+    """多红利标的全收益归一化对比（起点=100）"""
+    db = get_db()
+    pool = [
+        # (code, name, source表, 类型)
+        ('H00922', '中证红利·全收益', 'index_full_return_daily'),
+        ('000922', '中证红利·价格', 'index_daily_kline'),
+        ('980092', '国证自由现金流', 'index_daily_kline'),
+        ('000300', '沪深300', 'index_daily_kline'),
+    ]
+    series = []
+    for code, name, table in pool:
+        if table == 'index_full_return_daily':
+            rows = db.execute(f"""SELECT date, close FROM {table}
+                WHERE stock_code=? AND date>='2018-01-01' ORDER BY date""", (code,)).fetchall()
+        else:
+            rows = db.execute(f"""SELECT date, close FROM {table}
+                WHERE stock_code=? AND kline_type='normal' AND date>='2018-01-01' ORDER BY date""", (code,)).fetchall()
+        if not rows:
+            continue
+        dates = [r['date'] for r in rows]
+        closes = [r['close'] for r in rows]
+        base = closes[0]
+        series.append({'code': code, 'name': name, 'type': 'index',
+                       'dates': dates, 'values': [round(c / base * 100, 1) for c in closes]})
+    # 港股四只（全收益 hfq）
+    hk_names = {'513820': '港股通高股息', '159691': '港股通高股息精选',
+                '513630': '标普港股红利低波', '159545': '恒生港股通高息低波'}
+    for code, name in hk_names.items():
+        rows = db.execute("SELECT date, close FROM hk_etf_full_return WHERE stock_code=? ORDER BY date", (code,)).fetchall()
+        if not rows:
+            continue
+        dates = [r['date'] for r in rows]
+        closes = [r['close'] for r in rows]
+        base = closes[0]
+        series.append({'code': code, 'name': name + '·全收益', 'type': 'hk_etf',
+                       'dates': dates, 'values': [round(c / base * 100, 1) for c in closes],
+                       'start': dates[0]})
+    return jsonify({'series': series, 'note': '全收益=含分红再投资（H00922/港股ETF）；价格口径为对比参照；各自起点=100，窗口不同（港股自2023-2024起）'})
+
+
+# ═══════════════════════════════════════════════
+# API: GET /api/market-scan/div-sustainability（个股分红可持续性）
+# ═══════════════════════════════════════════════
+
+@app.route('/api/market-scan/div-sustainability')
+def api_market_div_sustainability():
+    """个股分红可持续性：连续年限/派息率/FCF覆盖率/股息增长/历年序列"""
+    code = request.args.get('code', '')
+    if not code:
+        return jsonify({'error': 'code 必填'}), 400
+    db = get_db()
+
+    rows = db.execute("""SELECT * FROM dividend_records
+        WHERE code=? AND kind='stock' AND status='implemented' AND dividend > 0
+        ORDER BY ex_date""", (code,)).fetchall()
+    if not rows:
+        return jsonify({'error': '无分红数据（需先运行 scripts/fetch_dividends.py）', 'code': code})
+
+    # 历年每股分红（按 ex_date 年份聚合）
+    year_map = {}
+    for r in rows:
+        y = r['ex_date'][:4]
+        year_map[y] = year_map.get(y, 0) + (r['dividend'] or 0)
+    years = sorted(year_map.keys())
+
+    # 连续分红年限（最近一年有分红起往前连续）
+    import datetime as _dt
+    cur_year = _dt.date.today().year
+    streak = 0
+    for y in range(cur_year, cur_year - 20, -1):
+        if str(y) in year_map:
+            streak += 1
+        else:
+            break
+
+    # 最新派息率（最后一次有值的）
+    payout = None
+    for r in reversed(rows):
+        if r['payout_ratio'] is not None:
+            payout = round(r['payout_ratio'] * 100, 1)
+            break
+
+    # FCF 覆盖率：最新年度经营现金流 ÷ 当年分红总额
+    latest_year = years[-1] if years else ''
+    f = db.execute("""SELECT operating_cash_flow, free_cash_flow, net_profit FROM stock_financials_annual
+        WHERE stock_code=? AND report_date LIKE ? ORDER BY report_date DESC LIMIT 1""", (code, latest_year + '%')).fetchone()
+    fcf_cov = None
+    div_amount = None
+    for r in reversed(rows):
+        if r['total_amount']:
+            div_amount = r['total_amount']
+            break
+    if f and div_amount and div_amount > 0:
+        ocf = f['operating_cash_flow'] or 0
+        fcf_cov = round(ocf / div_amount, 2) if ocf else None
+
+    # 股息增长（每股分红近5年 CAGR）
+    div_growth = None
+    if len(years) >= 6:
+        y0, y1 = years[0], years[-1]
+        d0, d1 = year_map[y0], year_map[y1]
+        n = int(y1) - int(y0)
+        if d0 > 0 and d1 > 0 and n > 0:
+            div_growth = round(((d1 / d0) ** (1 / n) - 1) * 100, 1)
+
+    return jsonify({
+        'code': code, 'dividend_count': len(rows),
+        'streak_years': streak, 'payout_ratio': payout,
+        'fcf_coverage': fcf_cov, 'div_growth': div_growth,
+        'yearly': [{'year': y, 'dividend': round(year_map[y], 4)} for y in years],
+        'note': '派息率/FCF覆盖率仅个股（理杏仁+本地财务）；ETF/基金无派息率概念',
+    })
+
+
 @app.route('/api/market-scan/coal-advice')
 def api_market_coal_advice():
     """中证煤炭网格投资建议：网格档位位置 + 网格回测摘要（支持历史回看）"""

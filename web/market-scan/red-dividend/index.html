@@ -53,11 +53,12 @@ const LV = {
 
 async function load() {
   try {
-    const [da, fa, ca, hk] = await Promise.all([
+    const [da, fa, ca, hk, fr] = await Promise.all([
       fetch(API_BASE + '/api/market-scan/dividend-advice').then(r => r.json()).catch(() => ({indices:[]})),
       fetch(API_BASE + '/api/market-scan/fcf-advice').then(r => r.json()).catch(() => ({})),
       fetch(API_BASE + '/api/market-scan/coal-advice').then(r => r.json()).catch(() => ({error:'no data'})),
-      fetch(API_BASE + '/api/market-scan/hk-etf').then(r => r.json()).catch(() => ({etfs:[]}))
+      fetch(API_BASE + '/api/market-scan/hk-etf').then(r => r.json()).catch(() => ({etfs:[]})),
+      fetch(API_BASE + '/api/market-scan/full-return-compare').then(r => r.json()).catch(() => ({series:[]}))
     ]);
     const date = da.date || fa.date || ca.date || '';
     document.getElementById('meta').textContent = '红利/自由现金流/中证煤炭指数操作建议 · ' + date + ' · 点击卡片查看详情';
@@ -73,6 +74,7 @@ async function load() {
     html += '<div style="padding-left:16px;color:var(--muted)">估值分位 = 定投加权（短线择时无效）｜ 温度计 ≥65 热区 = 回避/减仓（60日43%）｜ 拥挤度 = 状态监控</div>';
     html += '<div style="color:var(--muted);margin-top:4px">⚠️ 无效信号：PB分位择时（53%≈随机）、息差 &lt;2.5% 买入（51%≈随机）、估值分位短线择时——别用</div>';
     html += '</div>';
+    html += '<div class="card"><div class="ct">📈 红利标的全收益对比（起点=100 · 含分红再投）</div><div id="chart-fr" style="height:360px"></div><div style="font-size:0.6rem;color:var(--muted);margin-top:4px" id="fr-note"></div></div>';
     // 红利指数
     html += '<div class="section-hdr">📌 红利指数（回撤+估值规则）</div><div class="sector-grid">';
     (da.indices || []).forEach(x => {
@@ -158,11 +160,38 @@ async function load() {
 
     html += '<div class="note">📊 口径说明：① 回撤：中证红利（000922）用全收益 H00922（含分红再投资，2018起），其余红利指数暂用价格口径；买点规则 250日回撤≥10%（回测32次触发/20日胜率75%）。② 估值分位：PE/PB/股息率分位为<b>10年滚动口径</b>（理杏仁 y10.cvpos），非全历史——红利 PE 分位极少>85%、PB 分位极少>55%、股息率分位从未<20%，属数据特性非异常。③ 网格：中证煤炭用 8% 间距（回测最优），回撤实验室同页可用。</div>';
     document.getElementById('content').innerHTML = html;
+    renderFR(fr);
   } catch(e) {
     document.getElementById('content').innerHTML = '加载失败: ' + e.message;
   }
 }
 load();
+
+// 全收益对比图
+let frChart = null;
+function renderFR(fr) {
+  const el = document.getElementById('chart-fr');
+  if (!el || !fr || !fr.series || !fr.series.length) return;
+  if (frChart) frChart.dispose();
+  frChart = echarts.init(el);
+  const colors = ['#ef4444', '#8b8b90', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+  const series = fr.series.map((s, i) => ({
+    name: s.name, type: 'line', data: s.values, smooth: true, showSymbol: false,
+    lineStyle: {width: s.type === 'index' ? 1.2 : 1.8, color: colors[i % colors.length], type: s.code === '000922' ? 'dashed' : 'solid'},
+    itemStyle: {color: colors[i % colors.length]},
+    emphasis: {focus: 'series'}
+  }));
+  frChart.setOption({
+    backgroundColor: chartBg, tooltip: {trigger: 'axis', valueFormatter: v => v + ''},
+    legend: {type: 'scroll', bottom: 0, textStyle: {color: tx, fontSize: 9}},
+    grid: {left: '6%', right: '4%', top: 12, bottom: 40},
+    xAxis: {type: 'category', data: fr.series[0].dates, axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp}}},
+    yAxis: {type: 'value', axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
+    dataZoom: [{type: 'inside'}, {type: 'slider', height: 14, bottom: 18}],
+    series: series
+  });
+  document.getElementById('fr-note').textContent = fr.note || '';
+}
 
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
