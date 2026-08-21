@@ -149,7 +149,15 @@ async function load() {
 
     // 港股红利ETF（观察）
     if (hk && hk.etfs && hk.etfs.length) {
-      html += '<div class="section-hdr">🇭🇰 港股红利ETF（观察）</div><div class="sector-grid">';
+      html += '<div class="section-hdr">🇭🇰 港股红利ETF（观察）</div>';
+      html += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
+      html += '<div style="font-weight:600;color:#ef4444">🟢 买点（回测 2018 起，指数口径）</div>';
+      html += '<div style="padding-left:16px;color:var(--muted)">513820 港股通高股息：<b style="color:#ef4444">深回撤 ≥15%</b> → 分批买入（60日72%）｜ 息差≥4% 辅助</div>';
+      html += '<div style="padding-left:16px;color:var(--muted)">159691 高股息精选：<b style="color:#ef4444">深回撤 ≥20%</b>（67%/+7.3%）或 <b>股息率 ≥6%</b>（60%）或 <b>息差 ≥4%</b>（69%）</div>';
+      html += '<div style="color:var(--muted)">❌ 无效：PE/PB 估值分位（48%≈随机甚至反向——港股盈利波动大，低分位常是盈利高点假象）；浅回撤≥10% 无效（接飞刀，与趋势指数同规律）</div>';
+      html += '<div style="color:var(--muted)">⏳ 513630/159545：数据窗口短（2023-2024 起），暂无可靠结论，继续观察</div>';
+      html += '</div>';
+      html += '<div class="sector-grid">';
       hk.etfs.forEach(x => {
         const chgCls = x.chg >= 0 ? '#ef4444' : '#10b981';
         html += '<div class="sector-card" style="background:var(--card);border-color:var(--border)">';
