@@ -2234,6 +2234,7 @@ HK_ETFS = [
     ('159691', '港股通高股息精选', 0.52, '中证港股通高股息精选', '工银瑞信'),
     ('513630', '标普港股红利低波', 0.60, '标普港股通低波红利', '摩根'),
     ('159545', '恒生港股通高息低波', 0.20, '恒生港股通高股息低波动', '易方达'),
+    ('512000', '券商ETF', 0.50, '证券公司(399975)', '华宝'),
 ]
 
 
@@ -2279,6 +2280,8 @@ def api_market_hk_etf():
             'ann': round(ann * 100, 2), 'total': round(total * 100, 1),
             'start_date': dates[0], 'days': len(dates),
             'dd_250': round(dd250, 1), 'pos_250': round(pos250),
+            'lo_250': round(min(seg), 3), 'hi_250': round(max(seg), 3),
+            'type': 'a' if code == '512000' else 'hk',
             'advice_level': advice_level, 'advice': advice,
         })
     return jsonify({'date': result[0]['date'] if result else '', 'etfs': result})
