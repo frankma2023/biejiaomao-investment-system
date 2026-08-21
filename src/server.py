@@ -2259,12 +2259,27 @@ def api_market_hk_etf():
         y0 = (_dt.strptime(dates[-1], '%Y-%m-%d') - _dt.strptime(dates[0], '%Y-%m-%d')).days / 365.25
         total = cur / closes[0] - 1
         ann = (1 + total) ** (1 / y0) - 1 if total > -1 else -1
+        # ── 信号（回测依据 analysis/hk_div_buypoint.py）──
+        seg = closes[-250:]
+        hi250 = max(seg)
+        dd250 = (hi250 - cur) / hi250 * 100
+        pos250 = (cur - min(seg)) / (hi250 - min(seg)) * 100 if hi250 > min(seg) else 50
+        # 买入阈值：513820→15%（60日72%），159691→20%（67%），其余暂用15%观察
+        buy_dd = 20 if code == '159691' else 15
+        if dd250 >= buy_dd:
+            advice_level, advice = 'buy', '买入（深回撤' + str(buy_dd) + '%触发，60日胜率' + ('67%' if code == '159691' else '72%') + '）'
+        elif pos250 > 85:
+            advice_level, advice = 'caution', '高位区（250日位置' + str(round(pos250)) + '%），勿追高'
+        else:
+            advice_level, advice = 'hold', '观望（回撤' + str(round(dd250, 1)) + '%未到' + str(buy_dd) + '%买点）'
         result.append({
             'code': code, 'name': name,
             'fee': fee, 'index_name': index_name, 'mgr': mgr,
             'date': dates[-1], 'close': round(cur, 3), 'chg': round(chg, 2),
             'ann': round(ann * 100, 2), 'total': round(total * 100, 1),
             'start_date': dates[0], 'days': len(dates),
+            'dd_250': round(dd250, 1), 'pos_250': round(pos250),
+            'advice_level': advice_level, 'advice': advice,
         })
     return jsonify({'date': result[0]['date'] if result else '', 'etfs': result})
 
