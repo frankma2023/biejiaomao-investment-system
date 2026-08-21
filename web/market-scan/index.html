@@ -420,7 +420,7 @@
         html+='</div>';
       }
 
-      // ═══ 大盘操作建议（红利指数规则）═══
+      // ═══ 红利操作建议（红利指数规则）═══
       if(h.dividend_advice&&h.dividend_advice.indices&&h.dividend_advice.indices.length){
         var da=h.dividend_advice;
         html+='<div class="section-hdr" style="margin-top:18px">📌 红利操作建议 <span style="font-size:9px;color:var(--muted);font-weight:400">红利指数规则引擎 · 回测验证</span></div>';
@@ -452,7 +452,7 @@
         html+='</div>';
       }
 
-      // ═══ 大盘操作建议（自由现金流指数）═══
+      // ═══ 自由现金流操作建议 ═══
       var fcfList = (h.fcf_advice && h.fcf_advice.indices && h.fcf_advice.indices.length) ? h.fcf_advice.indices : (h.fcf_advice && h.fcf_advice.code ? [h.fcf_advice] : []);
       if(fcfList.length){
         var daColorMap2={'strong_buy':'#ef4444','buy':'#ef4444','caution':'#f59e0b','hold':'#8b8b90'};
