@@ -172,6 +172,12 @@
       if(s>=50)return{r:'C',l:'中性市场',a:'精选个股，仓位35%'};if(s>=35)return{r:'D',l:'偏弱市场',a:'减少操作，仓位20%'};
       if(s>=20)return{r:'E',l:'弱势市场',a:'暂停选股，现金为王'};return{r:'F',l:'深度熊市',a:'全面防守，停止买入'};
     }
+    const SIG_CN = {
+  gold_buy: '回撤买点', high_div: '高股息', double_confirm: '买点+高股息确认',
+  pe_warn: 'PE高位警示', low_div: '低股息警示',
+  surge_sell: '涨幅过大', pe_high_sell: 'PE高位卖点',
+  fcf_buy: '估值买点', fcf_strong: '估值双确认', fcf_warn: '估值偏高'
+};
     const DESC={
       ma50_above:'MA50上方占比衡量市场宽度。高于70%说明多数个股处于上升趋势，是健康牛市的标志；低于30%意味着市场极度疲弱，但极端低值常预示反弹。',
       hl_ratio:'新高新低比反映创新高和创新低个股的力量对比。比值>2表明多方主导、突破力量充沛；比值<0.5则多数个股在创新低，选股风险极大。',
@@ -430,7 +436,7 @@
           var ddCls=dax.dd_250>=15?'#ef4444':(dax.dd_250>=10?'#f59e0b':'#8b8b90');
           var peV=dax.valuation?dax.valuation.pe_pct:'—';
           var dyrV=dax.valuation?dax.valuation.dyr_pct:'—';
-          var sigText=dax.signals&&dax.signals.length?dax.signals.join('·'):'—';
+          var sigText=dax.signals&&dax.signals.length?dax.signals.map(s=>SIG_CN[s]||s).join('·'):'—';
           html+='<div class="sector-card" style="background:'+daBg.bg+';border:1px solid '+daBg.bd+'" onclick="window.open(\'dividend-advice-detail.html?code='+dax.code+'&date='+da.date+'\')">';
           html+='<div class="sc-title">'+dax.name+' <span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">'+dax.code+'</span></div>';
           html+='<div style="display:flex;align-items:baseline;gap:6px;margin:4px 0">';
@@ -461,7 +467,7 @@
           var peV=fx.valuation&&fx.valuation.pe_pct!=null?fx.valuation.pe_pct:'—';
           var pbV=fx.valuation&&fx.valuation.pb_pct!=null?fx.valuation.pb_pct:'—';
           var dyrV=fx.valuation&&fx.valuation.dyr_pct!=null?fx.valuation.dyr_pct:'—';
-          var sigText=fx.signals&&fx.signals.length?fx.signals.join('·'):'—';
+          var sigText=fx.signals&&fx.signals.length?fx.signals.map(s=>SIG_CN[s]||s).join('·'):'—';
           html+='<div class="sector-card" style="background:'+fxBg.bg+';border:1px solid '+fxBg.bd+'" onclick="window.open(\'fcf-advice-detail.html?code='+fx.code+'&date='+(fx.date||h.date||'')+'\')">';
           html+='<div class="sc-title">'+fx.name+' <span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">'+fx.code+'</span></div>';
           html+='<div style="display:flex;align-items:baseline;gap:6px;margin:4px 0">';
