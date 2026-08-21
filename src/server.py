@@ -2265,14 +2265,18 @@ def api_market_hk_etf():
         hi250 = max(seg)
         dd250 = (hi250 - cur) / hi250 * 100
         pos250 = (cur - min(seg)) / (hi250 - min(seg)) * 100 if hi250 > min(seg) else 50
-        # 买入阈值：513820→15%（60日72%），159691→20%（67%），其余暂用15%观察
-        buy_dd = 20 if code == '159691' else 15
-        if dd250 >= buy_dd:
-            advice_level, advice = 'buy', '买入（深回撤' + str(buy_dd) + '%触发，60日胜率' + ('67%' if code == '159691' else '72%') + '）'
+        # 信号覆盖范围：仅 513820(930914)/159691(930839) 有回测依据（hk_div_buypoint.py）；
+        # 513630/159545 数据年限不足无结论 → 降级 hold 观察；512000(type=a) 是券商网格标的 → 不套港股信号
+        if code in ('513630', '159545'):
+            advice_level, advice = 'hold', '观察（数据年限不足，暂无回测结论；买点规则待验证）'
+        elif code == '512000':
+            advice_level, advice = 'hold', '券商网格标的（见⛳券商指数 tab 档位表）'
+        elif dd250 >= (20 if code == '159691' else 15):
+            advice_level, advice = 'buy', '买入（深回撤' + str(20 if code == '159691' else 15) + '%触发，60日胜率' + ('67%' if code == '159691' else '72%') + '）'
         elif pos250 > 85:
             advice_level, advice = 'caution', '高位区（250日位置' + str(round(pos250)) + '%），勿追高'
         else:
-            advice_level, advice = 'hold', '观望（回撤' + str(round(dd250, 1)) + '%未到' + str(buy_dd) + '%买点）'
+            advice_level, advice = 'hold', '观望（回撤' + str(round(dd250, 1)) + '%未到' + str(20 if code == '159691' else 15) + '%买点）'
         result.append({
             'code': code, 'name': name,
             'fee': fee, 'index_name': index_name, 'mgr': mgr,
