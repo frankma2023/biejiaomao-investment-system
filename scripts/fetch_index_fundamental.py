@@ -86,6 +86,8 @@ def load_indices(categories=None):
     cats = data.get("categories", {})
     result = {}
     for cat_name, indices in cats.items():
+        if cat_name == 'etf':
+            continue  # ETF 不走理杏仁（价格字段量级错误），由 fetch_hk_etf.py 独立管理
         if categories and cat_name not in categories:
             continue
         for item in indices:

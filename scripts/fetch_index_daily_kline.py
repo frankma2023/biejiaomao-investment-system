@@ -40,6 +40,8 @@ def load_index_config(path: str = None) -> dict:
     categories = data.get("categories", {})
     result = {}
     for cat_name, indices in categories.items():
+        if cat_name == 'etf':
+            continue  # ETF 不走理杏仁（价格字段量级错误），由 fetch_hk_etf.py 独立管理
         for item in indices:
             result[item["code"]] = item["name"]
     return result
@@ -52,6 +54,8 @@ def load_index_config_by_category(path: str = None) -> dict:
         data = yaml.safe_load(f)
     result = {}
     for cat_name, indices in data.get("categories", {}).items():
+        if cat_name == 'etf':
+            continue  # ETF 不走理杏仁（价格字段量级错误），由 fetch_hk_etf.py 独立管理
         result[cat_name] = {item["code"]: item["name"] for item in indices}
     return result
 
