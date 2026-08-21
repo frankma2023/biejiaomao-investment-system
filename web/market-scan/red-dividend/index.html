@@ -45,7 +45,7 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
   <button class="pill-tab" onclick="switchIvTab('fcf')">🧲 自由现金流</button>
   <button class="pill-tab" onclick="switchIvTab('coal')">⛏ 中证煤炭</button>
   <button class="pill-tab" onclick="switchIvTab('hk')">🇭🇰 港股红利</button>
-  <button class="pill-tab" onclick="switchIvTab('broker')">⛳ 券商网格</button>
+  <button class="pill-tab" onclick="switchIvTab('broker')">⛳ 券商指数</button>
 </div>
 <div id="pane-ov" class="iv-pane"></div>
 <div id="pane-red" class="iv-pane" style="display:none"></div>
@@ -217,17 +217,45 @@ async function load() {
       const step = base * 0.05;
       const lvl = Math.floor((broker.close - base) / step);
       const curLow = base + lvl * step;
-      brokerHtml += '<div class="section-hdr">⛳ 券商网格（512000 券商ETF · 5%间距）</div>';
-      brokerHtml += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
-      brokerHtml += '<div style="font-weight:600;color:#ef4444">🟢 网格适配：8.6年横盘零收益+高波动29.5% → 5%间距回测超额+57pp（10%间距+61pp最优）· PE分位0%历史最低</div>';
-      brokerHtml += '<div style="color:var(--muted)">当前 <b>' + broker.close + '</b> 位于 <b>档' + lvl + '</b>（' + curLow.toFixed(3) + ' ~ ' + (curLow + step).toFixed(3) + '）· 250日位置 ' + broker.pos_250 + '% · 回撤 ' + broker.dd_250 + '% · 距下沿 ' + ((broker.close - base) / broker.close * 100).toFixed(1) + '%</div>';
-      brokerHtml += '<div style="color:var(--muted)">10万计划：首仓 2万（20%）→ 每跌一档加 1.5万（4档共6万）→ 留2万应急 · 每涨一档对称卖1.5万 · 跌破档-2（' + (base - 2 * step).toFixed(3) + '）停止买入</div>';
-      brokerHtml += '<div style="color:var(--muted)">⚠️ 大牛市脉冲（券商历史+40%级）会踏空——突破上沿停止卖出是设计代价；卫星仓10-20%</div>';
+      const per = 1.5;  // 每档金额（万元，10万计划）
+      // 512000 指数卡片（与煤炭卡同构）
+      brokerHtml += '<div class="section-hdr">⛳ 券商指数（512000 券商ETF · 5%间距）</div>';
+      brokerHtml += '<div class="sector-grid">';
+      brokerHtml += '<div class="sector-card" style="background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2)">';
+      brokerHtml += '<div class="sc-title">512000 券商ETF <span class="code">' + broker.code + '</span></div>';
+      brokerHtml += '<div style="display:flex;align-items:baseline;gap:8px;margin:4px 0">';
+      brokerHtml += '<span style="font-family:var(--font-display);font-size:1.6rem;font-weight:400;color:var(--text-primary)">' + broker.close + '</span>';
+      brokerHtml += '<span style="font-size:12px;font-weight:600;color:' + (broker.chg >= 0 ? '#ef4444' : '#10b981') + '">' + (broker.chg > 0 ? '+' : '') + broker.chg + '%</span>';
+      brokerHtml += '<span style="font-size:11px;font-weight:600;color:#ef4444;border:1px solid #ef444466;border-radius:6px;padding:1px 6px">档' + lvl + '</span>';
+      brokerHtml += '</div>';
+      brokerHtml += '<div class="tx" style="font-size:0.62rem">当前档 ' + curLow.toFixed(3) + ' ~ ' + (curLow + step).toFixed(3) + ' · 250日位置 ' + broker.pos_250 + '% · 回撤 ' + broker.dd_250 + '%</div>';
+      brokerHtml += '<div class="meta">费率 ' + broker.fee + '% · ' + broker.index_name + ' · ' + broker.mgr + ' · PE分位0%(399975)</div>';
+      brokerHtml += '<div class="sig">回测：5%间距超额+57pp（10%最优+61pp）· 8.6年横盘零收益</div>';
+      brokerHtml += '</div>';
+      brokerHtml += '</div>';
+      // 网格档位表
+      brokerHtml += '<div class="card" style="padding:12px 14px"><div class="ct" style="font-size:0.72rem;font-weight:600;color:var(--accent);margin-bottom:8px">🕸 5% 网格档位表（10万计划）</div>';
+      brokerHtml += '<table style="width:100%;border-collapse:collapse;font-size:0.68rem">';
+      brokerHtml += '<tr><th style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted);text-align:left">档位</th><th style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted);text-align:right">触发价</th><th style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted);text-align:right">距当前</th><th style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted);text-align:center">动作</th><th style="padding:5px 8px;border-bottom:1px solid var(--border);color:var(--muted);text-align:right">金额(万)</th></tr>';
+      // 卖出档（当前上方）
+      for (let l = lvl + 4; l > lvl; l--) {
+        const v = base + l * step;
+        brokerHtml += '<tr><td style="padding:4px 8px;border-bottom:1px solid var(--border)">档' + l + '</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right;color:#10b981">' + v.toFixed(3) + '</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right">+' + (((v - broker.close) / broker.close) * 100).toFixed(1) + '%</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center;color:#10b981">卖出</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right">' + per + '</td></tr>';
+      }
+      // 当前档
+      brokerHtml += '<tr style="background:var(--accent-subtle)"><td style="padding:4px 8px;border-bottom:1px solid var(--border)">档' + lvl + ' ★当前</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right">' + broker.close.toFixed(3) + '</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right">—</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center;color:#ef4444">首仓 2万</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right">2.0</td></tr>';
+      // 买入档
+      for (let l = lvl - 1; l >= Math.max(-2, lvl - 4); l--) {
+        const v = base + l * step;
+        brokerHtml += '<tr><td style="padding:4px 8px;border-bottom:1px solid var(--border)">档' + l + '</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right;color:#ef4444">' + v.toFixed(3) + '</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right">-' + (((broker.close - v) / broker.close) * 100).toFixed(1) + '%</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center;color:#ef4444">买入</td><td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:right">' + per + '</td></tr>';
+      }
+      brokerHtml += '</table>';
+      brokerHtml += '<div style="font-size:0.6rem;color:var(--muted);margin-top:6px">10万计划：首仓2万 + 下方4档各1.5万（共6万）+ 2万应急。跌破档-2（' + (base - 2 * step).toFixed(3) + '）停止买入；涨一档对称卖出1.5万。⚠️ 券商牛市脉冲会踏空（设计代价）；卫星仓10-20%。</div>';
       brokerHtml += '</div>';
     }
     }
 
-    ovHtml += '<div class="note">📊 口径说明：① 回撤：中证红利（000922）用全收益 H00922（含分红再投资，2018起），其余红利指数暂用价格口径；买点规则 250日回撤≥10%（回测32次触发/20日胜率75%）。② 估值分位：PE/PB/股息率分位为<b>10年滚动口径</b>（理杏仁 y10.cvpos），非全历史——红利 PE 分位极少>85%、PB 分位极少>55%、股息率分位从未<20%，属数据特性非异常。③ 网格：中证煤炭用 8% 间距（回测最优），回撤实验室同页可用。</div>';
+ovHtml += '<div class="note">📊 口径说明：① 回撤：中证红利（000922）用全收益 H00922（含分红再投资，2018起），其余红利指数暂用价格口径；买点规则 250日回撤≥10%（回测32次触发/20日胜率75%）。② 估值分位：PE/PB/股息率分位为<b>10年滚动口径</b>（理杏仁 y10.cvpos），非全历史——红利 PE 分位极少>85%、PB 分位极少>55%、股息率分位从未<20%，属数据特性非异常。③ 网格：中证煤炭用 8% 间距（回测最优），回撤实验室同页可用。</div>';
     document.getElementById('pane-ov').innerHTML = ovHtml;
     document.getElementById('pane-red').innerHTML = redHtml;
     document.getElementById('pane-fcf').innerHTML = fcfHtml;
