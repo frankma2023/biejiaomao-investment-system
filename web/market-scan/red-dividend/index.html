@@ -105,110 +105,110 @@ async function load() {
 
     let ovHtml = '', redHtml = '', fcfHtml = '', coalHtml = '', hkHtml = '', brokerHtml = '';
     // 📋 决策框架（回测验证 2018-2026，H00922 全收益口径）
-    ov += '<div class="section-hdr">📋 红利决策框架（怎么买怎么卖）</div>';
-    ov += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
-    ov += '<div style="font-weight:600;color:#ef4444">🟢 买点（主信号）：250日回撤 ≥10% → 分批买入 <span style="font-weight:400;color:var(--muted)">（74%胜率 · 32次验证 · 全收益口径）</span></div>';
-    ov += '<div style="padding-left:16px;color:var(--muted)">加码条件：息差 ≥3%（60日74%）或 温度计 ≤30 冷区（60日64%）→ 买得更重</div>';
-    ov += '<div style="font-weight:600;color:#10b981;margin-top:4px">🔴 卖点（三个预警，出现即减仓）<span style="font-weight:400;color:var(--muted)">：PE分位&gt;80% ｜ 20日涨幅&gt;10% ｜ 60日涨幅&gt;15%（下跌概率80%，样本6-10次偏小）</span></div>';
-    ov += '<div style="font-weight:600;color:#f59e0b;margin-top:4px">🟡 辅助尺度（各管各的时间尺度）</div>';
-    ov += '<div style="padding-left:16px;color:var(--muted)">估值分位 = 定投加权（短线择时无效）｜ 温度计 ≥65 热区 = 回避/减仓（60日43%）｜ 拥挤度 = 状态监控</div>';
-    ov += '<div style="color:var(--muted);margin-top:4px">⚠️ 无效信号：PB分位择时（53%≈随机）、息差 &lt;2.5% 买入（51%≈随机）、估值分位短线择时——别用</div>';
-    ov += '</div>';
-    ov += '<div class="card"><div class="ct">📈 红利标的全收益对比（起点=100 · 含分红再投）</div><div id="chart-fr" style="height:360px"></div><div style="font-size:0.6rem;color:var(--muted);margin-top:4px" id="fr-note"></div></div>';
+    ovHtml += '<div class="section-hdr">📋 红利决策框架（怎么买怎么卖）</div>';
+    ovHtml += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
+    ovHtml += '<div style="font-weight:600;color:#ef4444">🟢 买点（主信号）：250日回撤 ≥10% → 分批买入 <span style="font-weight:400;color:var(--muted)">（74%胜率 · 32次验证 · 全收益口径）</span></div>';
+    ovHtml += '<div style="padding-left:16px;color:var(--muted)">加码条件：息差 ≥3%（60日74%）或 温度计 ≤30 冷区（60日64%）→ 买得更重</div>';
+    ovHtml += '<div style="font-weight:600;color:#10b981;margin-top:4px">🔴 卖点（三个预警，出现即减仓）<span style="font-weight:400;color:var(--muted)">：PE分位&gt;80% ｜ 20日涨幅&gt;10% ｜ 60日涨幅&gt;15%（下跌概率80%，样本6-10次偏小）</span></div>';
+    ovHtml += '<div style="font-weight:600;color:#f59e0b;margin-top:4px">🟡 辅助尺度（各管各的时间尺度）</div>';
+    ovHtml += '<div style="padding-left:16px;color:var(--muted)">估值分位 = 定投加权（短线择时无效）｜ 温度计 ≥65 热区 = 回避/减仓（60日43%）｜ 拥挤度 = 状态监控</div>';
+    ovHtml += '<div style="color:var(--muted);margin-top:4px">⚠️ 无效信号：PB分位择时（53%≈随机）、息差 &lt;2.5% 买入（51%≈随机）、估值分位短线择时——别用</div>';
+    ovHtml += '</div>';
+    ovHtml += '<div class="card"><div class="ct">📈 红利标的全收益对比（起点=100 · 含分红再投）</div><div id="chart-fr" style="height:360px"></div><div style="font-size:0.6rem;color:var(--muted);margin-top:4px" id="fr-note"></div></div>';
     // 红利指数
-    red += '<div class="section-hdr">📌 红利指数（回撤+估值规则）</div><div class="sector-grid">';
+    redHtml += '<div class="section-hdr">📌 红利指数（回撤+估值规则）</div><div class="sector-grid">';
     (da.indices || []).forEach(x => {
       const lv = LV[x.advice_level] || LV.hold;
       const peV = x.valuation && x.valuation.pe_pct != null ? x.valuation.pe_pct + '%' : '—';
       const dyV = x.valuation && x.valuation.dyr_pct != null ? x.valuation.dyr_pct + '%' : '—';
-      red += '<div class="sector-card" style="background:' + lv[2].bg + ';border-color:' + lv[2].bd + '" onclick="window.open(\'../dividend-advice-detail.html?code=' + x.code + '&date=' + date + '\')">';
-      red += '<div class="sc-title">' + x.name + ' <span class="code">' + x.code + '</span></div>';
-      red += '<div style="margin-top:6px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span></div>';
-      red += '<div class="tx">' + x.advice + '</div>';
-      red += '<div class="meta">回撤 ' + x.dd_250 + '%' + (x.dd_source === 'full_return' ? '（全收益）' : '') + ' · PE分位 ' + peV + ' · 股息率分位 ' + dyV + '</div>';
-      red += '<div class="sig">信号: ' + (x.signals && x.signals.length ? x.signals.map(s => SIG_CN[s] || s).join(' · ') : '—') + '</div>';
-      red += '</div>';
+      redHtml += '<div class="sector-card" style="background:' + lv[2].bg + ';border-color:' + lv[2].bd + '" onclick="window.open(\'../dividend-advice-detail.html?code=' + x.code + '&date=' + date + '\')">';
+      redHtml += '<div class="sc-title">' + x.name + ' <span class="code">' + x.code + '</span></div>';
+      redHtml += '<div style="margin-top:6px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span></div>';
+      redHtml += '<div class="tx">' + x.advice + '</div>';
+      redHtml += '<div class="meta">回撤 ' + x.dd_250 + '%' + (x.dd_source === 'full_return' ? '（全收益）' : '') + ' · PE分位 ' + peV + ' · 股息率分位 ' + dyV + '</div>';
+      redHtml += '<div class="sig">信号: ' + (x.signals && x.signals.length ? x.signals.map(s => SIG_CN[s] || s).join(' · ') : '—') + '</div>';
+      redHtml += '</div>';
     });
-    red += '</div>';
+    redHtml += '</div>';
 
     // 自由现金流（多指数：980092 + 932365）
     const fcfList = (fa && fa.indices && fa.indices.length) ? fa.indices : (fa && fa.code ? [fa] : []);
     if (fcfList.length) {
-      fcf += '<div class="section-hdr">🧲 自由现金流（估值分位规则）</div><div class="sector-grid">';
+      fcfHtml += '<div class="section-hdr">🧲 自由现金流（估值分位规则）</div><div class="sector-grid">';
       fcfList.forEach(fx => {
         const lv = LV[fx.advice_level] || LV.hold;
         const peV = fx.valuation && fx.valuation.pe_pct != null ? fx.valuation.pe_pct + '%' : '—';
         const pbV = fx.valuation && fx.valuation.pb_pct != null ? fx.valuation.pb_pct + '%' : '—';
         const dyV = fx.valuation && fx.valuation.dyr_pct != null ? fx.valuation.dyr_pct + '%' : '—';
-        fcf += '<div class="sector-card" style="background:' + lv[2].bg + ';border-color:' + lv[2].bd + '" onclick="window.open(\'../fcf-advice-detail.html?code=' + fx.code + '&date=' + date + '\')">';
-        fcf += '<div class="sc-title">' + fx.name + ' <span class="code">' + fx.code + '</span></div>';
-        fcf += '<div style="margin-top:6px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span></div>';
-        fcf += '<div class="tx">' + fx.advice + '</div>';
-        fcf += '<div class="meta">回撤 ' + fx.dd_250 + '% · PE分位 ' + peV + ' · PB分位 ' + pbV + ' · 股息率分位 ' + dyV + '</div>';
-        fcf += '<div class="sig">信号: ' + (fx.signals && fx.signals.length ? fx.signals.map(s => SIG_CN[s] || s).join(' · ') : '—') + '</div>';
-        fcf += '</div>';
+        fcfHtml += '<div class="sector-card" style="background:' + lv[2].bg + ';border-color:' + lv[2].bd + '" onclick="window.open(\'../fcf-advice-detail.html?code=' + fx.code + '&date=' + date + '\')">';
+        fcfHtml += '<div class="sc-title">' + fx.name + ' <span class="code">' + fx.code + '</span></div>';
+        fcfHtml += '<div style="margin-top:6px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span></div>';
+        fcfHtml += '<div class="tx">' + fx.advice + '</div>';
+        fcfHtml += '<div class="meta">回撤 ' + fx.dd_250 + '% · PE分位 ' + peV + ' · PB分位 ' + pbV + ' · 股息率分位 ' + dyV + '</div>';
+        fcfHtml += '<div class="sig">信号: ' + (fx.signals && fx.signals.length ? fx.signals.map(s => SIG_CN[s] || s).join(' · ') : '—') + '</div>';
+        fcfHtml += '</div>';
       });
-      fcf += '</div>';
-      fcf += '<div class="note">⚠️ ' + (fcfList[0].data_note || '自由现金流估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考。') + '</div>';
+      fcfHtml += '</div>';
+      fcfHtml += '<div class="note">⚠️ ' + (fcfList[0].data_note || '自由现金流估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考。') + '</div>';
     }
 
     // 自由现金流决策框架（回测 2012-2026 价格 + 2024-09 起估值短窗口）
     if (fcfList.length) {
-      fcf += '<div class="section-hdr">📋 自由现金流决策框架（怎么买怎么卖）</div>';
-      fcf += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
-      fcf += '<div style="font-weight:600;color:#ef4444">🟢 买点：深回撤 ≥20% → 分批买入 <span style="font-weight:400;color:var(--muted)">（60日67% · 27次 · 趋势指数深回调才是上车点）</span></div>';
-      fcf += '<div style="padding-left:16px;color:var(--muted)">增强：估值双低 PE+PB分位&lt;33%（60日100%，短窗口观察级）｜ 长期最优 = 定投/持有（年化13%）</div>';
-      fcf += '<div style="font-weight:600;color:#10b981">🔴 卖点：20日涨幅&gt;10% → 减仓 <span style="font-weight:400;color:var(--muted)">（未来60日仅30%胜率/-3.0%）</span> ｜ 60日涨幅&gt;15% → 减仓（44%/-4.3%）</div>';
-      fcf += '<div style="color:var(--muted)">⚠️ 浅回撤 ≥10% 无效（59% &lt; 随机67% = 接飞刀，与红利相反）；股息率分位择时不可用（短窗口噪声）</div>';
-      fcf += '</div>';
+      fcfHtml += '<div class="section-hdr">📋 自由现金流决策框架（怎么买怎么卖）</div>';
+      fcfHtml += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
+      fcfHtml += '<div style="font-weight:600;color:#ef4444">🟢 买点：深回撤 ≥20% → 分批买入 <span style="font-weight:400;color:var(--muted)">（60日67% · 27次 · 趋势指数深回调才是上车点）</span></div>';
+      fcfHtml += '<div style="padding-left:16px;color:var(--muted)">增强：估值双低 PE+PB分位&lt;33%（60日100%，短窗口观察级）｜ 长期最优 = 定投/持有（年化13%）</div>';
+      fcfHtml += '<div style="font-weight:600;color:#10b981">🔴 卖点：20日涨幅&gt;10% → 减仓 <span style="font-weight:400;color:var(--muted)">（未来60日仅30%胜率/-3.0%）</span> ｜ 60日涨幅&gt;15% → 减仓（44%/-4.3%）</div>';
+      fcfHtml += '<div style="color:var(--muted)">⚠️ 浅回撤 ≥10% 无效（59% &lt; 随机67% = 接飞刀，与红利相反）；股息率分位择时不可用（短窗口噪声）</div>';
+      fcfHtml += '</div>';
     }
 
     // 中证煤炭（网格规则）
     if (ca && !ca.error) {
       const clv = LV[ca.advice_level] || LV.hold;
       const g = ca.grid || {};
-      coal += '<div class="section-hdr">⛏ 中证煤炭（网格规则）</div><div class="sector-grid">';
-      coal += '<div class="sector-card" style="background:' + clv[2].bg + ';border-color:' + clv[2].bd + '" onclick="window.open(\'../coal-advice-detail.html?date=' + ca.date + '\')">';
-      coal += '<div class="sc-title">' + ca.name + ' <span class="code">' + ca.code + '</span></div>';
-      coal += '<div style="margin-top:6px"><span class="lv" style="color:' + clv[1] + '">' + clv[0] + '</span></div>';
-      coal += '<div class="tx">' + ca.advice + '</div>';
-      coal += '<div class="meta">第' + (g.level != null ? g.level : '—') + '档 ' + (g.grid_low != null ? g.grid_low + '~' + g.grid_high : '—') + ' · 250日位置 ' + ca.pos_250 + '% · 回撤 ' + ca.dd_250 + '%</div>';
-      coal += '<div class="sig">2018起网格 +' + (g.ret_2018 != null ? g.ret_2018 + '%' : '—') + ' vs 持有 +' + (g.hold_2018 != null ? g.hold_2018 + '%' : '—') + ' · 间距 ' + g.step_pct + '%</div>';
-      coal += '</div>';
-      coal += '</div>';
-      coal += '<div class="note">⚠️ ' + (ca.data_note || '网格回测未计滑点/手续费') + '</div>';
+      coalHtml += '<div class="section-hdr">⛏ 中证煤炭（网格规则）</div><div class="sector-grid">';
+      coalHtml += '<div class="sector-card" style="background:' + clv[2].bg + ';border-color:' + clv[2].bd + '" onclick="window.open(\'../coal-advice-detail.html?date=' + ca.date + '\')">';
+      coalHtml += '<div class="sc-title">' + ca.name + ' <span class="code">' + ca.code + '</span></div>';
+      coalHtml += '<div style="margin-top:6px"><span class="lv" style="color:' + clv[1] + '">' + clv[0] + '</span></div>';
+      coalHtml += '<div class="tx">' + ca.advice + '</div>';
+      coalHtml += '<div class="meta">第' + (g.level != null ? g.level : '—') + '档 ' + (g.grid_low != null ? g.grid_low + '~' + g.grid_high : '—') + ' · 250日位置 ' + ca.pos_250 + '% · 回撤 ' + ca.dd_250 + '%</div>';
+      coalHtml += '<div class="sig">2018起网格 +' + (g.ret_2018 != null ? g.ret_2018 + '%' : '—') + ' vs 持有 +' + (g.hold_2018 != null ? g.hold_2018 + '%' : '—') + ' · 间距 ' + g.step_pct + '%</div>';
+      coalHtml += '</div>';
+      coalHtml += '</div>';
+      coalHtml += '<div class="note">⚠️ ' + (ca.data_note || '网格回测未计滑点/手续费') + '</div>';
     }
 
     // 港股红利ETF（观察）
     const hkEtfs = (hk && hk.etfs || []).filter(x => x.type !== 'a');
     if (hkEtfs.length) {
-      hk += '<div class="section-hdr">🇭🇰 港股红利ETF（观察）</div>';
-      hk += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
-      hk += '<div style="font-weight:600;color:#ef4444">🟢 买点（回测 2018 起，指数口径）</div>';
-      hk += '<div style="padding-left:16px;color:var(--muted)">513820 港股通高股息：<b style="color:#ef4444">深回撤 ≥15%</b> → 分批买入（60日72%）｜ 息差≥4% 辅助</div>';
-      hk += '<div style="padding-left:16px;color:var(--muted)">159691 高股息精选：<b style="color:#ef4444">深回撤 ≥20%</b>（67%/+7.3%）或 <b>股息率 ≥6%</b>（60%）或 <b>息差 ≥4%</b>（69%）</div>';
-      hk += '<div style="color:var(--muted)">❌ 无效：PE/PB 估值分位（48%≈随机甚至反向——港股盈利波动大，低分位常是盈利高点假象）；浅回撤≥10% 无效（接飞刀，与趋势指数同规律）</div>';
-      hk += '<div style="color:var(--muted)">⏳ 513630/159545：数据窗口短（2023-2024 起），暂无可靠结论，继续观察</div>';
-      hk += '</div>';
-      hk += '<div class="sector-grid">';
+      hkHtml += '<div class="section-hdr">🇭🇰 港股红利ETF（观察）</div>';
+      hkHtml += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
+      hkHtml += '<div style="font-weight:600;color:#ef4444">🟢 买点（回测 2018 起，指数口径）</div>';
+      hkHtml += '<div style="padding-left:16px;color:var(--muted)">513820 港股通高股息：<b style="color:#ef4444">深回撤 ≥15%</b> → 分批买入（60日72%）｜ 息差≥4% 辅助</div>';
+      hkHtml += '<div style="padding-left:16px;color:var(--muted)">159691 高股息精选：<b style="color:#ef4444">深回撤 ≥20%</b>（67%/+7.3%）或 <b>股息率 ≥6%</b>（60%）或 <b>息差 ≥4%</b>（69%）</div>';
+      hkHtml += '<div style="color:var(--muted)">❌ 无效：PE/PB 估值分位（48%≈随机甚至反向——港股盈利波动大，低分位常是盈利高点假象）；浅回撤≥10% 无效（接飞刀，与趋势指数同规律）</div>';
+      hkHtml += '<div style="color:var(--muted)">⏳ 513630/159545：数据窗口短（2023-2024 起），暂无可靠结论，继续观察</div>';
+      hkHtml += '</div>';
+      hkHtml += '<div class="sector-grid">';
       hkEtfs.forEach(x => {
         const chgCls = x.chg >= 0 ? '#ef4444' : '#10b981';
         const lvMap = {'buy': ['买入', '#ef4444', 'rgba(239,68,68,.06)'], 'caution': ['高位警示', '#f59e0b', 'rgba(245,158,11,.06)'], 'hold': ['观望', '#8b8b90', 'rgba(139,139,144,.06)']};
         const lv = lvMap[x.advice_level] || lvMap.hold;
-        hk += '<div class="sector-card" style="background:' + lv[2] + ';border-color:var(--border)">';
-        hk += '<div class="sc-title">' + x.name + ' <span class="code">' + x.code + '</span></div>';
-        hk += '<div style="display:flex;align-items:baseline;gap:8px;margin:4px 0">';
-        hk += '<span style="font-family:var(--font-display);font-size:1.5rem;font-weight:400;color:var(--text-primary)">' + x.close + '</span>';
-        hk += '<span style="font-size:12px;font-weight:600;color:' + chgCls + '">' + (x.chg > 0 ? '+' : '') + x.chg + '%</span>';
-        hk += '<span style="font-size:11px;font-weight:600;color:' + lv[1] + ';border:1px solid ' + lv[1] + '66;border-radius:6px;padding:1px 6px">' + lv[0] + '</span>';
-        hk += '</div>';
-        hk += '<div class="tx" style="font-size:0.62rem">' + x.advice + '</div>';
-        hk += '<div class="meta">成立来年化 ' + (x.ann > 0 ? '+' : '') + x.ann + '%（价格口径）· 费率 ' + x.fee + '% · 回撤 ' + x.dd_250 + '%</div>';
-        hk += '<div class="sig">' + x.index_name + ' · ' + x.mgr + '</div>';
-        hk += '</div>';
+        hkHtml += '<div class="sector-card" style="background:' + lv[2] + ';border-color:var(--border)">';
+        hkHtml += '<div class="sc-title">' + x.name + ' <span class="code">' + x.code + '</span></div>';
+        hkHtml += '<div style="display:flex;align-items:baseline;gap:8px;margin:4px 0">';
+        hkHtml += '<span style="font-family:var(--font-display);font-size:1.5rem;font-weight:400;color:var(--text-primary)">' + x.close + '</span>';
+        hkHtml += '<span style="font-size:12px;font-weight:600;color:' + chgCls + '">' + (x.chg > 0 ? '+' : '') + x.chg + '%</span>';
+        hkHtml += '<span style="font-size:11px;font-weight:600;color:' + lv[1] + ';border:1px solid ' + lv[1] + '66;border-radius:6px;padding:1px 6px">' + lv[0] + '</span>';
+        hkHtml += '</div>';
+        hkHtml += '<div class="tx" style="font-size:0.62rem">' + x.advice + '</div>';
+        hkHtml += '<div class="meta">成立来年化 ' + (x.ann > 0 ? '+' : '') + x.ann + '%（价格口径）· 费率 ' + x.fee + '% · 回撤 ' + x.dd_250 + '%</div>';
+        hkHtml += '<div class="sig">' + x.index_name + ' · ' + x.mgr + '</div>';
+        hkHtml += '</div>';
       });
-      hk += '</div>';
-      hk += '<div class="note">⚠️ 港股红利：收益为价格口径未计分红（实际全收益更高）；港股通分红需扣红利税（H股10%/红筹20%）+ 汇率风险；数据源 akshare（新浪/东财），daily_update 步骤 5.7 日更；ETF 分红为复权差异反推的估算值（含送转年份可能偏差）。</div>';
+      hkHtml += '</div>';
+      hkHtml += '<div class="note">⚠️ 港股红利：收益为价格口径未计分红（实际全收益更高）；港股通分红需扣红利税（H股10%/红筹20%）+ 汇率风险；数据源 akshare（新浪/东财），daily_update 步骤 5.7 日更；ETF 分红为复权差异反推的估算值（含送转年份可能偏差）。</div>';
 
     // ⛳ 券商网格（512000 券商ETF，5% 间距）
     const broker = (hk && hk.etfs || []).find(x => x.type === 'a');
@@ -217,17 +217,17 @@ async function load() {
       const step = base * 0.05;
       const lvl = Math.floor((broker.close - base) / step);
       const curLow = base + lvl * step;
-      broker += '<div class="section-hdr">⛳ 券商网格（512000 券商ETF · 5%间距）</div>';
-      broker += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
-      broker += '<div style="font-weight:600;color:#ef4444">🟢 网格适配：8.6年横盘零收益+高波动29.5% → 5%间距回测超额+57pp（10%间距+61pp最优）· PE分位0%历史最低</div>';
-      broker += '<div style="color:var(--muted)">当前 <b>' + broker.close + '</b> 位于 <b>档' + lvl + '</b>（' + curLow.toFixed(3) + ' ~ ' + (curLow + step).toFixed(3) + '）· 250日位置 ' + broker.pos_250 + '% · 回撤 ' + broker.dd_250 + '% · 距下沿 ' + ((broker.close - base) / broker.close * 100).toFixed(1) + '%</div>';
-      broker += '<div style="color:var(--muted)">10万计划：首仓 2万（20%）→ 每跌一档加 1.5万（4档共6万）→ 留2万应急 · 每涨一档对称卖1.5万 · 跌破档-2（' + (base - 2 * step).toFixed(3) + '）停止买入</div>';
-      broker += '<div style="color:var(--muted)">⚠️ 大牛市脉冲（券商历史+40%级）会踏空——突破上沿停止卖出是设计代价；卫星仓10-20%</div>';
-      broker += '</div>';
+      brokerHtml += '<div class="section-hdr">⛳ 券商网格（512000 券商ETF · 5%间距）</div>';
+      brokerHtml += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
+      brokerHtml += '<div style="font-weight:600;color:#ef4444">🟢 网格适配：8.6年横盘零收益+高波动29.5% → 5%间距回测超额+57pp（10%间距+61pp最优）· PE分位0%历史最低</div>';
+      brokerHtml += '<div style="color:var(--muted)">当前 <b>' + broker.close + '</b> 位于 <b>档' + lvl + '</b>（' + curLow.toFixed(3) + ' ~ ' + (curLow + step).toFixed(3) + '）· 250日位置 ' + broker.pos_250 + '% · 回撤 ' + broker.dd_250 + '% · 距下沿 ' + ((broker.close - base) / broker.close * 100).toFixed(1) + '%</div>';
+      brokerHtml += '<div style="color:var(--muted)">10万计划：首仓 2万（20%）→ 每跌一档加 1.5万（4档共6万）→ 留2万应急 · 每涨一档对称卖1.5万 · 跌破档-2（' + (base - 2 * step).toFixed(3) + '）停止买入</div>';
+      brokerHtml += '<div style="color:var(--muted)">⚠️ 大牛市脉冲（券商历史+40%级）会踏空——突破上沿停止卖出是设计代价；卫星仓10-20%</div>';
+      brokerHtml += '</div>';
     }
     }
 
-    ov += '<div class="note">📊 口径说明：① 回撤：中证红利（000922）用全收益 H00922（含分红再投资，2018起），其余红利指数暂用价格口径；买点规则 250日回撤≥10%（回测32次触发/20日胜率75%）。② 估值分位：PE/PB/股息率分位为<b>10年滚动口径</b>（理杏仁 y10.cvpos），非全历史——红利 PE 分位极少>85%、PB 分位极少>55%、股息率分位从未<20%，属数据特性非异常。③ 网格：中证煤炭用 8% 间距（回测最优），回撤实验室同页可用。</div>';
+    ovHtml += '<div class="note">📊 口径说明：① 回撤：中证红利（000922）用全收益 H00922（含分红再投资，2018起），其余红利指数暂用价格口径；买点规则 250日回撤≥10%（回测32次触发/20日胜率75%）。② 估值分位：PE/PB/股息率分位为<b>10年滚动口径</b>（理杏仁 y10.cvpos），非全历史——红利 PE 分位极少>85%、PB 分位极少>55%、股息率分位从未<20%，属数据特性非异常。③ 网格：中证煤炭用 8% 间距（回测最优），回撤实验室同页可用。</div>';
     document.getElementById('pane-ov').innerHTML = ovHtml;
     document.getElementById('pane-red').innerHTML = redHtml;
     document.getElementById('pane-fcf').innerHTML = fcfHtml;
@@ -236,7 +236,7 @@ async function load() {
     document.getElementById('pane-broker').innerHTML = brokerHtml;
     renderFR(fr);
   } catch(e) {
-    document.getElementById('content').innerHTML = '加载失败: ' + e.message;
+    document.getElementById('pane-ov').innerHTML = '加载失败: ' + e.message;
   }
 }
 load();
