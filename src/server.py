@@ -2294,13 +2294,17 @@ def api_market_full_return_compare():
     db = get_db()
     pool = [
         # (code, name, source表, 类型)
-        ('H00922', '中证红利·全收益', 'index_full_return_daily'),
-        ('000922', '中证红利·价格', 'index_daily_kline'),
-        ('980092', '国证自由现金流', 'index_daily_kline'),
-        ('000300', '沪深300', 'index_daily_kline'),
+        ('H00922', '中证红利·全收益', 'index_full_return_daily', 'tri'),
+        ('000922', '中证红利·价格', 'index_daily_kline', 'price'),
+        ('980092', '国证自由现金流', 'index_daily_kline', 'price'),
+        ('H30269', '红利低波·价格', 'index_daily_kline', 'price'),
+        ('931468', '红利质量·价格', 'index_daily_kline', 'price'),
+        ('000015', '红利指数·价格', 'index_daily_kline', 'price'),
+        ('931848', '800红利低波·价格', 'index_daily_kline', 'price'),
+        ('000300', '沪深300', 'index_daily_kline', 'price'),
     ]
     series = []
-    for code, name, table in pool:
+    for code, name, table, stype in pool:
         if table == 'index_full_return_daily':
             rows = db.execute(f"""SELECT date, close FROM {table}
                 WHERE stock_code=? AND date>='2018-01-01' ORDER BY date""", (code,)).fetchall()
@@ -2312,7 +2316,7 @@ def api_market_full_return_compare():
         dates = [r['date'] for r in rows]
         closes = [r['close'] for r in rows]
         base = closes[0]
-        series.append({'code': code, 'name': name, 'type': 'index',
+        series.append({'code': code, 'name': name, 'type': stype,
                        'dates': dates, 'values': [round(c / base * 100, 1) for c in closes]})
     # 港股四只（全收益 hfq）
     hk_names = {'513820': '港股通高股息', '159691': '港股通高股息精选',
@@ -2327,7 +2331,7 @@ def api_market_full_return_compare():
         series.append({'code': code, 'name': name + '·全收益', 'type': 'hk_etf',
                        'dates': dates, 'values': [round(c / base * 100, 1) for c in closes],
                        'start': dates[0]})
-    return jsonify({'series': series, 'note': '全收益=含分红再投资（H00922/港股ETF）；价格口径为对比参照；各自起点=100，窗口不同（港股自2023-2024起）'})
+    return jsonify({'series': series, 'note': '全收益=含分红再投资（H00922/港股ETF）；带·价格为价格口径（未计分红，H30269/931468/000015/931848 暂无可靠全收益源）；各自起点=100，窗口不同（港股自2023-2024起）'})
 
 
 # ═══════════════════════════════════════════════

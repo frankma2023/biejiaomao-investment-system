@@ -207,7 +207,7 @@ function renderFR(fr) {
     name: s.name, type: 'line',
     data: s.dates.map((d, j) => [d, s.values[j]]),
     smooth: true, showSymbol: false,
-    lineStyle: {width: s.type === 'index' ? 1.2 : 1.8, color: colors[i % colors.length], type: s.code === '000922' ? 'dashed' : 'solid'},
+    lineStyle: {width: s.type === 'tri' || s.type === 'hk_etf' ? 1.8 : 1.2, color: colors[i % colors.length], type: s.type === 'price' ? 'dashed' : 'solid'},
     itemStyle: {color: colors[i % colors.length]},
     emphasis: {focus: 'series'}
   }));
