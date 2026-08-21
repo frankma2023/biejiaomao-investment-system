@@ -119,7 +119,7 @@ async function loadData(){
     '<div class="stat-card"><div class="val">'+(dyr?(dyr*100).toFixed(2)+'%':'—')+'</div><div class="lbl">股息率</div></div>'+
     '<div class="stat-card"><div class="val" style="color:'+clr(dyrPct)+'">'+(dyrPct!=null?(dyrPct*100).toFixed(0)+'%':'—')+'</div><div class="lbl">股息率 十年分位</div></div>';
 
-  var isDark=document.documentElement.dataset.theme==='dark';
+  var isDark=document.documentElement.dataset.theme==='dark';var chartBg=isDark?'rgba(26,26,31,.6)':'rgba(255,255,255,.75)';
   var peColor=isDark?'#FF6B6B':'#E8553D',pbColor=isDark?'#539BF5':'#3568B8',dyrColor=isDark?'#4ECDC4':'#2D9D5A';
   var pctColor='#E8A838',hsColor=isDark?'#777':'#B0B0B0',tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.04)';
 
@@ -151,7 +151,7 @@ async function loadFS(code){
       });
       return;
     }
-    var isDark=document.documentElement.dataset.theme==='dark';
+    var isDark=document.documentElement.dataset.theme==='dark';var chartBg=isDark?'rgba(26,26,31,.6)':'rgba(255,255,255,.75)';
     var up=isDark?'#FF6B6B':'#E8553D',dn=isDark?'#4ECDC4':'#2D9D5A';
     buildBar('chart-roe','ROE %',fs.dates,fs.roe,dn);genFsText('text-roe','ROE',fs.roe,'%',fs.dates);
     buildBar('chart-eps','EPS',fs.dates,fs.eps,up);genFsText('text-eps','EPS',fs.eps,'元',fs.dates);
@@ -166,15 +166,15 @@ async function loadFS(code){
 
 function buildChart(id,name,dates,vals,pcts,hsVals,lineColor){
   var dom=document.getElementById(id);if(dom._echart)dom._echart.dispose();
-  var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark';
+  var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark',chartBg=isDark?'rgba(26,26,31,.6)':'rgba(255,255,255,.75)';
   var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.04)';
   var pctVals=pcts.map(function(v){return v!=null?(v*100).toFixed(0):null});
   ch.setOption({
-    backgroundColor:'transparent',tooltip:{trigger:'axis'},
-    legend:{data:[name,'沪深300','十年分位%'],bottom:20,textStyle:{color:tx,fontSize:10},selectedMode:true},
-    grid:{left:'8%',right:'4%',top:12,bottom:56},
+    backgroundColor:chartBg,tooltip:{trigger:'axis'},
+    legend:{data:[name,'沪深300','十年分位%'],bottom:0,textStyle:{color:tx,fontSize:10},selectedMode:true},
+    grid:{left:'8%',right:'4%',top:12,bottom:92},
     xAxis:{type:'category',data:dates,axisLabel:{color:tx,fontSize:9,formatter:function(v){return v.slice(0,7)}},axisLine:{lineStyle:{color:sp}}},
-    dataZoom:[{type:'inside',start:50,end:100},{type:'slider',start:50,end:100,height:18,bottom:4}],
+    dataZoom:[{type:'inside',start:50,end:100},{type:'slider',start:50,end:100,height:10,bottom:52,dataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},selectedDataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},borderColor:'rgba(139,139,144,.25)',fillerColor:'rgba(139,139,144,.12)',handleSize:'80%',showDetail:false}],
     yAxis:[{type:'value',name:name,axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},{type:'value',name:'分位%',min:0,max:100,axisLabel:{color:tx,fontSize:9,formatter:function(v){return v+'%'}},splitLine:{show:false}}],
     series:[
       {name:name,type:'line',data:vals,smooth:true,symbol:'none',lineStyle:{color:lineColor,width:1.5},yAxisIndex:0},
@@ -209,11 +209,11 @@ init();
 
 function buildBar(id,name,dates,vals,color){
   var dom=document.getElementById(id);if(dom._echart)dom._echart.dispose();
-  var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark';
+  var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark',chartBg=isDark?'rgba(26,26,31,.6)':'rgba(255,255,255,.75)';
   var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
   var avg=vals.filter(function(v){return v!=null}).reduce(function(a,b){return a+b},0)/vals.filter(function(v){return v!=null}).length;
   ch.setOption({
-    backgroundColor:'transparent',tooltip:{trigger:'axis'},
+    backgroundColor:chartBg,tooltip:{trigger:'axis'},
     grid:{left:'8%',right:'4%',top:12,bottom:36},
     xAxis:{type:'category',data:dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
     yAxis:{type:'value',axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
@@ -228,13 +228,13 @@ function buildBar(id,name,dates,vals,color){
 
 function buildBarBig(id,name,dates,vals,unit){
   var dom=document.getElementById(id);if(dom._echart)dom._echart.dispose();
-  var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark';
+  var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark',chartBg=isDark?'rgba(26,26,31,.6)':'rgba(255,255,255,.75)';
   var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
   var vv=vals.filter(function(v){return v!=null}),avg=vv.reduce(function(a,b){return a+b},0)/vv.length;
   var d1=vals.map(function(v){return v!=null?(v/1e8).toFixed(1):null});
   var d2=vals.map(function(){return (avg/1e8).toFixed(1)});
   ch.setOption({
-    backgroundColor:'transparent',tooltip:{trigger:'axis',formatter:function(p){return p[0].name+'<br/>'+p[0].marker+name+': '+(p[0].value||'—')+unit}},
+    backgroundColor:chartBg,tooltip:{trigger:'axis',formatter:function(p){return p[0].name+'<br/>'+p[0].marker+name+': '+(p[0].value||'—')+unit}},
     grid:{left:'10%',right:'4%',top:12,bottom:36},
     xAxis:{type:'category',data:dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
     yAxis:{type:'value',axisLabel:{color:tx,fontSize:9,formatter:function(v){return v+unit}},splitLine:{lineStyle:{color:sp}}},
