@@ -20,6 +20,11 @@ signals:
     score: 50
     source: backtest
     note: "口袋支点（V1/V2），可叠加 PP 评分"
+  pocket_pivot_v2:
+    dir: long
+    score: 50
+    source: backtest
+    note: "口袋支点 V2 引擎（PP-base 基部确认）"
   base_breakout:
     dir: long
     score: 45
@@ -63,6 +68,11 @@ signals:
     note: "缠论背驰（P0 仅标注）"
 
   # ── 卖出系（基础分 × sell_priority_mult）──
+  distribution_day:
+    dir: short
+    score: 30
+    source: expert
+    note: "抛盘日（大盘/个股级别，欧奈尔卖出信号）"
   top_pattern:
     dir: short
     score: 45

@@ -72,11 +72,16 @@ html[data-theme="light"] .r-card{{background:rgba(255,255,255,.75)}}
 <script>Nav.init({{brandIcon:'🦊',brandText:'知行',currentPage:'watchlist-report'}})</script>
 <div class="page-header">
   <h1>📋 自选池日报</h1>
-  <select id="cal-select" onchange="location.href=this.value"><option>加载中...</option></select>
+  <select id="cal-select" onchange="location.href='report-'+this.value+'.html'"><option>加载中...</option></select>
 </div>
 <div id="report-root"><div style="text-align:center;padding:60px;color:var(--muted)">加载中...</div></div>
 </div>
 <script>window.REPORT_DATA = {data_json};</script>
+<script>
+  function toggleTheme(){{var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}}
+  (function(){{var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s}})();
+  window.API_BASE = 'http://localhost:8788';
+</script>
 <script src="watchlist-report.js"></script>
 <script>window.renderReport && renderReport();</script>
 </body>

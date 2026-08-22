@@ -156,7 +156,7 @@ def _chanlun_note(code, db, scan_date):
     return {'text': ' · '.join(parts), 'side': r['latest_trade_side'], 'date': r['scan_date']}
 
 
-def scan_stock(code, name, db, scan_date, weights=None):
+def scan_stock(code, name, db, scan_date, weights=None, holdings=None, last_view=None):
     """股票轨：引擎扫描 + 规则引擎 → 卡片"""
     klines = _load_klines(db, code, scan_date)
     if not klines:
@@ -164,6 +164,10 @@ def scan_stock(code, name, db, scan_date, weights=None):
 
     ctx = build_context(klines)
     ctx['rps'] = _rs_latest(code, db)
+    # 持仓上下文注入规则引擎（十戒止损/获利了结/不摊平依赖）
+    if holdings and code in holdings:
+        ctx['holding_cost'] = holdings[code]['cost']
+        ctx['holding_stop'] = holdings[code].get('stop_loss')
 
     # 引擎扫描（复用 pattern-scan 管线）
     from src.server import _compute_indicators
@@ -185,6 +189,12 @@ def scan_stock(code, name, db, scan_date, weights=None):
     from src.scanners.report_rules import _dedup_by_source, _days_between
     win = int((weights or load_weights())['rules'].get('new_signal_window', 60))
     pool = [s for s in norm + mw_signals if s.get('date') and _days_between(s['date'], scan_date) <= win]
+    # 回填信号日收盘价（错过检测：信号日价 → 现价涨幅）
+    close_by_date = {k['date']: k['close'] for k in klines}
+    for s in pool:
+        if s.get('date') in close_by_date:
+            s['close_at'] = close_by_date[s['date']]
+    # 同源去重：优先保留带 TS 置信度的（MW 表行）
     norm = _dedup_by_source(pool)
 
     # 缠论标注
@@ -192,8 +202,8 @@ def scan_stock(code, name, db, scan_date, weights=None):
 
     # 规则引擎（norm 已含 mw_signals 并去重）
     res = evaluate(norm, ctx, weights=weights, scan_date=scan_date)
-    # 错过检测（有 last_view 时）
-    missed = detect_missed(norm, None, scan_date, ctx, weights=weights)
+    # 错过检测：last_view 锚点 + 信号日价回填
+    missed = detect_missed(norm, last_view, scan_date, ctx, weights=weights)
 
     return {
         'code': code, 'name': name, 'kind': 'stock',
@@ -218,6 +228,17 @@ def _index_metrics(db, code, scan_date):
     if ddinfo:
         out['dd_250'] = round(ddinfo['dd_250'], 1)
         out['close'] = ddinfo['current']
+    # 位置：250日区间百分位（用价格指数收盘）
+    try:
+        rows = db.execute("""SELECT close FROM index_daily_kline WHERE stock_code=?
+            AND date<=? ORDER BY date DESC LIMIT 250""", (code, scan_date)).fetchall()
+        if len(rows) >= 30:
+            closes = [r['close'] for r in rows]
+            lo, hi = min(closes), max(closes)
+            if hi > lo:
+                out['pos_250'] = round((closes[0] - lo) / (hi - lo) * 100)
+    except Exception:
+        pass
     r = db.execute("""SELECT pe_ttm, pe_ttm_pct, dyr, dyr_pct FROM index_fundamental_daily
         WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1""", (code, scan_date)).fetchone()
     if r:
@@ -327,6 +348,12 @@ def generate_report(scan_date=None, weights=None):
     holdings = load_holdings(db)
     last_view = db.execute("SELECT value FROM watchlist_review_state WHERE key='last_view'").fetchone()
     last_view = last_view['value'] if last_view else None
+    # 无锚点：初始窗口 = scan_date 前 60 个自然日（PRD 决策 2）
+    init_view = None
+    if not last_view:
+        from datetime import timedelta as _td
+        init_view = (datetime.strptime(scan_date, '%Y-%m-%d') - _td(days=60)).strftime('%Y-%m-%d')
+        last_view = init_view
 
     cards = []
     for item in wl:
@@ -334,7 +361,7 @@ def generate_report(scan_date=None, weights=None):
         kind = classify(code, db)
         try:
             if kind == 'stock':
-                card = scan_stock(code, name, db, scan_date, weights)
+                card = scan_stock(code, name, db, scan_date, weights, holdings, last_view)
             elif kind in ('etf', 'index'):
                 card = scan_index(code, name, db, scan_date)
             else:

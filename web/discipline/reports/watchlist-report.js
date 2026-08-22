@@ -9,7 +9,7 @@
     wait: { cn: '等回调', color: '#f59e0b', bg: 'rgba(245,158,11,.08)', bd: 'rgba(245,158,11,.28)' },
     avoid: { cn: '回避', color: '#10b981', bg: 'rgba(16,185,129,.08)', bd: 'rgba(16,185,129,.28)' },
   };
-  const LV_ORDER = { avoid: 0, wait: 1, buy: 2, buy_strong: 3, hold: 4 };
+  const LV_ORDER = { avoid: 0, wait: 1, buy_strong: 2, buy: 3, hold: 4 };
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

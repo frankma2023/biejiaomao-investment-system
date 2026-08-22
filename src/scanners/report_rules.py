@@ -103,14 +103,22 @@ def _days_between(a, b):
 def _dedup_by_source(signals):
     """同源去重：每 source 只保留最早一条（首次确认日）
     形态引擎会每日重复报告已确认形态（如 top_pattern 连报 39 天）；
-    保留最早=首次确认，让信号在窗口内自然衰减过期，避免重复信号常驻。"""
+    保留最早=首次确认，让信号在窗口内自然衰减过期，避免重复信号常驻。
+    同日期多条时优先保留带 TS 置信度的（MW 表行信息更全）。"""
     best = {}
     for s in signals:
         src = s.get('source')
         if not src:
             continue
-        if src not in best or (s.get('date') or '') < (best[src].get('date') or ''):
+        cur = best.get(src)
+        if cur is None:
             best[src] = s
+            continue
+        sd, cd = s.get('date') or '', cur.get('date') or ''
+        if sd < cd:
+            best[src] = s
+        elif sd == cd and s.get('ts') is not None and cur.get('ts') is None:
+            best[src] = s  # 同日：保留带 ts 的
     return list(best.values())
 
 
@@ -209,6 +217,8 @@ def evaluate(signals, ctx, weights=None, scan_date=None):
     # ③ 买入判定（无卖出阻挡时）
     if level == 'hold':
         resonance = len(buy_list)
+        # MA50 十戒检查先行：资格通过才给买入（避免理由链自相矛盾）
+        ma50_ban = rules.get('ma50_down_ban') and ctx.get('ma50') and close < ctx['ma50'] and ctx.get('ma50_slope', 0) < 0
         if buy_score >= rules.get('buy_strong_net', 80) and resonance >= rules.get('buy_strong_resonance', 3) and pos < rules.get('buy_position_ok', 60):
             level = 'buy_strong'
             reasons.append(f"🟢 买入（强）：净分 {net} ≥{rules['buy_strong_net']}，共振 {resonance} ≥{rules['buy_strong_resonance']}，位置 {pos}% <{rules['buy_position_ok']}")
@@ -224,11 +234,11 @@ def evaluate(signals, ctx, weights=None, scan_date=None):
                 level = 'buy'
                 reasons.append(f"🟢 买入：净分 {net} ≥{rules['buy_min_net']}，共振 {resonance} ≥{rules['buy_min_resonance']}，位置 {pos}% <{rules['buy_position_ok']}")
 
-    # ④ 十戒：MA50 下行禁买
+    # ④ 十戒：MA50 下行禁买（否决已给出的买入档）
     if level in ('buy', 'buy_strong') and rules.get('ma50_down_ban') and ctx.get('ma50'):
         if close < ctx['ma50'] and ctx.get('ma50_slope', 0) < 0:
             level = 'wait'
-            reasons.append(f"⏳ 十戒禁买：现价 {close} < MA50 {round(ctx['ma50'],2)} 且 MA50 下行——下降通道不接飞刀")
+            reasons.append(f"⏳ 十戒禁买：现价 {close} < MA50 {round(ctx['ma50'],2)} 且 MA50 下行——下降通道不接飞刀（否决上方买入资格）")
 
     # ⑤ 十戒：追高（自低点涨幅）→ 提示 + 降级
     gain = ctx.get('gain_from_low', 0)

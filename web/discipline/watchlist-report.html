@@ -67,6 +67,11 @@ html[data-theme="light"] #cal-select{background:rgba(255,255,255,.8)}
 </div>
 
 <script src="reports/watchlist-report.js"></script>
-<script>window.API_BASE = ''; loadReport(new URLSearchParams(location.search).get('date') || '');</script>
+<script>
+  function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+  (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+  window.API_BASE = 'http://localhost:8788';
+  loadReport(new URLSearchParams(location.search).get('date') || '');
+</script>
 </body>
 </html>
