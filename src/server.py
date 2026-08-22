@@ -97,6 +97,10 @@ def init_schema():
         db.execute("ALTER TABLE discipline_trades ADD COLUMN asset_type TEXT DEFAULT 'stock'")
     except sqlite3.OperationalError:
         pass
+    # 自选池日报：落盘表 + 查看锚点
+    db.execute("CREATE TABLE IF NOT EXISTS watchlist_report_daily (date TEXT PRIMARY KEY, report_json TEXT, created_at TEXT)")
+    db.execute("CREATE TABLE IF NOT EXISTS watchlist_review_state (key TEXT PRIMARY KEY, value TEXT)")
+    db.commit()
     # V2: 添加 buy_signal_date 列到精选快照
     try:
         db.execute("ALTER TABLE discipline_screening_daily ADD COLUMN buy_signal_date TEXT")
@@ -6860,6 +6864,61 @@ def serve_web(subpath):
     if os.path.isfile(idx):
         return send_from_directory(WEB_DIR, os.path.join(subpath, 'index.html'))
     return jsonify({'error': 'Not found', 'path': subpath}), 404
+
+
+# ═══════════════════════════════════════════════
+# API: 自选池日报（watchlist-report）
+# ═══════════════════════════════════════════════
+
+@app.route('/api/watchlist-report/data')
+def api_watchlist_report_data():
+    """日报数据（daily_update 步骤 32 落盘后读取）"""
+    d = request.args.get('date', '')
+    db = get_db()
+    if not d:
+        r = db.execute("SELECT MAX(date) d FROM watchlist_report_daily").fetchone()
+        d = r['d'] if r and r['d'] else ''
+    if not d:
+        return jsonify({'error': 'no_report', 'date': None})
+    r = db.execute("SELECT report_json, created_at FROM watchlist_report_daily WHERE date=?", (d,)).fetchone()
+    if not r:
+        return jsonify({'error': 'no_report', 'date': d})
+    try:
+        data = json.loads(r['report_json'])
+    except Exception:
+        return jsonify({'error': 'corrupt_report', 'date': d})
+    data['created_at'] = r['created_at']
+    data['date'] = d
+    # 注入 last_view 供前端错过检测高亮
+    lv = db.execute("SELECT value FROM watchlist_review_state WHERE key='last_view'").fetchone()
+    data['last_view'] = lv['value'] if lv else None
+    return jsonify(data)
+
+
+@app.route('/api/watchlist-report/view', methods=['POST', 'OPTIONS'])
+def api_watchlist_report_view():
+    """记录用户查看日期（错过检测锚点）"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    body = request.get_json(silent=True) or {}
+    d = body.get('date', '')
+    if not d:
+        return jsonify({'error': 'date required'}), 400
+    db = get_db()
+    cur = db.execute("SELECT value FROM watchlist_review_state WHERE key='last_view'").fetchone()
+    if cur and cur['value'] and cur['value'] >= d:
+        return jsonify({'ok': True, 'last_view': cur['value'], 'unchanged': True})  # 不倒退
+    db.execute("INSERT OR REPLACE INTO watchlist_review_state(key, value) VALUES('last_view', ?)", (d,))
+    db.commit()
+    return jsonify({'ok': True, 'last_view': d})
+
+
+@app.route('/api/watchlist-report/index')
+def api_watchlist_report_index():
+    """历史日报日期列表（日历选择器）"""
+    db = get_db()
+    rows = db.execute("SELECT date FROM watchlist_report_daily ORDER BY date").fetchall()
+    return jsonify({'dates': [r['date'] for r in rows]})
 
 
 if __name__ == '__main__':

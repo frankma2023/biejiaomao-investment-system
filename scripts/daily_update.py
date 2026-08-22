@@ -257,6 +257,9 @@ TASKS.append(("💎 30.市值快照", [PYTHON_EXE, "src/cockpit/market_cap_snaps
 # 31. 驾驶舱管道（五级硬过滤 → 简报卡 → 五关检查单 → 仓位/止损建议）
 TASKS.append(("🚀 31.投资决策驾驶舱", [PYTHON_EXE, "src/cockpit/pipeline.py", "--date", today_str, "--save"]))
 
+# 步骤 32：自选池日报（依赖前序全部步骤：K线/RS/形态/缠论/MW 就位后，扫描自选池生成每日技术面日报）
+TASKS.append(("📋 32.自选池日报", [PYTHON_EXE, "scripts/gen_watchlist_report.py"]))
+
 for label, cmd in TASKS:
     lbl, ok, elapsed, _ = run_task(label, cmd)
     tasks.append((lbl, ok, elapsed))

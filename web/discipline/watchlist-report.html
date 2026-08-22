@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>自选池日报</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<style>
+body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)}
+.page-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.page-header h1{font-family:var(--font-display);font-size:1.2rem;font-weight:400;color:var(--text-primary);margin:0}
+#cal-select{background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);padding:6px 10px;font-size:12px;font-family:var(--font-mono);outline:none}
+#cal-select option{background:var(--card)}
+
+.r-top{margin-bottom:12px}
+.r-title{font-family:var(--font-display);font-size:1.05rem;color:var(--text-primary);display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+.dim{color:var(--muted);font-size:0.72rem;font-weight:300}
+.gen{font-size:0.65rem}
+.sum-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:0.72rem}
+.sum-chip{border:1px solid;border-radius:8px;padding:3px 10px;font-weight:300}
+.sum-chip b{font-weight:600}
+.sum-total{color:var(--muted);font-size:0.7rem}
+
+.r-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px;backdrop-filter:blur(16px);box-shadow:var(--shadow-card)}
+.r-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.r-name{font-family:var(--font-display);font-size:0.95rem;color:var(--text-primary)}
+.kind-tag{font-size:9px;border:1px solid var(--border);border-radius:5px;padding:1px 5px;color:var(--muted)}
+.r-code{font-family:var(--font-mono);font-size:0.68rem;color:var(--muted)}
+.r-lv{font-size:10px;font-weight:600;border:1px solid;border-radius:8px;padding:2px 8px}
+.r-price{margin-left:auto;font-family:var(--font-mono);font-size:0.8rem;color:var(--text-primary)}
+.r-net{font-size:0.68rem;color:var(--muted);margin:4px 0}
+.r-net b{color:var(--accent);font-family:var(--font-mono)}
+.r-ctx{display:flex;gap:10px;flex-wrap:wrap;font-size:0.64rem;margin-bottom:4px}
+.hold-line{font-size:0.66rem;color:var(--text-secondary);margin:2px 0}
+.chan-line{font-size:0.66rem;margin:2px 0}
+.miss-line{font-size:0.66rem;color:#fbbf24;margin:3px 0;line-height:1.7}
+.miss-line .ok{color:#34d399;border:1px solid #34d39944;border-radius:5px;padding:0 5px;font-size:0.62rem}
+.r-reasons{font-size:0.66rem;color:var(--text-secondary);line-height:1.9;margin-top:4px;border-top:1px dashed var(--border);padding-top:6px}
+.sig-line{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.sig-tag{font-size:0.6rem;border-radius:6px;padding:2px 7px;font-family:var(--font-mono)}
+.sig-long{background:rgba(239,68,68,.08);color:#ef4444;border:1px solid rgba(239,68,68,.2)}
+.sig-short{background:rgba(16,185,129,.08);color:#10b981;border:1px solid rgba(16,185,129,.2)}
+.cb-line{font-size:0.66rem;color:var(--text-secondary);margin-top:4px}
+.r-tips{font-size:0.64rem;color:#f59e0b;margin-top:4px}
+.err-line{font-size:0.66rem;color:#f87171;margin-top:4px}
+.r-empty{text-align:center;padding:60px 20px;color:var(--muted);font-family:var(--font-display)}
+
+html[data-theme="light"] .r-card{background:rgba(255,255,255,.75)}
+html[data-theme="light"] #cal-select{background:rgba(255,255,255,.8)}
+</style>
+</head>
+<body>
+<div class="app-container">
+<nav id="top-nav"></nav>
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'🦊',brandText:'知行',currentPage:'watchlist-report'})</script>
+
+<div class="page-header">
+  <h1>📋 自选池日报</h1>
+  <select id="cal-select" onchange="loadReport(this.value)"><option>加载中...</option></select>
+</div>
+<div id="report-root"><div style="text-align:center;padding:60px;color:var(--muted)">加载中...</div></div>
+</div>
+
+<script src="reports/watchlist-report.js"></script>
+<script>window.API_BASE = ''; loadReport(new URLSearchParams(location.search).get('date') || '');</script>
+</body>
+</html>

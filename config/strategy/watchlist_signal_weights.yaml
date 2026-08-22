@@ -1,0 +1,133 @@
+# 自选池日报 · 信号权重表
+# 方向：long=看多 / short=看空 · score：基础分 0~100
+# source：expert=专家权重（欧奈尔优先级） / backtest=回测置信度
+# 规则：sell_priority_mult 卖出优先放大 / position_limit 位置降级 / buy_min_net 买入门槛
+
+signals:
+  # ── 买入系 ──
+  mw_b1:
+    dir: long
+    score: 55
+    source: backtest
+    note: "MW B1 主突破信号，可叠加 TS 置信度"
+  mw_b2:
+    dir: long
+    score: 35
+    source: backtest
+    note: "MW B2 次级确认，置信度低于 B1"
+  pocket_pivot:
+    dir: long
+    score: 50
+    source: backtest
+    note: "口袋支点（V1/V2），可叠加 PP 评分"
+  base_breakout:
+    dir: long
+    score: 45
+    source: expert
+    note: "基部突破 V2（欧奈尔 buy point）"
+  base_breakout_v2:
+    dir: long
+    score: 45
+    source: expert
+    note: "基部突破 V2 引擎"
+  box_breakout:
+    dir: long
+    score: 35
+    source: expert
+    note: "放量箱体突破"
+  double_bottom:
+    dir: long
+    score: 30
+    source: expert
+  flat_base:
+    dir: long
+    score: 25
+    source: expert
+  cup_handle:
+    dir: long
+    score: 25
+    source: expert
+  saucer_base:
+    dir: long
+    score: 25
+    source: expert
+  chanlun_buy:
+    dir: long
+    score: 30
+    source: expert
+    note: "缠论买点（P0 仅标注）"
+  chanlun_bd:
+    dir: long
+    score: 20
+    source: expert
+    note: "缠论背驰（P0 仅标注）"
+
+  # ── 卖出系（基础分 × sell_priority_mult）──
+  top_pattern:
+    dir: short
+    score: 45
+    source: expert
+    note: "头部形态（头肩顶/双重顶/三重顶）"
+  climax_top:
+    dir: short
+    score: 45
+    source: expert
+    note: "高潮见顶"
+  box_breakdown:
+    dir: short
+    score: 40
+    source: expert
+    note: "跌破箱体"
+  railroad_tracks:
+    dir: short
+    score: 35
+    source: expert
+    note: "铁轨线"
+  breakout_failure:
+    dir: short
+    score: 30
+    source: expert
+    note: "基部突破失败"
+  volume_stall:
+    dir: short
+    score: 25
+    source: expert
+    note: "放量滞涨"
+  volume_divergence:
+    dir: short
+    score: 25
+    source: expert
+    note: "量价背离"
+
+  # ── 参考信号（不参与评分，仅标注）──
+  cdl:
+    dir: null
+    score: 0
+    source: expert
+    note: "K线形态，P0 仅标注不评分"
+  talib:
+    dir: null
+    score: 0
+    source: expert
+    note: "指标信号（RS/金叉等）作为上下文，不直接计分"
+
+rules:
+  sell_priority_mult: 1.5      # 卖出信号权重放大（保本优先）
+  sell_fresh_days: 20          # 卖出信号新鲜窗口：20日内才算强卖（触发 avoid）
+  position_limit: 85           # 250日位置 > 85 → 买入降级等回调
+  buy_min_net: 60              # 买入(中)门槛：净分 ≥60
+  buy_strong_net: 80           # 买入(强)门槛：净分 ≥80
+  buy_min_resonance: 2         # 买入要求共振信号数 ≥2
+  buy_strong_resonance: 3      # 买入(强)要求共振 ≥3（更罕见的确认）
+  buy_position_ok: 60          # 位置 <60 才允许买入
+  miss_gain_pct: 15            # 错过标注：信号后涨幅 >15%
+  new_signal_window: 60        # 信号窗口（交易日）
+  decay_after: 30              # 30 日后权重衰减
+  decay_factor: 0.6            # 衰减系数
+  ma50_down_ban: true          # 十戒：现价<MA50 且 MA50 向下 → 禁买
+  stop_loss_pct: 8.0           # 十戒：持仓浮亏 >8% → 回避
+  profit_take_pct: 25.0        # 软提示：自低点涨幅 >25% 获利了结
+  fib_levels: [0.382, 0.5, 0.618]
+  callback_trigger_pct: 5.0    # 等回调触发：现价距回调位 ≤5%
+  hold_net_range: [20, 60]     # 持有档净分区间
+  avoid_net: -30               # 净分 < -30 → 回避（无卖出信号时）
