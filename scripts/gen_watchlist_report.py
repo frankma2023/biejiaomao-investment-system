@@ -9,6 +9,7 @@ import os
 import sys
 import json
 import sqlite3
+import requests
 from datetime import datetime
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -89,6 +90,54 @@ html[data-theme="light"] .r-card{{background:rgba(255,255,255,.75)}}
 """
 
 
+def _feishu_webhook():
+    """读取 FEISHU_WEBHOOK：环境变量 → D:/hanako/.env → ~/.hermes/.env"""
+    v = os.environ.get('FEISHU_WEBHOOK', '')
+    if v:
+        return v
+    for p in [r'D:\hanako\.env', os.path.expanduser('~/.hermes/.env')]:
+        try:
+            with open(p, encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('FEISHU_WEBHOOK='):
+                        return line.split('=', 1)[1].strip().strip('"').strip("'")
+        except Exception:
+            continue
+    return ''
+
+
+def push_feishu(report):
+    """日报生成后推送飞书摘要（webhook 配置 FEISHU_WEBHOOK，未配置则跳过）"""
+    webhook = _feishu_webhook()
+    if not webhook:
+        print('[watchlist-report] 未配置 FEISHU_WEBHOOK，跳过推送')
+        return False
+    s = report.get('summary') or {}
+    lines = [f"📋 自选池日报 {report.get('date')}",
+             f"🔴 回避 {s.get('avoid', 0)} · 🟢 买入 {(s.get('buy', 0) or 0) + (s.get('buy_strong', 0) or 0)} · ⏳ 等回调 {s.get('wait', 0)} · ⚪ 持有 {s.get('hold', 0)}"]
+    # 关键卡片摘要
+    for c in report.get('cards', []):
+        ev = c.get('eval') or {}
+        lv = ev.get('level')
+        if lv in ('avoid', 'buy_strong', 'buy'):
+            h = c.get('holding')
+            pnl = f"({h['pnl_pct']:+.1f}%持仓)" if h and h.get('pnl_pct') is not None else ''
+            lines.append(f"  {lv == 'avoid' and '🔴' or '🟢'} {c['name']} {ev.get('level_cn')} {pnl}")
+            if ev.get('reasons'):
+                lines.append(f"    {ev['reasons'][0][:80]}")
+    lines.append("🔗 查看: http://localhost:8772/discipline/watchlist-report.html")
+    try:
+        r = requests.post(webhook, json={'msg_type': 'text', 'content': {'text': chr(10).join(lines)}},
+                          timeout=10)
+        ok = r.ok
+        print(f'[watchlist-report] 飞书推送 {"成功" if ok else "失败"} ({r.status_code})')
+        return ok
+    except Exception as e:
+        print(f'[watchlist-report] 飞书推送异常: {e}')
+        return False
+
+
 def generate(scan_date=None):
     """主入口：生成并落盘。返回 (date, html_path)"""
     rep = generate_report(scan_date)
@@ -124,6 +173,7 @@ def generate(scan_date=None):
 
     print(f"[watchlist-report] 已生成 {date}：{len(rep['cards'])} 标的，摘要 {rep['summary']}")
     print(f"[watchlist-report] HTML: {html_path}")
+    push_feishu(rep)
     return date, html_path
 
 

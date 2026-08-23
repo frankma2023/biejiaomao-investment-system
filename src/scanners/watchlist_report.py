@@ -142,18 +142,31 @@ def _rs_latest(code, db):
 
 
 def _chanlun_note(code, db, scan_date):
-    """缠论最新状态（P0 仅标注）"""
+    """缠论状态：返回 (标注文本, 评分信号列表)（P1 进评分）"""
     r = db.execute("""SELECT latest_trade_side, latest_trade_type, latest_div_type, scan_date
         FROM chanlun_scan_daily WHERE stock_code=? AND scan_date<=?
         ORDER BY scan_date DESC LIMIT 1""", (code, scan_date)).fetchone()
     if not r or (r['latest_trade_side'] is None and r['latest_div_type'] is None):
-        return None
+        return None, []
     parts = []
+    sigs = []
     if r['latest_trade_side']:
         parts.append(f"缠论{r['latest_trade_type'] or r['latest_trade_side']}")
+        if r['latest_trade_side'] == 'buy':
+            sigs.append({'source': 'chanlun_buy', 'date': r['scan_date'], 'dir': 'long',
+                         'note': f"缠论{r['latest_trade_type']}"})
+        elif r['latest_trade_side'] == 'sell':
+            sigs.append({'source': 'chanlun_sell', 'date': r['scan_date'], 'dir': 'short',
+                         'note': f"缠论{r['latest_trade_type']}"})
     if r['latest_div_type']:
         parts.append(r['latest_div_type'])
-    return {'text': ' · '.join(parts), 'side': r['latest_trade_side'], 'date': r['scan_date']}
+        if '底背驰' in r['latest_div_type']:
+            sigs.append({'source': 'chanlun_bd', 'date': r['scan_date'], 'dir': 'long',
+                         'note': r['latest_div_type']})
+        elif '顶背驰' in r['latest_div_type']:
+            sigs.append({'source': 'chanlun_sell', 'date': r['scan_date'], 'dir': 'short',
+                         'note': r['latest_div_type']})
+    return {'text': ' · '.join(parts), 'side': r['latest_trade_side'], 'date': r['scan_date']}, sigs
 
 
 def scan_stock(code, name, db, scan_date, weights=None, holdings=None, last_view=None):
@@ -189,6 +202,9 @@ def scan_stock(code, name, db, scan_date, weights=None, holdings=None, last_view
     from src.scanners.report_rules import _dedup_by_source, _days_between
     win = int((weights or load_weights())['rules'].get('new_signal_window', 60))
     pool = [s for s in norm + mw_signals if s.get('date') and _days_between(s['date'], scan_date) <= win]
+    # 缠论：标注 + 评分信号（P1）
+    chan, chan_sigs = _chanlun_note(code, db, scan_date)
+    pool = pool + chan_sigs  # 缠论信号（低权重，窗口内）
     # 回填信号日收盘价（错过检测：信号日价 → 现价涨幅）
     close_by_date = {k['date']: k['close'] for k in klines}
     for s in pool:
