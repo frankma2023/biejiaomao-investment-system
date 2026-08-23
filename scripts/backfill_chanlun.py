@@ -81,18 +81,63 @@ def scan_stock_worker(args):
         return (None, f"{code}: {str(e)[:120]}")
 
 
+def save_stock_results(db_path, code, results, max_retry=8):
+    """单只股票全部日期的结果写库（worker 内调用，单事务，busy 重试）
+
+    results: [(date, summary) or None]
+    返回: 成功写入的天数
+    """
+    import time as _time
+    rows = [(d, s) for d, s in results if s]
+    if not rows:
+        return 0
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    for attempt in range(max_retry):
+        try:
+            db = sqlite3.connect(db_path, timeout=60)
+            try:
+                db.execute("PRAGMA journal_mode=WAL")
+                for d, s in rows:
+                    db.execute("DELETE FROM chanlun_scan_daily WHERE stock_code=? AND scan_date=?", (code, d))
+                    db.execute("""INSERT INTO chanlun_scan_daily
+                        (scan_date, stock_code, stock_name, bi_count, zs_count, segment_count,
+                         latest_bi_dir, latest_bi_power, divergence_count, latest_div_type,
+                         trade_signal_count, latest_trade_type, latest_trade_side, latest_trade_price,
+                         resonance_strength, created_at)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (d, code, '', s.get('bi_count', 0), s.get('zs_count', 0), s.get('segment_count', 0),
+                         s.get('latest_bi_dir', ''), s.get('latest_bi_power', 0), s.get('divergence_count', 0),
+                         s.get('latest_div_type', ''), s.get('trade_signal_count', 0), s.get('latest_trade_type', ''),
+                         s.get('latest_trade_side', ''), s.get('latest_trade_price', 0),
+                         s.get('resonance_strength', ''), now))
+                    if s.get('bi_json'):
+                        db.execute("INSERT OR REPLACE INTO chanlun_bi_json (stock_code, scan_date, bi_json) VALUES (?,?,?)",
+                                   (code, d, s['bi_json']))
+                db.commit()
+                return len(rows)
+            finally:
+                db.close()
+        except sqlite3.OperationalError as e:
+            if 'locked' in str(e).lower() and attempt < max_retry - 1:
+                _time.sleep(2 * (attempt + 1))
+            else:
+                raise
+    return 0
+
+
 def scan_stock_all_worker(args):
-    """单只股票全历史增量扫描（--by-stock 模式）
+    """单只股票全历史增量扫描 + 直接写库（--by-stock 模式）
     args: (code, dates)
-    Returns: (code, [(date, summary)]) 或 (code, err)
+    Returns: (code, saved_count, err_msg) 小结果，避免大数据回传主进程
     """
     code, dates = args
     try:
         from scanners.chanlun_scan import scan_stock_all
         res = scan_stock_all(code, dates)
-        return (code, res)
+        n = save_stock_results(DB, code, res)
+        return (code, n, None)
     except Exception as e:
-        return (code, f"{code}: {str(e)[:120]}")
+        return (code, 0, f"{code}: {str(e)[:120]}")
 
 
 def save_day_results(db_path, scan_date, results):
@@ -267,38 +312,35 @@ if __name__ == '__main__':
         t_start = time.time()
         completed = 0
         err_codes = []
-        # 并行按股票处理
+        total_saved = 0
+        # 并行按股票处理（worker 直接写库，主进程只收小结果，避免内存爆炸）
         task_args = [(code, dates) for code in stock_codes]
-        results_by_code = []
         if workers == 1 or len(task_args) < 8:
             for a in task_args:
-                results_by_code.append(scan_stock_all_worker(a))
+                code, n, err = scan_stock_all_worker(a)
+                completed += 1
+                total_saved += n
+                if err:
+                    err_codes.append(err)
+                if completed % 100 == 0:
+                    eta = (time.time() - t_start) / completed * (len(task_args) - completed)
+                    log.info(f"  进度 {completed}/{len(task_args)} 已写{total_saved}日 ETA {eta/60:.0f}min")
         else:
             with ProcessPoolExecutor(max_workers=workers) as pool:
                 futures = {pool.submit(scan_stock_all_worker, a): a for a in task_args}
                 for f in as_completed(futures):
-                    results_by_code.append(f.result())
+                    code, n, err = f.result()
                     completed += 1
+                    total_saved += n
+                    if err:
+                        err_codes.append(err)
                     if completed % 100 == 0 or completed == len(task_args):
                         eta = (time.time() - t_start) / completed * (len(task_args) - completed)
-                        log.info(f"  进度 {completed}/{len(task_args)} ETA {eta/60:.0f}min")
-
-        # 按日重组并写库
-        day_map = {d: [] for d in dates}
-        for code, res in results_by_code:
-            if isinstance(res, str):
-                err_codes.append(res)
-                continue
-            for d, summary in res:
-                if d in day_map and summary:
-                    day_map[d].append(summary)
-        for d in dates:
-            n = save_day_results(DB, d, day_map[d])
-            log.info(f"  ✓ {d} 保存 {n} 只")
+                        log.info(f"  进度 {completed}/{len(task_args)} 已写{total_saved}日 ETA {eta/60:.0f}min")
 
         total_elapsed = time.time() - t_start
         log.info(f"\n=== 完成 ===")
-        log.info(f"股票 {len(stock_codes)} 只 × {len(dates)} 天")
+        log.info(f"股票 {len(stock_codes)} 只 × {len(dates)} 天，写库 {total_saved} 股票日")
         log.info(f"失败股票: {len(err_codes)}")
         for e in err_codes[:5]:
             log.warning(f"  {e}")
