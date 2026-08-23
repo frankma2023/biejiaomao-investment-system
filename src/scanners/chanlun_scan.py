@@ -180,8 +180,13 @@ def scan_stock_all(code, dates, limit=1500):
     """单股全历史增量扫描：1 次加载 K 线 + CZSC 逐根 update，
     每个目标日取当日分析结果（CZSC.update 增量与全量结果一致，已验证）
 
+    窗口策略（W1 修复）：加载截至 max(dates) 的全部历史 K 线（不设 LIMIT），
+    与单日 analyze(limit=1500) 一致性靠 max_bi_num=50 截断保证——
+    只要历史笔数 ≥50，两条路径都截断为最近 50 笔，结果一致；
+    不足 50 笔的新股两边都是全量，同样一致。
+
     Returns:
-        list[dict]: 每个目标日的摘要 dict（失败日返回 None 占位）
+        list[tuple]: [(date, summary or None)]
     """
     import pandas as pd
     from scanners.chanlun import analyze_from_czsc
@@ -191,16 +196,13 @@ def scan_stock_all(code, dates, limit=1500):
         conn = _connect()
         df = pd.read_sql(f"""
             SELECT date, open, high, low, close, volume, amount
-            FROM daily_kline WHERE stock_code = ?
-            ORDER BY date DESC LIMIT ?
-        """, conn, params=(code, limit * 2))
+            FROM daily_kline WHERE stock_code = ? AND date <= ?
+            ORDER BY date DESC LIMIT 10000
+        """, conn, params=(code, max(dates)))
         conn.close()
         if df.empty:
             return [(d, None) for d in dates]
         df = df.sort_values("date").reset_index(drop=True)
-        df = df[df["date"].astype(str) <= max(dates)]
-        if df.empty:
-            return [(d, None) for d in dates]
         df["dt"] = pd.to_datetime(df["date"])
         bars = []
         for _, row in df.iterrows():
@@ -209,14 +211,14 @@ def scan_stock_all(code, dates, limit=1500):
                 open=row.open, close=row.close, high=row.high, low=row.low,
                 vol=row.volume, amount=row.amount
             ))
-        # 前 50 根初始化，之后逐根增量
-        c = CZSC(bars[:50])
+        # 前 50 根初始化，之后逐根增量；max_bi_num 显式钉死截断契约（W1/O5）
+        c = CZSC(bars[:50], max_bi_num=50)
         out = []
-        for bar in bars[50:]:
+        for j, bar in enumerate(bars[50:]):
             c.update(bar)
             d = str(bar.dt.date())
             if d in date_set:
-                r = analyze_from_czsc(code, c, freq="D", bars=bars[:len(out) + 51])
+                r = analyze_from_czsc(code, c, freq="D", bars=bars[:51 + j])
                 out.append((d, summarize(code, d, r)))
         # 补齐未覆盖的目标日（数据起点之前的日期）
         got = {d for d, _ in out}
@@ -265,8 +267,8 @@ def run_scan(scan_date=None, all_market=False):
                 (scan_date, stock_code, stock_name, bi_count, zs_count, segment_count,
                  latest_bi_dir, latest_bi_power, divergence_count, latest_div_type,
                  trade_signal_count, latest_trade_type, latest_trade_side, latest_trade_price,
-                 resonance_strength)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 resonance_strength, algo_version)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 result["scan_date"], result["stock_code"], result["stock_name"],
                 result["bi_count"], result["zs_count"], result["segment_count"],
@@ -274,7 +276,7 @@ def run_scan(scan_date=None, all_market=False):
                 result["divergence_count"], result["latest_div_type"],
                 result["trade_signal_count"], result["latest_trade_type"],
                 result["latest_trade_side"], result["latest_trade_price"],
-                result["resonance_strength"]
+                result["resonance_strength"], 'czsc101'
             ))
             if result.get("bi_json"):
                 conn.execute(

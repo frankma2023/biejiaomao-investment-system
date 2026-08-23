@@ -1055,8 +1055,8 @@ def analyze(code, freq="D", limit=500, data_mode="auto", end_date=None):
             vol=row.volume, amount=row.amount
         ))
     
-    # CZSC 计算
-    czsc_obj = CZSC(bars)
+    # CZSC 计算（max_bi_num 显式钉死截断契约，避免依赖环境变量默认值）
+    czsc_obj = CZSC(bars, max_bi_num=50)
     return analyze_from_czsc(code, czsc_obj, freq=freq, bars=bars)
 
 

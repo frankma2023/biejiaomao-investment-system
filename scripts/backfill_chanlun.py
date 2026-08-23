@@ -81,40 +81,55 @@ def scan_stock_worker(args):
         return (None, f"{code}: {str(e)[:120]}")
 
 
-def save_stock_results(db_path, code, results, max_retry=8):
+def save_stock_results(db_path, code, dates_all, results, max_retry=8):
     """单只股票全部日期的结果写库（worker 内调用，单事务，busy 重试）
 
     results: [(date, summary) or None]
+    - DELETE 覆盖全部目标日期（O3：清除旧行/失效残留）
+    - 写入 algo_version='czsc101'（B1：区分新旧算法，续跑只跳过新版日期）
     返回: 成功写入的天数
     """
     import time as _time
-    rows = [(d, s) for d, s in results if s]
-    if not rows:
-        return 0
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # 股票名称（W4：从 stock_basic 查，缺省回退 code）
+    name = code
+    try:
+        db0 = sqlite3.connect(db_path, timeout=30)
+        r = db0.execute("SELECT name FROM stock_basic WHERE stock_code=?", (code,)).fetchone()
+        if r and r[0]:
+            name = r[0]
+        db0.close()
+    except Exception:
+        pass
     for attempt in range(max_retry):
         try:
             db = sqlite3.connect(db_path, timeout=60)
             try:
                 db.execute("PRAGMA journal_mode=WAL")
-                for d, s in rows:
-                    db.execute("DELETE FROM chanlun_scan_daily WHERE stock_code=? AND scan_date=?", (code, d))
+                # 先清空该股全部目标日旧行（O3）
+                db.executemany("DELETE FROM chanlun_scan_daily WHERE stock_code=? AND scan_date=?",
+                               [(code, d) for d in dates_all])
+                db.executemany("DELETE FROM chanlun_bi_json WHERE stock_code=? AND scan_date=?",
+                               [(code, d) for d in dates_all])
+                for d, s in results:
+                    if not s:
+                        continue
                     db.execute("""INSERT INTO chanlun_scan_daily
                         (scan_date, stock_code, stock_name, bi_count, zs_count, segment_count,
                          latest_bi_dir, latest_bi_power, divergence_count, latest_div_type,
                          trade_signal_count, latest_trade_type, latest_trade_side, latest_trade_price,
-                         resonance_strength, created_at)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (d, code, '', s.get('bi_count', 0), s.get('zs_count', 0), s.get('segment_count', 0),
+                         resonance_strength, created_at, algo_version)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (d, code, name, s.get('bi_count', 0), s.get('zs_count', 0), s.get('segment_count', 0),
                          s.get('latest_bi_dir', ''), s.get('latest_bi_power', 0), s.get('divergence_count', 0),
                          s.get('latest_div_type', ''), s.get('trade_signal_count', 0), s.get('latest_trade_type', ''),
                          s.get('latest_trade_side', ''), s.get('latest_trade_price', 0),
-                         s.get('resonance_strength', ''), now))
+                         s.get('resonance_strength', ''), now, 'czsc101'))
                     if s.get('bi_json'):
                         db.execute("INSERT OR REPLACE INTO chanlun_bi_json (stock_code, scan_date, bi_json) VALUES (?,?,?)",
                                    (code, d, s['bi_json']))
                 db.commit()
-                return len(rows)
+                return len([s for _, s in results if s])
             finally:
                 db.close()
         except sqlite3.OperationalError as e:
@@ -127,14 +142,27 @@ def save_stock_results(db_path, code, results, max_retry=8):
 
 def scan_stock_all_worker(args):
     """单只股票全历史增量扫描 + 直接写库（--by-stock 模式）
-    args: (code, dates)
-    Returns: (code, saved_count, err_msg) 小结果，避免大数据回传主进程
+    args: (code, dates, incremental)
+    incremental 时按 code 查已有 czsc101 日期，只算缺失日（B1 修复）
+    Returns: (code, saved_count, err_msg) 小结果
     """
-    code, dates = args
+    code, dates, incremental = args
     try:
+        if incremental:
+            db = sqlite3.connect(DB, timeout=30)
+            try:
+                db.execute("ALTER TABLE chanlun_scan_daily ADD COLUMN algo_version TEXT DEFAULT 'czsc010'")
+            except sqlite3.OperationalError:
+                pass
+            rows = db.execute("SELECT scan_date FROM chanlun_scan_daily WHERE stock_code=? AND algo_version='czsc101'", (code,)).fetchall()
+            db.close()
+            done = {r[0] for r in rows}
+            dates = [d for d in dates if d not in done]
+        if not dates:
+            return (code, 0, None)
         from scanners.chanlun_scan import scan_stock_all
         res = scan_stock_all(code, dates)
-        n = save_stock_results(DB, code, res)
+        n = save_stock_results(DB, code, dates, res)
         return (code, n, None)
     except Exception as e:
         return (code, 0, f"{code}: {str(e)[:120]}")
@@ -279,8 +307,8 @@ if __name__ == '__main__':
         print(f"区间 {start_date} ~ {end_date} 无交易日")
         sys.exit(0)
 
-    # 增量过滤
-    if args.incremental:
+    # 增量过滤（仅日模式；by_stock 在 worker 内按 code+algo_version 过滤，B1）
+    if args.incremental and not args.by_stock:
         existing = get_existing_dates()
         dates = [d for d in all_dates if d not in existing]
         print(f"增量模式: 已完成 {len(all_dates)-len(dates)} 天, 剩余 {len(dates)} 天")
@@ -298,8 +326,17 @@ if __name__ == '__main__':
 
     if args.by_stock:
         # ── 按股票分片增量扫描（每只 1 次加载 + 逐日增量）──
-        # 股票列表：重算窗口内出现过交易的全部股票
+        # 日期不过滤（incremental 在 worker 内按 code+algo_version 过滤，B1 修复）
+        dates_all = all_dates
+        # W2：确保 algo_version 列 + UNIQUE 约束（幂等）
         db = sqlite3.connect(DB)
+        try:
+            db.execute("ALTER TABLE chanlun_scan_daily ADD COLUMN algo_version TEXT DEFAULT 'czsc010'")
+        except sqlite3.OperationalError:
+            pass
+        db.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_chanlun_scan_daily ON chanlun_scan_daily(scan_date, stock_code)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_chanlun_scan_algo ON chanlun_scan_daily(algo_version)")
+        db.commit()
         if codes:
             ph = ','.join('?' * len(codes))
             stock_rows = db.execute(f"SELECT DISTINCT stock_code FROM daily_kline WHERE date>=? AND date<=? AND stock_code IN ({ph})", (start_date, end_date) + tuple(codes)).fetchall()
@@ -307,14 +344,14 @@ if __name__ == '__main__':
             stock_rows = db.execute("SELECT DISTINCT stock_code FROM daily_kline WHERE date>=? AND date<=?", (start_date, end_date)).fetchall()
         db.close()
         stock_codes = [r[0] for r in stock_rows]
-        log.info(f"按股票分片: {len(stock_codes)} 只股票 × {len(dates)} 天")
+        log.info(f"按股票分片: {len(stock_codes)} 只股票 × {len(dates_all)} 天" + ("（incremental：跳过已有 czsc101 日期）" if args.incremental else ""))
 
         t_start = time.time()
         completed = 0
         err_codes = []
         total_saved = 0
         # 并行按股票处理（worker 直接写库，主进程只收小结果，避免内存爆炸）
-        task_args = [(code, dates) for code in stock_codes]
+        task_args = [(code, dates_all, args.incremental) for code in stock_codes]
         if workers == 1 or len(task_args) < 8:
             for a in task_args:
                 code, n, err = scan_stock_all_worker(a)
@@ -329,7 +366,12 @@ if __name__ == '__main__':
             with ProcessPoolExecutor(max_workers=workers) as pool:
                 futures = {pool.submit(scan_stock_all_worker, a): a for a in task_args}
                 for f in as_completed(futures):
-                    code, n, err = f.result()
+                    try:
+                        code, n, err = f.result()
+                    except Exception as e:
+                        # W3：worker 进程级死亡（OOM/段错误）不拖垮主进程
+                        err_codes.append(f"{futures[f][0]}: worker 死亡 {type(e).__name__}: {str(e)[:80]}")
+                        code, n, err = futures[f][0], 0, None
                     completed += 1
                     total_saved += n
                     if err:
@@ -340,10 +382,15 @@ if __name__ == '__main__':
 
         total_elapsed = time.time() - t_start
         log.info(f"\n=== 完成 ===")
-        log.info(f"股票 {len(stock_codes)} 只 × {len(dates)} 天，写库 {total_saved} 股票日")
+        log.info(f"股票 {len(stock_codes)} 只 × {len(dates_all)} 天，写库 {total_saved} 股票日")
         log.info(f"失败股票: {len(err_codes)}")
         for e in err_codes[:5]:
             log.warning(f"  {e}")
+        if len(err_codes) > 5:
+            # 失败股票落盘，供 --codes 重跑（B1 兜底）
+            with open(os.path.join(PROJECT, 'logs', 'chanlun_failed_codes.txt'), 'w', encoding='utf-8') as f:
+                f.write('\n'.join(err_codes))
+            log.info(f"失败清单已存 logs/chanlun_failed_codes.txt")
         log.info(f"总耗时: {total_elapsed/60:.1f}min")
         sys.exit(0)
 
