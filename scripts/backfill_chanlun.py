@@ -1,17 +1,27 @@
 """
-缠论笔全市场批量回填 v1.0
+缠论笔全市场批量回填 v2.0（CZSC 1.0.1 Rust 版适配）
 将全市场市值大于50亿的股票的缠论笔数据从指定起始日期计算至今
 
 依赖：src/scanners/chanlun.py、chanlun_scan.py
-输出：chanlun_scan_daily 表
+输出：chanlun_scan_daily + chanlun_bi_json 表
 
 用法：
-    python scripts/backfill_chanlun.py --start 2016-01-01 --end 2016-03-31 --workers 8
-    python scripts/backfill_chanlun.py --quarter 2016Q1 --incremental --workers 8
-    python scripts/backfill_chanlun.py --incremental --workers 8  # 全量
+    # 全量重算（CZSC 1.0.1 升级后笔算法变化，需重写历史 bi_json）
+    python scripts/backfill_chanlun.py --start 2016-01-01 --end 2026-08-21 --workers 8 --log
+    # 按季度分片（白天人工跑，断点续跑）
+    python scripts/backfill_chanlun.py --quarter 2024Q1 --workers 8 --log
+    # 增量（跳过已有日期）
+    python scripts/backfill_chanlun.py --quarter 2024Q1 --incremental --workers 8 --log
+    # 只重算指定股票（先验证质量，如自选池）
+    python scripts/backfill_chanlun.py --start 2026-08-01 --end 2026-08-21 --codes 300750,002648 --workers 4 --log
 
-性能参考：
-    8进程: ~4000只/天, ~90秒/天, 全量2535天约64小时
+性能参考（CZSC 1.0.1 Rust 版，实测快约 100 倍）：
+    8进程: ~25000只/天（旧版 ~4000只/天），全量2535天约 2~4 小时（旧版约64小时）
+
+注意：
+    - 同一天重跑 = 覆盖该日（DELETE 后重插），天然支持"重算某日"
+    - --incremental 跳过已存在的日期，中断后继续用同一命令即可续跑
+    - 建议先用 --codes 重算少量股票验证质量，再全量
 """
 import sys, os, time, argparse, sqlite3, traceback
 from datetime import datetime, timedelta
@@ -122,16 +132,25 @@ def save_day_results(db_path, scan_date, results):
                 raise
 
 
-def get_candidates(date):
-    """获取当天可扫描的股票列表"""
+def get_candidates(date, codes=None):
+    """获取当天可扫描的股票列表（codes 过滤时只取指定股票）"""
     db = sqlite3.connect(DB)
     db.row_factory = sqlite3.Row
-    stocks = db.execute("""
-        SELECT DISTINCT k.stock_code, b.name
-        FROM daily_kline k
-        JOIN stock_basic b ON k.stock_code = b.stock_code
-        WHERE k.date = ?
-    """, (date,)).fetchall()
+    if codes:
+        placeholders = ','.join('?' * len(codes))
+        stocks = db.execute(f"""
+            SELECT DISTINCT k.stock_code, b.name
+            FROM daily_kline k
+            JOIN stock_basic b ON k.stock_code = b.stock_code
+            WHERE k.date = ? AND k.stock_code IN ({placeholders})
+        """, (date,) + tuple(codes)).fetchall()
+    else:
+        stocks = db.execute("""
+            SELECT DISTINCT k.stock_code, b.name
+            FROM daily_kline k
+            JOIN stock_basic b ON k.stock_code = b.stock_code
+            WHERE k.date = ?
+        """, (date,)).fetchall()
     db.close()
     return [(r['stock_code'], r['name']) for r in stocks]
 
@@ -141,19 +160,56 @@ def get_candidates(date):
 # ══════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='缠论批量回填')
+    parser = argparse.ArgumentParser(description='缠论批量回填（CZSC 1.0.1 全量重算版）')
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--start', help='起始日期（需同时指定 --end）')
     group.add_argument('--quarter', help='按季度，如 2016Q1')
     parser.add_argument('--end', help='结束日期')
     parser.add_argument('--workers', type=int, default=8, help='并行进程数（默认8）')
-    parser.add_argument('--incremental', action='store_true', help='增量模式')
+    parser.add_argument('--incremental', action='store_true', help='增量模式（跳过已有日期）')
+    parser.add_argument('--codes', help='只处理指定股票，逗号分隔（如 300750,002648）')
+    parser.add_argument('--log', action='store_true', help='同时输出到日志文件（logs/backfill_chanlun.log）')
+    parser.add_argument('--backup', action='store_true', help='重算前备份 chanlun 两表到 data/backup/')
     args = parser.parse_args()
 
     if args.quarter:
         start_date, end_date = quarter_to_range(args.quarter)
     else:
         start_date, end_date = args.start, args.end
+
+    codes = [c.strip() for c in (args.codes or '').split(',') if c.strip()] or None
+    # 防御：前导零丢失（PowerShell 数组解析 002648→2648）
+    if codes:
+        codes = [c.zfill(6) if c.isdigit() and len(c) < 6 else c for c in codes]
+        print(f"股票过滤: {len(codes)} 只 {codes[:5]}{'...' if len(codes) > 5 else ''}")
+
+    # 日志
+    if args.log:
+        import logging
+        os.makedirs(os.path.join(PROJECT, 'logs'), exist_ok=True)
+        log_path = os.path.join(PROJECT, 'logs', 'backfill_chanlun.log')
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s', datefmt='%H:%M:%S',
+                            handlers=[logging.FileHandler(log_path, encoding='utf-8'), logging.StreamHandler()])
+        log = logging
+        print(f'日志: {log_path}')
+    else:
+        import logging
+        logging.basicConfig(level=logging.INFO, format='%(message)s')
+        log = logging
+
+    # 备份提示
+    if args.backup:
+        os.makedirs(os.path.join(PROJECT, 'data', 'backup'), exist_ok=True)
+        for t in ('chanlun_scan_daily', 'chanlun_bi_json'):
+            bp = os.path.join(PROJECT, 'data', 'backup', f'{t}_pre_czsc101.db')
+            if not os.path.exists(bp):
+                db = sqlite3.connect(DB)
+                db.execute(f"ATTACH DATABASE ? AS bak", (bp,))
+                db.execute(f"CREATE TABLE bak.{t} AS SELECT * FROM {t}")
+                db.commit(); db.close()
+                log.info(f'已备份 {t} → {bp}')
+            else:
+                log.info(f'备份已存在，跳过: {bp}')
 
     all_dates = get_trading_dates(start_date, end_date)
     if not all_dates:
@@ -185,7 +241,7 @@ if __name__ == '__main__':
 
     for date in dates:
         t0 = time.time()
-        stocks = get_candidates(date)
+        stocks = get_candidates(date, codes)
         
         if completed > 0:
             eta = (time.time() - t_start) / completed * (len(dates) - completed)
@@ -193,7 +249,7 @@ if __name__ == '__main__':
         else:
             eta_str = ""
 
-        print(f"[{completed+1}/{len(dates)}] {date} ({len(stocks)}只) ...", end=' ', flush=True)
+        log.info(f"[{completed+1}/{len(dates)}] {date} ({len(stocks)}只) ...")
 
         # 并行扫描
         task_args = [(code, date) for code, name in stocks]
@@ -218,16 +274,17 @@ if __name__ == '__main__':
         total_stocks += len(stocks)
         total_bi += day_bi
 
-        print(f"✓ 保存{saved}只, {day_bi}笔 ({elapsed:.1f}s) {eta_str}")
+        log.info(f"✓ {date} 保存{saved}只, {day_bi}笔 ({elapsed:.1f}s) {eta_str}")
 
         if day_errs:
             err_samples = [r[1] for r in results if r[1]][:3]
-            print(f"  ⚠ {day_errs}错: {'; '.join(err_samples)}")
+            log.warning(f"  ⚠ {day_errs}错: {'; '.join(err_samples)}")
 
     # 汇总
     total_elapsed = time.time() - t_start
-    print(f"\n=== 完成 ===")
-    print(f"成功: {completed}/{len(dates)} 天")
-    print(f"总股票次: {total_stocks}")
-    print(f"总笔数: {total_bi}")
-    print(f"总耗时: {total_elapsed/3600:.1f}h ({total_elapsed/60:.0f}min)")
+    log.info(f"\n=== 完成 ===")
+    log.info(f"成功: {completed}/{len(dates)} 天")
+    log.info(f"总股票次: {total_stocks}")
+    log.info(f"总笔数: {total_bi}")
+    log.info(f"总耗时: {total_elapsed/3600:.1f}h ({total_elapsed/60:.0f}min)")
+    log.info(f"平均: {total_elapsed/max(completed,1):.1f}s/天")
