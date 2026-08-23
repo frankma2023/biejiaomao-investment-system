@@ -898,6 +898,90 @@ def classify_trend(zs_list, bi_list=None, ubi=None):
 # 主分析函数
 # ═══════════════════════════════════════════════
 
+def analyze_from_czsc(code, czsc_obj, freq="D", bars=None):
+    """给定 CZSC 对象（已含截至某日的 K 线）完成全部缠论分析
+
+    供增量回填复用：外部维护一个 CZSC 对象逐根 update，
+    每个目标日调用本函数得到当日完整分析结果，避免每日重复加载 K 线。
+    """
+    # ── 提取笔列表 ──
+    bi_list = []
+    for bi in czsc_obj.bi_list:
+        bi_list.append({
+            "sdt": str(bi.sdt),
+            "edt": str(bi.edt),
+            "direction": str(bi.direction),
+            "high": float(bi.high) if bi.high is not None and bi.high == bi.high else 0,
+            "low": float(bi.low) if bi.low is not None and bi.low == bi.low else 0,
+            "power": float(bi.power) if bi.power is not None and bi.power == bi.power else 0,
+            "slope": float(bi.slope) if bi.slope is not None and bi.slope == bi.slope else 0,
+            "angle": float(bi.angle) if bi.angle is not None and bi.angle == bi.angle else 0,
+            "length": int(bi.length) if bi.length else 0
+        })
+
+    # ── 提取分型列表 ──
+    fx_list = []
+    for fx in czsc_obj.fx_list:
+        fx_type = getattr(fx, 'mark', getattr(fx, 'fx_type', getattr(fx, 'fx', '?')))
+        fx_list.append({
+            "dt": str(fx.dt),
+            "fx_type": str(fx_type),
+            "high": float(fx.high) if fx.high is not None and fx.high == fx.high else 0,
+            "low": float(fx.low) if fx.low is not None and fx.low == fx.low else 0
+        })
+
+    # ── 中枢检测 ──
+    zs_list = compute_zhongshu(czsc_obj.bi_list)
+
+    # ── 线段计算 ──
+    segment_list = compute_segments(czsc_obj.bi_list)
+    segment_zs_list = compute_segment_zs(segment_list)
+
+    # ── 背驰检测 ──
+    divergence_signals = detect_divergence(czsc_obj.bi_list, zs_list)
+
+    # ── 买卖信号 ──
+    trade_signals = generate_trade_signals(czsc_obj.bi_list, zs_list, divergence_signals)
+
+    # ── 未完成笔 ──
+    ubi_info = None
+    if czsc_obj.ubi:
+        ubi_info = {
+            "direction": str(czsc_obj.ubi.get("direction", "?")),
+            "high": float(czsc_obj.ubi.get("high", 0)),
+            "low": float(czsc_obj.ubi.get("low", 0))
+        }
+
+    # ── 走势类型判断 ──
+    trend_classification = classify_trend(zs_list, bi_list, ubi_info)
+
+    # ── 背驰后追踪 ──
+    divergence_outcomes = track_divergence_outcomes(divergence_signals, bi_list, zs_list)
+
+    return {
+        "code": code,
+        "freq": freq,
+        "kline_count": len(bars) if bars is not None else len(bi_list),
+        "bi_count": len(bi_list),
+        "fx_count": len(fx_list),
+        "zs_count": len(zs_list),
+        "segment_count": len(segment_list),
+        "segment_zs_count": len(segment_zs_list),
+        "divergence_count": len(divergence_signals),
+        "trade_signal_count": len(trade_signals),
+        "ubi": ubi_info,
+        "bi_list": bi_list,
+        "fx_list": fx_list,
+        "zs_list": zs_list,
+        "segment_list": segment_list,
+        "segment_zs_list": segment_zs_list,
+        "divergence_signals": divergence_signals,
+        "trade_signals": trade_signals,
+        "trend_classification": trend_classification,
+        "divergence_outcomes": divergence_outcomes
+    }
+
+
 def analyze(code, freq="D", limit=500, data_mode="auto", end_date=None):
     """分析单只股票/指数的缠论结构
     
@@ -973,83 +1057,7 @@ def analyze(code, freq="D", limit=500, data_mode="auto", end_date=None):
     
     # CZSC 计算
     czsc_obj = CZSC(bars)
-    
-    # ── 提取笔列表 ──
-    bi_list = []
-    for bi in czsc_obj.bi_list:
-        bi_list.append({
-            "sdt": str(bi.sdt),
-            "edt": str(bi.edt),
-            "direction": str(bi.direction),
-            "high": float(bi.high) if bi.high is not None and bi.high == bi.high else 0,
-            "low": float(bi.low) if bi.low is not None and bi.low == bi.low else 0,
-            "power": float(bi.power) if bi.power is not None and bi.power == bi.power else 0,
-            "slope": float(bi.slope) if bi.slope is not None and bi.slope == bi.slope else 0,
-            "angle": float(bi.angle) if bi.angle is not None and bi.angle == bi.angle else 0,
-            "length": int(bi.length) if bi.length else 0
-        })
-    
-    # ── 提取分型列表 ──
-    fx_list = []
-    for fx in czsc_obj.fx_list:
-        fx_type = getattr(fx, 'mark', getattr(fx, 'fx_type', getattr(fx, 'fx', '?')))
-        fx_list.append({
-            "dt": str(fx.dt),
-            "fx_type": str(fx_type),
-            "high": float(fx.high) if fx.high is not None and fx.high == fx.high else 0,
-            "low": float(fx.low) if fx.low is not None and fx.low == fx.low else 0
-        })
-    
-    # ── 中枢检测 ──
-    zs_list = compute_zhongshu(czsc_obj.bi_list)
-    
-    # ── 线段计算 ──
-    segment_list = compute_segments(czsc_obj.bi_list)
-    segment_zs_list = compute_segment_zs(segment_list)
-    
-    # ── 背驰检测 ──
-    divergence_signals = detect_divergence(czsc_obj.bi_list, zs_list)
-    
-    # ── 买卖信号 ──
-    trade_signals = generate_trade_signals(czsc_obj.bi_list, zs_list, divergence_signals)
-    
-    # ── 未完成笔 ──
-    ubi_info = None
-    if czsc_obj.ubi:
-        ubi_info = {
-            "direction": str(czsc_obj.ubi.get("direction", "?")),
-            "high": float(czsc_obj.ubi.get("high", 0)),
-            "low": float(czsc_obj.ubi.get("low", 0))
-        }
-    
-    # ── 走势类型判断 ──
-    trend_classification = classify_trend(zs_list, bi_list, ubi_info)
-    
-    # ── 背驰后追踪 ──
-    divergence_outcomes = track_divergence_outcomes(divergence_signals, bi_list, zs_list)
-    
-    return {
-        "code": code,
-        "freq": freq,
-        "kline_count": len(bars),
-        "bi_count": len(bi_list),
-        "fx_count": len(fx_list),
-        "zs_count": len(zs_list),
-        "segment_count": len(segment_list),
-        "segment_zs_count": len(segment_zs_list),
-        "divergence_count": len(divergence_signals),
-        "trade_signal_count": len(trade_signals),
-        "ubi": ubi_info,
-        "bi_list": bi_list,
-        "fx_list": fx_list,
-        "zs_list": zs_list,
-        "segment_list": segment_list,
-        "segment_zs_list": segment_zs_list,
-        "divergence_signals": divergence_signals,
-        "trade_signals": trade_signals,
-        "trend_classification": trend_classification,
-        "divergence_outcomes": divergence_outcomes
-    }
+    return analyze_from_czsc(code, czsc_obj, freq=freq, bars=bars)
 
 
 # ═══════════════════════════════════════════════

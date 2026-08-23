@@ -123,65 +123,112 @@ def get_stock_name(conn, code):
         return code
 
 
+def summarize(code, scan_date, r):
+    """从 analyze/analyze_from_czsc 结果提取当日摘要（scan_stock 与增量模式共用）"""
+    if not r or r.get("error"):
+        return None
+    bi_list = r.get("bi_list", [])
+    latest_bi_dir = latest_bi_power = None
+    if bi_list:
+        last_bi = bi_list[-1]
+        latest_bi_dir = str(last_bi.get("direction", ""))
+        latest_bi_power = round(float(last_bi.get("power", 0)), 1)
+    div_list = r.get("divergence_signals", [])
+    latest_div_type = div_list[0].get("type", "") if div_list else None
+    trade_list = r.get("trade_signals", [])
+    latest_trade_type = latest_trade_side = latest_trade_price = None
+    if trade_list:
+        ts = trade_list[0]
+        latest_trade_type = ts.get("type", "")
+        latest_trade_side = ts.get("side", "")
+        latest_trade_price = ts.get("price", None)
+    return {
+        "scan_date": scan_date,
+        "stock_code": code,
+        "bi_count": r.get("bi_count", 0),
+        "zs_count": r.get("zs_count", 0),
+        "segment_count": r.get("segment_count", 0),
+        "latest_bi_dir": latest_bi_dir,
+        "latest_bi_power": latest_bi_power,
+        "divergence_count": r.get("divergence_count", 0),
+        "latest_div_type": latest_div_type,
+        "trade_signal_count": r.get("trade_signal_count", 0),
+        "latest_trade_type": latest_trade_type,
+        "latest_trade_side": latest_trade_side,
+        "latest_trade_price": latest_trade_price,
+        "resonance_strength": None,
+        "bi_json": json.dumps(r.get("bi_list", []), ensure_ascii=False)
+    }
+
+
 def scan_stock(code, scan_date):
-    """对单只股票执行缠论分析并提取摘要
+    """对单只股票执行缠论分析并提取摘要（窗口 1500 根 ≈6年，与增量重算口径统一）
     
     Returns:
         dict: 扫描结果，失败返回 None
     """
     from scanners.chanlun import analyze
-    
     try:
-        r = analyze(code, "D", 400, data_mode="stock", end_date=scan_date)
-        if r.get("error"):
-            return None
-        
-        # 最新笔
-        bi_list = r.get("bi_list", [])
-        latest_bi_dir = None
-        latest_bi_power = None
-        if bi_list:
-            last_bi = bi_list[-1]
-            latest_bi_dir = str(last_bi.get("direction", ""))
-            latest_bi_power = round(float(last_bi.get("power", 0)), 1)
-        
-        # 最新背驰信号
-        div_list = r.get("divergence_signals", [])
-        latest_div_type = None
-        if div_list:
-            latest_div_type = div_list[0].get("type", "")
-        
-        # 最新买卖信号
-        trade_list = r.get("trade_signals", [])
-        latest_trade_type = None
-        latest_trade_side = None
-        latest_trade_price = None
-        if trade_list:
-            ts = trade_list[0]
-            latest_trade_type = ts.get("type", "")
-            latest_trade_side = ts.get("side", "")
-            latest_trade_price = ts.get("price", None)
-        
-        return {
-            "scan_date": scan_date,
-            "stock_code": code,
-            "bi_count": r.get("bi_count", 0),
-            "zs_count": r.get("zs_count", 0),
-            "segment_count": r.get("segment_count", 0),
-            "latest_bi_dir": latest_bi_dir,
-            "latest_bi_power": latest_bi_power,
-            "divergence_count": r.get("divergence_count", 0),
-            "latest_div_type": latest_div_type,
-            "trade_signal_count": r.get("trade_signal_count", 0),
-            "latest_trade_type": latest_trade_type,
-            "latest_trade_side": latest_trade_side,
-            "latest_trade_price": latest_trade_price,
-            "resonance_strength": None,
-            "bi_json": json.dumps(r.get("bi_list", []), ensure_ascii=False)
-        }
+        r = analyze(code, "D", 1500, data_mode="stock", end_date=scan_date)
+        return summarize(code, scan_date, r)
     except Exception as e:
         print(f"  {code} 扫描异常: {e}")
         return None
+
+
+def scan_stock_all(code, dates, limit=1500):
+    """单股全历史增量扫描：1 次加载 K 线 + CZSC 逐根 update，
+    每个目标日取当日分析结果（CZSC.update 增量与全量结果一致，已验证）
+
+    Returns:
+        list[dict]: 每个目标日的摘要 dict（失败日返回 None 占位）
+    """
+    import pandas as pd
+    from scanners.chanlun import analyze_from_czsc
+    from czsc import CZSC, RawBar, Freq
+    date_set = set(dates)
+    try:
+        conn = _connect()
+        df = pd.read_sql(f"""
+            SELECT date, open, high, low, close, volume, amount
+            FROM daily_kline WHERE stock_code = ?
+            ORDER BY date DESC LIMIT ?
+        """, conn, params=(code, limit * 2))
+        conn.close()
+        if df.empty:
+            return [(d, None) for d in dates]
+        df = df.sort_values("date").reset_index(drop=True)
+        df = df[df["date"].astype(str) <= max(dates)]
+        if df.empty:
+            return [(d, None) for d in dates]
+        df["dt"] = pd.to_datetime(df["date"])
+        bars = []
+        for _, row in df.iterrows():
+            bars.append(RawBar(
+                symbol=code, dt=row["dt"], freq=Freq.D,
+                open=row.open, close=row.close, high=row.high, low=row.low,
+                vol=row.volume, amount=row.amount
+            ))
+        # 前 50 根初始化，之后逐根增量
+        c = CZSC(bars[:50])
+        out = []
+        for bar in bars[50:]:
+            c.update(bar)
+            d = str(bar.dt.date())
+            if d in date_set:
+                r = analyze_from_czsc(code, c, freq="D", bars=bars[:len(out) + 51])
+                out.append((d, summarize(code, d, r)))
+        # 补齐未覆盖的目标日（数据起点之前的日期）
+        got = {d for d, _ in out}
+        for d in dates:
+            if d not in got:
+                out.append((d, None))
+        out.sort(key=lambda x: x[0])
+        return out
+    except Exception as e:
+        print(f"  {code} 全历史扫描异常: {e}")
+        return [(d, None) for d in dates]
+
 
 
 def run_scan(scan_date=None, all_market=False):

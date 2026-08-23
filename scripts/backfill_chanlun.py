@@ -7,21 +7,24 @@
 
 用法：
     # 全量重算（CZSC 1.0.1 升级后笔算法变化，需重写历史 bi_json）
-    python scripts/backfill_chanlun.py --start 2016-01-01 --end 2026-08-21 --workers 8 --log
+    # ✅ 推荐 --by-stock：每只股票只加载 1 次 K 线 + CZSC 逐日增量，全量约 40 分钟
+    python scripts/backfill_chanlun.py --start 2016-01-01 --end 2026-08-21 --workers 8 --log --by-stock
     # 按季度分片（白天人工跑，断点续跑）
-    python scripts/backfill_chanlun.py --quarter 2024Q1 --workers 8 --log
+    python scripts/backfill_chanlun.py --quarter 2024Q1 --workers 8 --log --by-stock
     # 增量（跳过已有日期）
-    python scripts/backfill_chanlun.py --quarter 2024Q1 --incremental --workers 8 --log
+    python scripts/backfill_chanlun.py --quarter 2024Q1 --incremental --workers 8 --log --by-stock
     # 只重算指定股票（先验证质量，如自选池）
-    python scripts/backfill_chanlun.py --start 2026-08-01 --end 2026-08-21 --codes 300750,002648 --workers 4 --log
+    python scripts/backfill_chanlun.py --start 2026-08-01 --end 2026-08-21 --codes "300750,002648" --workers 4 --log --by-stock
 
-性能参考（CZSC 1.0.1 Rust 版，实测快约 100 倍）：
-    8进程: ~25000只/天（旧版 ~4000只/天），全量2535天约 2~4 小时（旧版约64小时）
+性能参考（CZSC 1.0.1 Rust 版 + 增量模式）：
+    --by-stock: 每只 1 次 K线加载 + 逐根 update（与全量结果一致已验证），
+                全量 2535 天约 40 分钟（按日模式约 3.5 小时）
 
 注意：
     - 同一天重跑 = 覆盖该日（DELETE 后重插），天然支持"重算某日"
     - --incremental 跳过已存在的日期，中断后继续用同一命令即可续跑
     - 建议先用 --codes 重算少量股票验证质量，再全量
+    - --by-stock 与 --incremental 兼容：中断续跑时已重算日期会被按日跳过（存量模式）
 """
 import sys, os, time, argparse, sqlite3, traceback
 from datetime import datetime, timedelta
@@ -76,6 +79,20 @@ def scan_stock_worker(args):
         return (r, None)
     except Exception as e:
         return (None, f"{code}: {str(e)[:120]}")
+
+
+def scan_stock_all_worker(args):
+    """单只股票全历史增量扫描（--by-stock 模式）
+    args: (code, dates)
+    Returns: (code, [(date, summary)]) 或 (code, err)
+    """
+    code, dates = args
+    try:
+        from scanners.chanlun_scan import scan_stock_all
+        res = scan_stock_all(code, dates)
+        return (code, res)
+    except Exception as e:
+        return (code, f"{code}: {str(e)[:120]}")
 
 
 def save_day_results(db_path, scan_date, results):
@@ -168,6 +185,7 @@ if __name__ == '__main__':
     parser.add_argument('--workers', type=int, default=8, help='并行进程数（默认8）')
     parser.add_argument('--incremental', action='store_true', help='增量模式（跳过已有日期）')
     parser.add_argument('--codes', help='只处理指定股票，逗号分隔（如 300750,002648）')
+    parser.add_argument('--by-stock', action='store_true', help='按股票分片增量扫描（每只1次加载K线+逐日增量，全量重算推荐）')
     parser.add_argument('--log', action='store_true', help='同时输出到日志文件（logs/backfill_chanlun.log）')
     parser.add_argument('--backup', action='store_true', help='重算前备份 chanlun 两表到 data/backup/')
     args = parser.parse_args()
@@ -232,6 +250,60 @@ if __name__ == '__main__':
     workers = args.workers
     print(f"并行: {workers} 进程")
     print()
+
+    if args.by_stock:
+        # ── 按股票分片增量扫描（每只 1 次加载 + 逐日增量）──
+        # 股票列表：重算窗口内出现过交易的全部股票
+        db = sqlite3.connect(DB)
+        if codes:
+            ph = ','.join('?' * len(codes))
+            stock_rows = db.execute(f"SELECT DISTINCT stock_code FROM daily_kline WHERE date>=? AND date<=? AND stock_code IN ({ph})", (start_date, end_date) + tuple(codes)).fetchall()
+        else:
+            stock_rows = db.execute("SELECT DISTINCT stock_code FROM daily_kline WHERE date>=? AND date<=?", (start_date, end_date)).fetchall()
+        db.close()
+        stock_codes = [r[0] for r in stock_rows]
+        log.info(f"按股票分片: {len(stock_codes)} 只股票 × {len(dates)} 天")
+
+        t_start = time.time()
+        completed = 0
+        err_codes = []
+        # 并行按股票处理
+        task_args = [(code, dates) for code in stock_codes]
+        results_by_code = []
+        if workers == 1 or len(task_args) < 8:
+            for a in task_args:
+                results_by_code.append(scan_stock_all_worker(a))
+        else:
+            with ProcessPoolExecutor(max_workers=workers) as pool:
+                futures = {pool.submit(scan_stock_all_worker, a): a for a in task_args}
+                for f in as_completed(futures):
+                    results_by_code.append(f.result())
+                    completed += 1
+                    if completed % 100 == 0 or completed == len(task_args):
+                        eta = (time.time() - t_start) / completed * (len(task_args) - completed)
+                        log.info(f"  进度 {completed}/{len(task_args)} ETA {eta/60:.0f}min")
+
+        # 按日重组并写库
+        day_map = {d: [] for d in dates}
+        for code, res in results_by_code:
+            if isinstance(res, str):
+                err_codes.append(res)
+                continue
+            for d, summary in res:
+                if d in day_map and summary:
+                    day_map[d].append(summary)
+        for d in dates:
+            n = save_day_results(DB, d, day_map[d])
+            log.info(f"  ✓ {d} 保存 {n} 只")
+
+        total_elapsed = time.time() - t_start
+        log.info(f"\n=== 完成 ===")
+        log.info(f"股票 {len(stock_codes)} 只 × {len(dates)} 天")
+        log.info(f"失败股票: {len(err_codes)}")
+        for e in err_codes[:5]:
+            log.warning(f"  {e}")
+        log.info(f"总耗时: {total_elapsed/60:.1f}min")
+        sys.exit(0)
 
     t_start = time.time()
     completed = 0
