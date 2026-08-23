@@ -1,442 +1,865 @@
-# index_style.yaml — RS强度计算的指数K线配置
-# 共 407 个指数，5 个分类
-# 生成自 docs/RS强度完整指数清单_v2.md
-
 meta:
   description: RS强度计算用指数K线配置
   source: docs/RS强度完整指数清单_v2.md
   total_indices: 408
-
 categories:
-  market:  # 全市场指数 (30个)
-    - {code: "000001", name: "上证指数"}
-    - {code: "399001", name: "深证成指"}
-    - {code: "000680", name: "科创综指"}
-    - {code: "930903", name: "中证A股"}
-    - {code: "399006", name: "创业板指"}
-    - {code: "000009", name: "上证380"}
-    - {code: "000010", name: "上证180"}
-    - {code: "000016", name: "上证50"}
-    - {code: "000043", name: "超大盘"}
-    - {code: "000044", name: "上证中盘"}
-    - {code: "000046", name: "上证中小"}
-    - {code: "000300", name: "沪深300"}
-    - {code: "000510", name: "中证A500"}
-    - {code: "000688", name: "科创50"}
-    - {code: "000698", name: "科创100"}
-    - {code: "000699", name: "科创200"}
-    - {code: "000852", name: "中证1000"}
-    - {code: "000903", name: "中证A100"}
-    - {code: "000904", name: "中证200"}
-    - {code: "000905", name: "中证500"}
-    - {code: "000906", name: "中证800"}
-    - {code: "000907", name: "中证700"}
-    - {code: "000985", name: "中证全指"}
-    - {code: "899050", name: "北证50"}
-    - {code: "930050", name: "中证A50"}
-    - {code: "930931", name: "港股通50"}
-    - {code: "931395", name: "沪港深300"}
-    - {code: "931643", name: "科创创业50"}
-    - {code: "932000", name: "中证2000"}
-    - {code: "H30455", name: "沪港深500"}
-  sector_l1:  # L1 一级行业 (11个)
-    - {code: "000986", name: "全指能源"}
-    - {code: "000987", name: "全指材料"}
-    - {code: "000988", name: "全指工业"}
-    - {code: "000989", name: "全指可选"}
-    - {code: "000990", name: "全指消费"}
-    - {code: "000991", name: "全指医药"}
-    - {code: "000992", name: "全指金融"}
-    - {code: "000993", name: "全指信息"}
-    - {code: "000994", name: "全指电信"}
-    - {code: "000995", name: "全指公用"}
-    - {code: "931775", name: "全指房地产"}
-  sector_l2:  # L2 二级行业 (45个)
-    - {code: "000018", name: "180金融"}
-    - {code: "000036", name: "上证消费"}
-    - {code: "000037", name: "上证医药"}
-    - {code: "000807", name: "食品饮料"}
-    - {code: "000808", name: "医药生物"}
-    - {code: "000819", name: "有色金属"}
-    - {code: "000841", name: "800医药"}
-    - {code: "000857", name: "500医药"}
-    - {code: "000858", name: "500信息"}
-    - {code: "399965", name: "800地产"}
-    - {code: "399975", name: "证券公司"}
-    - {code: "399986", name: "中证银行"}
-    - {code: "399995", name: "基建工程"}
-    - {code: "399998", name: "中证煤炭"}
-    - {code: "930697", name: "家用电器"}
-    - {code: "930910", name: "农牧渔"}
-    - {code: "930965", name: "HKC医药C"}
-    - {code: "931479", name: "证券保险"}
-    - {code: "931897", name: "绿色电力"}
-    - {code: "932087", name: "集成电路"}
-    - {code: "932088", name: "全指航空"}
-    - {code: "H30171", name: "运输指数"}
-    - {code: "H30182", name: "计算机"}
-    - {code: "H30184", name: "半导体"}
-    - {code: "H30198", name: "油气产业"}
-    - {code: "H30199", name: "电力指数"}
-    - {code: "H30217", name: "医疗器械"}
-    - {code: "H30463", name: "沪港深500医药"}
-    - {code: "000935", name: "800信息"}
-    - {code: "000936", name: "800通信"}
-    - {code: "000937", name: "800公用"}
-    - {code: "000908", name: "300能源"}
-    - {code: "000909", name: "300材料"}
-    - {code: "000910", name: "300工业"}
-    - {code: "000911", name: "300可选"}
-    - {code: "000912", name: "300消费"}
-    - {code: "000913", name: "300医药"}
-    - {code: "000915", name: "300信息"}
-    - {code: "000917", name: "300公用"}
-    - {code: "000928", name: "800能源"}
-    - {code: "000929", name: "800材料"}
-    - {code: "000930", name: "800工业"}
-    - {code: "000931", name: "800可选"}
-    - {code: "000932", name: "800消费"}
-    - {code: "000933", name: "800医卫"}
-  thematic:  # L3 行业主题 (229个)
-    - {code: "000021", name: "180治理"}
-    - {code: "000042", name: "上证央企"}
-    - {code: "000048", name: "责任指数"}
-    - {code: "000056", name: "上证国企"}
-    - {code: "000063", name: "上证周期"}
-    - {code: "000066", name: "上证商品"}
-    - {code: "000068", name: "上证资源"}
-    - {code: "000069", name: "消费80"}
-    - {code: "000092", name: "资源50"}
-    - {code: "000126", name: "消费50"}
-    - {code: "000171", name: "新兴成指"}
-    - {code: "000682", name: "科创信息"}
-    - {code: "000683", name: "科创生物"}
-    - {code: "000685", name: "科创芯片"}
-    - {code: "000689", name: "科创材料"}
-    - {code: "000692", name: "科创新能"}
-    - {code: "000806", name: "消费服务"}
-    - {code: "000811", name: "细分有色"}
-    - {code: "000812", name: "细分机械"}
-    - {code: "000813", name: "细分化工"}
-    - {code: "000814", name: "细分医药"}
-    - {code: "000815", name: "细分食品"}
-    - {code: "000816", name: "细分地产"}
-    - {code: "000818", name: "细分金融"}
-    - {code: "000827", name: "中证环保"}
-    - {code: "000859", name: "国企一带一路"}
-    - {code: "000860", name: "结构调整"}
-    - {code: "000861", name: "央企创新"}
-    - {code: "000901", name: "小康指数"}
-    - {code: "000941", name: "新能源"}
-    - {code: "000942", name: "内地消费"}
-    - {code: "000945", name: "内地运输"}
-    - {code: "000949", name: "中证农业"}
-    - {code: "000955", name: "中证国企"}
-    - {code: "000958", name: "创业成长"}
-    - {code: "000961", name: "中证上游"}
-    - {code: "000962", name: "中证中游"}
-    - {code: "000963", name: "中证下游"}
-    - {code: "000968", name: "300周期"}
-    - {code: "000969", name: "300非周"}
-    - {code: "000977", name: "内地低碳"}
-    - {code: "000978", name: "医药100"}
-    - {code: "000979", name: "大宗商品"}
-    - {code: "000998", name: "中证TMT"}
-    - {code: "399803", name: "工业4.0"}
-    - {code: "399804", name: "中证体育"}
-    - {code: "399805", name: "互联金融"}
-    - {code: "399806", name: "环境治理"}
-    - {code: "399807", name: "高铁产业"}
-    - {code: "399808", name: "中证新能"}
-    - {code: "399809", name: "保险主题"}
-    - {code: "399812", name: "养老产业"}
-    - {code: "399814", name: "大农业"}
-    - {code: "399966", name: "800证保"}
-    - {code: "399967", name: "中证军工"}
-    - {code: "399970", name: "移动互联"}
-    - {code: "399971", name: "中证传媒"}
-    - {code: "399973", name: "中证国防"}
-    - {code: "399974", name: "国企改革"}
-    - {code: "399976", name: "CS新能车"}
-    - {code: "399987", name: "中证酒"}
-    - {code: "399989", name: "中证医疗"}
-    - {code: "399991", name: "一带一路"}
-    - {code: "399993", name: "CSWD生科"}
-    - {code: "399994", name: "信息安全"}
-    - {code: "399996", name: "智能家居"}
-    - {code: "399997", name: "中证白酒"}
-    - {code: "930598", name: "稀土产业"}
-    - {code: "930599", name: "中证高装"}
-    - {code: "930601", name: "中证软件"}
-    - {code: "930604", name: "中国互联网30"}
-    - {code: "930606", name: "中证钢铁"}
-    - {code: "930608", name: "中证基建"}
-    - {code: "930614", name: "环保50"}
-    - {code: "930625", name: "SHS互联网"}
-    - {code: "930629", name: "CSSW健康"}
-    - {code: "930632", name: "CS稀金属"}
-    - {code: "930633", name: "中证旅游"}
-    - {code: "930641", name: "中证中药"}
-    - {code: "930648", name: "CS智消费"}
-    - {code: "930651", name: "CS计算机"}
-    - {code: "930652", name: "CS电子"}
-    - {code: "930653", name: "CS食品饮"}
-    - {code: "930662", name: "CS现代农"}
-    - {code: "930707", name: "中证畜牧"}
-    - {code: "930708", name: "中证有色"}
-    - {code: "930709", name: "香港证券"}
-    - {code: "930712", name: "CS物联网"}
-    - {code: "930713", name: "CS人工智"}
-    - {code: "930716", name: "CS物流"}
-    - {code: "930719", name: "CS精准医"}
-    - {code: "930721", name: "CS智汽车"}
-    - {code: "930726", name: "CS生医"}
-    - {code: "930734", name: "360互联+"}
-    - {code: "930743", name: "中证生科"}
-    - {code: "930746", name: "港中小企"}
-    - {code: "930771", name: "CS新能源"}
-    - {code: "930781", name: "中证影视"}
-    - {code: "930790", name: "CS娱乐TI"}
-    - {code: "930791", name: "CS医药TI"}
-    - {code: "930792", name: "HK银行"}
-    - {code: "930794", name: "中美互联网"}
-    - {code: "930796", name: "全球中国互联网"}
-    - {code: "930820", name: "CS高端制"}
-    - {code: "930821", name: "中证VR"}
-    - {code: "930850", name: "智能制造"}
-    - {code: "930851", name: "云计算"}
-    - {code: "930875", name: "空天军工"}
-    - {code: "930901", name: "动漫游戏"}
-    - {code: "930902", name: "中证数据"}
-    - {code: "930914", name: "港股通高股息"}
-    - {code: "930957", name: "港股通中国100"}
-    - {code: "930986", name: "金融科技"}
-    - {code: "930997", name: "新能源车"}
-    - {code: "931000", name: "大湾区"}
-    - {code: "931008", name: "汽车指数"}
-    - {code: "931009", name: "建筑材料"}
-    - {code: "931021", name: "家电龙头"}
-    - {code: "931024", name: "港股通非银"}
-    - {code: "931025", name: "港股通地产"}
-    - {code: "931027", name: "港股通大消费"}
-    - {code: "931066", name: "军工龙头"}
-    - {code: "931068", name: "消费龙头"}
-    - {code: "931071", name: "人工智能"}
-    - {code: "931079", name: "5G通信"}
-    - {code: "931087", name: "科技龙头"}
-    - {code: "931139", name: "CS消费50"}
-    - {code: "931140", name: "医药50"}
-    - {code: "931144", name: "通信技术"}
-    - {code: "931151", name: "光伏产业"}
-    - {code: "931152", name: "CS创新药"}
-    - {code: "931159", name: "创新100"}
-    - {code: "931160", name: "通信设备"}
-    - {code: "931168", name: "绿色价值100"}
-    - {code: "931186", name: "中证科技"}
-    - {code: "931187", name: "科技100"}
-    - {code: "931230", name: "汽车零部件"}
-    - {code: "931235", name: "中证电信"}
-    - {code: "931238", name: "SSH黄金股票"}
-    - {code: "931239", name: "港股通汽车"}
-    - {code: "931247", name: "中证信创"}
-    - {code: "931248", name: "油气资源"}
-    - {code: "931250", name: "港股通创新药"}
-    - {code: "931268", name: "持续发展"}
-    - {code: "931357", name: "优选消费50"}
-    - {code: "931373", name: "股息龙头"}
-    - {code: "931380", name: "科技50"}
-    - {code: "931381", name: "中证长三角"}
-    - {code: "931397", name: "A股通50"}
-    - {code: "931403", name: "品牌工程"}
-    - {code: "931404", name: "SHS品牌消费50"}
-    - {code: "931406", name: "5G 50"}
-    - {code: "931409", name: "SHS创新药"}
-    - {code: "931412", name: "证券公司30"}
-    - {code: "931442", name: "SHS科技100"}
-    - {code: "931447", name: "科技先锋"}
-    - {code: "931454", name: "港股通消费"}
-    - {code: "931456", name: "中国教育"}
-    - {code: "931461", name: "电子50"}
-    - {code: "931469", name: "云计算50"}
-    - {code: "931470", name: "SHS云计算"}
-    - {code: "931480", name: "线上消费"}
-    - {code: "931481", name: "SHS线上消费"}
-    - {code: "931484", name: "CS医药创新"}
-    - {code: "931487", name: "SHS人工智能50"}
-    - {code: "931494", name: "消费电子"}
-    - {code: "931521", name: "高装细分50"}
-    - {code: "931524", name: "SHS科技龙头"}
-    - {code: "931526", name: "企业核心竞争力50"}
-    - {code: "931573", name: "HKC科技"}
-    - {code: "931574", name: "港股科技"}
-    - {code: "931582", name: "数字经济"}
-    - {code: "931594", name: "卫星产业"}
-    - {code: "931637", name: "港股通互联网"}
-    - {code: "931663", name: "SHS消费龙头"}
-    - {code: "931672", name: "风电产业"}
-    - {code: "931688", name: "中证算力"}
-    - {code: "931719", name: "CS电池"}
-    - {code: "931733", name: "绿色能源"}
-    - {code: "931743", name: "半导体材料设备"}
-    - {code: "931746", name: "储能产业"}
-    - {code: "931747", name: "中证储能"}
-    - {code: "931752", name: "工程机械主题"}
-    - {code: "931755", name: "SEEE碳中和"}
-    - {code: "931783", name: "智能驾驶"}
-    - {code: "931787", name: "港股创新药"}
-    - {code: "931798", name: "光伏龙头30"}
-    - {code: "931802", name: "中证龙头"}
-    - {code: "931845", name: "生猪产业"}
-    - {code: "931865", name: "中证半导"}
-    - {code: "931866", name: "中证机床"}
-    - {code: "931892", name: "有色矿业"}
-    - {code: "931992", name: "疫苗生物"}
-    - {code: "931994", name: "电网设备主题"}
-    - {code: "932037", name: "央企现代能源"}
-    - {code: "932038", name: "央企科技引领"}
-    - {code: "932069", name: "港股通医疗主题"}
-    - {code: "932246", name: "储能电池"}
-    - {code: "932420", name: "智选船舶产业"}
-    - {code: "932438", name: "科创创业机器人"}
-    - {code: "932456", name: "科创创业AI"}
-    - {code: "950096", name: "上海国企"}
-    - {code: "950125", name: "科创半导体材料设备"}
-    - {code: "950161", name: "科创新药"}
-    - {code: "950162", name: "科创芯片设计"}
-    - {code: "950180", name: "科创AI"}
-    - {code: "990001", name: "中华半导体芯片"}
-    - {code: "H11052", name: "智能电车"}
-    - {code: "H11054", name: "装备产业"}
-    - {code: "H11057", name: "石化产业"}
-    - {code: "H11059", name: "工业有色"}
-    - {code: "H11136", name: "中国互联网"}
-    - {code: "H11146", name: "港股通内地金融"}
-    - {code: "H30007", name: "芯片产业"}
-    - {code: "H30015", name: "800汽车"}
-    - {code: "H30035", name: "300非银"}
-    - {code: "H30089", name: "红利潜力"}
-    - {code: "H30106", name: "H300金融服务"}
-    - {code: "H30178", name: "医疗保健"}
-    - {code: "H30202", name: "软件指数"}
-    - {code: "H30318", name: "科技传媒通信150"}
-    - {code: "H30533", name: "中国互联网50"}
-    - {code: "H30535", name: "互联网"}
-    - {code: "H30588", name: "中证证保"}
-    - {code: "H30590", name: "机器人"}
-    - {code: "H30597", name: "新材料"}
-    - {code: "H50040", name: "上红低波"}
-    - {code: "000934", name: "800金融"}
-    - {code: "000914", name: "300金融"}
-  strategy:  # 策略指数 (93个)
-    - {code: "000028", name: "180成长"}
-    - {code: "000029", name: "180价值"}
-    - {code: "000918", name: "300成长"}
-    - {code: "000919", name: "300价值"}
-    - {code: "H30356", name: "800价值"}
-    - {code: "000015", name: "红利指数"}
-    - {code: "000052", name: "50基本"}
-    - {code: "000150", name: "380红利"}
-    - {code: "000151", name: "上国红利"}
-    - {code: "000690", name: "科创成长"}
-    - {code: "000821", name: "300红利"}
-    - {code: "000822", name: "500红利"}
-    - {code: "000824", name: "国企红利"}
-    - {code: "000825", name: "央企红利"}
-    - {code: "000842", name: "800等权"}
-    - {code: "000922", name: "中证红利"}
-    - {code: "000925", name: "基本面50"}
-    - {code: "000971", name: "等权90"}
-    - {code: "000982", name: "500等权"}
-    - {code: "399701", name: "深证F60"}
-    - {code: "399702", name: "深证F120"}
-    - {code: "399983", name: "地产等权"}
-    - {code: "399990", name: "煤炭等权"}
-    - {code: "930723", name: "沪港深F100"}
-    - {code: "930740", name: "300红利LV"}
-    - {code: "930758", name: "凤凰50"}
-    - {code: "930782", name: "500SNLV"}
-    - {code: "930838", name: "CS高股息"}
-    - {code: "930839", name: "港股通高息精选"}
-    - {code: "930846", name: "300SNLV"}
-    - {code: "930938", name: "500成长估值"}
-    - {code: "930939", name: "500质量"}
-    - {code: "930949", name: "价值回报"}
-    - {code: "930955", name: "红利低波100"}
-    - {code: "930992", name: "沪港深红利低波"}
-    - {code: "931039", name: "银行AH"}
-    - {code: "931052", name: "国信价值"}
-    - {code: "931067", name: "绩优策略"}
-    - {code: "931069", name: "中金300"}
-    - {code: "931082", name: "A500现金流"}
-    - {code: "931130", name: "红利成长低波"}
-    - {code: "931132", name: "诚通央企红利"}
-    - {code: "931142", name: "东证竞争"}
-    - {code: "931155", name: "300质量成长"}
-    - {code: "931157", name: "SHS红利成长LV"}
-    - {code: "931165", name: "新兴科技100"}
-    - {code: "931166", name: "医药健康100"}
-    - {code: "931167", name: "先进制造100"}
-    - {code: "931233", name: "港股通央企红利"}
-    - {code: "931371", name: "品牌消费100"}
-    - {code: "931375", name: "300质量低波"}
-    - {code: "931402", name: "证券先锋"}
-    - {code: "931446", name: "东证红利低波"}
-    - {code: "931468", name: "红利质量"}
-    - {code: "931476", name: "ESG 120策略"}
-    - {code: "931579", name: "东证优势成长"}
-    - {code: "931586", name: "300价值稳健"}
-    - {code: "931587", name: "500价值稳健"}
-    - {code: "931588", name: "1000价值稳健"}
-    - {code: "931590", name: "500成长创新"}
-    - {code: "931591", name: "1000成长创新"}
-    - {code: "931644", name: "800红利"}
-    - {code: "931645", name: "1000红利"}
-    - {code: "931696", name: "科技50策略"}
-    - {code: "931697", name: "消费50策略"}
-    - {code: "931718", name: "高端造质量成长50"}
-    - {code: "931722", name: "国新港股通央企红利"}
-    - {code: "931785", name: "智选沪深港科技50"}
-    - {code: "931829", name: "中证回购"}
-    - {code: "931848", name: "800红利低波"}
-    - {code: "932039", name: "央企股东回报"}
-    - {code: "932152", name: "港股通成长策略"}
-    - {code: "932153", name: "港股通价值策略"}
-    - {code: "932255", name: "A500红利增长"}
-    - {code: "932305", name: "智选高股息"}
-    - {code: "932315", name: "中证红利质量"}
-    - {code: "932365", name: "中证现金流"}
-    - {code: "932366", name: "300现金流"}
-    - {code: "932367", name: "500现金流"}
-    - {code: "932368", name: "800现金流"}
-    - {code: "932369", name: "1000现金流"}
-    - {code: "932422", name: "A500红利低波"}
-    - {code: "932431", name: "300质量"}
-    - {code: "932450", name: "香港现金流"}
-    - {code: "932457", name: "港股通现金流"}
-    - {code: "932596", name: "港股通红利低波"}
-    - {code: "950090", name: "50AH优选"}
-    - {code: "950333", name: "智选创新价值"}
-    - {code: "H11140", name: "香港红利"}
-    - {code: "H30094", name: "消费红利"}
-    - {code: "H30095", name: "医药红利"}
-    - {code: "H30269", name: "红利低波"}
-    - {code: "H30270", name: "红利价值"}
-    - {code: "980092", name: "国证自由现金流"}
-
-  etf:  # ETF指数基金（数据源：通达信本地文件 + 理杏仁兜底）
-    - {code: "513120", name: "港股创新药ETF广发"}
-    - {code: "159201", name: "自由现金流ETF华夏"}
-    - {code: "100032", name: "富国中证红利指数增强"}
-    - {code: "159327", name: "半导体设备ETF万家"}
-    - {code: "159530", name: "机器人ETF易方达"}
-    - {code: "159206", name: "卫星ETF永赢"}
-    - {code: "516020", name: "化工ETF华宝"}
-    - {code: "512660", name: "军工ETF国泰"}
-    - {code: "515220", name: "煤炭ETF国泰"}
-    - {code: "512580", name: "碳中和ETF广发"}
-    - {code: "159690", name: "有色矿业ETF招商"}
-    - {code: "515790", name: "芯片ETF国泰"}
-    - {code: "515790", name: "光伏ETF华泰柏瑞"}
-    - {code: "510880", name: "红利ETF华泰柏瑞"}
-    - {code: "513630", name: "标普港股通低波红利"}
-    - {code: "159545", name: "恒生港股通高股息低波动"}
+  market:
+  - code: '000001'
+    name: 上证指数
+  - code: '399001'
+    name: 深证成指
+  - code: 000680
+    name: 科创综指
+  - code: '930903'
+    name: 中证A股
+  - code: '399006'
+    name: 创业板指
+  - code: 000009
+    name: 上证380
+  - code: '000010'
+    name: 上证180
+  - code: '000016'
+    name: 上证50
+  - code: '000043'
+    name: 超大盘
+  - code: '000044'
+    name: 上证中盘
+  - code: '000046'
+    name: 上证中小
+  - code: '000300'
+    name: 沪深300
+  - code: '000510'
+    name: 中证A500
+  - code: 000688
+    name: 科创50
+  - code: 000698
+    name: 科创100
+  - code: 000699
+    name: 科创200
+  - code: 000852
+    name: 中证1000
+  - code: 000903
+    name: 中证A100
+  - code: 000904
+    name: 中证200
+  - code: 000905
+    name: 中证500
+  - code: 000906
+    name: 中证800
+  - code: 000907
+    name: 中证700
+  - code: 000985
+    name: 中证全指
+  - code: '899050'
+    name: 北证50
+  - code: '930050'
+    name: 中证A50
+  - code: '930931'
+    name: 港股通50
+  - code: '931395'
+    name: 沪港深300
+  - code: '931643'
+    name: 科创创业50
+  - code: '932000'
+    name: 中证2000
+  - code: H30455
+    name: 沪港深500
+  sector_l1:
+  - code: 000986
+    name: 全指能源
+  - code: 000987
+    name: 全指材料
+  - code: 000988
+    name: 全指工业
+  - code: 000989
+    name: 全指可选
+  - code: 000990
+    name: 全指消费
+  - code: 000991
+    name: 全指医药
+  - code: 000992
+    name: 全指金融
+  - code: 000993
+    name: 全指信息
+  - code: 000994
+    name: 全指电信
+  - code: 000995
+    name: 全指公用
+  - code: '931775'
+    name: 全指房地产
+  sector_l2:
+  - code: 000018
+    name: 180金融
+  - code: '000036'
+    name: 上证消费
+  - code: '000037'
+    name: 上证医药
+  - code: 000807
+    name: 食品饮料
+  - code: 000808
+    name: 医药生物
+  - code: 000819
+    name: 有色金属
+  - code: 000841
+    name: 800医药
+  - code: 000857
+    name: 500医药
+  - code: 000858
+    name: 500信息
+  - code: '399965'
+    name: 800地产
+  - code: '399975'
+    name: 证券公司
+  - code: '399986'
+    name: 中证银行
+  - code: '399995'
+    name: 基建工程
+  - code: '399998'
+    name: 中证煤炭
+  - code: '930697'
+    name: 家用电器
+  - code: '930910'
+    name: 农牧渔
+  - code: '930965'
+    name: HKC医药C
+  - code: '931479'
+    name: 证券保险
+  - code: '931897'
+    name: 绿色电力
+  - code: '932087'
+    name: 集成电路
+  - code: '932088'
+    name: 全指航空
+  - code: H30171
+    name: 运输指数
+  - code: H30182
+    name: 计算机
+  - code: H30184
+    name: 半导体
+  - code: H30198
+    name: 油气产业
+  - code: H30199
+    name: 电力指数
+  - code: H30217
+    name: 医疗器械
+  - code: H30463
+    name: 沪港深500医药
+  - code: 000935
+    name: 800信息
+  - code: 000936
+    name: 800通信
+  - code: 000937
+    name: 800公用
+  - code: 000908
+    name: 300能源
+  - code: 000909
+    name: 300材料
+  - code: 000910
+    name: 300工业
+  - code: 000911
+    name: 300可选
+  - code: 000912
+    name: 300消费
+  - code: 000913
+    name: 300医药
+  - code: 000915
+    name: 300信息
+  - code: 000917
+    name: 300公用
+  - code: 000928
+    name: 800能源
+  - code: 000929
+    name: 800材料
+  - code: 000930
+    name: 800工业
+  - code: 000931
+    name: 800可选
+  - code: 000932
+    name: 800消费
+  - code: 000933
+    name: 800医卫
+  thematic:
+  - code: '000021'
+    name: 180治理
+  - code: '000042'
+    name: 上证央企
+  - code: 000048
+    name: 责任指数
+  - code: '000056'
+    name: 上证国企
+  - code: '000063'
+    name: 上证周期
+  - code: '000066'
+    name: 上证商品
+  - code: 000068
+    name: 上证资源
+  - code: 000069
+    name: 消费80
+  - code: 000092
+    name: 资源50
+  - code: '000126'
+    name: 消费50
+  - code: '000171'
+    name: 新兴成指
+  - code: 000682
+    name: 科创信息
+  - code: 000683
+    name: 科创生物
+  - code: 000685
+    name: 科创芯片
+  - code: 000689
+    name: 科创材料
+  - code: 000692
+    name: 科创新能
+  - code: 000806
+    name: 消费服务
+  - code: 000811
+    name: 细分有色
+  - code: 000812
+    name: 细分机械
+  - code: 000813
+    name: 细分化工
+  - code: 000814
+    name: 细分医药
+  - code: 000815
+    name: 细分食品
+  - code: 000816
+    name: 细分地产
+  - code: 000818
+    name: 细分金融
+  - code: 000827
+    name: 中证环保
+  - code: 000859
+    name: 国企一带一路
+  - code: 000860
+    name: 结构调整
+  - code: 000861
+    name: 央企创新
+  - code: 000901
+    name: 小康指数
+  - code: 000941
+    name: 新能源
+  - code: 000942
+    name: 内地消费
+  - code: 000945
+    name: 内地运输
+  - code: 000949
+    name: 中证农业
+  - code: 000955
+    name: 中证国企
+  - code: 000958
+    name: 创业成长
+  - code: 000961
+    name: 中证上游
+  - code: 000962
+    name: 中证中游
+  - code: 000963
+    name: 中证下游
+  - code: 000968
+    name: 300周期
+  - code: 000969
+    name: 300非周
+  - code: 000977
+    name: 内地低碳
+  - code: 000978
+    name: 医药100
+  - code: 000979
+    name: 大宗商品
+  - code: 000998
+    name: 中证TMT
+  - code: '399803'
+    name: 工业4.0
+  - code: '399804'
+    name: 中证体育
+  - code: '399805'
+    name: 互联金融
+  - code: '399806'
+    name: 环境治理
+  - code: '399807'
+    name: 高铁产业
+  - code: '399808'
+    name: 中证新能
+  - code: '399809'
+    name: 保险主题
+  - code: '399812'
+    name: 养老产业
+  - code: '399814'
+    name: 大农业
+  - code: '399966'
+    name: 800证保
+  - code: '399967'
+    name: 中证军工
+  - code: '399970'
+    name: 移动互联
+  - code: '399971'
+    name: 中证传媒
+  - code: '399973'
+    name: 中证国防
+  - code: '399974'
+    name: 国企改革
+  - code: '399976'
+    name: CS新能车
+  - code: '399987'
+    name: 中证酒
+  - code: '399989'
+    name: 中证医疗
+  - code: '399991'
+    name: 一带一路
+  - code: '399993'
+    name: CSWD生科
+  - code: '399994'
+    name: 信息安全
+  - code: '399996'
+    name: 智能家居
+  - code: '399997'
+    name: 中证白酒
+  - code: '930598'
+    name: 稀土产业
+  - code: '930599'
+    name: 中证高装
+  - code: '930601'
+    name: 中证软件
+  - code: '930604'
+    name: 中国互联网30
+  - code: '930606'
+    name: 中证钢铁
+  - code: '930608'
+    name: 中证基建
+  - code: '930614'
+    name: 环保50
+  - code: '930625'
+    name: SHS互联网
+  - code: '930629'
+    name: CSSW健康
+  - code: '930632'
+    name: CS稀金属
+  - code: '930633'
+    name: 中证旅游
+  - code: '930641'
+    name: 中证中药
+  - code: '930648'
+    name: CS智消费
+  - code: '930651'
+    name: CS计算机
+  - code: '930652'
+    name: CS电子
+  - code: '930653'
+    name: CS食品饮
+  - code: '930662'
+    name: CS现代农
+  - code: '930707'
+    name: 中证畜牧
+  - code: '930708'
+    name: 中证有色
+  - code: '930709'
+    name: 香港证券
+  - code: '930712'
+    name: CS物联网
+  - code: '930713'
+    name: CS人工智
+  - code: '930716'
+    name: CS物流
+  - code: '930719'
+    name: CS精准医
+  - code: '930721'
+    name: CS智汽车
+  - code: '930726'
+    name: CS生医
+  - code: '930734'
+    name: 360互联+
+  - code: '930743'
+    name: 中证生科
+  - code: '930746'
+    name: 港中小企
+  - code: '930771'
+    name: CS新能源
+  - code: '930781'
+    name: 中证影视
+  - code: '930790'
+    name: CS娱乐TI
+  - code: '930791'
+    name: CS医药TI
+  - code: '930792'
+    name: HK银行
+  - code: '930794'
+    name: 中美互联网
+  - code: '930796'
+    name: 全球中国互联网
+  - code: '930820'
+    name: CS高端制
+  - code: '930821'
+    name: 中证VR
+  - code: '930850'
+    name: 智能制造
+  - code: '930851'
+    name: 云计算
+  - code: '930875'
+    name: 空天军工
+  - code: '930901'
+    name: 动漫游戏
+  - code: '930902'
+    name: 中证数据
+  - code: '930914'
+    name: 港股通高股息
+  - code: '930957'
+    name: 港股通中国100
+  - code: '930986'
+    name: 金融科技
+  - code: '930997'
+    name: 新能源车
+  - code: '931000'
+    name: 大湾区
+  - code: '931008'
+    name: 汽车指数
+  - code: '931009'
+    name: 建筑材料
+  - code: '931021'
+    name: 家电龙头
+  - code: '931024'
+    name: 港股通非银
+  - code: '931025'
+    name: 港股通地产
+  - code: '931027'
+    name: 港股通大消费
+  - code: '931066'
+    name: 军工龙头
+  - code: '931068'
+    name: 消费龙头
+  - code: '931071'
+    name: 人工智能
+  - code: '931079'
+    name: 5G通信
+  - code: '931087'
+    name: 科技龙头
+  - code: '931139'
+    name: CS消费50
+  - code: '931140'
+    name: 医药50
+  - code: '931144'
+    name: 通信技术
+  - code: '931151'
+    name: 光伏产业
+  - code: '931152'
+    name: CS创新药
+  - code: '931159'
+    name: 创新100
+  - code: '931160'
+    name: 通信设备
+  - code: '931168'
+    name: 绿色价值100
+  - code: '931186'
+    name: 中证科技
+  - code: '931187'
+    name: 科技100
+  - code: '931230'
+    name: 汽车零部件
+  - code: '931235'
+    name: 中证电信
+  - code: '931238'
+    name: SSH黄金股票
+  - code: '931239'
+    name: 港股通汽车
+  - code: '931247'
+    name: 中证信创
+  - code: '931248'
+    name: 油气资源
+  - code: '931250'
+    name: 港股通创新药
+  - code: '931268'
+    name: 持续发展
+  - code: '931357'
+    name: 优选消费50
+  - code: '931373'
+    name: 股息龙头
+  - code: '931380'
+    name: 科技50
+  - code: '931381'
+    name: 中证长三角
+  - code: '931397'
+    name: A股通50
+  - code: '931403'
+    name: 品牌工程
+  - code: '931404'
+    name: SHS品牌消费50
+  - code: '931406'
+    name: 5G 50
+  - code: '931409'
+    name: SHS创新药
+  - code: '931412'
+    name: 证券公司30
+  - code: '931442'
+    name: SHS科技100
+  - code: '931447'
+    name: 科技先锋
+  - code: '931454'
+    name: 港股通消费
+  - code: '931456'
+    name: 中国教育
+  - code: '931461'
+    name: 电子50
+  - code: '931469'
+    name: 云计算50
+  - code: '931470'
+    name: SHS云计算
+  - code: '931480'
+    name: 线上消费
+  - code: '931481'
+    name: SHS线上消费
+  - code: '931484'
+    name: CS医药创新
+  - code: '931487'
+    name: SHS人工智能50
+  - code: '931494'
+    name: 消费电子
+  - code: '931521'
+    name: 高装细分50
+  - code: '931524'
+    name: SHS科技龙头
+  - code: '931526'
+    name: 企业核心竞争力50
+  - code: '931573'
+    name: HKC科技
+  - code: '931574'
+    name: 港股科技
+  - code: '931582'
+    name: 数字经济
+  - code: '931594'
+    name: 卫星产业
+  - code: '931637'
+    name: 港股通互联网
+  - code: '931663'
+    name: SHS消费龙头
+  - code: '931672'
+    name: 风电产业
+  - code: '931688'
+    name: 中证算力
+  - code: '931719'
+    name: CS电池
+  - code: '931733'
+    name: 绿色能源
+  - code: '931743'
+    name: 半导体材料设备
+  - code: '931746'
+    name: 储能产业
+  - code: '931747'
+    name: 中证储能
+  - code: '931752'
+    name: 工程机械主题
+  - code: '931755'
+    name: SEEE碳中和
+  - code: '931783'
+    name: 智能驾驶
+  - code: '931787'
+    name: 港股创新药
+  - code: '931798'
+    name: 光伏龙头30
+  - code: '931802'
+    name: 中证龙头
+  - code: '931845'
+    name: 生猪产业
+  - code: '931865'
+    name: 中证半导
+  - code: '931866'
+    name: 中证机床
+  - code: '931892'
+    name: 有色矿业
+  - code: '931992'
+    name: 疫苗生物
+  - code: '931994'
+    name: 电网设备主题
+  - code: '932037'
+    name: 央企现代能源
+  - code: '932038'
+    name: 央企科技引领
+  - code: '932069'
+    name: 港股通医疗主题
+  - code: '932246'
+    name: 储能电池
+  - code: '932420'
+    name: 智选船舶产业
+  - code: '932438'
+    name: 科创创业机器人
+  - code: '932456'
+    name: 科创创业AI
+  - code: '950096'
+    name: 上海国企
+  - code: '950125'
+    name: 科创半导体材料设备
+  - code: '950161'
+    name: 科创新药
+  - code: '950162'
+    name: 科创芯片设计
+  - code: '950180'
+    name: 科创AI
+  - code: '990001'
+    name: 中华半导体芯片
+  - code: H11052
+    name: 智能电车
+  - code: H11054
+    name: 装备产业
+  - code: H11057
+    name: 石化产业
+  - code: H11059
+    name: 工业有色
+  - code: H11136
+    name: 中国互联网
+  - code: H11146
+    name: 港股通内地金融
+  - code: H30007
+    name: 芯片产业
+  - code: H30015
+    name: 800汽车
+  - code: H30035
+    name: 300非银
+  - code: H30089
+    name: 红利潜力
+  - code: H30106
+    name: H300金融服务
+  - code: H30178
+    name: 医疗保健
+  - code: H30202
+    name: 软件指数
+  - code: H30318
+    name: 科技传媒通信150
+  - code: H30533
+    name: 中国互联网50
+  - code: H30535
+    name: 互联网
+  - code: H30588
+    name: 中证证保
+  - code: H30590
+    name: 机器人
+  - code: H30597
+    name: 新材料
+  - code: H50040
+    name: 上红低波
+  - code: 000934
+    name: 800金融
+  - code: 000914
+    name: 300金融
+  strategy:
+  - code: 000028
+    name: 180成长
+  - code: 000029
+    name: 180价值
+  - code: 000918
+    name: 300成长
+  - code: 000919
+    name: 300价值
+  - code: H30356
+    name: 800价值
+  - code: '000015'
+    name: 红利指数
+  - code: '000052'
+    name: 50基本
+  - code: '000150'
+    name: 380红利
+  - code: '000151'
+    name: 上国红利
+  - code: 000690
+    name: 科创成长
+  - code: 000821
+    name: 300红利
+  - code: 000822
+    name: 500红利
+  - code: 000824
+    name: 国企红利
+  - code: 000825
+    name: 央企红利
+  - code: 000842
+    name: 800等权
+  - code: 000922
+    name: 中证红利
+  - code: 000925
+    name: 基本面50
+  - code: 000971
+    name: 等权90
+  - code: 000982
+    name: 500等权
+  - code: '399701'
+    name: 深证F60
+  - code: '399702'
+    name: 深证F120
+  - code: '399983'
+    name: 地产等权
+  - code: '399990'
+    name: 煤炭等权
+  - code: '930723'
+    name: 沪港深F100
+  - code: '930740'
+    name: 300红利LV
+  - code: '930758'
+    name: 凤凰50
+  - code: '930782'
+    name: 500SNLV
+  - code: '930838'
+    name: CS高股息
+  - code: '930839'
+    name: 港股通高息精选
+  - code: '930846'
+    name: 300SNLV
+  - code: '930938'
+    name: 500成长估值
+  - code: '930939'
+    name: 500质量
+  - code: '930949'
+    name: 价值回报
+  - code: '930955'
+    name: 红利低波100
+  - code: '930992'
+    name: 沪港深红利低波
+  - code: '931039'
+    name: 银行AH
+  - code: '931052'
+    name: 国信价值
+  - code: '931067'
+    name: 绩优策略
+  - code: '931069'
+    name: 中金300
+  - code: '931082'
+    name: A500现金流
+  - code: '931130'
+    name: 红利成长低波
+  - code: '931132'
+    name: 诚通央企红利
+  - code: '931142'
+    name: 东证竞争
+  - code: '931155'
+    name: 300质量成长
+  - code: '931157'
+    name: SHS红利成长LV
+  - code: '931165'
+    name: 新兴科技100
+  - code: '931166'
+    name: 医药健康100
+  - code: '931167'
+    name: 先进制造100
+  - code: '931233'
+    name: 港股通央企红利
+  - code: '931371'
+    name: 品牌消费100
+  - code: '931375'
+    name: 300质量低波
+  - code: '931402'
+    name: 证券先锋
+  - code: '931446'
+    name: 东证红利低波
+  - code: '931468'
+    name: 红利质量
+  - code: '931476'
+    name: ESG 120策略
+  - code: '931579'
+    name: 东证优势成长
+  - code: '931586'
+    name: 300价值稳健
+  - code: '931587'
+    name: 500价值稳健
+  - code: '931588'
+    name: 1000价值稳健
+  - code: '931590'
+    name: 500成长创新
+  - code: '931591'
+    name: 1000成长创新
+  - code: '931644'
+    name: 800红利
+  - code: '931645'
+    name: 1000红利
+  - code: '931696'
+    name: 科技50策略
+  - code: '931697'
+    name: 消费50策略
+  - code: '931718'
+    name: 高端造质量成长50
+  - code: '931722'
+    name: 国新港股通央企红利
+  - code: '931785'
+    name: 智选沪深港科技50
+  - code: '931829'
+    name: 中证回购
+  - code: '931848'
+    name: 800红利低波
+  - code: '932039'
+    name: 央企股东回报
+  - code: '932152'
+    name: 港股通成长策略
+  - code: '932153'
+    name: 港股通价值策略
+  - code: '932255'
+    name: A500红利增长
+  - code: '932305'
+    name: 智选高股息
+  - code: '932315'
+    name: 中证红利质量
+  - code: '932365'
+    name: 中证现金流
+  - code: '932366'
+    name: 300现金流
+  - code: '932367'
+    name: 500现金流
+  - code: '932368'
+    name: 800现金流
+  - code: '932369'
+    name: 1000现金流
+  - code: '932422'
+    name: A500红利低波
+  - code: '932431'
+    name: 300质量
+  - code: '932450'
+    name: 香港现金流
+  - code: '932457'
+    name: 港股通现金流
+  - code: '932596'
+    name: 港股通红利低波
+  - code: '950090'
+    name: 50AH优选
+  - code: '950333'
+    name: 智选创新价值
+  - code: H11140
+    name: 香港红利
+  - code: H30094
+    name: 消费红利
+  - code: H30095
+    name: 医药红利
+  - code: H30269
+    name: 红利低波
+  - code: H30270
+    name: 红利价值
+  - code: '980092'
+    name: 国证自由现金流
+  etf:
+  - code: '513120'
+    name: 港股创新药ETF广发
+  - code: '159201'
+    name: 自由现金流ETF华夏
+  - code: '100032'
+    name: 富国中证红利指数增强
+  - code: '159327'
+    name: 半导体设备ETF万家
+  - code: '159530'
+    name: 机器人ETF易方达
+  - code: '159206'
+    name: 卫星ETF永赢
+  - code: '516020'
+    name: 化工ETF华宝
+  - code: '512660'
+    name: 军工ETF国泰
+  - code: '515220'
+    name: 煤炭ETF国泰
+  - code: '512580'
+    name: 碳中和ETF广发
+  - code: '159690'
+    name: 有色矿业ETF招商
+  - code: '515790'
+    name: 芯片ETF国泰
+  - code: '515790'
+    name: 光伏ETF华泰柏瑞
+  - code: '510880'
+    name: 红利ETF华泰柏瑞
+  - code: '513630'
+    name: 标普港股通低波红利
+  - code: '159545'
+    name: 恒生港股通高股息低波动
+  - code: '159985'
+    name: 豆粕ETF
+  - code: '512400'
+    name: 有色ETF

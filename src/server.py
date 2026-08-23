@@ -6953,6 +6953,78 @@ def api_watchlist_report_index():
     return jsonify({'dates': [r['date'] for r in rows]})
 
 
+# ═══════════════════════════════════════════════
+# API: 商品监控（豆粕/有色）
+# ═══════════════════════════════════════════════
+
+COMMODITY_WATCH = [
+    {'type': 'bean_meal', 'codes': ['159985'], 'name': '豆粕', 'note': '厄尔尼诺/天气逻辑标的'},
+    {'type': 'nonferrous', 'codes': ['512400', '930708', '000819'], 'name': '有色', 'note': 'AI基建+电网+供给约束'},
+]
+
+
+def _comm_metrics(db, code, target_date):
+    """商品标的指标：close/20日/60日涨幅/位置/回撤"""
+    rows = db.execute("""SELECT date, close FROM index_daily_kline
+        WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 261""", (code, target_date)).fetchall()
+    if len(rows) < 21:
+        return None
+    out = {'date': rows[0]['date'], 'close': rows[0]['close']}
+    out['chg_20'] = round((rows[0]['close'] / rows[20]['close'] - 1) * 100, 1)
+    if len(rows) >= 61:
+        out['chg_60'] = round((rows[0]['close'] / rows[60]['close'] - 1) * 100, 1)
+    else:
+        out['chg_60'] = None
+    seg = rows[:250]
+    lo, hi = min(r['close'] for r in seg), max(r['close'] for r in seg)
+    out['pos_250'] = round((rows[0]['close'] - lo) / (hi - lo) * 100) if hi > lo else 50
+    out['dd_250'] = round((hi - rows[0]['close']) / hi * 100, 1)
+    return out
+
+
+@app.route('/api/market-scan/commodity')
+def api_market_commodity():
+    """商品监控（豆粕/有色）：价格/涨幅/位置/回撤 + 简版建议"""
+    target_date = request.args.get('date', '')
+    db = get_db()
+    if not target_date:
+        r = db.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
+        target_date = r[0]
+    result = []
+    for item in COMMODITY_WATCH:
+        entry = {'type': item['type'], 'name': item['name'], 'note': item['note'], 'targets': []}
+        for code in item['codes']:
+            m = _comm_metrics(db, code, target_date)
+            if not m:
+                continue
+            name = code
+            try:
+                names = load_index_names()
+                name = names.get(code, code)
+            except Exception:
+                pass
+            entry['targets'].append({'code': code, 'name': name, **m})
+        # 简版建议（按主标的）
+        t = entry['targets'][0] if entry['targets'] else None
+        if t:
+            if item['type'] == 'bean_meal':
+                if t['pos_250'] < 30 and t['dd_250'] > 15:
+                    entry['level'], entry['advice'] = 'buy', f"布局窗口：位置 {t['pos_250']}% 低位 + 回撤 {t['dd_250']}%（厄尔尼诺预期，注意高波动）"
+                elif t['pos_250'] > 85:
+                    entry['level'], entry['advice'] = 'wait', f"高位 {t['pos_250']}%，天气行情兑现后勿追"
+                else:
+                    entry['level'], entry['advice'] = 'hold', f"观望（位置 {t['pos_250']}%，豆粕 20日 {t['chg_20']}% 尚未启动）"
+            else:
+                if t['chg_20'] > 10 and t['pos_250'] < 70:
+                    entry['level'], entry['advice'] = 'buy', f"趋势启动：20日 {t['chg_20']}% + 位置 {t['pos_250']}% 未过热（AI基建+供给约束逻辑）"
+                elif t['pos_250'] > 85:
+                    entry['level'], entry['advice'] = 'wait', f"高位 {t['pos_250']}%，不追"
+                else:
+                    entry['level'], entry['advice'] = 'hold', f"观望（20日 {t['chg_20']}% / 位置 {t['pos_250']}%）"
+        result.append(entry)
+    return jsonify({'date': target_date, 'items': result})
+
+
 if __name__ == '__main__':
     import sys, io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')

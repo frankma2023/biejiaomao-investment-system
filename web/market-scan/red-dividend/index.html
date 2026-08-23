@@ -50,6 +50,8 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
   <button class="pill-tab" onclick="switchIvTab('coal')">⛏ 中证煤炭</button>
   <button class="pill-tab" onclick="switchIvTab('hk')">🇭🇰 港股红利</button>
   <button class="pill-tab" onclick="switchIvTab('broker')">⛳ 券商指数</button>
+  <button class="pill-tab" onclick="switchIvTab('bean')">🌾 豆粕</button>
+  <button class="pill-tab" onclick="switchIvTab('color')">🥉 有色</button>
 </div>
 <div id="pane-ov" class="iv-pane"></div>
 <div id="pane-red" class="iv-pane" style="display:none"></div>
@@ -57,6 +59,8 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
 <div id="pane-coal" class="iv-pane" style="display:none"></div>
 <div id="pane-hk" class="iv-pane" style="display:none"></div>
 <div id="pane-broker" class="iv-pane" style="display:none"></div>
+<div id="pane-bean" class="iv-pane" style="display:none"></div>
+<div id="pane-color" class="iv-pane" style="display:none"></div>
 </div>
 
 <script>
@@ -86,28 +90,29 @@ const LV = {
 
 // 指数投资 tab 切换
 function switchIvTab(tab) {
-  ['ov','red','fcf','coal','hk','broker'].forEach(function(t) {
+  ['ov','red','fcf','coal','hk','broker','bean','color'].forEach(function(t) {
     var el = document.getElementById('pane-' + t);
     if (el) el.style.display = (t === tab) ? '' : 'none';
   });
   document.querySelectorAll('.pill-tab').forEach(function(b, i) {
-    b.classList.toggle('active', ['ov','red','fcf','coal','hk','broker'][i] === tab);
+    b.classList.toggle('active', ['ov','red','fcf','coal','hk','broker','bean','color'][i] === tab);
   });
   if (tab === 'ov' && frChart) frChart.resize();
 }
 async function load() {
   try {
-    const [da, fa, ca, hk, fr] = await Promise.all([
+    const [da, fa, ca, hk, fr, cm] = await Promise.all([
       fetch(API_BASE + '/api/market-scan/dividend-advice').then(r => r.json()).catch(() => ({indices:[]})),
       fetch(API_BASE + '/api/market-scan/fcf-advice').then(r => r.json()).catch(() => ({})),
       fetch(API_BASE + '/api/market-scan/coal-advice').then(r => r.json()).catch(() => ({error:'no data'})),
       fetch(API_BASE + '/api/market-scan/hk-etf').then(r => r.json()).catch(() => ({etfs:[]})),
-      fetch(API_BASE + '/api/market-scan/full-return-compare').then(r => r.json()).catch(() => ({series:[]}))
+      fetch(API_BASE + '/api/market-scan/full-return-compare').then(r => r.json()).catch(() => ({series:[]})),
+      fetch(API_BASE + '/api/market-scan/commodity').then(r => r.json()).catch(() => ({items:[]}))
     ]);
     const date = da.date || fa.date || ca.date || '';
     document.getElementById('meta').textContent = '红利/自由现金流/中证煤炭指数操作建议 · ' + date + ' · 点击卡片查看详情';
 
-    let ovHtml = '', redHtml = '', fcfHtml = '', coalHtml = '', hkHtml = '', brokerHtml = '';
+    let ovHtml = '', redHtml = '', fcfHtml = '', coalHtml = '', hkHtml = '', brokerHtml = '', beanHtml = '', colorHtml = '';
     // 📋 决策框架（回测验证 2018-2026，H00922 全收益口径）
     ovHtml += '<div class="section-hdr">📋 红利决策框架（怎么买怎么卖）</div>';
     ovHtml += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
@@ -266,7 +271,32 @@ ovHtml += '<div class="note">📊 口径说明：① 回撤：中证红利（000
     document.getElementById('pane-fcf').innerHTML = fcfHtml;
     document.getElementById('pane-coal').innerHTML = coalHtml;
     document.getElementById('pane-hk').innerHTML = hkHtml;
+    // 🌾 豆粕 / 🥉 有色（商品监控）
+    const comm = (cm && cm.items || []).reduce((o, x) => { o[x.type] = x; return o; }, {});
+    const LV2 = {'buy': ['买入', '#ef4444'], 'wait': ['等回调', '#f59e0b'], 'hold': ['观望', '#8b8b90']};
+    function commCard(item) {
+      const t = (item.targets || [])[0];
+      if (!t) return '<div class="card" style="padding:14px 16px;font-size:0.7rem;color:var(--muted)">' + item.name + ' 数据缺失</div>';
+      const lv = LV2[item.level] || LV2.hold;
+      const pct = function(v, p) { return (v != null ? ((p && v > 0 ? '+' : '') + v + '%') : '—'); };
+      return '<div class="sector-grid">' +
+        '<div class="sector-card" style="background:rgba(239,68,68,.05);border-color:rgba(239,68,68,.18)">' +
+        '<div class="sc-title">' + item.name + ' <span class="code">' + t.code + '</span> ' + t.name + '</div>' +
+        '<div style="display:flex;align-items:baseline;gap:8px;margin:4px 0">' +
+        '<span style="font-family:var(--font-display);font-size:1.5rem;font-weight:400;color:var(--text-primary)">' + t.close + '</span>' +
+        '<span style="font-size:11px;font-weight:600;color:' + lv[1] + ';border:1px solid ' + lv[1] + '66;border-radius:6px;padding:1px 6px">' + lv[0] + '</span></div>' +
+        '<div class="tx" style="font-size:0.62rem">' + item.advice + '</div>' +
+        '<div class="meta">20日 ' + pct(t.chg_20, 1) + ' · 60日 ' + pct(t.chg_60, 1) + ' · 位置 ' + (t.pos_250 != null ? t.pos_250 + '%' : '—') + ' · 回撤 ' + (t.dd_250 != null ? t.dd_250 + '%' : '—') + '</div>' +
+        '<div class="sig">' + item.note + '</div>' +
+        '</div></div>' +
+        '<div class="note">⚠️ 商品高波动标的；简版建议（位置/回撤规则），非完整回测结论。数据源：通达信日K（' + t.date + '）。</div>';
+    }
+    if (comm.bean_meal) beanHtml = '<div class="section-hdr">🌾 豆粕监控</div>' + commCard(comm.bean_meal);
+    if (comm.nonferrous) colorHtml = '<div class="section-hdr">🥉 有色监控</div>' + commCard(comm.nonferrous);
+
     document.getElementById('pane-broker').innerHTML = brokerHtml;
+    document.getElementById('pane-bean').innerHTML = beanHtml;
+    document.getElementById('pane-color').innerHTML = colorHtml;
     renderFR(fr);
   } catch(e) {
     document.getElementById('pane-ov').innerHTML = '加载失败: ' + e.message;
