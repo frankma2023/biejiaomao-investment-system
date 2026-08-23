@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>大宗商品ETF 详情 · 510170</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<style>
+body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)}
+.page-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.page-header h1{font-family:var(--font-display);font-size:1.2rem;font-weight:400;color:var(--text-primary);margin:0}
+.sub{color:var(--muted);font-size:0.7rem}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px}
+.stat .k{font-size:0.62rem;color:var(--muted)}
+.stat .v{font-family:var(--font-mono);font-size:1.05rem;margin-top:2px}
+.stat .v.hot{color:#ef4444}
+.stat .v.ok{color:#10b981}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.chart-card h3{font-family:var(--font-display);font-size:0.8rem;font-weight:400;color:var(--text-primary);margin:0 0 8px}
+#ch1{height:300px}
+#ch2{height:280px}
+.rules{font-size:0.66rem;color:var(--muted);line-height:1.9;border-top:1px dashed var(--border);padding-top:8px;margin-top:8px}
+html[data-theme="light"] .stat,.chart-card{background:rgba(255,255,255,.75)}
+</style>
+</head>
+<body>
+<div class="app-container">
+<nav id="top-nav"></nav>
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'🦊',brandText:'知行',currentPage:'index-scan'})</script>
+
+<div class="page-header">
+  <h1>📦 大宗商品ETF 详情 <span class="sub">510170 · 上证大宗商品(000066)</span></h1>
+</div>
+<div id="stat-grid" class="stat-grid"><div class="stat" style="grid-column:1/-1"><div class="k">加载中...</div></div></div>
+<div class="chart-card"><h3>价格 · 250日回撤 · 15%回撤买点</h3><div id="ch1"></div></div>
+<div class="chart-card"><h3>估值分位（000066，3年）— PE / PB / 股息率</h3><div id="ch2"></div></div>
+<div class="chart-card" id="rules-box"><h3>买点/卖点规则（回测验证）</h3><div id="rules" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">加载中...</div></div>
+</div>
+
+<script src="../shared/js/echarts.min.js"></script>
+<script>
+var API_BASE = 'http://localhost:8788';
+var ch1 = null, ch2 = null;
+
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+
+function statGrid(c){
+  var cur = c.current || {};
+  var hot = cur.pb_pct != null && cur.pb_pct > 80;
+  var ddHot = cur.dd_250 != null && cur.dd_250 >= 15;
+  var html = '';
+  var items = [
+    ['现价', cur.close != null ? cur.close : '—', ''],
+    ['250日回撤', cur.dd_250 != null ? cur.dd_250 + '%' : '—', ddHot ? 'hot' : ''],
+    ['PE', cur.pe != null ? cur.pe + ' (' + cur.pe_pct + '%)' : '—', ''],
+    ['PB', cur.pb != null ? cur.pb + ' (' + cur.pb_pct + '%)' : '—', hot ? 'hot' : ''],
+    ['股息率', cur.dyr != null ? cur.dyr + '% (' + cur.dyr_pct + '%)' : '—', ''],
+    ['数据日', c.date || '', ''],
+  ];
+  items.forEach(function(it){
+    html += '<div class="stat"><div class="k">' + it[0] + '</div><div class="v ' + it[2] + '">' + it[1] + '</div></div>';
+  });
+  document.getElementById('stat-grid').innerHTML = html;
+}
+
+function chart1(d){
+  ch1 = echarts.init(document.getElementById('ch1'));
+  var ddMark = [];
+  (d.dd_buy_events || []).forEach(function(e){
+    ddMark.push({coord:[e.date, e.dd], value:'买', itemStyle:{color:'#ef4444'}});
+  });
+  var opt = {
+    backgroundColor:'var(--chart-bg)',
+    tooltip:{trigger:'axis'},
+    legend:{data:['收盘价','250日回撤'],top:0,textStyle:{color:'#8b8b90'}},
+    axisPointer:{link:[{xAxisIndex:[0,1]}]},
+    grid:[{left:50,right:16,top:28,height:110,bottom:0},{left:50,right:16,top:168,height:72,bottom:24}],
+    xAxis:[
+      {type:'category',data:d.dates,axisLabel:{color:'#8b8b90',fontSize:9}},
+      {type:'category',data:d.dates,gridIndex:1,axisLabel:{show:false}}
+    ],
+    yAxis:[
+      {type:'value',scale:true,axisLabel:{color:'#8b8b90',fontSize:9},splitLine:{lineStyle:{color:'rgba(128,128,128,.12)'}}},
+      {type:'value',gridIndex:1,min:0,max:40,axisLabel:{color:'#8b8b90',fontSize:9},splitLine:{show:false}}
+    ],
+    dataZoom:[{type:'inside',xAxisIndex:[0,1]},{type:'slider',xAxisIndex:[0,1],height:10,bottom:0,dataBackground:{opacity:0},showDetail:false}],
+    series:[
+      {name:'收盘价',type:'line',data:d.closes,symbol:'none',lineStyle:{width:1.4,color:'#3b82f6'},xAxisIndex:0,yAxisIndex:0},
+      {name:'250日回撤',type:'line',data:d.dd_series,symbol:'none',lineStyle:{width:1.2,color:'#f59e0b'},xAxisIndex:1,yAxisIndex:1,
+       markLine:{silent:true,symbol:'none',lineStyle:{color:'#ef4444',type:'dashed'},label:{show:false},data:[{yAxis:15}]},
+       markPoint:{symbolSize:0,data:ddMark}},
+      {name:'15%买点',type:'line',data:[],markLine:{silent:true,symbol:'none',lineStyle:{color:'#ef4444',type:'dashed'},label:{formatter:'15%买点',color:'#ef4444',fontSize:9},data:[{yAxis:15}]},xAxisIndex:1,yAxisIndex:1}
+    ]
+  };
+  ch1.setOption(opt);
+}
+
+function chart2(d){
+  ch2 = echarts.init(document.getElementById('ch2'));
+  var opt = {
+    backgroundColor:'var(--chart-bg)',
+    tooltip:{trigger:'axis'},
+    legend:{data:['PE分位','PB分位','股息率分位'],top:0,textStyle:{color:'#8b8b90'}},
+    grid:{left:50,right:16,top:28,height:200,bottom:24},
+    xAxis:{type:'category',data:d.dates,axisLabel:{color:'#8b8b90',fontSize:9}},
+    yAxis:{type:'value',min:0,max:100,axisLabel:{color:'#8b8b90',fontSize:9,formatter:'{value}%'},splitLine:{lineStyle:{color:'rgba(128,128,128,.12)'}}},
+    dataZoom:[{type:'inside'},{type:'slider',height:10,bottom:0,dataBackground:{opacity:0},showDetail:false}],
+    series:[
+      {name:'PE分位',type:'line',data:d.pe_series,symbol:'none',lineStyle:{width:1.2,color:'#3b82f6'}},
+      {name:'PB分位',type:'line',data:d.pb_series,symbol:'none',lineStyle:{width:1.2,color:'#ef4444'}},
+      {name:'股息率分位',type:'line',data:d.dyr_series,symbol:'none',lineStyle:{width:1.2,color:'#10b981'}}
+    ]
+  };
+  ch2.setOption(opt);
+}
+
+function load(){
+  var code = new URLSearchParams(location.search).get('code') || '510170';
+  fetch(API_BASE + '/api/market-scan/commodity-detail?code=' + code)
+    .then(function(r){return r.json()})
+    .then(function(d){
+      statGrid(d);
+      chart1(d);
+      chart2(d);
+      var rules = d.rules || {};
+      var html = '<div style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
+      html += '🟢 回撤买点：' + esc(rules.buy_dd) + '<br>';
+      html += '🟢 估值买点：' + esc(rules.buy_pb) + '<br>';
+      html += '🟢 股息买点：' + esc(rules.buy_dyr) + '<br>';
+      html += '🔴 卖点警示：' + esc(rules.sell_pb) + '<br>';
+      html += '📦 箱体策略：' + esc(rules.box);
+      html += '</div>';
+      document.getElementById('rules').innerHTML = html;
+    })
+    .catch(function(e){
+      document.getElementById('stat-grid').innerHTML = '<div class="stat" style="grid-column:1/-1"><div class="k">加载失败: ' + esc(e.message) + '</div></div>';
+    });
+}
+
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+window.addEventListener('resize',function(){ch1&&ch1.resize();ch2&&ch2.resize()});
+load();
+</script>
+</body>
+</html>

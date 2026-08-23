@@ -7056,6 +7056,71 @@ def api_market_commodity():
     return jsonify({'date': target_date, 'items': result})
 
 
+@app.route('/api/market-scan/commodity-detail')
+def api_market_commodity_detail():
+    """商品标的详情：价格/回撤/估值分位全景（510170 → 估值映射 000066）"""
+    code = request.args.get('code', '510170')
+    target_date = request.args.get('date', '')
+    fund_code = {'510170': '000066'}.get(code, code)
+    db = get_db()
+    if not target_date:
+        r = db.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()
+        target_date = r[0]
+
+    # 3 年价格（后复权）
+    rows = db.execute("""SELECT date, close FROM index_daily_kline
+        WHERE stock_code=? AND date>=date(?,'-3 years') AND date<=? ORDER BY date""",
+                      (code, target_date, target_date)).fetchall()
+    dates = [r['date'] for r in rows]
+    closes = [r['close'] for r in rows]
+
+    # 250 日回撤序列
+    dd_series = []
+    dd_buy_events = []
+    for i in range(len(closes)):
+        win = closes[max(0, i - 249):i + 1]
+        hi = max(win)
+        dd_series.append(round((hi - closes[i]) / hi * 100, 1))
+        if i >= 250 and dd_series[i] >= 15 and dd_series[i - 1] < 15:
+            dd_buy_events.append({'date': dates[i], 'dd': dd_series[i], 'price': round(closes[i], 3)})
+
+    # 估值（000066）：3 年分位 + 实际值
+    val_rows = db.execute("""SELECT date, pe_ttm, pe_ttm_pct, pb, pb_pct, dyr, dyr_pct
+        FROM index_fundamental_daily WHERE stock_code=?
+        AND date>=date(?,'-3 years') AND date<=? ORDER BY date""",
+                          (fund_code, target_date, target_date)).fetchall()
+    vmap = {r['date']: r for r in val_rows}
+    pe_s = [round(vmap[d]['pe_ttm_pct'] * 100) if d in vmap and vmap[d]['pe_ttm_pct'] is not None else None for d in dates]
+    pb_s = [round(vmap[d]['pb_pct'] * 100) if d in vmap and vmap[d]['pb_pct'] is not None else None for d in dates]
+    dyr_s = [round(vmap[d]['dyr_pct'] * 100) if d in vmap and vmap[d]['dyr_pct'] is not None else None for d in dates]
+    pe_v = [round(vmap[d]['pe_ttm'], 1) if d in vmap and vmap[d]['pe_ttm'] else None for d in dates]
+    pb_v = [round(vmap[d]['pb'], 2) if d in vmap and vmap[d]['pb'] else None for d in dates]
+    dyr_v = [round(vmap[d]['dyr'] * 100, 2) if d in vmap and vmap[d]['dyr'] else None for d in dates]
+
+    cur = vmap.get(dates[-1]) if dates else None
+    cur_dd = dd_series[-1] if dd_series else None
+    return jsonify({
+        'code': code, 'name': '大宗商品ETF', 'index': '上证大宗商品(000066)', 'date': dates[-1] if dates else target_date,
+        'dates': dates, 'closes': closes, 'dd_series': dd_series, 'dd_buy_events': dd_buy_events,
+        'pe_series': pe_s, 'pb_series': pb_s, 'dyr_series': dyr_s,
+        'pe_values': pe_v, 'pb_values': pb_v, 'dyr_values': dyr_v,
+        'current': {'close': closes[-1] if closes else None, 'dd_250': cur_dd,
+                    'pe': round(cur['pe_ttm'], 1) if cur and cur['pe_ttm'] else None,
+                    'pe_pct': round(cur['pe_ttm_pct'] * 100) if cur and cur['pe_ttm_pct'] is not None else None,
+                    'pb': round(cur['pb'], 2) if cur and cur['pb'] else None,
+                    'pb_pct': round(cur['pb_pct'] * 100) if cur and cur['pb_pct'] is not None else None,
+                    'dyr': round(cur['dyr'] * 100, 2) if cur and cur['dyr'] else None,
+                    'dyr_pct': round(cur['dyr_pct'] * 100) if cur and cur['dyr_pct'] is not None else None},
+        'rules': {
+            'buy_dd': '回撤≥15%（60日61%）且PB分位<60%',
+            'buy_pb': 'PB分位<20%（80%胜率）',
+            'buy_dyr': '股息率分位>90%（64%）',
+            'sell_pb': 'PB分位>90%（高位警示，当前97%）',
+            'box': '阶梯箱体：箱内网格/突破转趋势，当前台阶1.23-1.65，关键位1.25',
+        },
+    })
+
+
 if __name__ == '__main__':
     import sys, io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')

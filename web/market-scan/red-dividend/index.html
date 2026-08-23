@@ -280,7 +280,7 @@ ovHtml += '<div class="note">📊 口径说明：① 回撤：中证红利（000
       const lv = LV2[item.level] || LV2.hold;
       const pct = function(v, p) { return (v != null ? ((p && v > 0 ? '+' : '') + v + '%') : '—'); };
       return '<div class="sector-grid">' +
-        '<div class="sector-card" style="background:rgba(239,68,68,.05);border-color:rgba(239,68,68,.18)">' +
+        '<div class="sector-card" style="background:rgba(239,68,68,.05);border-color:rgba(239,68,68,.18);cursor:pointer" onclick="window.open(\'../commodity-detail.html?code=' + t.code + '\')">' +
         '<div class="sc-title">' + item.name + ' <span class="code">' + t.code + '</span> ' + t.name + '</div>' +
         '<div style="display:flex;align-items:baseline;gap:8px;margin:4px 0">' +
         '<span style="font-family:var(--font-display);font-size:1.5rem;font-weight:400;color:var(--text-primary)">' + t.close + '</span>' +
