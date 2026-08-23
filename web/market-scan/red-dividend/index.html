@@ -50,7 +50,7 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
   <button class="pill-tab" onclick="switchIvTab('coal')">⛏ 中证煤炭</button>
   <button class="pill-tab" onclick="switchIvTab('hk')">🇭🇰 港股红利</button>
   <button class="pill-tab" onclick="switchIvTab('broker')">⛳ 券商指数</button>
-  <button class="pill-tab" onclick="switchIvTab('bean')">🌾 豆粕</button>
+  <button class="pill-tab" onclick="switchIvTab('bean')">🌾 大宗商品</button>
   <button class="pill-tab" onclick="switchIvTab('color')">🥉 有色</button>
 </div>
 <div id="pane-ov" class="iv-pane"></div>
@@ -291,7 +291,11 @@ ovHtml += '<div class="note">📊 口径说明：① 回撤：中证红利（000
         '</div></div>' +
         '<div class="note">⚠️ 商品高波动标的；简版建议（位置/回撤规则），非完整回测结论。数据源：通达信日K（' + t.date + '）。</div>';
     }
-    if (comm.bean_meal) beanHtml = '<div class="section-hdr">🌾 豆粕监控</div>' + commCard(comm.bean_meal);
+    if (comm.bean_meal || comm.commodity) {
+      beanHtml = '<div class="section-hdr">🌾 大宗商品监控</div>';
+      if (comm.bean_meal) beanHtml += commCard(comm.bean_meal);
+      if (comm.commodity) beanHtml += commCard(comm.commodity);
+    }
     if (comm.nonferrous) colorHtml = '<div class="section-hdr">🥉 有色监控</div>' + commCard(comm.nonferrous);
 
     document.getElementById('pane-broker').innerHTML = brokerHtml;

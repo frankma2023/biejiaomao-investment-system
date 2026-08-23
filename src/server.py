@@ -6958,7 +6958,8 @@ def api_watchlist_report_index():
 # ═══════════════════════════════════════════════
 
 COMMODITY_WATCH = [
-    {'type': 'bean_meal', 'codes': ['159985'], 'name': '豆粕', 'note': '厄尔尼诺/天气逻辑标的'},
+    {'type': 'bean_meal', 'codes': ['159985'], 'name': '豆粕', 'note': '厄尔尼诺/天气逻辑标的（高波动，预期差观察）'},
+    {'type': 'commodity', 'codes': ['510170'], 'name': '大宗商品', 'note': '商品周期趋势标的（后复权8年+216%，网格不适用，趋势持有）'},
     {'type': 'nonferrous', 'codes': ['512400', '930708', '000819'], 'name': '有色', 'note': 'AI基建+电网+供给约束'},
 ]
 
@@ -7014,6 +7015,16 @@ def api_market_commodity():
                     entry['level'], entry['advice'] = 'wait', f"高位 {t['pos_250']}%，天气行情兑现后勿追"
                 else:
                     entry['level'], entry['advice'] = 'hold', f"观望（位置 {t['pos_250']}%，豆粕 20日 {t['chg_20']}% 尚未启动）"
+            elif item['type'] == 'commodity':
+                # 510170 大宗商品：趋势持有逻辑（网格不适用，后复权回测超额 -139pp）
+                if t['pos_250'] < 30 and t['dd_250'] > 20:
+                    entry['level'], entry['advice'] = 'buy', f"深回撤 {t['dd_250']}% + 位置 {t['pos_250']}%——商品周期布局窗口（趋势持有，勿网格）"
+                elif t['pos_250'] > 85:
+                    entry['level'], entry['advice'] = 'wait', f"高位 {t['pos_250']}%——周期见顶风险区，不追"
+                elif t['chg_20'] > 8 and t['pos_250'] < 70:
+                    entry['level'], entry['advice'] = 'buy', f"趋势启动：20日 {t['chg_20']}% + 位置 {t['pos_250']}%——持有逻辑"
+                else:
+                    entry['level'], entry['advice'] = 'hold', f"观望（20日 {t['chg_20']}% / 位置 {t['pos_250']}%）"
             else:
                 if t['chg_20'] > 10 and t['pos_250'] < 70:
                     entry['level'], entry['advice'] = 'buy', f"趋势启动：20日 {t['chg_20']}% + 位置 {t['pos_250']}% 未过热（AI基建+供给约束逻辑）"
