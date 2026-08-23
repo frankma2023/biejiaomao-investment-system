@@ -127,6 +127,19 @@ html[data-theme="light"] .filters button{background:rgba(255,255,255,.6)}
   </div>
 </div>
 
+<div class="modal-overlay" id="adjust-modal">
+  <div class="modal-box">
+    <h3>💰 调整持仓成本</h3>
+    <div id="adjust-info" style="font-size:0.65rem;color:var(--muted);margin-bottom:8px"></div>
+    <label>新成本价</label><input type="number" id="adjust-cost" step="0.0001" min="0.0001">
+    <label>调整理由（送转摊薄/分红/录入修正等）</label><textarea id="adjust-reason" placeholder="如：2026 中期分红除权，成本摊薄"></textarea>
+    <div class="modal-row">
+      <button class="btn-primary" onclick="submitAdjustCost()">确认调整</button>
+      <button class="btn-cancel" onclick="document.getElementById('adjust-modal').classList.remove('show')">取消</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var currentFilter = 'all';
 
@@ -152,7 +165,7 @@ function renderTable(trades) {
     html += '<td class="' + (pnl >= 0 ? 'pnl-pos' : 'pnl-neg') + '">' + (t.sell_date ? (pnl >= 0 ? '+' : '') + pnl.toFixed(2) : '—') + '</td>';
     html += '<td class="' + (pnlPct >= 0 ? 'pnl-pos' : 'pnl-neg') + '">' + (t.sell_date ? (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%' : '—') + '</td>';
     html += '<td>' + (t.hold_days || '—') + '</td>';
-    html += '<td>' + (t.sell_date ? '已平仓' : '<button class="btn-primary" onclick="showSellForm(' + t.id + ',\'' + t.stock_code + '\')">卖出</button>') + '</td>';
+    html += '<td>' + (t.sell_date ? '已平仓' : '<button class="btn-primary" onclick="showSellForm(' + t.id + ',\'' + t.stock_code + '\')" style="margin-right:4px">卖出</button><button class="btn-primary" style="background:rgba(59,130,246,.12);color:#3b82f6;border-color:rgba(59,130,246,.3)" onclick="showAdjustForm(' + t.id + ',\'' + (t.stock_name || t.stock_code) + '\',' + t.buy_price + ')">调整成本</button>') + '</td>';
     html += '</tr>';
   }
   html += '</tbody></table>';
@@ -244,6 +257,23 @@ async function submitBuy() {
 }
 
 function showSellForm(id, code) { document.getElementById('sell-trade-id').value = id; document.getElementById('sell-date').value = new Date().toISOString().slice(0,10); document.getElementById('sell-modal').classList.add('show'); }
+
+function showAdjustForm(id, name, oldCost) {
+  document.getElementById('adjust-modal').classList.add('show');
+  document.getElementById('adjust-info').textContent = '调整记录 #' + id + ' · ' + name + ' · 当前成本 ' + oldCost;
+  document.getElementById('adjust-cost').value = oldCost;
+  document.getElementById('adjust-reason').value = '';
+  window._adjustId = id;
+}
+async function submitAdjustCost() {
+  var cost = parseFloat(document.getElementById('adjust-cost').value);
+  var reason = document.getElementById('adjust-reason').value.trim();
+  if (!cost || cost <= 0) { alert('请输入合法新成本'); return; }
+  var resp = await fetch('/api/discipline/trades/adjust-cost', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ trade_id: window._adjustId, new_cost: cost, reason: reason }) });
+  var data = await resp.json();
+  if (data.ok) { document.getElementById('adjust-modal').classList.remove('show'); loadTrades(); }
+  else { alert(data.error || '调整失败'); }
+}
 async function submitSell() {
   var id = document.getElementById('sell-trade-id').value;
   var body = { sell_date: document.getElementById('sell-date').value, sell_price: parseFloat(document.getElementById('sell-price').value), sell_reason: document.getElementById('sell-reason').value.trim(), sell_emotion: document.getElementById('sell-emotion').value };

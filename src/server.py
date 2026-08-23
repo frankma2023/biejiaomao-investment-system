@@ -100,6 +100,11 @@ def init_schema():
     # 自选池日报：落盘表 + 查看锚点
     db.execute("CREATE TABLE IF NOT EXISTS watchlist_report_daily (date TEXT PRIMARY KEY, report_json TEXT, created_at TEXT)")
     db.execute("CREATE TABLE IF NOT EXISTS watchlist_review_state (key TEXT PRIMARY KEY, value TEXT)")
+    # 交易成本调整审计（透明可追溯）
+    db.execute("""CREATE TABLE IF NOT EXISTS discipline_trade_adjustments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        trade_id INTEGER, old_cost REAL, new_cost REAL,
+        reason TEXT, adjusted_at TEXT)""")
     db.commit()
     # V2: 添加 buy_signal_date 列到精选快照
     try:
@@ -6512,6 +6517,33 @@ def api_cockpit_oneil_report():
     with open(report_path, 'r', encoding='utf-8') as f:
         content = f.read()
     return content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+
+@app.route('/api/discipline/trades/adjust-cost', methods=['POST', 'OPTIONS'])
+def api_trade_adjust_cost():
+    """调整未平仓交易的成本价（buy_price），写审计日志"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    body = request.get_json(silent=True) or {}
+    trade_id = body.get('trade_id')
+    new_cost = body.get('new_cost')
+    reason = (body.get('reason') or '').strip()
+    if not trade_id or not new_cost or float(new_cost) <= 0:
+        return jsonify({'error': 'trade_id 与合法 new_cost 必填'}), 400
+    new_cost = float(new_cost)
+    db = get_db()
+    row = db.execute("SELECT buy_price, sell_date FROM discipline_trades WHERE id=?", (trade_id,)).fetchone()
+    if not row:
+        return jsonify({'error': '交易记录不存在'}), 404
+    if row['sell_date']:
+        return jsonify({'error': '已平仓交易不可调整成本'}), 400
+    old = row['buy_price']
+    db.execute("UPDATE discipline_trades SET buy_price=? WHERE id=?", (new_cost, trade_id))
+    db.execute("""INSERT INTO discipline_trade_adjustments(trade_id, old_cost, new_cost, reason, adjusted_at)
+        VALUES(?,?,?,?,?)""", (trade_id, old, new_cost, reason or '(无理由)',
+                                 datetime.now().strftime('%Y-%m-%d %H:%M')))
+    db.commit()
+    return jsonify({'ok': True, 'trade_id': trade_id, 'old_cost': old, 'new_cost': new_cost})
 
 
 @app.route('/api/discipline/trade-stats', methods=['GET', 'OPTIONS'])
