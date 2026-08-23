@@ -286,7 +286,7 @@ ovHtml += '<div class="note">📊 口径说明：① 回撤：中证红利（000
         '<span style="font-family:var(--font-display);font-size:1.5rem;font-weight:400;color:var(--text-primary)">' + t.close + '</span>' +
         '<span style="font-size:11px;font-weight:600;color:' + lv[1] + ';border:1px solid ' + lv[1] + '66;border-radius:6px;padding:1px 6px">' + lv[0] + '</span></div>' +
         '<div class="tx" style="font-size:0.62rem">' + item.advice + '</div>' +
-        '<div class="meta">20日 ' + pct(t.chg_20, 1) + ' · 60日 ' + pct(t.chg_60, 1) + ' · 位置 ' + (t.pos_250 != null ? t.pos_250 + '%' : '—') + ' · 回撤 ' + (t.dd_250 != null ? t.dd_250 + '%' : '—') + '</div>' +
+        '<div class="meta">20日 ' + pct(t.chg_20, 1) + ' · 60日 ' + pct(t.chg_60, 1) + ' · 位置 ' + (t.pos_250 != null ? t.pos_250 + '%' : '—') + ' · 回撤 ' + (t.dd_250 != null ? t.dd_250 + '%' : '—') + (t.pb != null ? ' · PE ' + t.pe + '(' + t.pe_pct + '%) · PB ' + t.pb + '(<b style="color:' + (t.pb_pct > 80 ? '#ef4444' : '#8b8b90') + '">' + t.pb_pct + '%</b>) · 股息率 ' + t.dyr + '%(' + t.dyr_pct + '%)' : '') + '</div>' +
         '<div class="sig">' + item.note + '</div>' +
         '</div></div>' +
         '<div class="note">⚠️ 商品高波动标的；简版建议（位置/回撤规则），非完整回测结论。数据源：通达信日K（' + t.date + '）。</div>';

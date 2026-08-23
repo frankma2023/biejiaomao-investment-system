@@ -6965,7 +6965,7 @@ COMMODITY_WATCH = [
 
 
 def _comm_metrics(db, code, target_date):
-    """商品标的指标：close/20日/60日涨幅/位置/回撤"""
+    """商品标的指标：close/20日/60日涨幅/位置/回撤/估值（510170 映射 000066）"""
     rows = db.execute("""SELECT date, close FROM index_daily_kline
         WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 261""", (code, target_date)).fetchall()
     if len(rows) < 21:
@@ -6980,6 +6980,18 @@ def _comm_metrics(db, code, target_date):
     lo, hi = min(r['close'] for r in seg), max(r['close'] for r in seg)
     out['pos_250'] = round((rows[0]['close'] - lo) / (hi - lo) * 100) if hi > lo else 50
     out['dd_250'] = round((hi - rows[0]['close']) / hi * 100, 1)
+    # 估值（ETF → 跟踪指数映射）
+    fund_code = {'510170': '000066'}.get(code, code)
+    v = db.execute("""SELECT pe_ttm, pe_ttm_pct, pb, pb_pct, dyr, dyr_pct
+        FROM index_fundamental_daily WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1""",
+                   (fund_code, target_date)).fetchone()
+    if v:
+        out['pe'] = round(v['pe_ttm'], 1) if v['pe_ttm'] else None
+        out['pe_pct'] = round(v['pe_ttm_pct'] * 100) if v['pe_ttm_pct'] is not None else None
+        out['pb'] = round(v['pb'], 2) if v['pb'] else None
+        out['pb_pct'] = round(v['pb_pct'] * 100) if v['pb_pct'] is not None else None
+        out['dyr'] = round(v['dyr'] * 100, 2) if v['dyr'] else None
+        out['dyr_pct'] = round(v['dyr_pct'] * 100) if v['dyr_pct'] is not None else None
     return out
 
 
@@ -7016,15 +7028,23 @@ def api_market_commodity():
                 else:
                     entry['level'], entry['advice'] = 'hold', f"观望（位置 {t['pos_250']}%，豆粕 20日 {t['chg_20']}% 尚未启动）"
             elif item['type'] == 'commodity':
-                # 510170 大宗商品：趋势持有逻辑（网格不适用，后复权回测超额 -139pp）
-                if t['pos_250'] < 30 and t['dd_250'] > 20:
-                    entry['level'], entry['advice'] = 'buy', f"深回撤 {t['dd_250']}% + 位置 {t['pos_250']}%——商品周期布局窗口（趋势持有，勿网格）"
+                # 510170 大宗商品：回撤买点(15%胜率61%) + 估值分位(PB<20%胜率80%) + 阶梯箱体
+                pb_pct = t.get('pb_pct')
+                pe_pct = t.get('pe_pct')
+                dyr_pct = t.get('dyr_pct')
+                dd = t.get('dd_250')
+                if pb_pct is not None and pb_pct > 90:
+                    entry['level'], entry['advice'] = 'wait', f"估值高位警示：PB {t.get('pb')} 分位 {pb_pct}% >90%（回测：PB分位<20%买入80%胜率）——不追高，等回撤≥15%或PB分位回落"
+                elif dd is not None and dd >= 15 and (pb_pct is None or pb_pct < 60):
+                    entry['level'], entry['advice'] = 'buy', f"回撤买点：250日回撤 {dd}% ≥15%（回测 60日61%/120日63%）——买"
+                elif pb_pct is not None and pb_pct < 20:
+                    entry['level'], entry['advice'] = 'buy', f"估值买点：PB 分位 {pb_pct}% <20%（回测 60日80%）——买"
+                elif dyr_pct is not None and dyr_pct > 90:
+                    entry['level'], entry['advice'] = 'buy', f"股息买点：股息率分位 {dyr_pct}% >90%（回测 64%）——买"
                 elif t['pos_250'] > 85:
-                    entry['level'], entry['advice'] = 'wait', f"高位 {t['pos_250']}%——周期见顶风险区，不追"
-                elif t['chg_20'] > 8 and t['pos_250'] < 70:
-                    entry['level'], entry['advice'] = 'buy', f"趋势启动：20日 {t['chg_20']}% + 位置 {t['pos_250']}%——持有逻辑"
+                    entry['level'], entry['advice'] = 'wait', f"高位 {t['pos_250']}%——突破后持有窗口，勿追高"
                 else:
-                    entry['level'], entry['advice'] = 'hold', f"观望（20日 {t['chg_20']}% / 位置 {t['pos_250']}%）"
+                    entry['level'], entry['advice'] = 'hold', f"持有/观望（回撤 {dd}% / PB分位 {pb_pct}%——未到买点）"
             else:
                 if t['chg_20'] > 10 and t['pos_250'] < 70:
                     entry['level'], entry['advice'] = 'buy', f"趋势启动：20日 {t['chg_20']}% + 位置 {t['pos_250']}% 未过热（AI基建+供给约束逻辑）"
