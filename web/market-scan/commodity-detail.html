@@ -134,6 +134,29 @@ function chart2(d){
   });
 }
 
+function load(){
+  var code = new URLSearchParams(location.search).get('code') || '510170';
+  fetch(API_BASE + '/api/market-scan/commodity-detail?code=' + code)
+    .then(function(r){return r.json()})
+    .then(function(d){
+      statGrid(d);
+      chart1(d);
+      chart2(d);
+      var rules = d.rules || {};
+      var html = '<div style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
+      html += '🟢 回撤买点：' + esc(rules.buy_dd) + '<br>';
+      html += '🟢 估值买点：' + esc(rules.buy_pb) + '<br>';
+      html += '🟢 股息买点：' + esc(rules.buy_dyr) + '<br>';
+      html += '🔴 卖点警示：' + esc(rules.sell_pb) + '<br>';
+      html += '📦 箱体策略：' + esc(rules.box);
+      html += '</div>';
+      document.getElementById('rules').innerHTML = html;
+    })
+    .catch(function(e){
+      document.getElementById('stat-grid').innerHTML = '<div class="stat" style="grid-column:1/-1"><div class="k">加载失败: ' + esc(e.message) + '</div></div>';
+    });
+}
+
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 window.addEventListener('resize',function(){ch1&&ch1.resize();ch2&&ch2.resize()});
