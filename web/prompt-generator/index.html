@@ -318,7 +318,7 @@ async function generateFourMasters(code, body){
       html+='</tbody></table>';
       // 十年财务
       if(fin.financials&&fin.financials.length){
-        html+='<div class="fin-table-title">📋 近 10 个季度财务数据</div>';
+        html+='<div class="fin-table-title">📋 近 10 个季度财务数据 <span style="color:var(--muted);font-size:0.6rem">(数据截至 ' + (data.fin_tables && data.fin_tables.financials && data.fin_tables.financials.length ? data.fin_tables.financials[0].year : '?') + '，理杏仁管道)</span></div>';
         html+='<table class="fin-tbl"><thead><tr><th>季度</th><th>营收(亿)</th><th>营收YoY</th><th>净利(亿)</th><th>净利YoY</th><th>毛利率</th><th>ROE</th><th>FCF(亿)</th><th>负债率</th><th>流动</th><th>速动</th></tr></thead><tbody>';
         var fcs=fin.financials;
         for(var fi=0;fi<fcs.length;fi++){
@@ -445,7 +445,7 @@ async function generate(){
       html+='</tbody></table>';
       // 十年财务
       if(fin.financials&&fin.financials.length){
-        html+='<div class="fin-table-title">📋 近 10 个季度财务数据</div>';
+        html+='<div class="fin-table-title">📋 近 10 个季度财务数据 <span style="color:var(--muted);font-size:0.6rem">(数据截至 ' + (data.fin_tables && data.fin_tables.financials && data.fin_tables.financials.length ? data.fin_tables.financials[0].year : '?') + '，理杏仁管道)</span></div>';
         html+='<table class="fin-tbl"><thead><tr><th>季度</th><th>营收(亿)</th><th>营收YoY</th><th>净利(亿)</th><th>净利YoY</th><th>毛利率</th><th>ROE</th><th>FCF(亿)</th><th>负债率</th><th>流动</th><th>速动</th></tr></thead><tbody>';
         var fcs=fin.financials;
         for(var fi=0;fi<fcs.length;fi++){

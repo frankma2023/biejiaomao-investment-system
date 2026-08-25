@@ -6182,7 +6182,7 @@ def api_four_masters_prepare():
                 rev = r['revenue_single'] or 0
                 np = r['net_profit_single'] or 0
                 fin_tables['financials'].append({
-                    'year': r['report_date'][:4]+'Q'+str(int(r['report_date'][5:7])//3+1) if r['report_date'] else '',
+                    'year': r['report_date'][:4]+'Q'+str((int(r['report_date'][5:7])-1)//3+1) if r['report_date'] else '',
                     'revenue': round(rev/1e8,1),
                     'rev_yoy': round(r['revenue_yoy'],1) if r['revenue_yoy'] else None,
                     'net_profit': round(np/1e8,2),
@@ -6321,7 +6321,7 @@ def api_prompt_generator():
             rev = r['revenue_single'] or 0
             np = r['net_profit_single'] or 0
             fin_tables['financials'].append({
-                'year': r['report_date'][:4]+'Q'+str(int(r['report_date'][5:7])//3+1) if r['report_date'] else '',
+                'year': r['report_date'][:4]+'Q'+str((int(r['report_date'][5:7])-1)//3+1) if r['report_date'] else '',
                 'revenue': round(rev/1e8,1),
                 'rev_yoy': round(r['revenue_yoy'],1) if r['revenue_yoy'] else None,
                 'net_profit': round(np/1e8,2),
