@@ -395,11 +395,18 @@ def recent_report_dates(years_back: int = 10) -> List[str]:
     return dates
 
 
-def due_report_dates(n: int = 2) -> List[str]:
-    """当前应披露的季度报告期（--recent 模式，含披露缓冲 45 天）
+def due_report_dates(n: int = 3) -> List[str]:
+    """当前应拉取的季度报告期（披露窗口内，覆盖写补晚披露公司）
 
-    A 股法定披露期：Q1/年报 → 4-30 截止；中报 → 8-31 截止；三季报 → 10-31 截止。
-    报告期结束 45 天后视为披露完成，才纳入拉取（避免未来季度/披露中的误拉）。
+    设计：公司披露时间差异大（如万华中报 8-24 发布），不能等披露截止（8-31）后才拉。
+    改为：报告期结束后即进入拉取窗口，窗口内每天覆盖拉取（INSERT OR REPLACE 幂等），
+    理杏仁每次返回"截至目前已披露的公司"——早披露早入库，晚披露的下次跑自动补上。
+
+    窗口（按报告期法定披露截止）：
+      Q1(03-31) → +60 天（4-30 截止）
+      中报(06-30) → +70 天（8-31 截止）
+      三季报(09-30) → +60 天（10-31 截止）
+      年报(12-31) → +150 天（次年 4-30 截止）
     """
     today = datetime.now()
     y = today.year
@@ -408,7 +415,9 @@ def due_report_dates(n: int = 2) -> List[str]:
     for _ in range(8):
         end_d = f"{y}-{q:02d}-{'31' if q in (3, 12) else '30'}"
         end_date = datetime.strptime(end_d, '%Y-%m-%d')
-        if (today - end_date).days >= 45:  # 披露缓冲 45 天
+        window = 150 if q == 12 else (70 if q == 6 else 60)
+        age = (today - end_date).days
+        if 0 <= age <= window:  # 报告期已结束且在披露窗口内
             dates.append(end_d)
         q -= 3
         if q == 0:
@@ -479,15 +488,6 @@ def main():
         all_codes = get_all_stock_codes(conn)
         log.info(f"   股票数量: {len(all_codes)}")
         batch_size = 50
-
-        # 增量：跳过库内已有报告期（--recent 模式下避免重复拉取）
-        existing_q = set(r[0] for r in conn.execute(
-            "SELECT DISTINCT report_date FROM stock_financials_quarterly").fetchall())
-        to_fetch = [d for d in quarterly_dates if d not in existing_q]
-        skipped_q = len(quarterly_dates) - len(to_fetch)
-        if skipped_q:
-            log.info(f"   跳过已有报告期: {skipped_q} 个 {set(quarterly_dates) - set(to_fetch)}")
-        quarterly_dates = to_fetch
 
         total_q_saved = 0
         for date_str in quarterly_dates:
