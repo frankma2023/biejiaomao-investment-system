@@ -395,6 +395,31 @@ def recent_report_dates(years_back: int = 10) -> List[str]:
     return dates
 
 
+def due_report_dates(n: int = 2) -> List[str]:
+    """当前应披露的季度报告期（--recent 模式，含披露缓冲 45 天）
+
+    A 股法定披露期：Q1/年报 → 4-30 截止；中报 → 8-31 截止；三季报 → 10-31 截止。
+    报告期结束 45 天后视为披露完成，才纳入拉取（避免未来季度/披露中的误拉）。
+    """
+    today = datetime.now()
+    y = today.year
+    q = ((today.month - 1) // 3) * 3 + 3  # 当前季度末月: 3/6/9/12
+    dates = []
+    for _ in range(8):
+        end_d = f"{y}-{q:02d}-{'31' if q in (3, 12) else '30'}"
+        end_date = datetime.strptime(end_d, '%Y-%m-%d')
+        if (today - end_date).days >= 45:  # 披露缓冲 45 天
+            dates.append(end_d)
+        q -= 3
+        if q == 0:
+            q = 12
+            y -= 1
+        if len(dates) >= n:
+            break
+    dates.reverse()
+    return dates
+
+
 def recent_annual_dates(years_back: int = 10) -> List[str]:
     """生成最近的年度报告日期"""
     today = datetime.now()
@@ -414,6 +439,7 @@ def main():
 
     do_quarterly = "--annual-only" not in sys.argv
     do_annual = "--quarters-only" not in sys.argv
+    recent_mode = "--recent" in sys.argv  # 只拉应披露报告期（财报季触发）
 
     # 指定年度覆盖
     if any(a.startswith("--year") for a in sys.argv):
@@ -436,6 +462,10 @@ def main():
         else:
             annual_dates = recent_annual_dates()
             quarterly_dates = recent_report_dates()
+    elif recent_mode:
+        # 财报季增量：只拉应披露报告期（Q1/年报→5月, 中报→9月, 三季报→11月）
+        quarterly_dates = due_report_dates(2)
+        annual_dates = [d for d in due_report_dates(4) if d.endswith("12-31")]
     else:
         annual_dates = recent_annual_dates()
         quarterly_dates = recent_report_dates()
@@ -449,6 +479,15 @@ def main():
         all_codes = get_all_stock_codes(conn)
         log.info(f"   股票数量: {len(all_codes)}")
         batch_size = 50
+
+        # 增量：跳过库内已有报告期（--recent 模式下避免重复拉取）
+        existing_q = set(r[0] for r in conn.execute(
+            "SELECT DISTINCT report_date FROM stock_financials_quarterly").fetchall())
+        to_fetch = [d for d in quarterly_dates if d not in existing_q]
+        skipped_q = len(quarterly_dates) - len(to_fetch)
+        if skipped_q:
+            log.info(f"   跳过已有报告期: {skipped_q} 个 {set(quarterly_dates) - set(to_fetch)}")
+        quarterly_dates = to_fetch
 
         total_q_saved = 0
         for date_str in quarterly_dates:

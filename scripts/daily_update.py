@@ -200,6 +200,12 @@ TASKS.append(("🟠 17.口袋支点V2", [PYTHON_EXE, "src/scanners/pocket_pivot_
 # 步骤 18~19：基本面层（财务/机构数据，周一全量，每日增量）
 # 18. 个股基本面增量（季度财报数据）
 TASKS.append(("💰 18.个股基本面", [PYTHON_EXE, "scripts/fetch_fundamental_nonfinancial.py", "--incremental", "--workers", "4"]))
+# 18b. 季度财报明细（财报季触发：Q1+年报→5月, 中报→8月末起, 三季报→11月；
+#      fetch_stock_financials.py --recent 只拉应披露且库内缺失的报告期，增量成本低）
+if date.today().month in (5, 9, 11):
+    TASKS.append(("💰 18b.季度财报(财报季)", [PYTHON_EXE, "scripts/fetch_stock_financials.py", "--quarters-only", "--recent"]))
+else:
+    log(f"⏭️  跳过季度财报明细（非财报季，month={date.today().month}，财报季=5/9/11月）")
 if date.today().weekday() == 0:
     # 19. 机构持股（每季更新，周一拉取）
     TASKS.append(("🏦 19.机构持股", [PYTHON_EXE, "scripts/fetch_institutional_holdings.py"]))
