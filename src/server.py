@@ -1969,7 +1969,8 @@ def api_market_fcf_detail():
     pb_series = [round(val_map[d]['pb_pct']*100) if d in val_map and val_map[d]['pb_pct'] is not None else None for d in dates]
     dyr_series = [round(val_map[d]['dyr_pct']*100) if d in val_map and val_map[d]['dyr_pct'] is not None else None for d in dates]
 
-    # 信号时间线：估值分位触发点（近2年，20日去重）
+    # 信号时间线：估值分位触发点（近2年，20日去重，窗口内取信号最强日——v1.1 修复）
+    # 原实现取窗口内第一个满足日，弱信号会占位吞掉更极端的强信号（2026-06-30 案例）
     events = []
     last_trig = -999
     for i, d in enumerate(dates):
@@ -1982,12 +1983,41 @@ def api_market_fcf_detail():
         n_buy = sum([pe_p is not None and pe_p < 0.33,
                      pb_p is not None and pb_p < 0.33,
                      dy_p is not None and dy_p > 0.66])
-        if n_buy >= 1 and i - last_trig >= 20:
+        if n_buy < 1:
+            continue
+        if i - last_trig >= 20:
+            # 新窗口：标记当前日
             events.append({'date': d, 'signal': 'fcf_strong' if n_buy >= 2 else 'fcf_buy',
                            'pe_pct': round(pe_p*100) if pe_p is not None else None,
                            'pb_pct': round(pb_p*100) if pb_p is not None else None,
                            'dyr_pct': round(dy_p*100) if dy_p is not None else None})
             last_trig = i
+        else:
+            # 窗口内：n_buy 更高则替换（升级为强信号）；同 n_buy 保留更极端者
+            cur = events[-1]
+            cur_n = sum([cur.get('pe_pct') is not None and cur.get('pe_pct') < 33,
+                         cur.get('pb_pct') is not None and cur.get('pb_pct') < 33,
+                         cur.get('dyr_pct') is not None and cur.get('dyr_pct') > 66])
+            if n_buy > cur_n:
+                events[-1] = {'date': d, 'signal': 'fcf_strong' if n_buy >= 2 else 'fcf_buy',
+                              'pe_pct': round(pe_p*100) if pe_p is not None else None,
+                              'pb_pct': round(pb_p*100) if pb_p is not None else None,
+                              'dyr_pct': round(dy_p*100) if dy_p is not None else None}
+                last_trig = i
+            elif n_buy == cur_n:
+                # 同 n_buy：估值更极端者替换（PE/PB 更低或 DYR 更高）
+                # 注意：不能用 x or 100（PB=0 是合法值且 falsy，or 会误判为 100）——v1.1 二级修复
+                def _score(d):
+                    return (d.get('pe_pct') if d.get('pe_pct') is not None else 100) + \
+                           (d.get('pb_pct') if d.get('pb_pct') is not None else 100) + \
+                           (100 - (d.get('dyr_pct') if d.get('dyr_pct') is not None else 0))
+                nw = {'date': d, 'signal': 'fcf_strong' if n_buy >= 2 else 'fcf_buy',
+                      'pe_pct': round(pe_p*100) if pe_p is not None else None,
+                      'pb_pct': round(pb_p*100) if pb_p is not None else None,
+                      'dyr_pct': round(dy_p*100) if dy_p is not None else None}
+                if _score(nw) < _score(cur):
+                    events[-1] = nw
+                    last_trig = i
 
     # 历史类似情况统计：满足 fcf_buy 条件的交易日（全窗口 2024-09 起，20日去重）
     similar = []
