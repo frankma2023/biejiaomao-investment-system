@@ -163,7 +163,7 @@ async function load() {
     return c;
   }});
   // 2. 估值分位走势（核心）
-  charts.push({title:'📊 估值分位走势（PE/PB/股息率 · 数据自2024-09起）', el:'chart-val', h:330, init: el => {
+  charts.push({title:'📊 估值分位走势（PE/PB/股息率 · 近2年窗口 · 数据自2024-09起）', el:'chart-val', h:330, init: el => {
     const c = echarts.init(el);
     c.setOption({
       backgroundColor:chartBg, tooltip:{trigger:'axis'},
