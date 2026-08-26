@@ -365,7 +365,7 @@ def run():
         rs = r.get('h_rs250') or 0
         decline = r.get('decline_pct') or 0
         vol = r.get('b1_vol_ratio') or 0
-        amp = r.get('c_amplitude_pct') or 100
+        amp = r.get('c_amplitude_pct') if r.get('c_amplitude_pct') is not None else 100
         tech = r.get('tech_score') or 0
         
         # RS (30分)
