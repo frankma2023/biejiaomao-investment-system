@@ -418,14 +418,19 @@ def score_i(db, stock_code, target_date, p):
         else:
             bd['inst_change'] = {'value': '{}'.format(delta), 'score': 0}
 
-    # Analyst coverage (table may not exist)
+    # Analyst coverage (table may not exist)；主源=sina（新浪研报，实时准确），备源=lx（东财批处理）
     ld = cfg.get('analyst_lookback_days', 90)
     ar = None
     try:
-        ar = db.execute("""SELECT org_count, first_coverage, upgrade_count
+        ar = db.execute("""SELECT org_count, first_coverage, upgrade_count, source
             FROM stock_analyst_reports
-            WHERE stock_code=? AND lookback_days=?
+            WHERE stock_code=? AND lookback_days=? AND source='sina'
             ORDER BY date DESC LIMIT 1""", (stock_code, ld)).fetchone()
+        if not ar:
+            ar = db.execute("""SELECT org_count, first_coverage, upgrade_count, source
+                FROM stock_analyst_reports
+                WHERE stock_code=? AND lookback_days=?
+                ORDER BY date DESC LIMIT 1""", (stock_code, ld)).fetchone()
     except sqlite3.OperationalError:
         pass
 
