@@ -255,6 +255,33 @@ async function load() {
     });
     return c;
   }});
+  // 2b. 股债息差走势（股息率 − 10Y国债，v1.3 新增；1pp 危险线 + 1.5-3pp 良好带）
+  charts.push({title:'📈 股债息差走势（股息率 − 10Y国债 · 回测：<1pp危险区/1.5-3pp可买区）', el:'chart-spread', h:280, init: el => {
+    const c = echarts.init(el);
+    const cur = d.spread_cur;
+    c.setOption({
+      backgroundColor: chartBg, tooltip: {trigger:'axis'},
+      legend: {data:['息差'], textStyle:{color:tx, fontSize:9}, bottom:0},
+      grid: {left:'8%', right:'4%', top:12, bottom:36},
+      xAxis: {type:'category', data:d.dates, axisLabel:{color:tx, fontSize:9}, axisLine:{lineStyle:{color:sp}}},
+      yAxis: {type:'value', axisLabel:{color:tx, fontSize:9, formatter:'{value}pp'}, splitLine:{lineStyle:{color:sp}}},
+      dataZoom: [{type:'inside'}],
+      series: [
+        {name:'息差', type:'line', data:d.spread_series, smooth:true, showSymbol:false,
+         lineStyle:{color:'#539BF5', width:1.5},
+         markPoint: cur != null ? {data:[{coord:[d.dates[d.dates.length-1], cur], value: cur + 'pp',
+           itemStyle:{color: cur < 1 ? '#ef4444' : (cur >= 1.5 ? '#10b981' : '#f59e0b')}, symbolSize:44,
+           label:{color:'#fff', fontSize:9}}]} : undefined,
+         markLine: {silent:true, symbol:'none',
+           lineStyle:{color:'#ef4444', type:'dashed'},
+           label:{formatter:'危险线 1pp', color:'#ef4444', fontSize:9},
+           data:[{yAxis:1}]},
+         markArea: {silent:true, itemStyle:{color:'rgba(16,185,129,.07)'},
+           data:[[{yAxis:1.5},{yAxis:3}]]}}
+      ]
+    });
+    return c;
+  }});
   // 3. 价格 + 信号时间线（近10年，Y轴起点=最低价×0.85 留15%差值）
   charts.push({title:'💹 价格走势 + 买点信号时间线（近10年）', el:'chart-px', h:360, init: el => {
     const c = echarts.init(el);

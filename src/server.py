@@ -1352,6 +1352,13 @@ def _dd_from_full_return(db, code, target_date, days=300, window=250):
 
 
 
+def _latest_y10(db, target_date):
+    """target_date 之前最近的 10Y 国债收益率（%）"""
+    r = db.execute("SELECT y10 FROM bond_yield_daily WHERE date<=? ORDER BY date DESC LIMIT 1",
+                   (target_date,)).fetchone()
+    return r['y10'] if r else None
+
+
 @app.route('/api/market-scan/dividend-advice')
 def api_market_dividend_advice():
     """红利指数操作建议：信号检测+建议合成（支持历史回看）"""
@@ -1420,18 +1427,29 @@ def api_market_dividend_advice():
         if val and val['pe_pct'] is not None and val['pe_pct'] > 80:
             signals.append('pe_high_sell')
 
-        # 建议（v1.2：卖出警示优先于买入）
+        # v1.3 股债息差因子（回测 2026-08-26：息差<1pp 为危险区，4指数60日胜率15-33%）
+        y10 = _latest_y10(db, target_date)
+        spread = None
+        if val and val['dyr'] is not None and y10 is not None:
+            spread = round(val['dyr'] - y10, 2)
+            if spread < 1:
+                signals.append('spread_low')
+
+        # 建议（v1.2：卖出警示优先于买入；v1.3：息差危险区降级买入）
         advice, level = '持有/观望', 'hold'
+        spread_low = 'spread_low' in signals
         if 'pe_high_sell' in signals and 'surge_sell' in signals:
             advice, level = '估值高位+涨幅过大双确认，建议强减仓', 'strong_reduce'
         elif 'pe_high_sell' in signals:
             advice, level = '估值高位（10年PE分位>80%），建议减仓', 'reduce'
         elif 'surge_sell' in signals:
             advice, level = '短期涨幅过大（20日>10%/60日>15%），建议减仓', 'reduce'
-        elif 'double_confirm' in signals:
-            advice, level = '分批买入（回撤+高息双确认）', 'strong_buy'
-        elif 'gold_buy' in signals or 'high_div' in signals:
-            advice, level = '观察买入（单信号触发）', 'buy'
+        elif 'double_confirm' in signals and not spread_low:
+            advice, level = '分批买入（回撤+高息双确认' + (f'· 息差+{spread}pp' if spread is not None else '') + '）', 'strong_buy'
+        elif ('gold_buy' in signals or 'high_div' in signals) and not spread_low:
+            advice, level = '观察买入（单信号触发' + (f'· 息差+{spread}pp' if spread is not None else '') + '）', 'buy'
+        elif spread_low:
+            advice, level = f'息差危险区（{spread}pp <1pp，吃息不如债）——即使回撤达标也观望', 'caution'
         elif 'pe_warn' in signals and dd_250 < 10:
             advice, level = '估值偏高（PE分位>80%），建议减仓', 'reduce'
         elif 'low_div' in signals:
@@ -1443,6 +1461,7 @@ def api_market_dividend_advice():
             'dd_250': dd_250,
             'high_250': high250,
             'valuation': val,
+            'spread': spread, 'y10': round(y10, 2) if y10 is not None else None,
             'signals': signals,
             'advice': advice,
             'advice_level': level,
@@ -1529,9 +1548,9 @@ def api_market_dividend_detail():
         dd_map = dict(zip(dd_dates, dd_series))
         dd_series = [dd_map.get(d) for d in dates]
 
-    # 估值分位（近3年，按K线日期对齐）
+    # 估值分位（近3年，按K线日期对齐；v1.3 加 dyr 绝对股息率供息差计算）
     val_rows = db.execute("""
-        SELECT date, pe_ttm_pct, pb_pct, dyr_pct FROM index_fundamental_daily
+        SELECT date, pe_ttm_pct, pb_pct, dyr_pct, dyr FROM index_fundamental_daily
         WHERE stock_code=? AND date>=date(?,'-3 years') AND date<=?
         ORDER BY date
     """, (code, target_date, target_date)).fetchall()
@@ -1736,8 +1755,29 @@ def api_market_dividend_detail():
                 (tri_code, target_date)).fetchall())
             tri_long = [tri_map.get(d) for d in dates_long]
 
+    # ── 股债息差序列（股息率 − 10Y国债，近3年，v1.3 新增）──
+    spread_series = []
+    bond_map = dict((r['date'], r['y10']) for r in db.execute(
+        "SELECT date, y10 FROM bond_yield_daily WHERE date>=date(?,'-3 years') AND date<=? ORDER BY date",
+        (target_date, target_date)).fetchall())
+    bond_dates_sorted = sorted(bond_map.keys())
+    import bisect as _bisect
+    for i, d in enumerate(dates):
+        if d not in val_map or val_map[d]['dyr'] is None:
+            spread_series.append(None)
+            continue
+        idx = _bisect.bisect_right(bond_dates_sorted, d) - 1
+        if idx < 0:
+            spread_series.append(None)
+            continue
+        spread_series.append(round(val_map[d]['dyr'] * 100 - bond_map[bond_dates_sorted[idx]], 2))
+
     return jsonify({
         'code': code, 'name': name, 'date': target_date,
+        'spread_series': spread_series,
+        'spread_cur': spread_series[-1] if spread_series else None,
+        'spread_ref': {'danger': 1.0, 'good': (1.5, 3.0),
+                       'note': '回测2026-08-26：息差<1pp危险区（60日胜率15-33%）；1.5-3pp可买区（55-79%）'},
         'dates': dates, 'closes': closes, 'dd_series': dd_series,
         'pe_series': pe_series, 'pb_series': pb_series, 'dyr_series': dyr_series,
         'events': events, 'similar': similar, 'stats': stats, 'val_similar': val_similar,
