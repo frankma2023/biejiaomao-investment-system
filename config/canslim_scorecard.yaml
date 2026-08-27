@@ -74,4 +74,8 @@ i_institutional:
   analyst_coverage_tiers:
   - 3
   - 1
-  debt_ratio_warning: 60
+  analyst_coverage_score: 4
+  first_coverage_score: 3
+  # v3.2：负债率移出 I 维度（2026-08-27）——语义错置（I 度量机构态度，负债率是公司质量），
+  # 原 2 分拨给首次覆盖(+1)与研报覆盖(+1)。负债率如需风险检查，另设门禁（未启用）
+  # debt_ratio_warning: 60

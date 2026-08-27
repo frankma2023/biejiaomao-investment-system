@@ -464,19 +464,8 @@ def score_i(db, stock_code, target_date, p):
         bd['first_cov'] = {'value': '-', 'score': 0}
         bd['rating_up'] = {'value': '-', 'score': 0}
 
-    # Debt ratio
-    qs = get_quarterly(db, stock_code, target_date, 1)
-    if qs:
-        debt = qs[0].get('asset_liability_ratio')
-        if debt is not None:
-            if debt < 30:
-                score += cfg.get('debt_ratio_ok', 2)
-                bd['debt'] = {'value': round(debt, 1), 'score': cfg.get('debt_ratio_ok', 2)}
-            elif debt > cfg.get('debt_ratio_warning', 60):
-                score += cfg.get('debt_ratio_penalty', -2)
-                bd['debt'] = {'value': round(debt, 1), 'score': cfg.get('debt_ratio_penalty', -2)}
-            detail.append('Debt {:.0f}%'.format(debt))
-
+    # v3.2：负债率移出 I 维度（2026-08-27）——语义错置（I 度量机构态度，负债率是公司质量）；
+    # 原 2 分拨给首次覆盖(+1)与研报覆盖(+1)。负债率如需风险检查，另设门禁（未启用）
     return {"score": max(0, min(score, 18)), "detail": ", ".join(detail), "breakdown": bd}
 
 
