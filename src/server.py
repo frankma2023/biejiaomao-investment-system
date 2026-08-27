@@ -1428,14 +1428,16 @@ def api_market_dividend_advice():
             signals.append('pe_high_sell')
 
         # v1.3 股债息差因子（回测 2026-08-26：息差<1pp 为危险区，4指数60日胜率15-33%）
+        # v1.4：卖点信号——息差<1pp 时持仓者应减仓（跌破后60日多数下跌）；仅吃息型启用
+        #   （931468 红利质量为质量型，2020-24 四年危险区却+27%，息差对失效——回测见 docs/analysis）
         y10 = _latest_y10(db, target_date)
         spread = None
         if val and val['dyr'] is not None and y10 is not None:
             spread = round(val['dyr'] - y10, 2)
-            if spread < 1:
+            if spread < 1 and cat != 'quality':
                 signals.append('spread_low')
 
-        # 建议（v1.2：卖出警示优先于买入；v1.3：息差危险区降级买入）
+        # 建议（v1.2：卖出警示优先于买入；v1.3：息差危险区降级买入；v1.4：危险区兼作卖出警示）
         advice, level = '持有/观望', 'hold'
         spread_low = 'spread_low' in signals
         if 'pe_high_sell' in signals and 'surge_sell' in signals:
@@ -1449,7 +1451,7 @@ def api_market_dividend_advice():
         elif ('gold_buy' in signals or 'high_div' in signals) and not spread_low:
             advice, level = '观察买入（单信号触发' + (f'· 息差+{spread}pp' if spread is not None else '') + '）', 'buy'
         elif spread_low:
-            advice, level = f'息差危险区（{spread}pp <1pp，吃息不如债）——即使回撤达标也观望', 'caution'
+            advice, level = f'息差危险区（{spread}pp <1pp，吃息不如债）——持币观望，持仓者建议减仓', 'caution'
         elif 'pe_warn' in signals and dd_250 < 10:
             advice, level = '估值偏高（PE分位>80%），建议减仓', 'reduce'
         elif 'low_div' in signals:
@@ -1777,7 +1779,9 @@ def api_market_dividend_detail():
         'spread_series': spread_series,
         'spread_cur': spread_series[-1] if spread_series else None,
         'spread_ref': {'danger': 1.0, 'good': (1.5, 3.0),
-                       'note': '回测2026-08-26：息差<1pp危险区（60日胜率15-33%）；1.5-3pp可买区（55-79%）'},
+                       'note': '回测2026-08-26：息差<1pp危险区（60日胜率15-33%）；1.5-3pp可买区（55-79%）',
+                       'sell': '卖点（仅吃息型）：息差<1pp 持币观望/持仓减仓（2018熊市避开-5~-6%）；质量型(931468)失效',
+                       'quality_exempt': code == '931468'},
         'dates': dates, 'closes': closes, 'dd_series': dd_series,
         'pe_series': pe_series, 'pb_series': pb_series, 'dyr_series': dyr_series,
         'events': events, 'similar': similar, 'stats': stats, 'val_similar': val_similar,

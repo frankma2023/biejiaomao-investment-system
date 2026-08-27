@@ -255,8 +255,9 @@ async function load() {
     });
     return c;
   }});
-  // 2b. 股债息差走势（股息率 − 10Y国债，v1.3 新增；1pp 危险线 + 1.5-3pp 良好带）
-  charts.push({title:'📈 股债息差走势（股息率 − 10Y国债 · 回测：<1pp危险区/1.5-3pp可买区）', el:'chart-spread', h:280, init: el => {
+  // 2b. 股债息差走势（股息率 − 10Y国债，v1.3 新增；1pp 危险线 + 1.5-3pp 良好带 + v1.4 卖点区）
+  const qtype = d.code == '931468' ? '（质量型，息差参考性弱）' : '';
+  charts.push({title:'📈 股债息差走势（股息率 − 10Y国债 · 红区<1pp=卖点/回避区 · 绿带1.5-3pp=可买区' + qtype + '）', el:'chart-spread', h:280, init: el => {
     const c = echarts.init(el);
     const cur = d.spread_cur;
     c.setOption({
@@ -274,10 +275,11 @@ async function load() {
            label:{color:'#fff', fontSize:9}}]} : undefined,
          markLine: {silent:true, symbol:'none',
            lineStyle:{color:'#ef4444', type:'dashed'},
-           label:{formatter:'危险线 1pp', color:'#ef4444', fontSize:9},
+           label:{formatter:'危险线 1pp（卖点/回避区）', color:'#ef4444', fontSize:9},
            data:[{yAxis:1}]},
-         markArea: {silent:true, itemStyle:{color:'rgba(16,185,129,.07)'},
-           data:[[{yAxis:1.5},{yAxis:3}]]}}
+         markArea: {silent:true,
+           itemStyle:[{color:'rgba(239,68,68,.08)'}, {color:'rgba(16,185,129,.07)'}],
+           data:[[{yAxis:-9999},{yAxis:1}],[{yAxis:1.5},{yAxis:3}]]}}
       ]
     });
     return c;
