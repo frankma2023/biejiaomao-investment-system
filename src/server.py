@@ -4630,6 +4630,50 @@ def api_valuation_fs():
 # API: 个股全维度看板
 # ═══════════════════════════════════════════════
 
+@app.route('/api/stock-valuation/shareholders')
+def api_stock_valuation_shareholders():
+    """股东人数 + 股价双序列（筹码集中度；披露日季度数据）"""
+    code = request.args.get('code', '600519')
+    db = get_db()
+    try:
+        rows = db.execute('''
+            SELECT date, total, change_rate, source FROM shareholders_num_daily
+            WHERE stock_code=? ORDER BY date
+        ''', (code,)).fetchall()
+    except sqlite3.OperationalError:
+        # 表未建（拉取脚本未跑/全新库）→ 返回 JSON 而非 500 HTML
+        return jsonify({'code': code, 'error': 'shareholders_num_daily 表不存在（先跑 fetch_shareholders_num.py）',
+                        'dates': [], 'totals': [], 'closes': []})
+    if not rows:
+        return jsonify({'code': code, 'error': 'no shareholders data', 'dates': [], 'totals': [], 'closes': []})
+    # 股价：披露日当日或之后首交易日收盘（报告期截止日近似）
+    dates = [r['date'] for r in rows]
+    totals = [r['total'] for r in rows]
+    sources = [r['source'] or 'lx' for r in rows]
+    closes = []
+    for d in dates:
+        k = db.execute("SELECT close FROM daily_kline WHERE stock_code=? AND date>=? ORDER BY date LIMIT 1",
+                       (code, d)).fetchone()
+        closes.append(round(k['close'], 2) if k else None)
+    # 名称
+    nm = db.execute("SELECT stock_name FROM watchlist WHERE stock_code=? LIMIT 1", (code,)).fetchone()
+    name = nm['stock_name'] if nm else None
+    if not name:
+        nm2 = db.execute("SELECT name FROM stock_basic WHERE stock_code=? LIMIT 1", (code,)).fetchone()
+        name = nm2['name'] if nm2 else None
+    # 主导源（W1：两源混合时诚实标注）
+    from collections import Counter
+    src_cnt = Counter(sources)
+    main_src = src_cnt.most_common(1)[0][0]
+    return jsonify({
+        'code': code, 'name': name,
+        'dates': dates, 'totals': totals, 'closes': closes,
+        'change_rates': [r['change_rate'] for r in rows],
+        'source': main_src, 'source_map': dict(src_cnt),
+        'note': '股东人数为报告期披露数据（季度）；股价为披露日当日或之后首交易日收盘',
+    })
+
+
 @app.route('/api/stock-valuation')
 def api_stock_valuation():
     """个股估值指标历史：PE/PB/PS/股息率/市值"""

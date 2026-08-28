@@ -58,6 +58,7 @@
     <button class="tab" onclick="switchTab('strength')">📈 市场强度</button>
     <button class="tab" onclick="switchTab('eval')">🧮 财务评估</button>
     <button class="tab" onclick="switchTab('fund')">🩺 基本面评估</button>
+    <button class="tab" onclick="switchTab('shn')">👥 股东人数</button>
   </div>
 
   <!-- Tab1: 估值仪表 -->
@@ -126,6 +127,14 @@
     <div id="fund-results"></div>
   </div>
 
+  <!-- Tab7: 股东人数（筹码集中度） -->
+  <div class="tab-content" id="tab-shn">
+    <div class="chart-card"><div class="chart-title">👥 股东人数 vs 股价（筹码集中度）</div>
+      <div id="chart-shn" style="height:360px"></div>
+      <div id="text-shn" class="analysis-text" style="margin-top:8px"></div>
+    </div>
+  </div>
+
 <script>
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('stkv-theme',n);setTimeout(loadAll,200)}
 (function(){var s=localStorage.getItem('stkv-theme')||'light';document.documentElement.dataset.theme=s})();
@@ -140,6 +149,7 @@ function switchTab(tab){
   if(tab!=='strength')setTimeout(function(){resizeCharts()},300);
   if(tab==='eval')loadEval();
   if(tab==='fund')loadFund();
+  if(tab==='shn'){setTimeout(function(){var c=document.getElementById('stock-input').value||'600519';loadShareholders(c)},100)}
   if(tab==='strength'){setTimeout(function(){var c=document.getElementById('stock-input').value||'600519';loadStrength(c)},100)}
 }
 
@@ -158,6 +168,7 @@ async function loadAll(){
   await loadValuation(code,startDate,endDate);
   await loadFinancials(code);
   loadEval(code);
+  loadShareholders(code);  // W2：切股票后股东人数同步刷新（轻量）
 }
 
 // ══════ 估值 ══════
@@ -433,6 +444,67 @@ async function loadStrength(code){
   });
   tbl+='</table>';
   document.getElementById('diverge-list').innerHTML='<span style="font-size:0.6rem;color:var(--muted)">共'+allSigs.length+'个信号</span>'+tbl;
+}
+
+// ══════ 股东人数（筹码集中度）══════
+async function loadShareholders(code){
+  var resp=await fetch(API+'/api/stock-valuation/shareholders?code='+code);
+  var d=await resp.json();
+  if(d.error){document.getElementById('text-shn').textContent='暂无股东人数数据（'+d.error+'）';return}
+  if(!d.dates||!d.dates.length){document.getElementById('text-shn').textContent='暂无股东人数数据';return}
+  var dom=document.getElementById('chart-shn');
+  if(dom._echart)dom._echart.dispose();
+  var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark';
+  var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
+  var upC='#ef4444';  // O2：统一铁律红，light 不再用 legacy 红
+  var totals=d.totals.map(function(v){return v!=null?Math.round(v/10000*100)/100:null});
+  var tv=totals.filter(function(v){return v!=null});
+  var avgT=tv.reduce(function(a,b){return a+b},0)/tv.length;
+  var closes=d.closes;
+  var sliderCfg={type:'slider',start:0,end:100,height:16,bottom:4,showDetail:false,
+    dataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},
+    selectedDataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},
+    fillerColor:'rgba(83,155,245,0.15)',borderColor:'rgba(255,255,255,0.08)'};
+  ch.setOption({
+    backgroundColor:'transparent',tooltip:{trigger:'axis'},
+    legend:{data:['股东人数(万)','股价(元)'],bottom:20,textStyle:{color:tx,fontSize:10}},
+    grid:{left:'10%',right:'5%',top:8,bottom:55},
+    xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9,formatter:function(v){return v.slice(0,7)}},axisLine:{lineStyle:{color:sp}}},
+    yAxis:[
+      {type:'value',name:'股东人数(万)',axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
+      {type:'value',name:'股价(元)',axisLabel:{color:tx,fontSize:9},splitLine:{show:false}}
+    ],
+    dataZoom:[{type:'inside',start:0,end:100},sliderCfg],
+    series:[
+      {name:'股东人数(万)',type:'line',data:totals,smooth:false,symbol:'circle',symbolSize:4,
+       lineStyle:{color:'#539BF5',width:1.5},itemStyle:{color:'#539BF5'},
+       markLine:{silent:true,symbol:'none',label:{color:tx,fontSize:8,formatter:'均值 {c}万'},
+         data:[{yAxis:Math.round(avgT*100)/100,lineStyle:{color:'#E8A838',type:'dashed',width:1}}]}},
+      {name:'股价(元)',type:'line',data:closes,smooth:false,symbol:'none',yAxisIndex:1,
+       lineStyle:{color:upC,width:1.5}}
+    ]
+  });dom._echart=ch;
+  // 筹码集中度分析文字
+  var n=totals.length;
+  var cur=totals[n-1],prev=n>=2?totals[n-2]:null;
+  if(cur==null){document.getElementById('text-shn').textContent='📌 最新股东人数暂无数据（披露缺失）';return}  // O8：null 降级
+  var minT=Math.min.apply(null,tv),maxT=Math.max.apply(null,tv);
+  var minD=d.dates[totals.indexOf(minT)],maxD=d.dates[totals.indexOf(maxT)];
+  var txt='📌 最新股东人数 '+cur+' 万';
+  if(prev!=null&&prev>0)txt+='（较上期 '+(((cur-prev)/prev*100)>0?'+':'')+((cur-prev)/prev*100).toFixed(1)+'%）';
+  txt+='｜历史区间 '+minT+' 万（'+minD+'）~ '+maxT+' 万（'+maxD+'）';
+  if(n>=3){  // O4：单点/两点数据不判新高新低
+    if(cur<=minT*1.05)txt+='。⚠️ 股东人数接近历史新低，筹码高度集中，后续走势通常更流畅（参考紫金2021案例）';
+    else if(cur>=maxT*0.95)txt+='。⚠️ 股东人数接近历史新高，筹码分散，走势易曲折（参考紫金2026案例）';
+    else txt+='。'+(cur<prev?'✅ 股东人数较上期减少，筹码趋向集中':'❌ 股东人数较上期增加，筹码趋向分散');
+  } else {
+    txt+='。'+(cur<prev?'✅ 股东人数较上期减少，筹码趋向集中':'❌ 股东人数较上期增加，筹码趋向分散');
+  }
+  var sm=d.source_map||{};
+  var srcTxt=d.source==='lx'?'理杏仁':'东财/akshare';
+  if(sm.lx&&sm.ak)srcTxt+='（混合：理杏仁'+(sm.lx||0)+'条/东财'+(sm.ak||0)+'条）';
+  txt+='（数据源：'+srcTxt+'，季度披露；'+(d.note||'')+'）';
+  document.getElementById('text-shn').textContent=txt;
 }
 
 var _compareCache={};
