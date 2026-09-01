@@ -2516,12 +2516,15 @@ def api_market_hk_advice_detail():
     # 估值/息差序列
     from collections import defaultdict
     pe_p, pb_p, dyr, dyr_p = [], [], [], []
+    pe_s, pb_s = [], []  # 绝对值序列（估值全景）
     for d in dates:
         v = val_map.get(d)
         pe_p.append(round(v['pe_ttm_pct'] * 100) if v and v['pe_ttm_pct'] is not None else None)
         pb_p.append(round(v['pb_pct'] * 100) if v and v['pb_pct'] is not None else None)
         dyr.append(round(v['dyr'] * 100, 2) if v and v['dyr'] is not None else None)
         dyr_p.append(round(v['dyr_pct'] * 100) if v and v['dyr_pct'] is not None else None)
+        pe_s.append(round(v['pe_ttm'], 1) if v and v['pe_ttm'] is not None else None)
+        pb_s.append(round(v['pb'], 2) if v and v['pb'] is not None else None)
     # 息差（国债对齐）
     bond = {r['date']: r['y10'] for r in db.execute("SELECT date, y10 FROM bond_yield_daily ORDER BY date").fetchall()}
     bdates = sorted(bond.keys())
@@ -2568,6 +2571,7 @@ def api_market_hk_advice_detail():
         'code': code, 'name': name, 'date': dates[cur],
         'dates': dates, 'tri_close': tri_close, 'price_close': price_close, 'dd_series': dd,
         'pe_pct': pe_p, 'pb_pct': pb_p, 'dyr': dyr, 'dyr_pct': dyr_p, 'spread_series': spread_s,
+        'pe_series': pe_s, 'pb_series': pb_s,
         'current': {
             'dd_250': dd[cur], 'dyr': dyr[cur], 'dyr_pct': dyr_p[cur],
             'pe_pct': pe_p[cur], 'pb_pct': pb_p[cur], 'spread': spread_s[cur],

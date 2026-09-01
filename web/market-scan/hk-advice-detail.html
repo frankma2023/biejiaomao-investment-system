@@ -41,18 +41,32 @@ html[data-theme="light"] .chart-card{background:rgba(255,255,255,.7)}
   <h1 id="title">港股红利详情</h1>
   <div class="sub" id="sub">—</div>
   <div class="advice-card" id="advice"><div class="lv">加载中...</div><div class="tx"></div></div>
-  <div class="chart-card"><div class="ct">🎯 买卖点规则（当前状态）</div>
-    <table><thead><tr><th>规则</th><th>当前值</th><th>状态</th><th>说明</th></tr></thead><tbody id="rules-body"></tbody></table></div>
-  <div class="stat-row" id="stats"></div>
-  <div class="chart-card"><div class="ct">📈 全收益 vs 价格（2016起）</div><div id="chart-px" style="height:300px"></div><div class="cs">全收益=含分红再投资；价格=净值口径</div></div>
-  <div class="chart-card"><div class="ct">📉 250日回撤（全收益，≥15%买点区）</div><div id="chart-dd" style="height:220px"></div></div>
-  <div class="chart-card"><div class="ct">📊 估值分位 + 股息率</div><div id="chart-val" style="height:260px"></div><div class="cs">港股分位有效性：PE 部分有效 / PB 无效 / 股息率分位反向（见信号表）</div></div>
-  <div class="chart-card"><div class="ct">📈 股债息差（≥4% 买点区）</div><div id="chart-spread" style="height:220px"></div></div>
-  <div class="chart-card"><div class="ct">🎯 信号有效性回测（2018起 · 60日前瞻 · 全收益口径）</div>
-    <table><thead><tr><th>信号</th><th>触发次数</th><th>60日胜率</th><th>60日中位</th><th>判定</th></tr></thead><tbody id="bt-body"></tbody></table>
-    <div class="cs">买点规则：回撤≥15% / 股息率≥6% / 息差≥4%；港股 PE 分位>80% 部分有效，PB 无效，股息率分位<10% 反向</div>
+  <div class="tabs" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+    <button class="tab active" id="tabbtn-op" onclick="switchHkTab('op')">🎯 操作建议</button>
+    <button class="tab" id="tabbtn-val" onclick="switchHkTab('val')">📊 估值全景</button>
+  </div>
+  <div id="pane-op">
+    <div class="chart-card"><div class="ct">🎯 买卖点规则（当前状态）</div>
+      <table><thead><tr><th>规则</th><th>当前值</th><th>状态</th><th>说明</th></tr></thead><tbody id="rules-body"></tbody></table></div>
+    <div class="stat-row" id="stats"></div>
+    <div class="chart-card"><div class="ct">📉 250日回撤（全收益，≥15%买点区）</div><div id="chart-dd" style="height:220px"></div></div>
+    <div class="chart-card"><div class="ct">🎯 信号有效性回测（2018起 · 60日前瞻 · 全收益口径）</div>
+      <table><thead><tr><th>信号</th><th>触发次数</th><th>60日胜率</th><th>60日中位</th><th>判定</th></tr></thead><tbody id="bt-body"></tbody></table>
+      <div class="cs">买点规则：回撤≥15% / 股息率≥6% / 息差≥4%；港股 PE 分位>80% 部分有效，PB 无效，股息率分位<10% 反向</div>
+    </div>
+  </div>
+  <div id="pane-val" style="display:none">
+    <div class="chart-card"><div class="ct">📈 全收益 vs 价格（2016起）</div><div id="chart-px" style="height:280px"></div><div class="cs">全收益=含分红再投资；价格=净值口径</div></div>
+    <div class="chart-card"><div class="ct">📊 估值分位 + 股息率</div><div id="chart-val" style="height:260px"></div><div class="cs">港股分位有效性：PE 部分有效 / PB 无效 / 股息率分位反向（见操作建议·信号表）</div></div>
+    <div class="chart-card"><div class="ct">📊 PE/PB 绝对值走势</div><div id="chart-abs" style="height:240px"></div></div>
+    <div class="chart-card"><div class="ct">📈 股债息差（≥4% 买点区）</div><div id="chart-spread" style="height:220px"></div></div>
   </div>
 </div>
+<style>
+.tab{padding:7px 16px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--muted);cursor:pointer;font-family:var(--font-display);font-size:0.72rem;font-weight:600;transition:all .2s}
+.tab:hover{color:#d4d4d8;border-color:var(--border-hover)}
+.tab.active{background:var(--accent-subtle);color:var(--accent);border-color:var(--accent-border)}
+</style>
 <script>
 // api-client.js 全局提供 API_BASE（铁律 5.4：加载 api-client.js 的页面禁止重声明 const API）
 const code = new URLSearchParams(location.search).get('code') || '930914';
@@ -100,8 +114,42 @@ async function load(){
     ['全收益收盘', d.tri_close[d.tri_close.length-1], '#8b8b90'],
   ];
   document.getElementById('stats').innerHTML = stats.map(s => '<div class="stat-box"><div class="n" style="color:' + s[2] + '">' + s[1] + '</div><div class="l">' + s[0] + '</div></div>').join('');
-  // 图表
-  buildPx(d); buildDd(d); buildVal(d); buildSpread(d); buildBt(d.signals_bt);
+  // 数据存全局，tab 懒渲染（pane-val 隐藏时 init 会 0 尺寸）
+  window._hkData = d;
+  // 操作建议 tab 图（默认可见）
+  buildDd(d); buildBt(d.signals_bt);
+  // 若当前在估值 tab，也渲染
+  if (window._hkTab === 'val') renderValTab(d);
+}
+function switchHkTab(tab){
+  window._hkTab = tab;
+  document.getElementById('pane-op').style.display = tab === 'op' ? '' : 'none';
+  document.getElementById('pane-val').style.display = tab === 'val' ? '' : 'none';
+  document.getElementById('tabbtn-op').classList.toggle('active', tab === 'op');
+  document.getElementById('tabbtn-val').classList.toggle('active', tab === 'val');
+  if (tab === 'val' && window._hkData) setTimeout(function(){ renderValTab(window._hkData); }, 60);
+}
+function renderValTab(d){
+  if (!d) return;
+  buildPx(d); buildVal(d); buildAbs(d); buildSpread(d);
+}
+function buildAbs(d){
+  const el = document.getElementById('chart-abs'); if (!el) return;
+  if (el._echart) el._echart.dispose();
+  const ch = echarts.init(el);
+  ch.setOption({
+    backgroundColor:'transparent', tooltip:{trigger:'axis'},
+    legend:{data:['PE(倍)','PB(倍)'],bottom:0,textStyle:{color:tx(),fontSize:9}},
+    grid:{left:'8%',right:'5%',top:8,bottom:36},
+    xAxis:{type:'category',data:d.dates,axisLabel:{color:tx(),fontSize:9,formatter:function(v){return v.slice(0,7)}},axisLine:{lineStyle:{color:sp()}}},
+    yAxis:[{type:'value',name:'PE',axisLabel:{color:tx(),fontSize:9},splitLine:{lineStyle:{color:sp()}}},
+           {type:'value',name:'PB',axisLabel:{color:tx(),fontSize:9},splitLine:{show:false}}],
+    dataZoom:[{type:'inside',start:0,end:100}],
+    series:[
+      {name:'PE(倍)',type:'line',data:d.pe_series,smooth:true,showSymbol:false,lineStyle:{color:upC,width:1.5}},
+      {name:'PB(倍)',type:'line',data:d.pb_series,smooth:true,showSymbol:false,yAxisIndex:1,lineStyle:{color:bluC,width:1.5}}
+    ]});
+  el._echart = ch;
 }
 function baseOpt(dates){
   return { backgroundColor:'transparent', tooltip:{trigger:'axis'},
