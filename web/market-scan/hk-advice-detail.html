@@ -54,7 +54,7 @@ html[data-theme="light"] .chart-card{background:rgba(255,255,255,.7)}
   </div>
 </div>
 <script>
-const API = 'http://' + window.location.hostname + ':8788';
+// api-client.js 全局提供 API_BASE（铁律 5.4：加载 api-client.js 的页面禁止重声明 const API）
 const code = new URLSearchParams(location.search).get('code') || '930914';
 const isDark = () => document.documentElement.dataset.theme === 'dark';
 const tx = () => isDark() ? '#999' : '#6E6E6E';
@@ -64,7 +64,7 @@ const upC = '#ef4444', dnC = '#10b981', midC = '#f59e0b', bluC = '#539BF5';
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
 
 async function load(){
-  const d = await (await fetch(API + '/api/market-scan/hk-advice-detail?code=' + code)).json();
+  const d = await (await fetch(API_BASE + '/api/market-scan/hk-advice-detail?code=' + code)).json();
   if (d.error) { document.getElementById('advice').innerHTML = '<div class="lv">无数据</div><div class="tx">' + d.error + '</div>'; return; }
   document.getElementById('title').textContent = d.name + '（' + d.code + '）详情';
   document.getElementById('sub').textContent = '数据截至 ' + d.date + ' · 全收益 2016 起 · 估值 2018 起 · 信号回测 2018-2026';
