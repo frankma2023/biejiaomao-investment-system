@@ -2336,6 +2336,7 @@ def api_market_hk_etf():
     db = get_db()
     result = []
     for code, name, fee, index_name, mgr in HK_ETFS:
+        track_index = {'513820': '930914', '159691': '930839'}.get(code, '')  # 中证系有详情页，标普/恒生暂缺
         rows = db.execute("""
             SELECT date, close FROM hk_etf_daily
             WHERE stock_code=? ORDER BY date
@@ -2372,6 +2373,7 @@ def api_market_hk_etf():
         result.append({
             'code': code, 'name': name,
             'fee': fee, 'index_name': index_name, 'mgr': mgr,
+            'track_index': track_index,
             'date': dates[-1], 'close': round(cur, 3), 'chg': round(chg, 2),
             'ann': round(ann * 100, 2), 'total': round(total * 100, 1),
             'start_date': dates[0], 'days': len(dates),
@@ -2434,6 +2436,97 @@ def api_market_full_return_compare():
                        'start': dates[0]})
     return jsonify({'series': series,
                     'note': '全收益=含分红再投资（理杏仁 total_return，2016起）；价格=未计分红（仅该指数无全收益数据时回退）；各自起点=100，港股ETF自上市/2023-2024起'})
+
+
+@app.route('/api/market-scan/hk-advice-detail')
+def api_market_hk_advice_detail():
+    """港股红利指数详情：全收益/回撤/估值分位/息差/信号有效性（仿 dividend-advice-detail，港股规则）"""
+    code = request.args.get('code', '930914')
+    db = get_db()
+    # 全收益 + 价格
+    tri = db.execute("SELECT date, close FROM index_full_return_daily WHERE stock_code=? ORDER BY date", (code,)).fetchall()
+    price = db.execute("SELECT date, close FROM index_daily_kline WHERE stock_code=? AND kline_type='normal' ORDER BY date", (code,)).fetchall()
+    # 估值
+    val = db.execute("""SELECT date, pe_ttm, pe_ttm_pct, pb, pb_pct, dyr, dyr_pct
+        FROM index_fundamental_daily WHERE stock_code=? ORDER BY date""", (code,)).fetchall()
+    val_map = {r['date']: r for r in val}
+    if not tri:
+        return jsonify({'error': 'no data', 'code': code})
+    dates = [r['date'] for r in tri]
+    tri_close = [r['close'] for r in tri]
+    # 价格对齐（tri 日期上取价格收盘）
+    price_map = {r['date']: r['close'] for r in price}
+    price_close = [price_map.get(d) for d in dates]
+    # 250 日回撤（全收益）
+    dd = []
+    for i in range(len(tri_close)):
+        if i < 250:
+            dd.append(None)
+            continue
+        hi = max(tri_close[i-250:i+1])
+        dd.append(round((hi - tri_close[i]) / hi * 100, 1))
+    # 估值/息差序列
+    from collections import defaultdict
+    pe_p, pb_p, dyr, dyr_p = [], [], [], []
+    for d in dates:
+        v = val_map.get(d)
+        pe_p.append(round(v['pe_ttm_pct'] * 100) if v and v['pe_ttm_pct'] is not None else None)
+        pb_p.append(round(v['pb_pct'] * 100) if v and v['pb_pct'] is not None else None)
+        dyr.append(round(v['dyr'] * 100, 2) if v and v['dyr'] is not None else None)
+        dyr_p.append(round(v['dyr_pct'] * 100) if v and v['dyr_pct'] is not None else None)
+    # 息差（国债对齐）
+    bond = {r['date']: r['y10'] for r in db.execute("SELECT date, y10 FROM bond_yield_daily ORDER BY date").fetchall()}
+    bdates = sorted(bond.keys())
+    import bisect as _b
+    spread_s = []
+    for i, d in enumerate(dates):
+        v = val_map.get(d)
+        if not v or v['dyr'] is None:
+            spread_s.append(None); continue
+        idx = _b.bisect_right(bdates, d) - 1
+        y10 = bond[bdates[idx]] if idx >= 0 else None
+        spread_s.append(round(v['dyr'] * 100 - y10, 2) if y10 is not None else None)
+    # 信号有效性回测（2018 起）
+    start_i = next((i for i, d in enumerate(dates) if d >= '2018-01-01'), 250)
+    bt = []
+    def _fwd(i):
+        return (tri_close[i+60] / tri_close[i] - 1) * 100 if i + 60 < len(tri_close) else None
+    def _spread(i):
+        return spread_s[i]
+    def _dd(i):
+        return dd[i]
+    signals_bt = {
+        '回撤≥15%': lambda i: _dd(i) is not None and _dd(i) >= 15,
+        '回撤≥10%': lambda i: _dd(i) is not None and _dd(i) >= 10,
+        '股息率≥6%': lambda i: dyr[i] is not None and dyr[i] >= 6,
+        '息差≥4%': lambda i: _spread(i) is not None and _spread(i) >= 4,
+        'PE分位>80%': lambda i: pe_p[i] is not None and pe_p[i] > 80,
+        'PB分位>70%': lambda i: pb_p[i] is not None and pb_p[i] > 70,
+        '股息率分位<10%': lambda i: dyr_p[i] is not None and dyr_p[i] < 10,
+    }
+    for name, fn in signals_bt.items():
+        hits = [i for i in range(start_i, len(tri_close)) if fn(i)]
+        if not hits:
+            bt.append({'signal': name, 'hits': 0, 'win': None, 'med': None}); continue
+        fwds = [f for i in hits if (f := _fwd(i)) is not None]
+        if not fwds:
+            bt.append({'signal': name, 'hits': len(hits), 'win': None, 'med': None}); continue
+        win = round(sum(1 for f in fwds if f > 0) / len(fwds) * 100)
+        med = round(sorted(fwds)[len(fwds)//2], 1)
+        bt.append({'signal': name, 'hits': len(hits), 'win': win, 'med': med})
+    cur = len(dates) - 1
+    name = '港股通高股息' if code == '930914' else ('港股通高股息精选' if code == '930839' else code)
+    return jsonify({
+        'code': code, 'name': name, 'date': dates[cur],
+        'dates': dates, 'tri_close': tri_close, 'price_close': price_close, 'dd_series': dd,
+        'pe_pct': pe_p, 'pb_pct': pb_p, 'dyr': dyr, 'dyr_pct': dyr_p, 'spread_series': spread_s,
+        'current': {
+            'dd_250': dd[cur], 'dyr': dyr[cur], 'dyr_pct': dyr_p[cur],
+            'pe_pct': pe_p[cur], 'pb_pct': pb_p[cur], 'spread': spread_s[cur],
+        },
+        'signals_bt': bt,
+        'note': '港股规则：回撤≥15%/股息率≥6%/息差≥4% 为买点（回测 59-70%）；PE分位>80% 部分有效（60%）；PB分位无效（47%）；股息率分位<10% 反向（44%）——与A股框架不同',
+    })
 
 
 # ═══════════════════════════════════════════════

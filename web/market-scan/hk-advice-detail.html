@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>港股红利详情</title>
+<link rel="stylesheet" href="/shared/css/hanako-glass.css">
+<script src="/shared/js/api-client.js"></script>
+<script src="/shared/js/echarts.min.js"></script>
+<style>
+body{background:var(--bg);color:var(--text-primary);font-family:var(--font-body);font-size:13px;margin:0;padding:24px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--accent);margin:0 0 4px}
+.sub{font-size:0.68rem;color:var(--muted);margin-bottom:20px}
+.back{font-size:0.68rem;color:var(--muted);cursor:pointer;margin-bottom:12px;display:inline-block}
+.advice-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.advice-card .lv{font-size:1.1rem;font-weight:700}
+.advice-card .tx{font-size:0.75rem;color:var(--text-secondary);flex:1}
+.stat-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.stat-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;flex:1;min-width:110px;text-align:center}
+.stat-box .n{font-family:var(--font-display);font-size:1.2rem;font-weight:600}
+.stat-box .l{font-size:0.58rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.04em}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.chart-card .ct{font-size:0.75rem;font-weight:600;color:var(--accent);margin-bottom:8px}
+.chart-card .cs{font-size:0.6rem;color:var(--muted);margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:0.68rem}
+th{padding:6px 8px;border-bottom:2px solid var(--border);font-weight:600;color:var(--muted);font-size:0.56rem;text-transform:uppercase;text-align:right;background:var(--card)}
+th:first-child,td:first-child{text-align:left}
+td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono)}
+td:first-child{font-family:var(--font-body)}
+.up{color:#ef4444;font-weight:600}
+.dn{color:#10b981;font-weight:600}
+.mid{color:#f59e0b;font-weight:600}
+.muted{color:var(--muted)}
+html[data-theme="light"] .chart-card{background:rgba(255,255,255,.7)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="back" onclick="history.back()">← 返回</div>
+  <h1 id="title">港股红利详情</h1>
+  <div class="sub" id="sub">—</div>
+  <div class="advice-card" id="advice"><div class="lv">加载中...</div><div class="tx"></div></div>
+  <div class="stat-row" id="stats"></div>
+  <div class="chart-card"><div class="ct">📈 全收益 vs 价格（2016起）</div><div id="chart-px" style="height:300px"></div><div class="cs">全收益=含分红再投资；价格=净值口径</div></div>
+  <div class="chart-card"><div class="ct">📉 250日回撤（全收益，≥15%买点区）</div><div id="chart-dd" style="height:220px"></div></div>
+  <div class="chart-card"><div class="ct">📊 估值分位 + 股息率</div><div id="chart-val" style="height:260px"></div><div class="cs">港股分位有效性：PE 部分有效 / PB 无效 / 股息率分位反向（见信号表）</div></div>
+  <div class="chart-card"><div class="ct">📈 股债息差（≥4% 买点区）</div><div id="chart-spread" style="height:220px"></div></div>
+  <div class="chart-card"><div class="ct">🎯 信号有效性回测（2018起 · 60日前瞻 · 全收益口径）</div>
+    <table><thead><tr><th>信号</th><th>触发次数</th><th>60日胜率</th><th>60日中位</th><th>判定</th></tr></thead><tbody id="bt-body"></tbody></table>
+    <div class="cs">买点规则：回撤≥15% / 股息率≥6% / 息差≥4%；港股 PE 分位>80% 部分有效，PB 无效，股息率分位<10% 反向</div>
+  </div>
+</div>
+<script>
+const API = 'http://' + window.location.hostname + ':8788';
+const code = new URLSearchParams(location.search).get('code') || '930914';
+const isDark = () => document.documentElement.dataset.theme === 'dark';
+const tx = () => isDark() ? '#999' : '#6E6E6E';
+const sp = () => isDark() ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+const upC = '#ef4444', dnC = '#10b981', midC = '#f59e0b', bluC = '#539BF5';
+(function(){const s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
+
+async function load(){
+  const d = await (await fetch(API + '/api/market-scan/hk-advice-detail?code=' + code)).json();
+  if (d.error) { document.getElementById('advice').innerHTML = '<div class="lv">无数据</div><div class="tx">' + d.error + '</div>'; return; }
+  document.getElementById('title').textContent = d.name + '（' + d.code + '）详情';
+  document.getElementById('sub').textContent = '数据截至 ' + d.date + ' · 全收益 2016 起 · 估值 2018 起 · 信号回测 2018-2026';
+  // 当前状态卡
+  const c = d.current;
+  const ddOk = c.dd_250 != null && c.dd_250 >= 15, dyOk = c.dyr != null && c.dyr >= 6, spOk = c.spread != null && c.spread >= 4;
+  const peHi = c.pe_pct != null && c.pe_pct > 80;
+  const buyN = (ddOk?1:0) + (dyOk?1:0) + (spOk?1:0);
+  let lv, lvTxt, advice;
+  if (buyN >= 2) { lv = '买入区', lvTxt = upC; advice = '回撤/股息率/息差' + buyN + '项达标——分批买入信号' }
+  else if (buyN === 1) { lv = '观察', lvTxt = midC; advice = '1 项达标（回撤' + (ddOk?'✅':'❌') + ' 股息率' + (dyOk?'✅':'❌') + ' 息差' + (spOk?'✅':'❌') + '），继续等待' }
+  else if (peHi) { lv = '高位警示', lvTxt = dnC; advice = 'PE 分位 ' + c.pe_pct + '% >80%（60%胜率卖出倾向）+ 无买点达标——偏减仓/观望' }
+  else { lv = '观望', lvTxt = '#8b8b90'; advice = '无买点达标（回撤 ' + (c.dd_250||0) + '% 远未到 15%）——持有等回撤或股息率提升' }
+  document.getElementById('advice').innerHTML = '<div class="lv" style="color:' + lvTxt + '">' + lv + '</div><div class="tx">' + advice + '</div>';
+  // 统计
+  let stats = [
+    ['250日回撤', (c.dd_250||0) + '%', ddOk ? upC : '#8b8b90'],
+    ['股息率', (c.dyr||0) + '%（分位' + (c.dyr_pct||0) + '%）', c.dyr >= 6 ? upC : '#8b8b90'],
+    ['息差', (c.spread||0) + 'pp', c.spread >= 4 ? upC : '#8b8b90'],
+    ['PE分位', (c.pe_pct||0) + '%', c.pe_pct > 80 ? dnC : '#8b8b90'],
+    ['PB分位', (c.pb_pct||0) + '%', '#8b8b90'],
+    ['全收益收盘', d.tri_close[d.tri_close.length-1], '#8b8b90'],
+  ];
+  document.getElementById('stats').innerHTML = stats.map(s => '<div class="stat-box"><div class="n" style="color:' + s[2] + '">' + s[1] + '</div><div class="l">' + s[0] + '</div></div>').join('');
+  // 图表
+  buildPx(d); buildDd(d); buildVal(d); buildSpread(d); buildBt(d.signals_bt);
+}
+function baseOpt(dates){
+  return { backgroundColor:'transparent', tooltip:{trigger:'axis'},
+    grid:{left:'8%',right:'4%',top:8,bottom:36},
+    xAxis:{type:'category',data:dates,axisLabel:{color:tx(),fontSize:9,formatter:function(v){return v.slice(0,7)}},axisLine:{lineStyle:{color:sp()}}},
+    yAxis:{type:'value',axisLabel:{color:tx(),fontSize:9},splitLine:{lineStyle:{color:sp()}}},
+    dataZoom:[{type:'inside',start:0,end:100}] };
+}
+function buildPx(d){
+  const el = document.getElementById('chart-px'); if (el._echart) el._echart.dispose();
+  const ch = echarts.init(el);
+  ch.setOption(Object.assign(baseOpt(d.dates), { legend:{data:['全收益','价格'],bottom:0,textStyle:{color:tx(),fontSize:9}},
+    series:[
+      {name:'全收益',type:'line',data:d.tri_close,smooth:true,showSymbol:false,lineStyle:{color:upC,width:1.8}},
+      {name:'价格',type:'line',data:d.price_close,smooth:true,showSymbol:false,lineStyle:{color:'#8b8b90',width:1,type:'dashed'}}
+    ]}));
+  el._echart = ch;
+}
+function buildDd(d){
+  const el = document.getElementById('chart-dd'); if (el._echart) el._echart.dispose();
+  const ch = echarts.init(el);
+  ch.setOption(Object.assign(baseOpt(d.dates), { series:[
+    {name:'250日回撤%',type:'line',data:d.dd_series,smooth:false,showSymbol:false,lineStyle:{color:midC,width:1.2},
+      markLine:{silent:true,symbol:'none',label:{color:upC,fontSize:9,formatter:'买点 15%'},data:[{yAxis:15,lineStyle:{color:upC,type:'dashed'}}]},
+      markArea:{silent:true,itemStyle:{color:'rgba(239,68,68,.08)'},data:[[{yAxis:15},{yAxis:999}]]}}
+  ]}));
+  el._echart = ch;
+}
+function buildVal(d){
+  const el = document.getElementById('chart-val'); if (el._echart) el._echart.dispose();
+  const ch = echarts.init(el);
+  ch.setOption({
+    backgroundColor:'transparent', tooltip:{trigger:'axis'},
+    legend:{data:['PE分位','PB分位','股息率分位','股息率%'],bottom:0,textStyle:{color:tx(),fontSize:9}},
+    grid:{left:'8%',right:'5%',top:8,bottom:36},
+    xAxis:{type:'category',data:d.dates,axisLabel:{color:tx(),fontSize:9,formatter:function(v){return v.slice(0,7)}},axisLine:{lineStyle:{color:sp()}}},
+    yAxis:[{type:'value',name:'分位%',min:0,max:100,axisLabel:{color:tx(),fontSize:9},splitLine:{lineStyle:{color:sp()}}},
+           {type:'value',name:'股息率%',axisLabel:{color:tx(),fontSize:9},splitLine:{show:false}}],
+    dataZoom:[{type:'inside',start:0,end:100}],
+    series:[
+      {name:'PE分位',type:'line',data:d.pe_pct,smooth:true,showSymbol:false,lineStyle:{color:upC,width:1.2}},
+      {name:'PB分位',type:'line',data:d.pb_pct,smooth:true,showSymbol:false,lineStyle:{color:'#8b5cf6',width:1.2}},
+      {name:'股息率分位',type:'line',data:d.dyr_pct,smooth:true,showSymbol:false,lineStyle:{color:'#8b8b90',width:1,type:'dashed'}},
+      {name:'股息率%',type:'line',data:d.dyr,smooth:true,showSymbol:false,yAxisIndex:1,lineStyle:{color:dnC,width:1.5},
+        markLine:{silent:true,symbol:'none',label:{color:upC,fontSize:9,formatter:'买点 6%'},data:[{yAxis:6,lineStyle:{color:upC,type:'dashed'}}]}}
+    ]});
+  el._echart = ch;
+}
+function buildSpread(d){
+  const el = document.getElementById('chart-spread'); if (el._echart) el._echart.dispose();
+  const ch = echarts.init(el);
+  ch.setOption(Object.assign(baseOpt(d.dates), { series:[
+    {name:'息差pp',type:'line',data:d.spread_series,smooth:true,showSymbol:false,lineStyle:{color:bluC,width:1.3},
+      markLine:{silent:true,symbol:'none',label:{color:upC,fontSize:9,formatter:'买点 4pp'},data:[{yAxis:4,lineStyle:{color:upC,type:'dashed'}}]}}
+  ]}));
+  el._echart = ch;
+}
+function buildBt(bt){
+  document.getElementById('bt-body').innerHTML = (bt||[]).map(x => {
+    let vd = x.win == null ? '—' : (x.win >= 58 ? '✅' : (x.win >= 50 ? '⚠️' : '❌'));
+    return '<tr><td>' + x.signal + '</td><td>' + x.hits + '</td><td>' + (x.win != null ? x.win + '%' : '—') + '</td><td>' + (x.med != null ? (x.med > 0 ? '+' : '') + x.med + '%' : '—') + '</td><td>' + vd + '</td></tr>';
+  }).join('');
+}
+load();
+</script>
+<script src="/shared/js/nav.js"></script>
+<script>window.NAV_PREFIX='../..';Nav.init({brandIcon:'🇭🇰',brandText:'指数投资',currentPage:'hk-advice-detail'})</script>
+</body>
+</html>
