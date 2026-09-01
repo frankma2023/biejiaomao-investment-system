@@ -2322,7 +2322,8 @@ def api_market_grid_advice():
 # ═══════════════════════════════════════════════
 
 HK_ETFS = [
-    ('513820', '港股通高股息', 0.60, '中证港股通高股息投资指数(930914)，中证指数公司编制', '汇添富'),
+    # 513820（汇添富场内）已替换为场外联接 023389（易方达 0.20% 费率更优，2026-09-01 用户决策）
+    ('023389', '易方达港股通高股息ETF联接A', 0.20, '中证港股通高股息投资指数(930914)，中证指数公司编制', '易方达'),
     ('159691', '港股通高股息精选', 0.52, '中证港股通高股息精选指数(930839)，中证指数公司编制', '工银瑞信'),
     ('513630', '标普港股红利低波', 0.60, '标普港股通低波红利指数（S&P Access HK Low Vol High Div，标普道琼斯编制）', '摩根'),
     ('159545', '恒生港股通高息低波', 0.20, '恒生港股通高股息低波动指数(HSHYLV)，恒生指数公司编制', '易方达'),
@@ -2336,11 +2337,18 @@ def api_market_hk_etf():
     db = get_db()
     result = []
     for code, name, fee, index_name, mgr in HK_ETFS:
-        track_index = {'513820': '930914', '159691': '930839'}.get(code, '')  # 中证系有详情页，标普/恒生暂缺
-        rows = db.execute("""
-            SELECT date, close FROM hk_etf_daily
-            WHERE stock_code=? ORDER BY date
-        """, (code,)).fetchall()
+        track_index = {'023389': '930914', '159691': '930839'}.get(code, '')  # 中证系有详情页，标普/恒生暂缺
+        is_otc = code == '023389'  # 场外联接：无场内行情，用跟踪指数 930914 驱动（行情+信号）
+        if is_otc:
+            rows = db.execute("""
+                SELECT date, close FROM index_daily_kline
+                WHERE stock_code='930914' AND kline_type='normal' ORDER BY date
+            """).fetchall()
+        else:
+            rows = db.execute("""
+                SELECT date, close FROM hk_etf_daily
+                WHERE stock_code=? ORDER BY date
+            """, (code,)).fetchall()
         if len(rows) < 2:
             continue
         dates = [r['date'] for r in rows]
@@ -2354,13 +2362,19 @@ def api_market_hk_etf():
         total = cur / closes[0] - 1
         ann = (1 + total) ** (1 / y0) - 1 if total > -1 else -1
         # ── 信号（回测依据 analysis/hk_div_buypoint.py）──
-        seg = closes[-250:]
-        hi250 = max(seg)
-        dd250 = (hi250 - cur) / hi250 * 100
-        pos250 = (cur - min(seg)) / (hi250 - min(seg)) * 100 if hi250 > min(seg) else 50
-        # 信号覆盖范围：仅 513820(930914)/159691(930839) 有回测依据（hk_div_buypoint.py）；
-        # 513630/159545 数据年限不足无结论 → 降级 hold 观察；512000(type=a) 是券商网格标的 → 不套港股信号
-        if code in ('513630', '159545'):
+        # 023389（场外联接）用 930914 全收益回撤（与 hk-advice-detail 同规则：≥15% 买点）
+        if is_otc:
+            ddinfo = _dd_from_full_return(db, '930914', dates[-1])
+            dd250 = ddinfo['dd_250'] if ddinfo else None
+            seg = closes[-250:]
+            pos250 = (cur - min(seg)) / (max(seg) - min(seg)) * 100 if max(seg) > min(seg) else 50
+            if dd250 is not None and dd250 >= 15:
+                advice_level, advice = 'buy', '买入（跟踪指数深回撤15%触发，60日69%）'
+            elif pos250 > 85:
+                advice_level, advice = 'caution', '高位区（跟踪指数250日位置' + str(round(pos250)) + '%），勿追高'
+            else:
+                advice_level, advice = 'hold', '观望（跟踪指数回撤' + str(round(dd250 or 0, 1)) + '%未到15%买点）'
+        elif code in ('513630', '159545'):
             advice_level, advice = 'hold', '观察（数据年限不足，暂无回测结论；买点规则待验证）'
         elif code == '512000':
             advice_level, advice = 'hold', '券商网格标的（见⛳券商指数 tab 档位表）'
@@ -2373,11 +2387,12 @@ def api_market_hk_etf():
         result.append({
             'code': code, 'name': name,
             'fee': fee, 'index_name': index_name, 'mgr': mgr,
-            'track_index': track_index,
+            'track_index': track_index, 'is_otc': is_otc,
             'date': dates[-1], 'close': round(cur, 3), 'chg': round(chg, 2),
             'ann': round(ann * 100, 2), 'total': round(total * 100, 1),
             'start_date': dates[0], 'days': len(dates),
-            'dd_250': round(dd250, 1), 'pos_250': round(pos250),
+            'dd_250': round(dd250, 1) if dd250 is not None else None,
+            'pos_250': round(pos250),
             'lo_250': round(min(seg), 3), 'hi_250': round(max(seg), 3),
             'type': 'a' if code == '512000' else 'hk',
             'advice_level': advice_level, 'advice': advice,

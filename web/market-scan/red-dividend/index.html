@@ -219,7 +219,7 @@ async function load() {
         hkHtml += '<span style="font-size:11px;font-weight:600;color:' + lv[1] + ';border:1px solid ' + lv[1] + '66;border-radius:6px;padding:1px 6px">' + lv[0] + '</span>';
         hkHtml += '</div>';
         hkHtml += '<div class="tx" style="font-size:0.62rem">' + x.advice + '</div>';
-        hkHtml += '<div class="meta">成立来年化 ' + (x.ann > 0 ? '+' : '') + x.ann + '%（价格口径）· 费率 ' + x.fee + '% · 回撤 ' + x.dd_250 + '%</div>';
+        hkHtml += '<div class="meta">' + (x.is_otc ? '场外联接 · 行情为跟踪指数' : '成立来年化 ' + (x.ann > 0 ? '+' : '') + x.ann + '%（价格口径）') + ' · 费率 ' + x.fee + '% · 回撤 ' + (x.dd_250 != null ? x.dd_250 : '—') + '%</div>';
         hkHtml += '<div class="sig" style="color:var(--accent)">📌 跟踪指数：' + (x.index_name || '—') + '</div>';
         hkHtml += '<div class="sig">' + (x.mgr || '') + '</div>';
         hkHtml += '</div>';
