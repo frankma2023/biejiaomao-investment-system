@@ -2453,6 +2453,39 @@ def api_market_full_return_compare():
                     'note': '全收益=含分红再投资（理杏仁 total_return，2016起）；价格=未计分红（仅该指数无全收益数据时回退）；各自起点=100，港股ETF自上市/2023-2024起'})
 
 
+@app.route('/api/market-scan/shareholder-low')
+def api_market_shareholder_low():
+    """全市场股东人数创新低扫描（筹码集中度，scan_shareholder_low.py 产出）"""
+    date = request.args.get('date', '')
+    db = get_db()
+    if not date:
+        r = db.execute("SELECT MAX(scan_date) FROM shareholder_low_scan").fetchone()
+        date = r[0] if r and r[0] else None
+    if not date:
+        return jsonify({'error': '先跑 scan_shareholder_low.py', 'items': [], 'date': None})
+    rows = db.execute("""SELECT * FROM shareholder_low_scan WHERE scan_date=? ORDER BY streak DESC, ratio ASC""", (date,)).fetchall()
+    items = []
+    for r in rows:
+        k = db.execute("""SELECT date, close FROM daily_kline WHERE stock_code=?
+            AND date<=? ORDER BY date DESC LIMIT 61""", (r['stock_code'], date)).fetchall()
+        k = list(reversed(k))
+        chg20 = chg60 = None
+        if len(k) >= 21 and k[-21]['close']:
+            chg20 = round((k[-1]['close'] / k[-21]['close'] - 1) * 100, 1)
+        if len(k) >= 61 and k[-61]['close']:
+            chg60 = round((k[-1]['close'] / k[-61]['close'] - 1) * 100, 1)
+        items.append({
+            'code': r['stock_code'], 'name': r['stock_name'],
+            'report_date': r['report_date'], 'total': r['total'],
+            'hist_min': r['hist_min'], 'hist_min_date': r['hist_min_date'],
+            'streak': r['streak'], 'chg': r['chg'], 'ratio': r['ratio'],
+            'chg20': chg20, 'chg60': chg60,
+            'is_new_low': 1 if (r['total'] <= r['hist_min']) else 0,
+        })
+    return jsonify({'date': date, 'count': len(items), 'items': items,
+                    'note': '筹码集中度扫描：最新股东人数 ≤ 历史最低×1.05（5%容差）；连续减=连续报告期减少；创新低=当前即历史最低；chg20/60=价格涨幅（启动检测）'})
+
+
 @app.route('/api/market-scan/hk-advice-detail')
 def api_market_hk_advice_detail():
     """港股红利指数详情：全收益/回撤/估值分位/息差/信号有效性（仿 dividend-advice-detail，港股规则）"""

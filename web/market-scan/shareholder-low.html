@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>筹码集中度扫描</title>
+<link rel="stylesheet" href="/shared/css/hanako-glass.css">
+<script src="/shared/js/api-client.js"></script>
+<style>
+body{background:var(--bg);color:var(--text-primary);font-family:var(--font-body);font-size:13px;margin:0;padding:24px}
+.wrap{max-width:1300px;margin:0 auto}
+h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--accent);margin:0 0 4px}
+.sub{font-size:0.68rem;color:var(--muted);margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.ct{font-size:0.75rem;font-weight:600;color:var(--accent);margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:0.68rem}
+th{padding:6px 8px;border-bottom:2px solid var(--border);font-weight:600;color:var(--muted);font-size:0.56rem;text-transform:uppercase;text-align:right;background:var(--card);cursor:pointer;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono)}
+td:first-child{font-family:var(--font-body)}
+.up{color:#ef4444;font-weight:600}
+.dn{color:#10b981;font-weight:600}
+.mid{color:#f59e0b;font-weight:600}
+.muted{color:var(--muted)}
+.badge{display:inline-block;font-size:0.55rem;padding:1px 6px;border-radius:6px;margin-left:4px}
+.badge-new{background:rgba(239,68,68,.12);color:#ef4444}
+.badge-streak{background:rgba(245,158,11,.12);color:#f59e0b}
+.filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.filters button{padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer;font-size:0.65rem}
+.filters button.active{background:var(--accent-subtle);color:var(--accent);border-color:var(--accent-border)}
+html[data-theme="light"] .card{background:rgba(255,255,255,.7)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>👥 筹码集中度扫描（股东人数创新低）</h1>
+  <div class="sub" id="sub">—</div>
+  <div class="filters">
+    <button data-f="all" class="active" onclick="setF('all')">全部</button>
+    <button data-f="new" onclick="setF('new')">🆕 当前即历史新低</button>
+    <button data-f="streak" onclick="setF('streak')">📈 连续≥2期减少</button>
+    <button data-f="rising" onclick="setF('rising')">🚀 20日上涨</button>
+  </div>
+  <div class="card">
+    <div class="ct">命中清单（点击代码跳转个股扫描）</div>
+    <table><thead><tr>
+      <th>代码/名称</th><th>最新股东数</th><th>较上期</th><th>连续减</th><th>历史最低</th><th>创新低</th><th>20日</th><th>60日</th>
+    </tr></thead><tbody id="tb"></tbody></table>
+    <div class="muted" style="margin-top:8px;font-size:0.6rem" id="note"></div>
+  </div>
+</div>
+<script>
+const isDark = () => document.documentElement.dataset.theme === 'dark';
+(function(){const s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
+let all = [];
+function setF(f){
+  document.querySelectorAll('.filters button').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+  render(f);
+}
+function render(f){
+  let list = all;
+  if (f === 'new') list = all.filter(x => x.is_new_low);
+  if (f === 'streak') list = all.filter(x => x.streak >= 2);
+  if (f === 'rising') list = all.filter(x => x.chg20 != null && x.chg20 > 0);
+  const html = list.map(x => {
+    const newB = x.is_new_low ? '<span class="badge badge-new">新低</span>' : '';
+    const stB = x.streak >= 2 ? '<span class="badge badge-streak">连减' + x.streak + '</span>' : '';
+    const chgCls = x.chg < 0 ? 'dn' : 'up';
+    const up20 = x.chg20 != null ? '<span class="' + (x.chg20 > 0 ? 'up' : 'dn') + '">' + (x.chg20 > 0 ? '+' : '') + x.chg20 + '%</span>' : '—';
+    const up60 = x.chg60 != null ? '<span class="' + (x.chg60 > 0 ? 'up' : 'dn') + '">' + (x.chg60 > 0 ? '+' : '') + x.chg60 + '%</span>' : '—';
+    return '<tr><td><a href="../stock-valuation/?code=' + x.code + '" style="color:var(--accent);text-decoration:none">' + x.name + ' <span class="muted">' + x.code + '</span></a>' + newB + stB + '</td>' +
+      '<td>' + x.total.toLocaleString() + '</td>' +
+      '<td class="' + chgCls + '">' + (x.chg > 0 ? '+' : '') + x.chg + '%</td>' +
+      '<td>' + x.streak + '</td>' +
+      '<td>' + x.hist_min.toLocaleString() + '<span class="muted" style="font-size:0.55rem"> ' + x.hist_min_date + '</span></td>' +
+      '<td>' + (x.is_new_low ? '<span class="up">✅</span>' : '接近') + '</td>' +
+      '<td>' + up20 + '</td><td>' + up60 + '</td></tr>';
+  }).join('');
+  document.getElementById('tb').innerHTML = html || '<tr><td colspan="8" class="muted" style="text-align:center">无匹配</td></tr>';
+}
+async function load(){
+  const d = await (await fetch(API_BASE + '/api/market-scan/shareholder-low')).json();
+  if (d.error) { document.getElementById('tb').innerHTML = '<tr><td colspan="8" class="muted">' + d.error + '</td></tr>'; return; }
+  all = d.items;
+  document.getElementById('sub').textContent = '扫描日 ' + d.date + ' · 命中 ' + d.count + ' 只（历史≥3期，最新股东人数≤历史最低×1.05）';
+  document.getElementById('note').textContent = d.note || '';
+  render('all');
+}
+load();
+</script>
+<script src="/shared/js/nav.js"></script>
+<script>window.NAV_PREFIX='../..';Nav.init({brandIcon:'👥',brandText:'指数投资',currentPage:'shareholder-low'})</script>
+</body>
+</html>
