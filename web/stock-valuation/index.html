@@ -459,7 +459,7 @@ async function loadShareholders(code){
   var upC='#ef4444';  // O2：统一铁律红，light 不再用 legacy 红
   var totals=d.totals.map(function(v){return v!=null?Math.round(v/10000*100)/100:null});
   var tv=totals.filter(function(v){return v!=null});
-  var avgT=tv.reduce(function(a,b){return a+b},0)/tv.length;
+  var avgT=tv.length?tv.reduce(function(a,b){return a+b},0)/tv.length:null;  // review O: tv空防NaN
   var closes=d.closes;
   var sliderCfg={type:'slider',start:0,end:100,height:16,bottom:4,showDetail:false,
     dataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},
@@ -478,8 +478,8 @@ async function loadShareholders(code){
     series:[
       {name:'股东人数(万)',type:'line',data:totals,smooth:false,symbol:'circle',symbolSize:4,
        lineStyle:{color:'#539BF5',width:1.5},itemStyle:{color:'#539BF5'},
-       markLine:{silent:true,symbol:'none',label:{color:tx,fontSize:8,formatter:'均值 {c}万'},
-         data:[{yAxis:Math.round(avgT*100)/100,lineStyle:{color:'#E8A838',type:'dashed',width:1}}]}},
+       markLine: avgT!=null ? {silent:true,symbol:'none',label:{color:tx,fontSize:8,formatter:'均值 {c}万'},
+         data:[{yAxis:Math.round(avgT*100)/100,lineStyle:{color:'#E8A838',type:'dashed',width:1}}]} : undefined},
       {name:'股价(元)',type:'line',data:closes,smooth:false,symbol:'none',yAxisIndex:1,
        lineStyle:{color:upC,width:1.5}}
     ]
@@ -488,6 +488,7 @@ async function loadShareholders(code){
   var n=totals.length;
   var cur=totals[n-1],prev=n>=2?totals[n-2]:null;
   if(cur==null){document.getElementById('text-shn').textContent='📌 最新股东人数暂无数据（披露缺失）';return}  // O8：null 降级
+  if(n===1){document.getElementById('text-shn').textContent='📌 最新股东人数 '+cur+' 万（仅一期数据，无法判断趋势）'+(d.note?'（'+(d.note.split('；')[0])+'）':'');return}  // review W: n==1 不判增减
   var minT=Math.min.apply(null,tv),maxT=Math.max.apply(null,tv);
   var minD=d.dates[totals.indexOf(minT)],maxD=d.dates[totals.indexOf(maxT)];
   var txt='📌 最新股东人数 '+cur+' 万';

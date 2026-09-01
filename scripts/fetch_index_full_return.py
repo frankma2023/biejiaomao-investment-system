@@ -56,19 +56,36 @@ def main():
             r = conn.execute("SELECT MAX(date) FROM index_full_return_daily WHERE stock_code=?", (code,)).fetchone()
             start = r[0] if r and r[0] else FULL_START
         try:
-            data = api_post('/index/candlestick', {
-                'stockCode': code, 'type': 'total_return',
-                'startDate': start, 'endDate': datetime.now().strftime('%Y-%m-%d'),
-            })
-            if not data:
+            # 分 9 年窗口（理杏仁约束 ≤10 年；实测容忍但防御性分窗，与 fetch_shareholders_num 同款）
+            from datetime import date as _d, timedelta as _td
+            rows_all = []
+            s = _d.fromisoformat(start)
+            e = _d.fromisoformat(datetime.now().strftime('%Y-%m-%d'))
+            cur = s
+            while cur <= e:
+                raw_end = _d(min(cur.year + 9, 2100), cur.month, cur.day)
+                seg_end = min(e, raw_end - _td(days=1))
+                if seg_end < cur:
+                    seg_end = e
+                data = api_post('/index/candlestick', {
+                    'stockCode': code, 'type': 'total_return',
+                    'startDate': cur.isoformat(), 'endDate': seg_end.isoformat(),
+                })
+                if data:
+                    rows_all.extend(data)
+                if seg_end >= e:
+                    break
+                cur = seg_end + _td(days=1)
+            if not rows_all:
                 print(f'⚠️ {code} {name}: 无数据')
                 continue
-            rows = [(code, d['date'][:10], d['close'], d.get('change'), None) for d in data]
+            rows = [(code, d['date'][:10], d['close'], d.get('change'), None) for d in rows_all]
             conn.executemany(
                 "INSERT OR REPLACE INTO index_full_return_daily (stock_code, date, close, change_pct, pe_ttm) VALUES (?,?,?,?,?)",
                 rows)
             conn.commit()
-            print(f'✅ {code} {name}: +{len(rows)} 条 ({rows[-1][1]} ~ {rows[0][1]})')
+            ds = sorted(r[1] for r in rows)
+            print(f'✅ {code} {name}: +{len(rows)} 条 ({ds[0]} ~ {ds[-1]})')
         except Exception as e:
             print(f'❌ {code} {name}: {str(e)[:70]}')
 

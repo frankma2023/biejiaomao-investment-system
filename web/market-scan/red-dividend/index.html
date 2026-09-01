@@ -99,6 +99,7 @@ function switchIvTab(tab) {
   });
   if (tab === 'ov' && frChart) frChart.resize();
   // HK 图：pane 隐藏时 init 会 0 尺寸空白，切到 HK tab 再懒渲染
+  window._curTab = tab;
   if (tab === 'hk') {
     setTimeout(function () {
       if (window._frData) renderHkFR(window._frData);
@@ -119,10 +120,10 @@ async function load() {
     document.getElementById('meta').textContent = '红利/自由现金流/中证煤炭指数操作建议 · ' + date + ' · 点击卡片查看详情';
 
     let ovHtml = '', redHtml = '', fcfHtml = '', coalHtml = '', hkHtml = '', brokerHtml = '', beanHtml = '', colorHtml = '';
-    // 📋 决策框架（回测验证 2018-2026，H00922 全收益口径）
+    // 📋 决策框架（回测验证 2018-2026，全收益口径；旧 H00922 已迁移至理杏仁 total_return 原代码入库）
     ovHtml += '<div class="section-hdr">📋 红利决策框架（怎么买怎么卖）</div>';
     ovHtml += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
-    ovHtml += '<div style="font-weight:600;color:#ef4444">🟢 买点（主信号）：250日回撤 ≥10% → 分批买入 <span style="font-weight:400;color:var(--muted)">（74%胜率 · 32次验证 · 全收益口径）</span></div>';
+    ovHtml += '<div style="font-weight:600;color:#ef4444">🟢 买点（主信号）：250日回撤 ≥10% → 分批买入 <span style="font-weight:400;color:var(--muted)">（75%胜率 · 32次验证 · 全收益口径）</span></div>';
     ovHtml += '<div style="padding-left:16px;color:var(--muted)">加码条件：息差 ≥3%（60日74%）或 温度计 ≤30 冷区（60日64%）→ 买得更重</div>';
     ovHtml += '<div style="font-weight:600;color:#10b981;margin-top:4px">🔴 卖点（三个预警，出现即减仓）<span style="font-weight:400;color:var(--muted)">：PE分位&gt;80% ｜ 20日涨幅&gt;10% ｜ 60日涨幅&gt;15%（下跌概率80%，样本6-10次偏小）</span></div>';
     ovHtml += '<div style="font-weight:600;color:#f59e0b;margin-top:4px">🟡 辅助尺度（各管各的时间尺度）</div>';
@@ -199,7 +200,7 @@ async function load() {
     if (hkEtfs.length) {
       hkHtml += '<div class="section-hdr">🇭🇰 港股红利ETF（观察）</div>';
       hkHtml += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
-      hkHtml += '<div style="font-weight:600;color:#ef4444">🟢 买点（回测 2018 起，指数口径）</div>';
+      hkHtml += '<div style="font-weight:600;color:#ef4444">🟢 买点（回测 2018 起，指数口径，未计滑点/手续费）</div>';
       hkHtml += '<div style="padding-left:16px;color:var(--muted)">513820 港股通高股息：<b style="color:#ef4444">深回撤 ≥15%</b> → 分批买入（60日69%，930914 全收益回测）｜ 息差≥4% 辅助</div>';
       hkHtml += '<div style="padding-left:16px;color:var(--muted)">159691 高股息精选：<b style="color:#ef4444">深回撤 ≥20%</b>（67%/+7.3%）或 <b>股息率 ≥6%</b>（60%）或 <b>息差 ≥4%</b>（69%）</div>';
       hkHtml += '<div style="color:var(--muted)">❌ 无效：PE/PB 估值分位（48%≈随机甚至反向——港股盈利波动大，低分位常是盈利高点假象）；浅回撤≥10% 无效（接飞刀，与趋势指数同规律）</div>';
@@ -351,6 +352,8 @@ function renderFR(fr) {
   });
   document.getElementById('fr-note').textContent = fr.note || '';
   window._frData = fr;
+  // 懒渲染竞态兜底：若用户已在 hk tab 且数据刚就绪，立即渲染
+  if (window._curTab === 'hk') { setTimeout(function () { renderHkFR(fr); }, 80); }
 }
 
 // HK tab 综合图：930914 vs 930839 全收益对比（容器可见时才渲染，避免 display:none 0 尺寸）

@@ -138,6 +138,7 @@ def main():
                 cnt2 = db.execute("SELECT COUNT(*) FROM hk_etf_full_return WHERE stock_code=?", (code,)).fetchone()[0]
                 print(f'✅ {code} {name}: 全收益全量刷新 {len(fr)} 条（累计 {cnt2}）')
         except Exception as e:
+            db.rollback()  # review: DELETE+INSERT 半截时回滚，防下一轮 commit 带脏
             print(f'⚠️ {code} 全收益拉取失败: {str(e)[:60]}')
 
     db.close()

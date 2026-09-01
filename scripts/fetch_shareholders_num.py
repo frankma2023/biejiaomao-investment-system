@@ -18,6 +18,11 @@ from datetime import datetime, timedelta
 
 import requests
 
+# Windows 重定向时避免 emoji/中文 stdout 编码崩溃
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 DB_PATH = SCRIPT_DIR.parent / "data" / "lixinger.db"
 LIXINGER_URL = "https://open.lixinger.com/api/cn/company/shareholders-num"
@@ -176,7 +181,7 @@ def main():
     token = load_token()
     codes = []
     if args.codes:
-        codes = [c for c in args.codes[0].split(',') if c]
+        codes = [c for raw in args.codes for c in raw.split(',') if c]
     elif args.watchlist:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row

@@ -1311,7 +1311,7 @@ DIVIDEND_INDICES = [
 
 # 全收益指数映射：价格指数代码 -> 全收益代码（回撤计算优先用全收益，分红再投资更真实）
 FULL_RETURN_MAP = {
-    # 全收益代码映射（2026-08-28：理杏仁 total_return，原代码入库，2016 起）
+    # 全收益白名单（2026-08-28：理杏仁 total_return 原代码入库，无代码变换——映射值=自身，仅标记该指数已入库全收益）
     '000922': '000922',  # 中证红利全收益（旧 H00922 数据保留兼容）
     'H30269': 'H30269',  # 红利低波全收益
     '930955': '930955',  # 红利低波100全收益
@@ -1430,7 +1430,7 @@ def api_market_dividend_advice():
                 chg20 = (tri_rows_adv[-1]['close'] / tri_rows_adv[-21]['close'] - 1) * 100
             if len(tri_rows_adv) >= 61:
                 chg60 = (tri_rows_adv[-1]['close'] / tri_rows_adv[-61]['close'] - 1) * 100
-        if chg20 is not None and chg20 > 10 or chg60 is not None and chg60 > 15:
+        if (chg20 is not None and chg20 > 10) or (chg60 is not None and chg60 > 15):
             signals.append('surge_sell')
         if val and val['pe_pct'] is not None and val['pe_pct'] > 80:
             signals.append('pe_high_sell')
@@ -4753,7 +4753,7 @@ def api_stock_valuation_shareholders():
     # 股价：披露日当日或之后首交易日收盘（报告期截止日近似）
     dates = [r['date'] for r in rows]
     totals = [r['total'] for r in rows]
-    sources = [r['source'] or 'lx' for r in rows]
+    sources = [r['source'] if r['source'] else 'lx' for r in rows]
     closes = []
     for d in dates:
         k = db.execute("SELECT close FROM daily_kline WHERE stock_code=? AND date>=? ORDER BY date LIMIT 1",
