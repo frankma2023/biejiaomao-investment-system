@@ -46,7 +46,7 @@
 
     <header class="panel-header">
       <h1>📋 欧奈尔投资系统 · 项目进展</h1>
-      <p>2026-07-31（阶段收尾 · 大师漏斗4层完成 + 当日分组精度修复）</p>
+      <p>2026-09-01（阶段收尾 · 红利全收益全口径 + 股东人数 + HK红利体系）</p>
     </header>
 
     <div class="pg-stats">
@@ -464,8 +464,60 @@
       </div>
     </div>
 
+    <div class="section-title" style="margin-top:28px">📆 2026-09-01 阶段收尾（红利全收益 + 股东人数 + HK红利）</div>
+    <div class="pg-grid">
+      <div class="pg-card">
+        <h3>📈 全收益对比全口径化</h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>理杏仁 total_return 8指数全收益</td><td>2016起，原代码入库，22927条</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>full-return-compare 全tri口径</td><td>价格仅回退(980092/沪深300)</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>FULL_RETURN_MAP 扩展7指数</td><td>dividend-advice 回撤全收益化</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>fetch_index_full_return.py</td><td>增量+分窗，daily_update 5.5</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>发现：港股通高股息10年391.4</td><td>红利质量339.8/红利低波245.8</td></tr>
+        </table>
+      </div>
+      <div class="pg-card">
+        <h3>👥 股东人数 tab（筹码集中度）</h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>fetch_shareholders_num.py</td><td>理杏仁主源+akshare兜底，2938只/20.9万条</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>双轴图+筹码分析文字</td><td>紫金案例：46.7万低点→流畅/131.8万新高→曲折</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>分窗跳年 B1 修复</td><td>seg_end-1天，2025不丢</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>万华2026-06股东+34%</td><td>筹码分散与顶背驰吻合</td></tr>
+        </table>
+      </div>
+      <div class="pg-card">
+        <h3>🇭🇰 HK 港股红利体系</h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>ETF卡片标注跟踪指数</td><td>代码+名称+编制机构</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>930914 vs 930839 对比图</td><td>投资391 vs 精选239，精选跑输</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>hk-advice-detail 详情页</td><td>回撤/估值/息差/信号回测/买卖点规则表</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>513820→易方达023389联接</td><td>0.20%费率，场外联接用指数驱动信号</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>港股框架差异验证</td><td>PE分位60%部分有效/PB无效/股息率分位反向</td></tr>
+        </table>
+      </div>
+      <div class="pg-card">
+        <h3>📊 CANSLIM I因子 + 息差 + 研究</h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>研报覆盖换源新浪</td><td>10家vs东财3家，首次覆盖差集判定</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>负债率移出I维度</td><td>2分拨研报+首次覆盖，PRD v3.3</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>股债息差买点/卖点</td><td><1pp危险区卖点，详情页息差图</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>卫星化学2026预测</td><td>油价87持平假设：营收~668亿/净利~140亿</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>万华箱体突破分析</td><td>79.12阻力未破，非突破</td></tr>
+        </table>
+      </div>
+    </div>
+
     <div class="section-title" style="margin-top:28px">📋 本次开发经验教训</div>
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">79. 前端静态服务必须用 serve_dev.py——裸 http.server 无 Cache-Control 头引发启发式缓存</div><div class="ld">python -m http.server 不发送 Cache-Control，浏览器按启发式缓存保存旧 HTML/JS，改文件后页面仍执行旧逻辑（表现：API 返回正常但页面显示旧值/0值）。8772 已固定改用 scripts/serve_dev.py（no-cache）。排查"前端异常但API正常"时第一嫌疑：验证 8772 响应头 + 文件内容是否含最新代码片段。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">88. 理杏仁指数全收益：/index/candlestick type=total_return（2016前无数据）</div><div class="ld">免费行情源（akshare东财/新浪/腾讯/中证官网旧接口）全部不支持H系全收益代码，理杏仁是唯一可靠渠道。用户指路的 docs/lixinger_index_apis_help/指数K线数据.md 是关键——专门目录里有股票接口文档没有的参数。教训：接口文档目录要全查（lixinger_index_apis_help 与 lixinger_apis_help 两套），别只盯已知目录。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">89. PowerShell 内联引号毁整条命令——python -c 带引号必写文件执行</div><div class="ld">多次踩坑：PowerShell 解析 python -c "..." 内联 f-string/字典引号直接 ParserError，导致 Stop-Process/Start-Process/验证整条命令不执行（8788 还是旧进程，验证结果骗人）。教训：Windows 下 python -c 带复杂引号一律写 .py 文件跑；验证前先确认进程确实是新的。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">90. ECharts 隐藏容器 init 得 0 尺寸——tab 图必须懒渲染</div><div class="ld">pane 初始 display:none 时 echarts.init 容器宽高为 0，图渲染空白且切 tab resize 不恢复（resize 只重测可见容器）。修复：切到 tab 时再渲染（数据存全局，容器可见后 init）+ _curTab 竞态兜底。教训：凡 tab 化页面新图表，统一懒渲染模式，别在 load 时 init 隐藏容器。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">91. 分窗拉取跳年 bug——seg_end 必须减 1 天再续</div><div class="ld">9 年分窗：第一窗 2016-01-01~2025-01-01 后直接 cur=2026-01-01，2025 全年（4个报告期）静默丢失。修复：seg_end 减 1 天（含上一年末）+ cur=seg_end+1 续。教训：分窗循环的边界重叠/间隙要逐窗推演，">=e 判断 + 跨年日期运算最容易漏一年。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">92. 港股 vs A股估值分位有效性不同——不能套用同一框架</div><div class="ld">930914 回测（2018-2026）：回撤≥15% 70%、股息率≥6% 59%、息差≥4% 60% 有效（与A股同）；但 PE分位>80% 仅60%部分有效（A股80%）、PB分位 47% 无效、股息率分位<10% 42% 反向（A股"股息率分位低=贵"在港股不成立）。教训：因子有效性必须按市场回测验证，港股盈利波动大导致分位语义漂移。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">93. 红利ETF分红策略差异巨大——512890 成立以来 0 次现金分红</div><div class="ld">中证红利低波指数有分红，但典型基金 512890（华泰柏瑞）把分红再投资留在净值（成立以来从未现金分红，仅2021拆分），而 515100 每年分红。"指数吃息"≠"基金给现金"。教训：选红利基金前必须查分红记录（新浪/天天基金/公司页交叉验证），吃息预期要匹配产品分红策略。</div></div>
+    <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">94. sqlite3.Row 不支持 .get()——回测脚本踩坑</div><div class="ld">val_map.get(date, {}).get('dyr') 对 Row 直接 AttributeError。理杏仁 Row 必须显式 'key' in row.keys() 或 dict() 转换。教训：脚本里 Row 与 dict 混用时统一转 dict 或统一索引式访问，别混用 .get()。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">95. 加载 api-client.js 的页面禁止声明 const API（铁律5.4再次踩坑）</div><div class="ld">hk-advice-detail.html 声明 const API 与 api-client.js 全局冲突 → 整块 script SyntaxError，页面全灭。修复：用 api-client.js 提供的 API_BASE。教训：新页面模板必须遵守 5.4（用 API_BASE），新建页面时先 grep 同目录页面惯例。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">96. PowerShell 逗号参数被解析为数组——前导零丢失查无此股</div><div class="ld">python script.py 600309,000858 → PowerShell 把逗号串拆成数组传多个位置参数，且 000858 被转数字剥前导零 → 理杏仁查 '858' 报 no data，一度误判"理杏仁无深市主板数据"。修复：参数加引号 "600309,000858"。教训：命令行传股票代码带前导零必须引号包裹，数据源"无数据"结论前先排除参数问题。</div></div>
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">80. 理杏仁API路径有坑：/index/ 返回指数级汇总，/company/ 才是个股级</div><div class="ld">旧文档写 /api/cn/index/margin-trading-and-securities-lending，实际会把 000001 当上证综指解析返回全指数汇总（单只"股票"融资余额1.26万亿）。个股级正确路径是 /api/cn/company/margin-trading-and-securities-lending。文档已修正。教训：对接第三方API先用手动示例验证数据量级，别信路径字面。</div></div>
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">81. 当日分组快照 vs RS_20 分组——快照不做评级，趋势才做评级</div><div class="ld">当日涨跌幅百分位分组定位是"今日谁强谁弱"的快照，若复用 RS_20 的总分/评级/仓位会与趋势口径打架（20日A级但当日大跌）。轻量卡片（组名/平均涨跌幅/涨跌家数）+ 与趋势区块并排，才能一眼抓出"趋势强但当日转弱"的背离信号。</div></div>
     <div class="lesson-card" style="border-left-color:#FF9800"><div class="ln" style="color:#F57F00">82. 四位大师漏斗完整闭环：3803→8只</div><div class="ld">第0层基础池3803→第1层段永平84（毛利率>30%/净利率>10%/ROE>15%/OCF>净利）→第2层巴菲特35（毛利稳定/PE<25/PB<5/股息>1%）→第3层芒格8（债务<5年/应收<30%/存货<25%/营收不萎缩）→第4层李录定性评级（3只4星：福耀/电投/青啤）。芒格层淘汰大头是应收账款（白酒渠道压货）。质押/减持数据缺失暂跳过。</div></div>
