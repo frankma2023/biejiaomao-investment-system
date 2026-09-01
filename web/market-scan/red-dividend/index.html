@@ -98,6 +98,12 @@ function switchIvTab(tab) {
     b.classList.toggle('active', ['ov','red','fcf','coal','hk','broker','bean','color'][i] === tab);
   });
   if (tab === 'ov' && frChart) frChart.resize();
+  // HK 图：pane 隐藏时 init 会 0 尺寸空白，切到 HK tab 再懒渲染
+  if (tab === 'hk') {
+    setTimeout(function () {
+      if (window._frData) renderHkFR(window._frData);
+    }, 80);
+  }
 }
 async function load() {
   try {
@@ -343,30 +349,32 @@ function renderFR(fr) {
     series: series
   });
   document.getElementById('fr-note').textContent = fr.note || '';
-  // ── HK tab 综合图：930914 vs 930839 全收益对比（同源数据筛选）──
+  window._frData = fr;
+}
+
+// HK tab 综合图：930914 vs 930839 全收益对比（容器可见时才渲染，避免 display:none 0 尺寸）
+function renderHkFR(fr) {
   const hkEl = document.getElementById('chart-hk-fr');
-  if (hkEl && fr.series && fr.series.length) {
-    if (hkEl._echart) hkEl._echart.dispose();
-    const hkSer = fr.series.filter(s => s.code === '930914' || s.code === '930839');
-    if (hkSer.length >= 1) {
-      const hkCh = echarts.init(hkEl);
-      const hkCol = {'930914': '#ef4444', '930839': '#539BF5'};
-      hkCh.setOption({
-        backgroundColor: chartBg, tooltip: {trigger: 'axis', valueFormatter: v => v + ''},
-        legend: {bottom: 0, textStyle: {color: tx, fontSize: 9}},
-        grid: {left: '6%', right: '4%', top: 12, bottom: 40},
-        xAxis: {type: 'time', axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp}}},
-        yAxis: {type: 'value', axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
-        dataZoom: [{type: 'inside'}],
-        series: hkSer.map(s => ({
-          name: s.name, type: 'line',
-          data: s.dates.map((d, j) => [d, s.values[j]]),
-          smooth: true, showSymbol: false, lineStyle: {width: 2, color: hkCol[s.code] || '#f59e0b'}
-        }))
-      });
-      hkEl._echart = hkCh;
-    }
-  }
+  if (!hkEl || !fr || !fr.series || !fr.series.length) return;
+  if (hkEl._echart) hkEl._echart.dispose();
+  const hkSer = fr.series.filter(s => s.code === '930914' || s.code === '930839');
+  if (!hkSer.length) return;
+  const hkCh = echarts.init(hkEl);
+  const hkCol = {'930914': '#ef4444', '930839': '#539BF5'};
+  hkCh.setOption({
+    backgroundColor: chartBg, tooltip: {trigger: 'axis', valueFormatter: v => v + ''},
+    legend: {bottom: 0, textStyle: {color: tx, fontSize: 9}},
+    grid: {left: '6%', right: '4%', top: 12, bottom: 40},
+    xAxis: {type: 'time', axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp}}},
+    yAxis: {type: 'value', axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
+    dataZoom: [{type: 'inside'}],
+    series: hkSer.map(s => ({
+      name: s.name, type: 'line',
+      data: s.dates.map((d, j) => [d, s.values[j]]),
+      smooth: true, showSymbol: false, lineStyle: {width: 2, color: hkCol[s.code] || '#f59e0b'}
+    }))
+  });
+  hkEl._echart = hkCh;
 }
 
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
