@@ -213,10 +213,14 @@ async function load() {
         hkHtml += '</div>';
         hkHtml += '<div class="tx" style="font-size:0.62rem">' + x.advice + '</div>';
         hkHtml += '<div class="meta">成立来年化 ' + (x.ann > 0 ? '+' : '') + x.ann + '%（价格口径）· 费率 ' + x.fee + '% · 回撤 ' + x.dd_250 + '%</div>';
-        hkHtml += '<div class="sig">' + x.index_name + ' · ' + x.mgr + '</div>';
+        hkHtml += '<div class="sig" style="color:var(--accent)">📌 跟踪指数：' + (x.index_name || '—') + '</div>';
+        hkHtml += '<div class="sig">' + (x.mgr || '') + '</div>';
         hkHtml += '</div>';
       });
       hkHtml += '</div>';
+      hkHtml += '<div class="card"><div class="ct">📊 港股通高股息全收益对比（930914 vs 930839 · 起点=100 · 2016起）</div>';
+      hkHtml += '<div id="chart-hk-fr" style="height:280px"></div>';
+      hkHtml += '<div style="font-size:0.6rem;color:var(--muted);margin-top:4px">标普港股通低波红利/恒生港股通高股息低波动：理杏仁无全收益数据，暂缺；930914=投资指数（513820 跟踪），930839=精选指数（159691 跟踪）</div></div>';
       hkHtml += '<div class="note">⚠️ 港股红利：收益为价格口径未计分红（实际全收益更高）；港股通分红需扣红利税（H股10%/红筹20%）+ 汇率风险；数据源 akshare（新浪/东财），daily_update 步骤 5.7 日更；ETF 分红为复权差异反推的估算值（含送转年份可能偏差）。</div>';
     }
 
@@ -339,6 +343,30 @@ function renderFR(fr) {
     series: series
   });
   document.getElementById('fr-note').textContent = fr.note || '';
+  // ── HK tab 综合图：930914 vs 930839 全收益对比（同源数据筛选）──
+  const hkEl = document.getElementById('chart-hk-fr');
+  if (hkEl && fr.series && fr.series.length) {
+    if (hkEl._echart) hkEl._echart.dispose();
+    const hkSer = fr.series.filter(s => s.code === '930914' || s.code === '930839');
+    if (hkSer.length >= 1) {
+      const hkCh = echarts.init(hkEl);
+      const hkCol = {'930914': '#ef4444', '930839': '#539BF5'};
+      hkCh.setOption({
+        backgroundColor: chartBg, tooltip: {trigger: 'axis', valueFormatter: v => v + ''},
+        legend: {bottom: 0, textStyle: {color: tx, fontSize: 9}},
+        grid: {left: '6%', right: '4%', top: 12, bottom: 40},
+        xAxis: {type: 'time', axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp}}},
+        yAxis: {type: 'value', axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
+        dataZoom: [{type: 'inside'}],
+        series: hkSer.map(s => ({
+          name: s.name, type: 'line',
+          data: s.dates.map((d, j) => [d, s.values[j]]),
+          smooth: true, showSymbol: false, lineStyle: {width: 2, color: hkCol[s.code] || '#f59e0b'}
+        }))
+      });
+      hkEl._echart = hkCh;
+    }
+  }
 }
 
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
