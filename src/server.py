@@ -1311,7 +1311,14 @@ DIVIDEND_INDICES = [
 
 # 全收益指数映射：价格指数代码 -> 全收益代码（回撤计算优先用全收益，分红再投资更真实）
 FULL_RETURN_MAP = {
-    '000922': 'H00922',  # 中证红利 -> 中证红利全收益
+    # 全收益代码映射（2026-08-28：理杏仁 total_return，原代码入库，2016 起）
+    '000922': '000922',  # 中证红利全收益（旧 H00922 数据保留兼容）
+    'H30269': 'H30269',  # 红利低波全收益
+    '930955': '930955',  # 红利低波100全收益
+    '931468': '931468',  # 红利质量全收益
+    '930914': '930914',  # 港股通高股息全收益
+    '000015': '000015',  # 红利指数全收益
+    '931848': '931848',  # 800红利低波全收益
 }
 
 # 红利 250日回撤买点阈值（%）：回测 32 次触发/20日胜率75% vs 15% 仅9次小样本假象（PRD §2.1 v1.1）
@@ -2381,33 +2388,35 @@ def api_market_hk_etf():
 
 @app.route('/api/market-scan/full-return-compare')
 def api_market_full_return_compare():
-    """多红利标的全收益归一化对比（起点=100）"""
+    """多红利标的全收益归一化对比（起点=100；2026-08-28 改：全部用理杏仁 total_return 全收益口径）"""
     db = get_db()
     pool = [
-        # (code, name, source表, 类型)
-        ('H00922', '中证红利·全收益', 'index_full_return_daily', 'tri'),
-        ('000922', '中证红利·价格', 'index_daily_kline', 'price'),
-        ('980092', '国证自由现金流', 'index_daily_kline', 'price'),
-        ('H30269', '红利低波·价格', 'index_daily_kline', 'price'),
-        ('931468', '红利质量·价格', 'index_daily_kline', 'price'),
-        ('000015', '红利指数·价格', 'index_daily_kline', 'price'),
-        ('931848', '800红利低波·价格', 'index_daily_kline', 'price'),
-        ('000300', '沪深300', 'index_daily_kline', 'price'),
+        # (code, name) —— 优先 index_full_return_daily（total_return 全收益，2016起），无则回退价格
+        ('000922', '中证红利'),
+        ('H30269', '红利低波'),
+        ('930955', '红利低波100'),
+        ('931468', '红利质量'),
+        ('930914', '港股通高股息'),
+        ('000015', '红利指数'),
+        ('931848', '800红利低波'),
+        ('980092', '国证自由现金流'),
+        ('000300', '沪深300'),
     ]
     series = []
-    for code, name, table, stype in pool:
-        if table == 'index_full_return_daily':
-            rows = db.execute(f"""SELECT date, close FROM {table}
-                WHERE stock_code=? AND date>='2018-01-01' ORDER BY date""", (code,)).fetchall()
-        else:
-            rows = db.execute(f"""SELECT date, close FROM {table}
+    for code, name in pool:
+        rows = db.execute("""SELECT date, close FROM index_full_return_daily
+            WHERE stock_code=? AND date>='2016-01-01' ORDER BY date""", (code,)).fetchall()
+        stype, label = 'tri', '·全收益'
+        if not rows:
+            rows = db.execute("""SELECT date, close FROM index_daily_kline
                 WHERE stock_code=? AND kline_type='normal' AND date>='2018-01-01' ORDER BY date""", (code,)).fetchall()
+            stype, label = 'price', '·价格'
         if not rows:
             continue
         dates = [r['date'] for r in rows]
         closes = [r['close'] for r in rows]
         base = closes[0]
-        series.append({'code': code, 'name': name, 'type': stype,
+        series.append({'code': code, 'name': name + label, 'type': stype,
                        'dates': dates, 'values': [round(c / base * 100, 1) for c in closes]})
     # 港股四只（全收益 hfq）
     hk_names = {'513820': '港股通高股息', '159691': '港股通高股息精选',
@@ -2422,7 +2431,8 @@ def api_market_full_return_compare():
         series.append({'code': code, 'name': name + '·全收益', 'type': 'hk_etf',
                        'dates': dates, 'values': [round(c / base * 100, 1) for c in closes],
                        'start': dates[0]})
-    return jsonify({'series': series, 'note': '全收益=含分红再投资（H00922/港股ETF）；带·价格为价格口径（未计分红，H30269/931468/000015/931848 暂无可靠全收益源）；各自起点=100，窗口不同（港股自2023-2024起）'})
+    return jsonify({'series': series,
+                    'note': '全收益=含分红再投资（理杏仁 total_return，2016起）；价格=未计分红（仅该指数无全收益数据时回退）；各自起点=100，港股ETF自上市/2023-2024起'})
 
 
 # ═══════════════════════════════════════════════

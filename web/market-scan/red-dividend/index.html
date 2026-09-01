@@ -265,7 +265,7 @@ async function load() {
       brokerHtml += '<div class="note">⚠️ 回测未计滑点/手续费；档位锚点 = 250日最低×0.95（滚动，每日随行情重排）；网格超额与趋势强度负相关，大牛市会跑输持有。</div>';
     }
 
-ovHtml += '<div class="note">📊 口径说明：① 回撤：中证红利（000922）用全收益 H00922（含分红再投资，2018起），其余红利指数暂用价格口径；买点规则 250日回撤≥10%（回测32次触发/20日胜率75%）。② 估值分位：PE/PB/股息率分位为<b>10年滚动口径</b>（理杏仁 y10.cvpos），非全历史——红利 PE 分位极少>85%、PB 分位极少>55%、股息率分位从未<20%，属数据特性非异常。③ 网格：中证煤炭用 8% 间距（回测最优），回撤实验室同页可用。</div>';
+ovHtml += '<div class="note">📊 口径说明：① 回撤：全部红利指数用<b>全收益口径</b>（理杏仁 total_return，2016起），回退价格仅限无全收益数据的指数；买点规则 250日回撤≥10%（回测32次触发/20日胜率75%）。② 全收益对比图：全部全收益口径（含分红再投资），价格口径仅回退。③ 估值分位：PE/PB/股息率分位为<b>10年滚动口径</b>（理杏仁 y10.cvpos），非全历史——红利 PE 分位极少>85%、PB 分位极少>55%、股息率分位从未<20%，属数据特性非异常。④ 网格：中证煤炭用 8% 间距（回测最优），回撤实验室同页可用。</div>';
     document.getElementById('pane-ov').innerHTML = ovHtml;
     document.getElementById('pane-red').innerHTML = redHtml;
     document.getElementById('pane-fcf').innerHTML = fcfHtml;
