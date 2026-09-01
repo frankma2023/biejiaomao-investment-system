@@ -122,9 +122,9 @@ def fetch_akshare(code):
                 continue
             try:
                 total = int(float(total))
+                chg = (total / float(prev) - 1) if prev else None
             except Exception:
                 continue  # W5：脏值整行跳过，不存半成品
-            chg = (total / prev - 1) if prev and float(prev) > 0 else None
             # 过滤股本变动等异常（绝对值 >5 置空；O4：两侧口径统一说明）
             if chg is not None and abs(chg) > 5:
                 chg = None

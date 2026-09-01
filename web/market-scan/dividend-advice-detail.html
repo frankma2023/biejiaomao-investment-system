@@ -105,7 +105,7 @@ async function load() {
   if (d.error) { document.getElementById('meta').textContent = '无数据'; return; }
 
   document.getElementById('title').textContent = '📌 ' + d.name + ' · 操作建议详情';
-  document.getElementById('meta').textContent = d.date + ' · 当前250日回撤 ' + d.current_dd + '%' + (d.dd_source === 'full_return' ? '（全收益口径，H00922 自2018起）' : '（价格指数口径）') + ' · 估值分位为10年滚动口径';
+  document.getElementById('meta').textContent = d.date + ' · 当前250日回撤 ' + d.current_dd + '%' + (d.dd_source === 'full_return' ? '（全收益口径，理杏仁 total_return 自2016起）' : '（价格指数口径）') + ' · 估值分位为10年滚动口径';
 
   // 当前建议（丰富版：结合历史类似估值分位/回撤统计）
   let advice = null;
@@ -167,7 +167,7 @@ async function load() {
   const charts = [];
   // 0a. 价格 vs 全收益对比线（归一化，近3年起点=100）+ 沪深300 对比
   if (d.price_norm && d.tri_norm) {
-    charts.push({title:'📈 价格 vs 全收益 vs 沪深300（分红再投资价值 · 近3年起点=100 · H00922 自2018起）', el:'chart-tri', h:330, init: el => {
+    charts.push({title:'📈 价格 vs 全收益 vs 沪深300（分红再投资价值 · 近3年起点=100 · 全收益自2016起）', el:'chart-tri', h:330, init: el => {
       const c = echarts.init(el);
       const series = [
         {name:'中证红利(价格)',type:'line',data:d.price_norm,smooth:true,showSymbol:false,lineStyle:{color:'#8b8b90',width:1.5}},

@@ -153,8 +153,8 @@ TASKS = [
     # 4. 通达信补K线（ETF + 个股，本地文件读取）
     ("📡 4.通达信ETF+K线",   [PYTHON_EXE, "scripts/fetch_tdx_kline.py"]),
     ("📈 5.个股日K线",       [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py"]),
-    # 5.5 中证全收益指数（H00922 红利全收益，回撤买点基准）
-    ("🧧 5.5全收益指数",     [PYTHON_EXE, "scripts/fetch_full_return_index.py"]),
+    # 5.5 指数全收益（理杏仁 total_return，8 指数 2016 起，回撤买点基准；替代旧 H00922 单指数脚本）
+    ("🧧 5.5全收益指数",     [PYTHON_EXE, "scripts/fetch_index_full_return.py"]),
     # 5.6 国债收益率（红利温度计股债息差用）
     ("🏦 5.6国债收益率",     [PYTHON_EXE, "scripts/fetch_bond_yield.py"]),
     # 5.7 港股红利ETF（每日行情，akshare 新浪源）
