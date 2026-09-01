@@ -60,20 +60,25 @@ def fetch_one(token, code, start, end):
 
 
 def fetch_lx_all(token, code, start, end):
-    """分 9 年窗口拉取合并（理杏仁 API 约束 ≤10 年间隔，实测容忍但防御性分窗）"""
-    from datetime import date as _date
+    """分 9 年窗口拉取合并（理杏仁 API 约束 ≤10 年间隔，实测容忍但防御性分窗）
+    B1 修复：seg_end 减 1 天 + cur 从 seg_end+1 续——原实现 2016~2025-01-01 后直接跳 2026-01-01，
+    2025 全年丢失（review-standards-tri-hk B1）"""
+    from datetime import date as _date, timedelta as _td
     s = _date.fromisoformat(start)
     e = _date.fromisoformat(end)
     all_rows = []
     cur = s
     while cur <= e:
-        seg_end = min(e, _date(min(cur.year + 9, 2100), cur.month, cur.day))
+        raw_end = _date(min(cur.year + 9, 2100), cur.month, cur.day)
+        seg_end = min(e, raw_end - _td(days=1))
+        if seg_end < cur:
+            seg_end = e  # 单窗兜底（极端起点）
         data = fetch_one(token, code, cur.isoformat(), seg_end.isoformat())
         if data:
             all_rows.extend(data)
         if seg_end >= e:
             break
-        cur = _date(seg_end.year + 1, 1, 1)
+        cur = seg_end + _td(days=1)
     return all_rows
 
 
