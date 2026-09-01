@@ -211,7 +211,7 @@ async function load() {
         const chgCls = x.chg >= 0 ? '#ef4444' : '#10b981';
         const lvMap = {'buy': ['买入', '#ef4444', 'rgba(239,68,68,.06)'], 'caution': ['高位警示', '#f59e0b', 'rgba(245,158,11,.06)'], 'hold': ['观望', '#8b8b90', 'rgba(139,139,144,.06)']};
         const lv = lvMap[x.advice_level] || lvMap.hold;
-        hkHtml += '<div class="sector-card" style="background:' + lv[2] + ';border-color:var(--border)" onclick="window.open(\'hk-advice-detail.html?code=' + (x.track_index || '930914') + '\')">';
+        hkHtml += '<div class="sector-card" style="background:' + lv[2] + ';border-color:var(--border)" onclick="window.open(\'../hk-advice-detail.html?code=' + (x.track_index || '930914') + '\')">';
         hkHtml += '<div class="sc-title">' + x.name + ' <span class="code">' + x.code + '</span></div>';
         hkHtml += '<div style="display:flex;align-items:baseline;gap:8px;margin:4px 0">';
         hkHtml += '<span style="font-family:var(--font-display);font-size:1.5rem;font-weight:400;color:var(--text-primary)">' + x.close + '</span>';

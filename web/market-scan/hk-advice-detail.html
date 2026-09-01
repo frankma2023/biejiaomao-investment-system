@@ -41,6 +41,8 @@ html[data-theme="light"] .chart-card{background:rgba(255,255,255,.7)}
   <h1 id="title">港股红利详情</h1>
   <div class="sub" id="sub">—</div>
   <div class="advice-card" id="advice"><div class="lv">加载中...</div><div class="tx"></div></div>
+  <div class="chart-card"><div class="ct">🎯 买卖点规则（当前状态）</div>
+    <table><thead><tr><th>规则</th><th>当前值</th><th>状态</th><th>说明</th></tr></thead><tbody id="rules-body"></tbody></table></div>
   <div class="stat-row" id="stats"></div>
   <div class="chart-card"><div class="ct">📈 全收益 vs 价格（2016起）</div><div id="chart-px" style="height:300px"></div><div class="cs">全收益=含分红再投资；价格=净值口径</div></div>
   <div class="chart-card"><div class="ct">📉 250日回撤（全收益，≥15%买点区）</div><div id="chart-dd" style="height:220px"></div></div>
@@ -66,7 +68,7 @@ async function load(){
   if (d.error) { document.getElementById('advice').innerHTML = '<div class="lv">无数据</div><div class="tx">' + d.error + '</div>'; return; }
   document.getElementById('title').textContent = d.name + '（' + d.code + '）详情';
   document.getElementById('sub').textContent = '数据截至 ' + d.date + ' · 全收益 2016 起 · 估值 2018 起 · 信号回测 2018-2026';
-  // 当前状态卡
+  // 当前状态卡（含买卖点四信号明细）
   const c = d.current;
   const ddOk = c.dd_250 != null && c.dd_250 >= 15, dyOk = c.dyr != null && c.dyr >= 6, spOk = c.spread != null && c.spread >= 4;
   const peHi = c.pe_pct != null && c.pe_pct > 80;
@@ -77,6 +79,17 @@ async function load(){
   else if (peHi) { lv = '高位警示', lvTxt = dnC; advice = 'PE 分位 ' + c.pe_pct + '% >80%（60%胜率卖出倾向）+ 无买点达标——偏减仓/观望' }
   else { lv = '观望', lvTxt = '#8b8b90'; advice = '无买点达标（回撤 ' + (c.dd_250||0) + '% 远未到 15%）——持有等回撤或股息率提升' }
   document.getElementById('advice').innerHTML = '<div class="lv" style="color:' + lvTxt + '">' + lv + '</div><div class="tx">' + advice + '</div>';
+  // 买卖点规则明细表（四信号 + PE/PB 绝对值）
+  const rules = [
+    ['🟢 买点1 · 回撤≥15%', (c.dd_250||0) + '%', ddOk, '全收益250日回撤，60日胜率69%'],
+    ['🟢 买点2 · 股息率≥6%', (c.dyr||0) + '%', dyOk, '当前股息率 ' + (c.dyr||0) + '%（历史分位 ' + (c.dyr_pct||0) + '%）'],
+    ['🟢 买点3 · 息差≥4pp', (c.spread||0) + 'pp', spOk, '股息率 − 10年国债，60日胜率60%'],
+    ['🔴 卖点 · PE分位>80%', (c.pe_pct||0) + '%', peHi, 'PE ' + (c.pe!=null?c.pe:'—') + '倍（分位 ' + (c.pe_pct||0) + '%），60%胜率卖出倾向'],
+    ['⚪ 无效信号 · PB分位', (c.pb_pct||0) + '%', false, 'PB ' + (c.pb!=null?c.pb:'—') + '（分位 ' + (c.pb_pct||0) + '%），回测47%≈随机'],
+    ['⚪ 无效信号 · 股息率分位<10%', (c.dyr_pct||0) + '%', false, '回测42%反向（与A股框架相反，勿用）'],
+  ];
+  const rulesHtml = rules.map(r => '<tr><td>' + r[0] + '</td><td style="font-weight:600">' + r[1] + '</td><td>' + (r[2] ? '<span class="up">✅ 达标</span>' : '<span class="muted">—</span>') + '</td><td style="text-align:left;color:var(--muted)">' + r[3] + '</td></tr>').join('');
+  document.getElementById('rules-body').innerHTML = rulesHtml;
   // 统计
   let stats = [
     ['250日回撤', (c.dd_250||0) + '%', ddOk ? upC : '#8b8b90'],

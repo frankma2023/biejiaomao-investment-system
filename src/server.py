@@ -2538,6 +2538,8 @@ def api_market_hk_advice_detail():
         'current': {
             'dd_250': dd[cur], 'dyr': dyr[cur], 'dyr_pct': dyr_p[cur],
             'pe_pct': pe_p[cur], 'pb_pct': pb_p[cur], 'spread': spread_s[cur],
+            'pe': round(v['pe_ttm'], 1) if (v := val_map.get(dates[cur])) and v['pe_ttm'] is not None else None,
+            'pb': round(v['pb'], 2) if (v := val_map.get(dates[cur])) and v['pb'] is not None else None,
         },
         'signals_bt': bt,
         'note': '港股规则：回撤≥15%/股息率≥6%/息差≥4% 为买点（回测 59-70%）；PE分位>80% 部分有效（60%）；PB分位无效（47%）；股息率分位<10% 反向（44%）——与A股框架不同',
