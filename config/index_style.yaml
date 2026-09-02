@@ -824,6 +824,8 @@ categories:
     name: 红利低波
   - code: H30270
     name: 红利价值
+  - code: '980081'
+    name: 价值100
   - code: '980092'
     name: 国证自由现金流
   etf:
