@@ -44,7 +44,7 @@ def dcf_valuation(stock_code, assumptions=None):
         WHERE stock_code = ? ORDER BY report_date DESC LIMIT 1''',
         (stock_code,)).fetchone()
     if not annual or not annual['revenue']:
-        db.close(); return {'error': f'{stock_code} 无年报数据'}
+        db.close(); return {'error': f'{stock_code} 无年报数据', 'base_basis': 'annual'}
 
     t_g = assumptions.get('terminal_growth', 0.025)
     exit_multiple = assumptions.get('exit_multiple', None)
@@ -73,7 +73,10 @@ def dcf_valuation(stock_code, assumptions=None):
         ttm_np = sum((r['net_profit_single'] or 0) for r in q4)
         ann_rev = annual['revenue'] or 0
         ann_np = annual['net_profit'] or 0
-        if ann_rev and ann_np and (abs(ttm_rev - ann_rev) / ann_rev > 0.15 or abs(ttm_np - ann_np) / ann_np > 0.15):
+        # abs 分母：亏损年报（ann_np<0）下扭亏为盈同样可触发；ttm_rev>0 防全 NULL 求和为 0 的荒谬起点
+        rev_drift = abs(ttm_rev - ann_rev) / abs(ann_rev) if ann_rev else None
+        np_drift = abs(ttm_np - ann_np) / abs(ann_np) if ann_np else None
+        if ttm_rev > 0 and ttm_np >= 0 and ((rev_drift is not None and rev_drift > 0.15) or (np_drift is not None and np_drift > 0.15)):
             revenue = ttm_rev
             ttm_flag = True
             ttm_np_note = f'（TTM营收 {ttm_rev/1e8:.0f}亿/净利 {ttm_np/1e8:.1f}亿）'
@@ -88,8 +91,8 @@ def dcf_valuation(stock_code, assumptions=None):
                 ebitda_margin = ebitda_margin * (gm_q / gm_ann)
                 warnings.append(
                     f'⚠️ 盈利偏离年报 >15%，DCF起点已切换滚动TTM {ttm_np_note}；'
-                    f'EBITDA率按最新季毛利率比例校准为 {ebitda_margin*100:.1f}%（原年报口径 {ext["ebitda"]/annual["revenue"]*100:.1f}%）；'
-                    '周期/剧变公司前瞻需结合量价情景，勿纯外推')
+                    f'EBITDA率按最新季毛利率比例校准为 {ebitda_margin*100:.1f}%（原年报口径 {ext["ebitda"]/annual["revenue"]*100:.1f}%）；D&A/CapEx比率按年报绝对值/TTM营收略偏低；'
+                    '周期/剧变公司前瞻需结合量价情景，勿纯外推；比例校准未计经营杠杆，方向偏保守')
         ebitda_val = ext['ebitda']
     else:
         warnings.append('EBITDA: stock_financials_annual_ext 中无数据')
@@ -220,12 +223,12 @@ def dcf_valuation(stock_code, assumptions=None):
         'current_price': round(current_price, 2),
         'base_revenue': round(revenue, 1),
         'ebitda_margin': f'{ebitda_margin*100:.1f}%',
-        'ebitda': round(ebitda_val, 1) if ebitda_val else None,
         'da_pct': f'{da_pct*100:.1f}%',
         'capex_pct': f'{capex_pct*100:.1f}%',
         'interest_expense': round(interest, 1) if interest else None,
         'net_debt': round(net_debt, 1) if net_debt else None,
         'wacc': f'{wacc*100:.0f}%',
+        'tax_rate': f'{tax*100:.0f}%',
         'terminal_growth': f'{t_g*100:.1f}%',
         'tv_method': tv_method,
         'projections': fcf_details,
@@ -374,14 +377,14 @@ def comps_analysis(stock_code, peer_codes=None):
         # TTM 口径主值（理杏仁）；缺失回退自算年报静态
         if lx_map.get('pe_ttm') is not None:
             mult_data[code]['pe_ttm'] = round(lx_map['pe_ttm'], 1)
-        if lx_map.get('pb') is not None:
+        if lx_map.get('pb') is not None and 0 < lx_map['pb'] < 30:  # O4：资不抵债负PB/失真值不入池
             mult_data[code]['pb'] = round(lx_map['pb'], 1)
-        if lx_map.get('ps_ttm') is not None:
+        if lx_map.get('ps_ttm') is not None and 0 < lx_map['ps_ttm'] < 60:
             mult_data[code]['ps_ttm'] = round(lx_map['ps_ttm'], 1)
         if total_equity:
             mult_data[code]['total_equity'] = total_equity
         # 市值兜底（理杏仁字段缺失时自算年报静态）
-        if ('pe_ttm' not in mult_data[code] or 'pb' not in mult_data[code]) and shares:
+        if any(k not in mult_data[code] for k in ('pe_ttm', 'pb', 'ps_ttm')) and shares:
             k_row = db.execute('''SELECT close FROM daily_kline
                 WHERE stock_code = ? ORDER BY date DESC LIMIT 1''', (code,)).fetchone()
             price = k_row['close'] if k_row else None
@@ -453,16 +456,21 @@ def comps_analysis(stock_code, peer_codes=None):
     # v1.2：真实净资产（mult_data 已存 total_equity），替代营收×30% 粗糙假设
     tgt_equity = (mult_data.get(stock_code, {}) or {}).get('total_equity')
 
-    # 估值（单位：亿元，v1.2 修正——原 /10000 把亿元错算成万元级）
+    # 估值（单位：亿元；v1.3：目标分子同口径 TTM——med_TTM倍数 × TTM绝对值，避免"TTM倍数×年报绝对值"混搭低估 40%）
+    tq = db.execute('''SELECT revenue_single, net_profit_single FROM stock_financials_quarterly
+        WHERE stock_code=? ORDER BY report_date DESC LIMIT 4''', (stock_code,)).fetchall()
+    ttm_target_rev = sum((r['revenue_single'] or 0) for r in tq) if len(tq) == 4 else None
+    ttm_target_np = sum((r['net_profit_single'] or 0) for r in tq) if len(tq) == 4 else None
+    ann_target_np = ann_data.get(stock_code, {}).get('net_profit', 0) or 0
     valuations = {}
-    if med_pe:
-        np = ann_data.get(stock_code, {}).get('net_profit', 0) or 0
-        if np > 0:
-            valuations['PE法'] = round(med_pe * np / 1e8, 1)
+    pe_base_np = ttm_target_np if ttm_target_np and ttm_target_np > 0 else (ann_target_np if ann_target_np > 0 else None)
+    if med_pe and pe_base_np:
+        valuations['PE法'] = round(med_pe * pe_base_np / 1e8, 1)
     if med_pb and tgt_equity:
         valuations['PB法'] = round(med_pb * tgt_equity / 1e8, 1)
-    if med_ps and target_revenue > 0:
-        valuations['PS法'] = round(med_ps * target_revenue / 1e8, 1)
+    ps_base_rev = ttm_target_rev if ttm_target_rev and ttm_target_rev > 0 else (target_revenue if target_revenue > 0 else None)
+    if med_ps and ps_base_rev:
+        valuations['PS法'] = round(med_ps * ps_base_rev / 1e8, 1)
 
     avg_val = sum(valuations.values()) / len(valuations) if valuations else None  # W4：全空返回 None
 
@@ -471,7 +479,7 @@ def comps_analysis(stock_code, peer_codes=None):
         'name': name_map.get(stock_code, stock_code),
         'industry': industry_name,
         'method': 'Comparable Company Analysis',
-        'val_basis': '估值TTM口径（理杏仁每日字段，及时反映盈利变化）；财务指标为年报静态',
+        'val_basis': '估值与目标分子均TTM口径（理杏仁pe_ttm/ps_ttm + 近4季滚动）；无季度数据回退年报静态',
         'peer_count': len(peer_codes),
         'peers': peers_table,
         'median_multiples': {'pe': round(med_pe, 1) if med_pe else None,
@@ -586,7 +594,7 @@ def three_statement_projection(stock_code, assumptions=None):
         WHERE stock_code = ? ORDER BY report_date DESC LIMIT 1''',
         (stock_code,)).fetchone()
     if not annual or not annual['revenue']:
-        db.close(); return {'error': f'{stock_code} 无年报数据'}
+        db.close(); return {'error': f'{stock_code} 无年报数据', 'base_basis': 'annual'}
 
     rev_yoy = annual['revenue_yoy'] if annual['revenue_yoy'] is not None else 12
     base_g = max(rev_yoy * 0.7, 5)
@@ -617,7 +625,7 @@ def three_statement_projection(stock_code, assumptions=None):
         ttm_rev = sum((r['revenue_single'] or 0) for r in q_rows)
         ttm_np = sum((r['net_profit_single'] or 0) for r in q_rows)
         ann_np = annual['net_profit'] or 0
-        if ann_np and abs(ttm_np - ann_np) / ann_np > 0.15 and ttm_rev > 0:
+        if ann_np and abs(ttm_np - ann_np) / abs(ann_np) > 0.15 and ttm_rev > 0 and ttm_np >= 0:
             base_revenue = ttm_rev
             latest_gm = q_rows[0]['gross_margin_single']
             if latest_gm:

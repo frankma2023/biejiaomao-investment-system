@@ -562,20 +562,27 @@ function renderEval(data){
   var name=d.name||c.name||e.name||m.name||'';
   var code=d.stock_code||c.stock_code||'';
   var h='<div class="stock-header"><span class="code">'+code+'</span><span class="name">'+name+'</span></div>';
+  // W9：子模块 error 占位（防 undefined 满屏）
+  h+=(d.error?'<div style="font-size:0.62rem;color:#FE2C55;margin:6px 0">⚠️ DCF: '+d.error+'</div>':'');
+  h+=(c.error?'<div style="font-size:0.62rem;color:#FE2C55;margin:6px 0">⚠️ 可比: '+c.error+'</div>':'');
+  h+=(e.error?'<div style="font-size:0.62rem;color:#FE2C55;margin:6px 0">⚠️ 盈利趋势: '+e.error+'</div>':'');
+  h+=(m.error?'<div style="font-size:0.62rem;color:#FE2C55;margin:6px 0">⚠️ 三表预测: '+m.error+'</div>':'');
   h+='<div class="result-grid">';
 
   // ═══ DCF ═══
   var upside=d.upside_pct;
-  var upsideTag=upside>20?'<span class="tag tag-green">低估 '+upside+'%</span>':(upside<-10?'<span class="tag tag-red">高估 '+Math.abs(upside)+'%</span>':'<span class="tag tag-orange">合理</span>');
+  // W7：低估=潜在涨=红、高估=跌=绿（A股红涨绿跌语义）
+  var upsideTag=upside>20?'<span class="tag" style="background:rgba(239,68,68,0.12);color:#ef4444">低估 '+upside+'%</span>':(upside<-10?'<span class="tag" style="background:rgba(16,185,129,0.12);color:#10b981">高估 '+Math.abs(upside)+'%</span>':'<span class="tag tag-orange">合理</span>');
   h+='<div class="xhs-card"><div class="xhs-card-header"><span class="xhs-card-label">💰 DCF估值</span>'+upsideTag+'<button class="btn-analysis" data-type="dcf" style="margin-left:auto;padding:3px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card-bg);cursor:pointer;font-size:0.62rem;font-family:var(--font-display)">📖 详解</button></div>';
   h+='<div class="metric-row">';
   h+='<div class="metric-item"><div class="val">'+(d.current_price||'—')+'</div><div class="lbl">当前价</div></div>';
   h+='<div class="metric-item"><div class="val '+(upside>0?'up':'down')+'">'+(d.target_price||'—')+'</div><div class="lbl">DCF目标价</div></div>';
   h+='<div class="metric-item"><div class="val">'+(d.enterprise_value?fmtNum(d.enterprise_value):'—')+'</div><div class="lbl">企业价值(亿)</div></div>';
-  h+='<div class="metric-item"><div class="val">'+d.wacc+'</div><div class="lbl">WACC</div></div>';
+  h+='<div class="metric-item"><div class="val">'+(d.wacc||'—')+'</div><div class="lbl">WACC</div></div>';
   h+='</div>';
   if(d.projections){h+='<table class="mini-table"><tr><th>年份</th><th>营收</th><th>FCF</th><th>现值</th></tr>';d.projections.forEach(function(p){h+='<tr><td>'+p.year+'年</td><td class="mono">'+fmtNum(p.revenue)+'</td><td class="mono">'+fmtNum(p.ufcf)+'</td><td class="mono">'+fmtNum(p.pv)+'</td></tr>'});h+='</table>'}
-  if(d.sensitivity){h+='<div style="font-size:0.6rem;color:var(--muted);margin-top:6px">敏感性(WACC→目标价): ';d.sensitivity.forEach(function(s){h+=s.wacc+':'+s.target_price+' '});h+='</div>'}
+  if(d.base_basis==='ttm_rolled'){h+='<div style="font-size:0.6rem;color:#f59e0b;margin-top:6px">⚠️ DCF起点已切换滚动TTM（EBITDA率按最新季毛利率比例校准）</div>'}
+  if(d.sensitivity){h+='<div style="font-size:0.6rem;color:var(--muted);margin-top:6px">敏感性(→目标价): ';d.sensitivity.forEach(function(s){h+=s.label+':'+s.target_price+'元 '});h+='</div>'}
   h+='</div>';
 
   // ═══ Comps ═══
@@ -603,10 +610,9 @@ function renderEval(data){
   h+='</div>';
 
   // ═══ 3-Statement ═══
-  h+='<div class="xhs-card"><div class="xhs-card-header"><span class="xhs-card-label">📋 三表预测</span><span style="font-size:0.65rem;color:var(--muted)">基准年:'+(m.base_year||'—')+' · '+m.base_gross_margin+'</span><button class="btn-analysis" data-type="model" style="margin-left:auto;padding:3px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card-bg);cursor:pointer;font-size:0.62rem;font-family:var(--font-display)">📖 详解</button></div>';
+  h+='<div class="xhs-card"><div class="xhs-card-header"><span class="xhs-card-label">📋 三表预测</span><span style="font-size:0.65rem;color:var(--muted)">基准年:'+(m.base_year||'—')+' · '+(m.base_gross_margin||'—')+'</span><button class="btn-analysis" data-type="model" style="margin-left:auto;padding:3px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card-bg);cursor:pointer;font-size:0.62rem;font-family:var(--font-display)">📖 详解</button></div>';
   if(m.projections){h+='<table class="mini-table"><tr><th>年份</th><th>营收</th><th>毛利</th><th>净利</th><th>经营CF</th><th>自由CF</th></tr>';m.projections.forEach(function(p){var i=p.income_statement||{},cf=p.cash_flow||{};h+='<tr><td>'+p.year+'年</td><td class="mono">'+fmtNum(i.revenue)+'</td><td class="mono">'+fmtNum(i.gross_profit)+'</td><td class="mono">'+fmtNum(i.net_income)+'</td><td class="mono">'+fmtNum(cf.operating_cf)+'</td><td class="mono">'+fmtNum(cf.free_cf)+'</td></tr>'});h+='</table>'}
   if(m.base_basis==='ttm_rolled'){h+='<div style="font-size:0.6rem;color:#f59e0b;margin-top:6px">⚠️ 三表预测基准已切换滚动TTM（整合最新季报）</div>'}
-  if(d.base_basis==='ttm_rolled'){h+='<div style="font-size:0.6rem;color:#f59e0b;margin-top:6px">⚠️ DCF起点已切换滚动TTM（EBITDA率按最新季毛利率比例校准）</div>'}
   h+='</div>';
 
   // ═══ v1.2 现金流与股东回报 ═══
@@ -628,7 +634,7 @@ h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:5px">'+(cf.note|
   if(q.latest||q.alerts){ 
     
     h+='<div class="xhs-card"><div class="xhs-card-header"><span class="xhs-card-label">⚠️ 盈利质量警示</span>'+(q.alerts&&q.alerts.length?q.alerts.map(function(a){return '<span class="tag tag-red" style="font-size:0.55rem;margin-left:4px">警示</span>'}).join(''):'<span class="tag tag-green" style="font-size:0.55rem">健康</span>')+'</div>';
-    if(q.latest){h+='<div class="metric-row"><div class="metric-item"><div class="val">'+q.latest.adj_ratio+'%</div><div class="lbl">扣非占比('+q.latest.report_date+')</div></div>';h+='<div class="metric-item"><div class="val">'+(q.latest.fcf_np_ratio_annual!=null?q.latest.fcf_np_ratio_annual:'—')+'x</div><div class="lbl">现金含量(年报FCF/净利)</div></div></div>'}
+    if(q.latest){h+='<div class="metric-row"><div class="metric-item"><div class="val">'+(q.latest.adj_ratio!=null?q.latest.adj_ratio:'—')+'%</div><div class="lbl">扣非占比('+q.latest.report_date+')</div></div>';h+='<div class="metric-item"><div class="val">'+(q.latest.fcf_np_ratio_annual!=null?q.latest.fcf_np_ratio_annual:'—')+'x</div><div class="lbl">现金含量(年报FCF/净利)</div></div></div>'}
     if(q.alerts&&q.alerts.length){q.alerts.forEach(function(a){h+='<div style="font-size:0.62rem;color:#FE2C55;margin-top:3px">⚠️ '+a+'</div>'})}
     if(q.share_note){h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:5px">'+q.share_note+'</div>'}
     h+='</div>';
@@ -703,7 +709,7 @@ function dcfAnalysis(d){
   h+='<p><strong>Step 2 · EBITDA</strong> = 营收 × EBITDA利润率 = '+fmtNum(rev_y)+' × '+ebitda_m+' = <strong>'+fmtNum(ebitda_y)+'</strong></p>';
   h+='<p><strong>Step 3 · EBIT</strong> = EBITDA − 折旧 = '+fmtNum(ebitda_y)+' − '+fmtNum(da_y)+' = <strong>'+fmtNum(ebit_y)+'</strong></p>';
   h+='<p style="color:var(--muted);font-size:0.75rem">折旧是怎么来的？公司建厂房花80亿，会计上分多年摊销——每年'+da_m+'相当于把80亿"分期付款"记在利润表上。但现金当年就已经全部付掉了，所以后面算现金流时要加回来。</p>';
-  h+='<p><strong>Step 4 · NOPAT(税后净营业利润)</strong> = EBIT × (1−税率25%) = '+fmtNum(ebit_y)+' × 0.75 = <strong>'+fmtNum(nopat_y)+'</strong></p>';
+  h+='<p><strong>Step 4 · NOPAT(税后净营业利润)</strong> = EBIT × (1−税率'+(d.tax_rate||'25%')+') = '+fmtNum(ebit_y)+' × '+(d.tax_rate?(1-parseFloat(d.tax_rate)/100).toFixed(2):'0.75')+' = <strong>'+fmtNum(nopat_y)+'</strong></p>';
   h+='<p><strong>Step 5 · 自由现金流</strong> = NOPAT + 折旧 − CapEx − 营运资本变动</p>';
   h+='<p>= '+fmtNum(nopat_y)+' + '+fmtNum(da_y)+' − '+fmtNum(capex_y)+' − '+fmtNum(dnwc_y)+' = <strong>'+fmtNum(ufcf_y)+'</strong></p>';
   h+='<p style="color:var(--muted);font-size:0.75rem">为什么加回折旧？因为折旧只是会计上的"纸面亏损"，并不是当年真实花出去的现金。公司在银行里的存款没有因为折旧而减少。所以算"实际赚了多少"时必须加回。CapEx（'+fmtNum(capex_y)+'）是真实的现金流出——买设备、建厂房——必须扣除。FCF='+fmtNum(ufcf_y)+'，意味着'+fmtNum(rev_y)+'的营收最终只留下这点可自由支配的现金——重资产制造业的典型特征。</p>';
@@ -714,7 +720,8 @@ function dcfAnalysis(d){
   h+='<p>有了每年的FCF后，需要把它们折现回今天。折现公式：<strong>现值 = 未来现金流 ÷ (1+WACC)^n</strong>，其中n是年数。WACC='+d.wacc+'意味着每多等一年，钱就贬值'+d.wacc+'。</p>';
   h+='<table class="mini-table"><tr><th>年份</th><th>营收</th><th>FCF</th><th>折现因子</th><th>现值</th></tr>';
   proj.forEach(function(p,i){
-    var df=1/Math.pow(1+0.10, i+0.5);
+    var waccVal=parseFloat(d.wacc)/100||0.10;
+    var df=1/Math.pow(1+waccVal, i+0.5);
     h+='<tr><td>'+p.year+'</td><td class="mono">'+fmtNum(p.revenue)+'</td><td class="mono">'+fmtNum(p.ufcf)+'</td><td class="mono">'+df.toFixed(4)+'</td><td class="mono">'+fmtNum(p.pv)+'</td></tr>';
   });
   h+='</table>';
@@ -723,8 +730,8 @@ function dcfAnalysis(d){
 
   h+='<h3>第五章 · 终值——5年之后的价值</h3>';
   h+='<p>一家公司不会只活5年。5年之后它还会继续经营、继续产生现金流。这部分叫<strong>终值（Terminal Value）</strong>——它通常占企业总价值的60~80%。本模型使用<strong>'+d.tv_method+'</strong>法计算终值：</p>';
-  h+='<p>终值 = '+fmtNum(proj[4].revenue*ebitdaVal)+'(第5年EBITDA) × 退出倍数 = <strong>'+fmtNum(tv)+'</strong></p>';
-  h+='<p>终值现值 = '+fmtNum(tv)+' ÷ (1+'+d.wacc+')^5.5 = <strong>'+fmtNum(tv)+'</strong></p>';
+  h+='<p>'+(d.tv_method&&d.tv_method.indexOf('EV/EBITDA')>-1?'终值 = '+fmtNum(proj[proj.length-1].revenue*ebitdaVal)+'(末年EBITDA) × 退出倍数':'终值 = 末年FCF × (1+永续增长率) ÷ (WACC−永续增长率)')+' = <strong>'+fmtNum(tv)+'</strong></p>';
+  h+='<p>终值现值 = '+fmtNum(tv)+' ÷ (1+'+d.wacc+')^5.5 = <strong>'+fmtNum(d.terminal_value)+'</strong></p>';
 
   h+='<h3>第六章 · 从企业价值到目标股价</h3>';
   h+='<div style="background:rgba(254,44,85,0.06);padding:12px;border-radius:10px;margin:8px 0">';
@@ -739,7 +746,7 @@ function dcfAnalysis(d){
   h+='<table class="mini-table"><tr><th>假设</th><th>目标价</th><th>相对当前价</th></tr>';
   (d.sensitivity||[]).forEach(function(s){
     var up=((s.target_price/cp-1)*100).toFixed(0);
-    h+='<tr><td>'+s.label+'</td><td class="mono">'+s.target_price+'元</td><td class="mono" style="color:'+(up>0?'#4CAF50':'#FE2C55')+'">'+(up>0?'+':'')+up+'%</td></tr>';
+    h+='<tr><td>'+s.label+'</td><td class="mono">'+s.target_price+'元</td><td class="mono" style="color:'+(up>0?'#ef4444':'#10b981')+'">'+(up>0?'+':'')+up+'%</td></tr>';
   });
   h+='</table>';
 
@@ -764,7 +771,7 @@ function compsAnalysis(c){
   h+='<p>• <strong>PE（市盈率）= 市值 ÷ 净利润</strong>。意思是"市场愿意为每1元净利润付多少钱"。PE=50表示你花50元买1元年利润——需要50年才能回本。高PE意味着市场预期高增长。</p>';
   h+='<p>• <strong>PB（市净率）= 市值 ÷ 净资产</strong>。比较适合银行、保险等资产驱动型行业。PB=3表示市场认为公司值净资产的3倍——"无形资产"（品牌、技术、管理）的价值。</p>';
   h+='<p>• <strong>PS（市销率）= 市值 ÷ 营业收入</strong>。适合亏损公司（因为没有净利润可用）。PS=5表示市场为公司每1元营收付5元。</p>';
-  h+='<p>本模型中，<strong>所有倍数都不依赖外部数据库</strong>，而是从三大核心数据自行计算：股价 × 总股本 = 市值，市值 ÷ 净利润 = PE，市值 ÷ 净资产 = PB，市值 ÷ 营收 = PS。</p>';
+  h+='<p>本模型中，估值倍数<strong>优先使用理杏仁每日 TTM 估值字段</strong>（pe_ttm/pb/ps_ttm，反映最新盈利变化），理杏仁缺数时才回退到自算年报静态口径（股价 × 总股本 = 市值，市值 ÷ 净利润 = PE，市值 ÷ 净资产 = PB，市值 ÷ 营收 = PS）。</p>';
 
   h+='<h3>第二章 · 可比公司筛选——"同一个小区"怎么定义</h3>';
   h+='<p>目标公司所在行业：<strong>'+c.industry+'</strong>（申万行业分类）。从该行业中找到了<strong>'+c.peer_count+'家</strong>可比公司。行业分类来自 stock_sw_industry 表，这是A股最常用的行业分类标准。</p>';
@@ -858,7 +865,7 @@ function earningsAnalysis(e){
     h+='<td class="mono">'+fmtNum(q.revenue)+'</td>';
     h+='<td class="mono" style="color:'+(q.revenue_yoy>0?'#4CAF50':'#FE2C55')+'">'+(q.revenue_yoy>0?'+':'')+q.revenue_yoy+'%</td>';
     h+='<td class="mono">'+fmtNum(q.net_profit)+'</td>';
-    h+='<td class="mono" style="color:'+(q.net_profit_yoy>0?'#4CAF50':'#FE2C55')+'">'+(q.net_profit_yoy>0?'+':'')+q.net_profit_yoy+'%</td>';
+    h+='<td class="mono" style="color:'+(q.net_profit_yoy>0?'#ef4444':'#10b981')+'">'+(q.net_profit_yoy>0?'+':'')+q.net_profit_yoy+'%</td>';
     h+='<td class="mono">'+q.gross_margin+'%</td></tr>';
   });
   h+='</table>';
@@ -883,7 +890,7 @@ function modelAnalysis(m){
 
   // ═══ 第一部分：数据基石 ═══
   h+='<h3>第一章 · 数据基石——所有参数均来自真实财报</h3>';
-  h+='<p>财务模型的质量完全取决于输入数据的质量。本模型的每一个参数都能在公司的年报中找到对应的数字，没有任何"拍脑袋"估算。以下六项核心参数定义了东方电气未来三年的财务轨迹：</p>';
+  h+='<p>财务模型的质量完全取决于输入数据的质量。本模型的每一个参数都能在公司的年报中找到对应的数字，没有任何"拍脑袋"估算。以下六项核心参数定义了'+(m.name||'目标公司')+'未来三年的财务轨迹：</p>';
   h+='<table class="mini-table"><tr><th style="width:20%">参数</th><th style="width:15%">数值</th><th style="width:30%">真实来源</th><th style="width:35%">在模型中的作用</th></tr>';
   h+='<tr><td>基准营收</td><td class="mono">'+baseRev+'</td><td>2025年报 stock_financials_annual.revenue</td><td>所有预测的起点，未来每年乘以(1+增长率)</td></tr>';
   h+='<tr><td>毛利率</td><td class="mono">'+gm+'</td><td>2025年报 gross_margin</td><td>营收×毛利率=毛利润，反映产品定价权和成本控制力</td></tr>';
@@ -897,7 +904,7 @@ function modelAnalysis(m){
   h+='<h3>第二章 · 增长率从何而来——这不是随便填的数字</h3>';
   h+='<p>金融建模中，营收增长率是最关键的假设——差1个百分点，五年后的企业价值可能差20%。但增长率无法"精确预测"，我们只能基于历史规律做<strong>合理推断</strong>。本模型采用的方法叫"均值回归递减法"，其底层逻辑有三层：</p>';
 
-  h+='<p><strong>第一层：看历史，知底线。</strong>东方电气过去五年（2021~2025）的营收增速分别为 28.3%→15.8%→9.6%→14.9%→12.8%，五年均值为<strong>16.3%</strong>。过去三年均值为<strong>12.4%</strong>。一家连续五年保持9%以上营收增长的公司，说明它处于一个持续扩张的行业，不是靠一次性订单活着的周期性企业。</p>';
+  h+='<p><strong>第一层：看历史，知底线。</strong>'+(m.name||'目标公司')+'的营收增速来自真实年报（详见盈利趋势Tab）——连续多年保持增长，说明它处于持续扩张的行业，不是靠一次性订单活着的周期性企业。若历史增速波动大，模型会给出偏保守的起始增长假设。</p>';
 
   h+='<p><strong>第二层：向均值回归。</strong>金融学有一条铁律叫"均值回归"——高增长不可永远持续。一个30%增速的公司，五年后大概率降到10%以下。原因很简单：规模越大，增长越难。786亿的营收要增长12%，意味着要多卖出94亿的产品。而5年前478亿时增长28%只需要多卖134亿。绝对增量在变大但百分比在缩小——这不是公司"变差了"，是基数效应。</p>';
 
@@ -917,13 +924,13 @@ function modelAnalysis(m){
 
   h+='<p><strong>Step 2 · 毛利润</strong><br>';
   h+='营收 '+fmtNum(rev1)+' × 毛利率 '+gm+' = <strong>'+fmtNum(gp1)+'</strong><br>';
-  h+='<span style="color:var(--muted);font-size:0.75rem">毛利率('+gm+')来自2025年报——东方电气每卖100元产品，扣除原材料和制造成本后剩15.9元。这个15.9元要支付后面的所有费用。</span></p>';
+  h+='<span style="color:var(--muted);font-size:0.75rem">毛利率('+gm+')来自'+(m.base_basis==='ttm_rolled'?'最新季报':'2025年报')+'——每卖100元产品，扣除原材料和制造成本后剩'+(parseFloat(gm||'0')||0).toFixed(1)+'元。这个数要支付后面的所有费用。</span></p>';
 
   h+='<p><strong>Step 3 · 扣除营业费用</strong><br>';
   h+='SG&A(销售+管理费) = '+fmtNum(rev1)+' × '+sga+' = <strong>−'+fmtNum(sga1)+'</strong><br>';
   h+='折旧摊销 = '+fmtNum(rev1)+' × '+da+' = <strong>−'+fmtNum(da1)+'</strong><br>';
   h+='EBIT(息税前利润) = '+fmtNum(gp1)+' − '+fmtNum(sga1)+' − '+fmtNum(da1)+' = <strong>'+fmtNum(ebit1)+'</strong><br>';
-  h+='<span style="color:var(--muted);font-size:0.75rem">SG&A='+sga1.toFixed(0)+'亿，其中销售费用'+fmtNum(rev1*0.011)+'、管理费用'+fmtNum(rev1*0.048)+'。注意管理费用是销售费用的4.5倍——东方电气是研发和管理密集型而非销售驱动型企业。折旧'+fmtNum(da1)+'亿是"会计成本"——现金早已付过，但利润表上需要分摊。所以后续算现金流时要加回来。</span></p>';
+  h+='<span style="color:var(--muted);font-size:0.75rem">SG&A='+sga1.toFixed(0)+'亿，其中销售费用'+fmtNum(rev1*0.011)+'、管理费用'+fmtNum(rev1*0.048)+'。折旧'+fmtNum(da1)+'亿是"会计成本"——现金早已付过，但利润表上需要分摊。所以后续算现金流时要加回来。</span></p>';
 
   h+='<p><strong>Step 4 · 净利润</strong><br>';
   h+='EBIT '+fmtNum(ebit1)+' × (1 − 所得税率25%) = <strong>'+fmtNum(ni1)+'</strong><br>';
@@ -935,7 +942,7 @@ function modelAnalysis(m){
 
   h+='<p><strong>Step 6 · 自由现金流</strong><br>';
   h+='经营CF '+fmtNum(ocf1)+' − CapEx(资本开支) '+fmtNum(capex1)+' = <strong>'+fmtNum(fcf1)+'</strong><br>';
-  h+='<span style="color:var(--muted);font-size:0.75rem">CapEx='+fmtNum(capex1)+'亿——这是东方电气为维持和扩大生产必须花出去的钱：买新设备、扩建厂房、升级产线。不花这笔钱，明年的产能就保不住。所以经营现金流虽然看起来还行（'+fmtNum(ocf1)+'），但扣除必需的资本开支后，真正自由可分配给股东的钱只有'+fmtNum(fcf1)+'。这就是重资产工业企业的宿命——赚钱机器本身就需要不断喂钱。</span></p>';
+  h+='<span style="color:var(--muted);font-size:0.75rem">CapEx='+fmtNum(capex1)+'亿——为维持和扩大生产必须花出去的钱：买新设备、扩建厂房、升级产线。不花这笔钱，明年的产能就保不住。所以经营现金流虽然看起来还行（'+fmtNum(ocf1)+'），但扣除必需的资本开支后，真正自由可分配给股东的钱只有'+fmtNum(fcf1)+'。这就是重资产工业企业的宿命——赚钱机器本身就需要不断喂钱。</span></p>';
 
   h+='</div>';
 
@@ -949,7 +956,7 @@ function modelAnalysis(m){
     h+='<tr><td>'+px.year+'</td><td class="mono">'+fmtNum(rx)+'</td><td class="mono">'+fmtNum(ix.gross_profit)+'</td><td class="mono">'+fmtNum(sx)+'</td><td class="mono">'+fmtNum(dx)+'</td><td class="mono">'+fmtNum(ex)+'</td><td class="mono">'+fmtNum(ix.net_income)+'</td><td class="mono">'+fmtNum(cfx.operating_cf)+'</td><td class="mono">'+fmtNum(cx)+'</td><td class="mono">'+fmtNum(cfx.free_cf)+'</td></tr>';
   });
   h+='</table>';
-  h+='<p>观察三年趋势：营收稳步增长，自由现金流也随之改善——从'+fmtNum(fcf1)+'到'+fmtNum((projs[projs.length-1].cash_flow||{}).free_cf||0)+'。但注意自由现金流始终只占营收的2~3%。这意味着<strong>东方电气是一个"薄利但稳定"的生意</strong>——规模巨大但每一块钱营收留下的自由现金很少，大部分利润被持续的设备投入吞噬。这不是"坏公司"，而是"重资产行业的正常特征"。</p>';
+  h+='<p>观察三年趋势：营收稳步增长，自由现金流也随之改善——从'+fmtNum(fcf1)+'到'+fmtNum((projs[projs.length-1].cash_flow||{}).free_cf||0)+'。自由现金流占营收比例取决于盈利质量与资本开支强度（详见盈利质量警示卡）——这不是"坏公司"，而是"重资产行业的正常特征"。</p>';
 
   // ═══ 第五部分：三表联动 ═══
   h+='<h3>第五章 · 三张财务报表如何联动</h3>';
