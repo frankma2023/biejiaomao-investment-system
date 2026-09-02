@@ -61,12 +61,35 @@ def dcf_valuation(stock_code, assumptions=None):
 
     warnings = []
 
-    # ── 营收 ──
+    # ── 营收（v1.3：TTM 检测——最新4季营收/盈利偏离年报 >15% 时起点切换滚动TTM）──
     revenue = annual['revenue']
+    ttm_flag = False
+    ttm_np_note = ''
+    q4 = db.execute('''SELECT report_date, revenue_single, net_profit_single, gross_margin_single
+        FROM stock_financials_quarterly WHERE stock_code=?
+        ORDER BY report_date DESC LIMIT 4''', (stock_code,)).fetchall()
+    if len(q4) == 4:
+        ttm_rev = sum((r['revenue_single'] or 0) for r in q4)
+        ttm_np = sum((r['net_profit_single'] or 0) for r in q4)
+        ann_rev = annual['revenue'] or 0
+        ann_np = annual['net_profit'] or 0
+        if ann_rev and ann_np and (abs(ttm_rev - ann_rev) / ann_rev > 0.15 or abs(ttm_np - ann_np) / ann_np > 0.15):
+            revenue = ttm_rev
+            ttm_flag = True
+            ttm_np_note = f'（TTM营收 {ttm_rev/1e8:.0f}亿/净利 {ttm_np/1e8:.1f}亿）'
 
-    # ── EBITDA ──
+    # ── EBITDA（v1.3：TTM 起点下按最新季毛利率比例校准，反映盈利爆发）──
     if ext and ext['ebitda']:
-        ebitda_margin = ext['ebitda'] / revenue
+        ebitda_margin = ext['ebitda'] / annual['revenue']
+        if ttm_flag:
+            gm_q = q4[0]['gross_margin_single']
+            gm_ann = annual['gross_margin']
+            if gm_q and gm_ann and gm_ann > 0:
+                ebitda_margin = ebitda_margin * (gm_q / gm_ann)
+                warnings.append(
+                    f'⚠️ 盈利偏离年报 >15%，DCF起点已切换滚动TTM {ttm_np_note}；'
+                    f'EBITDA率按最新季毛利率比例校准为 {ebitda_margin*100:.1f}%（原年报口径 {ext["ebitda"]/annual["revenue"]*100:.1f}%）；'
+                    '周期/剧变公司前瞻需结合量价情景，勿纯外推')
         ebitda_val = ext['ebitda']
     else:
         warnings.append('EBITDA: stock_financials_annual_ext 中无数据')
@@ -213,6 +236,7 @@ def dcf_valuation(stock_code, assumptions=None):
         'upside_pct': round((target_price/current_price - 1) * 100, 1) if current_price > 0 else None,
         'sensitivity': sensitivity,
         'warnings': warnings if warnings else None,
+        'base_basis': 'ttm_rolled' if ttm_flag else 'annual',
     }
 
 
@@ -324,39 +348,53 @@ def comps_analysis(stock_code, peer_codes=None):
             seen_codes.add(a['stock_code'])
             ann_data[a['stock_code']] = dict(a)
 
-    # 估值倍数 — 用真实数据自行计算
-    # PE = 市值/净利润 = (股本×股价)/净利润
-    # PB = 市值/净资产 = (股本×股价)/股东权益
-    # PS = 市值/营收
+    # 估值倍数（v1.3：优先理杏仁 TTM 每日字段——pe_ttm/pb/ps_ttm 及时反映盈利变化；
+    # 卫星案例：理杏仁 TTM PE 10.53 vs 市值÷年报净利静态 17.4，差 65%）
     mult_data = {}
     for code in all_codes:
-        # 取股价
-        k_row = db.execute('''SELECT close FROM daily_kline
-            WHERE stock_code = ? ORDER BY date DESC LIMIT 1''', (code,)).fetchone()
-        price = k_row['close'] if k_row else None
-        # 取股本
+        # 理杏仁 TTM 估值（fundamental_indicator 每日更新）
+        lx = db.execute('''SELECT date, metric_code, value FROM fundamental_indicator
+            WHERE stock_code=? AND metric_code IN ('pe_ttm','pb','ps_ttm')
+            AND value IS NOT NULL ORDER BY date DESC''', (code,)).fetchall()
+        lx_map = {}
+        for r in lx:
+            if r['metric_code'] not in lx_map:
+                lx_map[r['metric_code']] = r['value']
+        # 股本（股本核验用）
         eq_row = db.execute('''SELECT capitalization FROM stock_equity_change
             WHERE stock_code = ? ORDER BY change_date DESC LIMIT 1''', (code,)).fetchone()
         shares = eq_row['capitalization'] if eq_row else None
-        # 取年报数据
+        # 年报数据
         a = ann_data.get(code, {})
-        # 取扩展数据
+        # 扩展数据（净资产）
         ext2 = db.execute('''SELECT total_equity FROM stock_financials_annual_ext
             WHERE stock_code = ? ORDER BY report_date DESC LIMIT 1''', (code,)).fetchone()
         total_equity = ext2['total_equity'] if ext2 else None
-
-        if price and shares and shares > 0:
-            mkt_cap = price * shares
-            np = a.get('net_profit')
-            rev = a.get('revenue')
-            mult_data[code] = {}
-            if np and np > 0:
-                mult_data[code]['pe_ttm'] = round(mkt_cap / np, 1)
-            if total_equity and total_equity > 0:
-                mult_data[code]['pb'] = round(mkt_cap / total_equity, 1)
-                mult_data[code]['total_equity'] = total_equity  # v1.2：真实净资产存下供 PB 估值
-            if rev and rev > 0:
-                mult_data[code]['ps_ttm'] = round(mkt_cap / rev, 1)
+        mult_data[code] = {}
+        # TTM 口径主值（理杏仁）；缺失回退自算年报静态
+        if lx_map.get('pe_ttm') is not None:
+            mult_data[code]['pe_ttm'] = round(lx_map['pe_ttm'], 1)
+        if lx_map.get('pb') is not None:
+            mult_data[code]['pb'] = round(lx_map['pb'], 1)
+        if lx_map.get('ps_ttm') is not None:
+            mult_data[code]['ps_ttm'] = round(lx_map['ps_ttm'], 1)
+        if total_equity:
+            mult_data[code]['total_equity'] = total_equity
+        # 市值兜底（理杏仁字段缺失时自算年报静态）
+        if ('pe_ttm' not in mult_data[code] or 'pb' not in mult_data[code]) and shares:
+            k_row = db.execute('''SELECT close FROM daily_kline
+                WHERE stock_code = ? ORDER BY date DESC LIMIT 1''', (code,)).fetchone()
+            price = k_row['close'] if k_row else None
+            if price:
+                mkt_cap = price * shares
+                np = a.get('net_profit')
+                rev = a.get('revenue')
+                if np and np > 0 and 'pe_ttm' not in mult_data[code]:
+                    mult_data[code]['pe_ttm'] = round(mkt_cap / np, 1)
+                if total_equity and total_equity > 0 and 'pb' not in mult_data[code]:
+                    mult_data[code]['pb'] = round(mkt_cap / total_equity, 1)
+                if rev and rev > 0 and 'ps_ttm' not in mult_data[code]:
+                    mult_data[code]['ps_ttm'] = round(mkt_cap / rev, 1)
 
     # 名称
     names = db.execute(f'''SELECT stock_code, name FROM stock_basic
@@ -433,7 +471,7 @@ def comps_analysis(stock_code, peer_codes=None):
         'name': name_map.get(stock_code, stock_code),
         'industry': industry_name,
         'method': 'Comparable Company Analysis',
-        'val_basis': '年报静态口径（非TTM）；PB法基于真实净资产',
+        'val_basis': '估值TTM口径（理杏仁每日字段，及时反映盈利变化）；财务指标为年报静态',
         'peer_count': len(peer_codes),
         'peers': peers_table,
         'median_multiples': {'pe': round(med_pe, 1) if med_pe else None,

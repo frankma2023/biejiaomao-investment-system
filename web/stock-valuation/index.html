@@ -605,7 +605,8 @@ function renderEval(data){
   // ═══ 3-Statement ═══
   h+='<div class="xhs-card"><div class="xhs-card-header"><span class="xhs-card-label">📋 三表预测</span><span style="font-size:0.65rem;color:var(--muted)">基准年:'+(m.base_year||'—')+' · '+m.base_gross_margin+'</span><button class="btn-analysis" data-type="model" style="margin-left:auto;padding:3px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card-bg);cursor:pointer;font-size:0.62rem;font-family:var(--font-display)">📖 详解</button></div>';
   if(m.projections){h+='<table class="mini-table"><tr><th>年份</th><th>营收</th><th>毛利</th><th>净利</th><th>经营CF</th><th>自由CF</th></tr>';m.projections.forEach(function(p){var i=p.income_statement||{},cf=p.cash_flow||{};h+='<tr><td>'+p.year+'年</td><td class="mono">'+fmtNum(i.revenue)+'</td><td class="mono">'+fmtNum(i.gross_profit)+'</td><td class="mono">'+fmtNum(i.net_income)+'</td><td class="mono">'+fmtNum(cf.operating_cf)+'</td><td class="mono">'+fmtNum(cf.free_cf)+'</td></tr>'});h+='</table>'}
-  if(m.base_basis==='ttm_rolled'){h+='<div style="font-size:0.6rem;color:#f59e0b;margin-top:6px">⚠️ 基准已自动切换为滚动TTM（整合最新季报，因盈利偏离年报>15%）</div>'}
+  if(m.base_basis==='ttm_rolled'){h+='<div style="font-size:0.6rem;color:#f59e0b;margin-top:6px">⚠️ 三表预测基准已切换滚动TTM（整合最新季报）</div>'}
+  if(d.base_basis==='ttm_rolled'){h+='<div style="font-size:0.6rem;color:#f59e0b;margin-top:6px">⚠️ DCF起点已切换滚动TTM（EBITDA率按最新季毛利率比例校准）</div>'}
   h+='</div>';
 
   // ═══ v1.2 现金流与股东回报 ═══
