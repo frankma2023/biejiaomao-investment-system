@@ -49,7 +49,7 @@ def dcf_valuation(stock_code, assumptions=None):
     t_g = assumptions.get('terminal_growth', 0.025)
     exit_multiple = assumptions.get('exit_multiple', None)
     tax = assumptions.get('tax_rate', 0.25)
-    rev_yoy = annual['revenue_yoy'] or 12
+    rev_yoy = annual['revenue_yoy'] if annual['revenue_yoy'] is not None else 12
     base_g = max(rev_yoy * 0.7, 5)
     g = assumptions.get('growth_rates', [base_g, max(base_g-2,5), max(base_g-4,5), max(base_g-5,4), max(base_g-6,3)])
     g = [x/100.0 for x in g]
@@ -426,7 +426,7 @@ def comps_analysis(stock_code, peer_codes=None):
     if med_ps and target_revenue > 0:
         valuations['PS法'] = round(med_ps * target_revenue / 1e8, 1)
 
-    avg_val = sum(valuations.values()) / len(valuations) if valuations else 0
+    avg_val = sum(valuations.values()) / len(valuations) if valuations else None  # W4：全空返回 None
 
     return {
         'stock_code': stock_code,
@@ -550,7 +550,7 @@ def three_statement_projection(stock_code, assumptions=None):
     if not annual or not annual['revenue']:
         db.close(); return {'error': f'{stock_code} 无年报数据'}
 
-    rev_yoy = annual['revenue_yoy'] or 12
+    rev_yoy = annual['revenue_yoy'] if annual['revenue_yoy'] is not None else 12
     base_g = max(rev_yoy * 0.7, 5)
     g_list_assume = assumptions.get('growth_rates', [base_g, max(base_g-2,5), max(base_g-4,5)])
     g_list = [x/100.0 for x in g_list_assume]
@@ -584,7 +584,8 @@ def three_statement_projection(stock_code, assumptions=None):
             latest_gm = q_rows[0]['gross_margin_single']
             if latest_gm:
                 gm = latest_gm / 100.0
-            base_year_src = int(q_rows[0]['report_date'][:4])
+            # W3：sga/da/capex 比率仍以年报绝对值÷TTM营收（分母变大比率偏低），警告声明口径
+            warnings.append('⚠️ SG&A/折旧/CapEx 比率仍基于年报绝对值（TTM 分母下略偏低），仅毛利率已校准')
             warnings.append(
                 '⚠️ 盈利偏离年报 >15%，基准已自动切换为滚动TTM（整合最新季报）；'
                 f'TTM 净利 {ttm_np/1e8:.1f}亿 vs 年报 {ann_np/1e8:.1f}亿，'
@@ -722,11 +723,11 @@ def quality_analysis(stock_code):
     """盈利质量警示：扣非占比 / 一次性项检测 / 现金含量 / 股本核验"""
     db = get_db()
     q = db.execute('''SELECT report_date, net_profit_single, net_profit_adj_single,
-        net_profit_adj_yoy, free_cash_flow FROM stock_financials_quarterly
-        WHERE stock_code=? ORDER BY report_date DESC LIMIT 2''', (stock_code,)).fetchall()
+        free_cash_flow FROM stock_financials_quarterly
+        WHERE stock_code=? ORDER BY report_date DESC LIMIT 1''', (stock_code,)).fetchall()
     name_row = db.execute('SELECT name FROM stock_basic WHERE stock_code=?', (stock_code,)).fetchone()
     name = name_row['name'] if name_row else stock_code
-    ann = db.execute('''SELECT net_profit, net_profit_adj FROM stock_financials_annual
+    ann = db.execute('''SELECT net_profit, net_profit_adj, free_cash_flow FROM stock_financials_annual
         WHERE stock_code=? ORDER BY report_date DESC LIMIT 1''', (stock_code,)).fetchone()
     eq = db.execute('''SELECT capitalization, change_date FROM stock_equity_change
         WHERE stock_code=? ORDER BY change_date DESC LIMIT 1''', (stock_code,)).fetchone()
@@ -739,34 +740,38 @@ def quality_analysis(stock_code):
         r = q[0]
         np_ = r['net_profit_single'] or 0
         adj = r['net_profit_adj_single']
-        if np_ and adj is not None:
-            ratio = adj / np_ * 100 if np_ else None
-            latest = {
-                'report_date': r['report_date'],
-                'net_profit': round(np_ / 1e8, 2),
-                'net_profit_adj': round(adj / 1e8, 2),
-                'adj_ratio': round(ratio, 1) if ratio is not None else None,
-            }
-            if ratio is not None and ratio < 90:
-                alerts.append(f'一次性项占比 >10%（扣非占比 {ratio:.0f}%）：盈利被非经常损益污染，用扣非口径')
-                flags['one_off'] = True
-            elif ratio is not None:
-                flags['one_off'] = False
-        if r['free_cash_flow'] and np_ and np_ > 0:
-            cash_ratio = r['free_cash_flow'] / np_
-            latest['fcf_np_ratio'] = round(cash_ratio, 2)
-            if cash_ratio < 0.5:
-                alerts.append(f'现金含量低（FCF/净利 {cash_ratio:.2f}）：利润含金量需警惕')
+        if np_ and np_ > 0:  # B1+W7：净利>0 才判扣非占比；亏损季跳过
+            if adj is not None:
+                ratio = adj / np_ * 100
+                latest = {
+                    'report_date': r['report_date'],
+                    'net_profit': round(np_ / 1e8, 2),
+                    'net_profit_adj': round(adj / 1e8, 2),
+                    'adj_ratio': round(ratio, 1),
+                }
+                if ratio < 90:
+                    alerts.append(f'一次性项占比 >10%（扣非占比 {ratio:.0f}%）：盈利被非经常损益污染，用扣非口径')
+                    flags['one_off'] = True
+                else:
+                    flags['one_off'] = False
+            # W1：现金含量改用年报口径（FCF/净利 同为累计值自洽；quarterly FCF 为年内累计，配单季净利会高估 2-4 倍）
+            if ann and ann['free_cash_flow'] and ann['net_profit'] and ann['net_profit'] > 0:
+                cash_ratio = ann['free_cash_flow'] / ann['net_profit']
+                if latest is None:
+                    latest = {'report_date': r['report_date'], 'net_profit': round(np_ / 1e8, 2)}
+                latest['fcf_np_ratio_annual'] = round(cash_ratio, 2)
+                if cash_ratio < 0.5:
+                    alerts.append(f'现金含量低（年报FCF/净利 {cash_ratio:.2f}）：利润含金量需警惕')
     if ann:
         a_np = ann['net_profit'] or 0
         a_adj = ann['net_profit_adj']
-        if a_np and a_adj is not None:
+        if a_np and a_adj is not None and a_np > 0:
             ar = a_adj / a_np * 100
             if ar < 90:
                 alerts.append(f'年报扣非占比 {ar:.0f}%（一次性项影响年度盈利）')
-    # 股数核验：净利/股本 = 每股净利（无披露 EPS 时至少验证股本存在与数量级）
+    # 股数核验：净利/股本 = 每股净利（无披露 EPS 数据源，仅信息性输出，不作 >2% 偏差警示）
     share_note = None
-    if eq and eq['capitalization'] and latest:
+    if eq and eq['capitalization'] and latest and latest.get('net_profit'):
         eps_implied = latest['net_profit'] * 1e8 / eq['capitalization']
         share_note = f'股本 {eq["capitalization"]/1e8:.2f} 亿股（{eq["change_date"]}）；隐含EPS {eps_implied:.2f} 元（净利/股本，非披露值）'
     return {
@@ -801,18 +806,25 @@ def cashflow_analysis(stock_code):
         prev_y_cum = r2['free_cash_flow'] / 1e8 if r2 and r2['free_cash_flow'] else None
     db.close()
 
-    # FCF：理杏仁 quarterly free_cash_flow 为年内累计（单调递增已验证）
+    # FCF：理杏仁 quarterly free_cash_flow 为年内累计口径（fetch 脚本注释“当季”有误，实测 2025 Q1 11.9→Q4 69.6 单调递增验证；W1 已统一）
     q_list = list(reversed(qs))
     fcf_series = []
     prev = None
     for r in q_list:
         if r['free_cash_flow'] is None:
             continue
+        inc = None
         if prev is not None:
+            # W8：累计口径下新年首季值重置（r < prev）→ 增量置 None 不产生虚假负值
+            if r['free_cash_flow'] >= prev:
+                inc = round((r['free_cash_flow'] - prev) / 1e8, 1)
             fcf_series.append({'report_date': r['report_date'], 'fcf_cum': round(r['free_cash_flow'] / 1e8, 1),
-                               'fcf_qoq_inc': round((r['free_cash_flow'] - prev) / 1e8, 1)})
+                               'fcf_qoq_inc': inc})
         prev = r['free_cash_flow']
-    latest_cum = qs[0]['free_cash_flow'] / 1e8 if qs and qs[0]['free_cash_flow'] else None
+        if qs and qs[0]['free_cash_flow']:
+            latest_cum = qs[0]['free_cash_flow'] / 1e8
+        else:
+            latest_cum = None
 
     # 年度口径
     ann_list = []

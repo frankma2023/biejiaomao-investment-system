@@ -34,6 +34,9 @@
   html[data-theme="light"] .tab:hover{border-color:rgba(0,0,0,.15);color:#374151}
   html[data-theme="light"] .tab.active{background:rgba(217,119,6,.08);color:var(--accent);border-color:var(--accent-border)}
   html[data-theme="light"] .top-bar input,html[data-theme="light"] .top-bar select{background:rgba(255,255,255,.7);border-color:var(--divider);color:var(--text-primary)}
+
+html[data-theme] .up{color:#ef4444!important}
+html[data-theme] .down{color:#10b981!important}
 </style>
 </head>
 <body>
@@ -582,6 +585,7 @@ function renderEval(data){
   h+='<div class="metric-item"><div class="val">'+(mm.pe||'—')+'x</div><div class="lbl">中位PE</div></div>';
   h+='<div class="metric-item"><div class="val">'+(mm.pb||'—')+'x</div><div class="lbl">中位PB</div></div>';
   h+='<div class="metric-item"><div class="val">'+(mm.ps||'—')+'x</div><div class="lbl">中位PS</div></div>';
+  if(c.val_basis){h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:4px">口径：'+c.val_basis+'</div>'}
   h+='</div>';
   if(c.peers&&c.peers.length>1){h+='<table class="mini-table" style="margin-top:8px"><tr><th>公司</th><th>营收</th><th>增长</th><th>PE</th><th>PB</th></tr>';c.peers.slice(0,6).forEach(function(p){var isSelf=p.code===code;h+='<tr'+(isSelf?' style="background:rgba(254,44,85,0.04);font-weight:700"':'')+'><td>'+(isSelf?'▶ ':'')+p.name+'</td><td class="mono">'+fmtNum(p.revenue)+'</td><td class="mono">'+(p.revenue_growth||'—')+'%</td><td class="mono">'+(p.pe||'—')+'</td><td class="mono">'+(p.pb||'—')+'</td></tr>'});h+='</table>'}
   h+='</div>';
@@ -613,16 +617,17 @@ function renderEval(data){
     h+='<div class="metric-item"><div class="val">'+(cf.fcf_yoy!=null?(cf.fcf_yoy>0?'+':'')+cf.fcf_yoy+'%':'—')+'</div><div class="lbl">FCF同比</div></div>';
     h+='</div>';
     if(cf.annual&&cf.annual.length){h+='<table class="mini-table"><tr><th>年度</th><th>经营CF</th><th>FCF</th><th>资本开支(估)</th></tr>';cf.annual.forEach(function(a){h+='<tr><td>'+a.year+'</td><td class="mono">'+(a.ocf!=null?a.ocf:'—')+'亿</td><td class="mono">'+(a.fcf!=null?a.fcf:'—')+'亿</td><td class="mono">'+(a.capex_est!=null?a.capex_est:'—')+'亿</td></tr>'});h+='</table>'}
-    h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:5px">'+(cf.note||'')+'</div>';
+    if(cf.equity_changes&&cf.equity_changes.length){h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:4px">股本：'+(cf.equity_changes[0].cap!=null?cf.equity_changes[0].cap:'—')+'亿股('+cf.equity_changes[0].date+' · '+cf.equity_changes[0].reason+')</div>'}
+h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:5px">'+(cf.note||'')+'</div>';
     h+='</div>';
   }
 
   // ═══ v1.2 盈利质量警示 ═══
   var q=data.quality||{};
   if(q.latest||q.alerts){ 
-    var oneOff=q.flags&&q.flags.one_off;
+    
     h+='<div class="xhs-card"><div class="xhs-card-header"><span class="xhs-card-label">⚠️ 盈利质量警示</span>'+(q.alerts&&q.alerts.length?q.alerts.map(function(a){return '<span class="tag tag-red" style="font-size:0.55rem;margin-left:4px">警示</span>'}).join(''):'<span class="tag tag-green" style="font-size:0.55rem">健康</span>')+'</div>';
-    if(q.latest){h+='<div class="metric-row"><div class="metric-item"><div class="val">'+q.latest.adj_ratio+'%</div><div class="lbl">扣非占比('+q.latest.report_date+')</div></div>';h+='<div class="metric-item"><div class="val">'+(q.latest.fcf_np_ratio!=null?q.latest.fcf_np_ratio:'—')+'x</div><div class="lbl">现金含量(FCF/净利)</div></div></div>'}
+    if(q.latest){h+='<div class="metric-row"><div class="metric-item"><div class="val">'+q.latest.adj_ratio+'%</div><div class="lbl">扣非占比('+q.latest.report_date+')</div></div>';h+='<div class="metric-item"><div class="val">'+(q.latest.fcf_np_ratio_annual!=null?q.latest.fcf_np_ratio_annual:'—')+'x</div><div class="lbl">现金含量(年报FCF/净利)</div></div></div>'}
     if(q.alerts&&q.alerts.length){q.alerts.forEach(function(a){h+='<div style="font-size:0.62rem;color:#FE2C55;margin-top:3px">⚠️ '+a+'</div>'})}
     if(q.share_note){h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:5px">'+q.share_note+'</div>'}
     h+='</div>';
