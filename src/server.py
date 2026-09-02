@@ -5307,7 +5307,7 @@ def api_stock_analysis():
     if not stock_code:
         return jsonify({'error': 'code required'}), 400
     try:
-        from analysis.financial import dcf_valuation, comps_analysis, earnings_analysis, three_statement_projection
+        from analysis.financial import dcf_valuation, comps_analysis, earnings_analysis, three_statement_projection, quality_analysis, cashflow_analysis
         def safe(fn, *args):
             try: return fn(*args)
             except Exception as e: return {'error': str(e)}
@@ -5315,7 +5315,10 @@ def api_stock_analysis():
         comps = safe(comps_analysis, stock_code)
         earnings = safe(earnings_analysis, stock_code)
         model = safe(three_statement_projection, stock_code)
-        return jsonify({'dcf': dcf, 'comps': comps, 'earnings': earnings, 'model': model})
+        quality = safe(quality_analysis, stock_code)      # v1.2：盈利质量警示
+        cashflow = safe(cashflow_analysis, stock_code)   # v1.2：现金流与股东回报
+        return jsonify({'dcf': dcf, 'comps': comps, 'earnings': earnings, 'model': model,
+                        'quality': quality, 'cashflow': cashflow})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

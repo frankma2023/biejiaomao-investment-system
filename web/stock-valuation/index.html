@@ -601,7 +601,32 @@ function renderEval(data){
   // ═══ 3-Statement ═══
   h+='<div class="xhs-card"><div class="xhs-card-header"><span class="xhs-card-label">📋 三表预测</span><span style="font-size:0.65rem;color:var(--muted)">基准年:'+(m.base_year||'—')+' · '+m.base_gross_margin+'</span><button class="btn-analysis" data-type="model" style="margin-left:auto;padding:3px 10px;border:1px solid var(--divider);border-radius:8px;background:var(--card-bg);cursor:pointer;font-size:0.62rem;font-family:var(--font-display)">📖 详解</button></div>';
   if(m.projections){h+='<table class="mini-table"><tr><th>年份</th><th>营收</th><th>毛利</th><th>净利</th><th>经营CF</th><th>自由CF</th></tr>';m.projections.forEach(function(p){var i=p.income_statement||{},cf=p.cash_flow||{};h+='<tr><td>'+p.year+'年</td><td class="mono">'+fmtNum(i.revenue)+'</td><td class="mono">'+fmtNum(i.gross_profit)+'</td><td class="mono">'+fmtNum(i.net_income)+'</td><td class="mono">'+fmtNum(cf.operating_cf)+'</td><td class="mono">'+fmtNum(cf.free_cf)+'</td></tr>'});h+='</table>'}
+  if(m.base_basis==='ttm_rolled'){h+='<div style="font-size:0.6rem;color:#f59e0b;margin-top:6px">⚠️ 基准已自动切换为滚动TTM（整合最新季报，因盈利偏离年报>15%）</div>'}
   h+='</div>';
+
+  // ═══ v1.2 现金流与股东回报 ═══
+  var cf=data.cashflow||{};
+  if(cf.fcf_latest_cum!=null||(cf.annual&&cf.annual.length)){
+    h+='<div class="xhs-card"><div class="xhs-card-header"><span class="xhs-card-label">💵 现金流与股东回报</span><span style="font-size:0.65rem;color:var(--muted)">'+cf.fcf_report_date+'累计</span></div>';
+    h+='<div class="metric-row">';
+    h+='<div class="metric-item"><div class="val '+(cf.fcf_yoy>0?'up':'down')+'">'+(cf.fcf_latest_cum!=null?cf.fcf_latest_cum:'—')+'亿</div><div class="lbl">FCF(累计)</div></div>';
+    h+='<div class="metric-item"><div class="val">'+(cf.fcf_yoy!=null?(cf.fcf_yoy>0?'+':'')+cf.fcf_yoy+'%':'—')+'</div><div class="lbl">FCF同比</div></div>';
+    h+='</div>';
+    if(cf.annual&&cf.annual.length){h+='<table class="mini-table"><tr><th>年度</th><th>经营CF</th><th>FCF</th><th>资本开支(估)</th></tr>';cf.annual.forEach(function(a){h+='<tr><td>'+a.year+'</td><td class="mono">'+(a.ocf!=null?a.ocf:'—')+'亿</td><td class="mono">'+(a.fcf!=null?a.fcf:'—')+'亿</td><td class="mono">'+(a.capex_est!=null?a.capex_est:'—')+'亿</td></tr>'});h+='</table>'}
+    h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:5px">'+(cf.note||'')+'</div>';
+    h+='</div>';
+  }
+
+  // ═══ v1.2 盈利质量警示 ═══
+  var q=data.quality||{};
+  if(q.latest||q.alerts){ 
+    var oneOff=q.flags&&q.flags.one_off;
+    h+='<div class="xhs-card"><div class="xhs-card-header"><span class="xhs-card-label">⚠️ 盈利质量警示</span>'+(q.alerts&&q.alerts.length?q.alerts.map(function(a){return '<span class="tag tag-red" style="font-size:0.55rem;margin-left:4px">警示</span>'}).join(''):'<span class="tag tag-green" style="font-size:0.55rem">健康</span>')+'</div>';
+    if(q.latest){h+='<div class="metric-row"><div class="metric-item"><div class="val">'+q.latest.adj_ratio+'%</div><div class="lbl">扣非占比('+q.latest.report_date+')</div></div>';h+='<div class="metric-item"><div class="val">'+(q.latest.fcf_np_ratio!=null?q.latest.fcf_np_ratio:'—')+'x</div><div class="lbl">现金含量(FCF/净利)</div></div></div>'}
+    if(q.alerts&&q.alerts.length){q.alerts.forEach(function(a){h+='<div style="font-size:0.62rem;color:#FE2C55;margin-top:3px">⚠️ '+a+'</div>'})}
+    if(q.share_note){h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:5px">'+q.share_note+'</div>'}
+    h+='</div>';
+  }
 
   h+='</div>';  // result-grid
 

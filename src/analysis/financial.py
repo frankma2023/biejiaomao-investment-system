@@ -97,7 +97,7 @@ def dcf_valuation(stock_code, assumptions=None):
 
     # ── 股本 ──
     eq_row = db.execute('''SELECT capitalization FROM stock_equity_change
-        WHERE stock_code = ? ORDER BY date DESC LIMIT 1''',
+        WHERE stock_code = ? ORDER BY change_date DESC LIMIT 1''',
         (stock_code,)).fetchone()
     if eq_row and eq_row['capitalization']:
         shares = eq_row['capitalization']
@@ -292,7 +292,7 @@ def comps_analysis(stock_code, peer_codes=None):
         peer_codes = [p['stock_code'] for p in peers if p['stock_code']]
     else:
         # 申万: 同行业，按总市值降序取TOP20
-        peers = db.execute('''SELECT sw.stock_code FROM stock_sw_industry sw
+        peers = db.execute('''SELECT DISTINCT sw.stock_code FROM stock_sw_industry sw
             LEFT JOIN stock_equity_change eq ON sw.stock_code=eq.stock_code
             LEFT JOIN daily_kline k ON sw.stock_code=k.stock_code
                 AND k.date = (SELECT MAX(date) FROM daily_kline WHERE stock_code=sw.stock_code)
@@ -336,7 +336,7 @@ def comps_analysis(stock_code, peer_codes=None):
         price = k_row['close'] if k_row else None
         # 取股本
         eq_row = db.execute('''SELECT capitalization FROM stock_equity_change
-            WHERE stock_code = ? ORDER BY date DESC LIMIT 1''', (code,)).fetchone()
+            WHERE stock_code = ? ORDER BY change_date DESC LIMIT 1''', (code,)).fetchone()
         shares = eq_row['capitalization'] if eq_row else None
         # 取年报数据
         a = ann_data.get(code, {})
@@ -354,6 +354,7 @@ def comps_analysis(stock_code, peer_codes=None):
                 mult_data[code]['pe_ttm'] = round(mkt_cap / np, 1)
             if total_equity and total_equity > 0:
                 mult_data[code]['pb'] = round(mkt_cap / total_equity, 1)
+                mult_data[code]['total_equity'] = total_equity  # v1.2：真实净资产存下供 PB 估值
             if rev and rev > 0:
                 mult_data[code]['ps_ttm'] = round(mkt_cap / rev, 1)
 
@@ -390,7 +391,8 @@ def comps_analysis(stock_code, peer_codes=None):
         peers_table.append(row)
 
         if code != stock_code:
-            if pe: pe_vals.append(pe)
+            # v1.2：异常倍数过滤（PE>200 或 <0 多为微利/扭亏失真，污染中位数）
+            if pe and 0 < pe < 200: pe_vals.append(pe)
             if pb: pb_vals.append(pb)
             if ps: ps_vals.append(ps)
             if rg: rev_growth_vals.append(rg)
@@ -410,18 +412,19 @@ def comps_analysis(stock_code, peer_codes=None):
     # 目标公司数据
     target = peers_table[0] if peers_table else {}
     target_revenue = target.get('revenue', 0)
-    target_equity = target_revenue * 0.3  # 简化：净资产≈营收×30%
+    # v1.2：真实净资产（mult_data 已存 total_equity），替代营收×30% 粗糙假设
+    tgt_equity = (mult_data.get(stock_code, {}) or {}).get('total_equity')
 
-    # 估值
+    # 估值（单位：亿元，v1.2 修正——原 /10000 把亿元错算成万元级）
     valuations = {}
-    if med_pe and target.get('net_profit'):
+    if med_pe:
         np = ann_data.get(stock_code, {}).get('net_profit', 0) or 0
         if np > 0:
-            valuations['PE法'] = round(med_pe * np / 10000, 1)  # 亿
-    if med_pb:
-        valuations['PB法'] = round(med_pb * target_equity / 10000, 1)
+            valuations['PE法'] = round(med_pe * np / 1e8, 1)
+    if med_pb and tgt_equity:
+        valuations['PB法'] = round(med_pb * tgt_equity / 1e8, 1)
     if med_ps and target_revenue > 0:
-        valuations['PS法'] = round(med_ps * target_revenue / 10000, 1)
+        valuations['PS法'] = round(med_ps * target_revenue / 1e8, 1)
 
     avg_val = sum(valuations.values()) / len(valuations) if valuations else 0
 
@@ -430,6 +433,7 @@ def comps_analysis(stock_code, peer_codes=None):
         'name': name_map.get(stock_code, stock_code),
         'industry': industry_name,
         'method': 'Comparable Company Analysis',
+        'val_basis': '年报静态口径（非TTM）；PB法基于真实净资产',
         'peer_count': len(peer_codes),
         'peers': peers_table,
         'median_multiples': {'pe': round(med_pe, 1) if med_pe else None,
@@ -564,6 +568,33 @@ def three_statement_projection(stock_code, assumptions=None):
     base_revenue = annual['revenue']
     gm = (annual['gross_margin'] or 0) / 100.0
 
+    # ── v1.2 时效修复：整合最新季报（滚动TTM检测）──
+    # 盈利爆发期（如 002648 卫星化学 2026H1 净利+127%）若仍以年报为基准，
+    # 预测会严重低估（2026 预测 38.6亿 < H1 实际 62.3亿）。检测 TTM vs 年报偏差 >15%
+    # 时自动切换滚动基准，并校准毛利率为最新季度值，同时输出失真警示。
+    q_rows = db.execute('''SELECT report_date, revenue_single, net_profit_single,
+        gross_margin_single FROM stock_financials_quarterly
+        WHERE stock_code = ? ORDER BY report_date DESC LIMIT 4''', (stock_code,)).fetchall()
+    if len(q_rows) == 4:
+        ttm_rev = sum((r['revenue_single'] or 0) for r in q_rows)
+        ttm_np = sum((r['net_profit_single'] or 0) for r in q_rows)
+        ann_np = annual['net_profit'] or 0
+        if ann_np and abs(ttm_np - ann_np) / ann_np > 0.15 and ttm_rev > 0:
+            base_revenue = ttm_rev
+            latest_gm = q_rows[0]['gross_margin_single']
+            if latest_gm:
+                gm = latest_gm / 100.0
+            base_year_src = int(q_rows[0]['report_date'][:4])
+            warnings.append(
+                '⚠️ 盈利偏离年报 >15%，基准已自动切换为滚动TTM（整合最新季报）；'
+                f'TTM 净利 {ttm_np/1e8:.1f}亿 vs 年报 {ann_np/1e8:.1f}亿，'
+                '增长率假设需结合周期位置人工校准（勿直接外推）')
+            base_is_ttm = True
+        else:
+            base_is_ttm = False
+    else:
+        base_is_ttm = False
+
     # 真实 SG&A
     if ext and (ext['selling_expense'] or ext['admin_expense']):
         sga_pct = ((ext['selling_expense'] or 0) + (ext['admin_expense'] or 0)) / base_revenue
@@ -640,6 +671,7 @@ def three_statement_projection(stock_code, assumptions=None):
     return {
         'stock_code': stock_code, 'name': name, 'method': '3-Statement Projection',
         'base_year': base_year,
+        'base_basis': 'ttm_rolled' if base_is_ttm else 'annual',
         'base_growth': f'{base_g:.1f}%',
         'base_revenue': round(base_revenue, 1),
         'base_gross_margin': f'{gm*100:.1f}%',
@@ -679,3 +711,128 @@ if __name__ == '__main__':
         sys.exit(1)
 
     print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+# ═══════════════════════════════════════════
+# 5. 盈利质量警示 (Quality Analysis) —— v1.2 新增
+# 源自 financial-report-analysis-pro 核验纪律：剔一次性项 / 股数反推
+# ═══════════════════════════════════════════
+
+def quality_analysis(stock_code):
+    """盈利质量警示：扣非占比 / 一次性项检测 / 现金含量 / 股本核验"""
+    db = get_db()
+    q = db.execute('''SELECT report_date, net_profit_single, net_profit_adj_single,
+        net_profit_adj_yoy, free_cash_flow FROM stock_financials_quarterly
+        WHERE stock_code=? ORDER BY report_date DESC LIMIT 2''', (stock_code,)).fetchall()
+    name_row = db.execute('SELECT name FROM stock_basic WHERE stock_code=?', (stock_code,)).fetchone()
+    name = name_row['name'] if name_row else stock_code
+    ann = db.execute('''SELECT net_profit, net_profit_adj FROM stock_financials_annual
+        WHERE stock_code=? ORDER BY report_date DESC LIMIT 1''', (stock_code,)).fetchone()
+    eq = db.execute('''SELECT capitalization, change_date FROM stock_equity_change
+        WHERE stock_code=? ORDER BY change_date DESC LIMIT 1''', (stock_code,)).fetchone()
+    db.close()
+
+    alerts = []
+    flags = {}
+    latest = None
+    if q:
+        r = q[0]
+        np_ = r['net_profit_single'] or 0
+        adj = r['net_profit_adj_single']
+        if np_ and adj is not None:
+            ratio = adj / np_ * 100 if np_ else None
+            latest = {
+                'report_date': r['report_date'],
+                'net_profit': round(np_ / 1e8, 2),
+                'net_profit_adj': round(adj / 1e8, 2),
+                'adj_ratio': round(ratio, 1) if ratio is not None else None,
+            }
+            if ratio is not None and ratio < 90:
+                alerts.append(f'一次性项占比 >10%（扣非占比 {ratio:.0f}%）：盈利被非经常损益污染，用扣非口径')
+                flags['one_off'] = True
+            elif ratio is not None:
+                flags['one_off'] = False
+        if r['free_cash_flow'] and np_ and np_ > 0:
+            cash_ratio = r['free_cash_flow'] / np_
+            latest['fcf_np_ratio'] = round(cash_ratio, 2)
+            if cash_ratio < 0.5:
+                alerts.append(f'现金含量低（FCF/净利 {cash_ratio:.2f}）：利润含金量需警惕')
+    if ann:
+        a_np = ann['net_profit'] or 0
+        a_adj = ann['net_profit_adj']
+        if a_np and a_adj is not None:
+            ar = a_adj / a_np * 100
+            if ar < 90:
+                alerts.append(f'年报扣非占比 {ar:.0f}%（一次性项影响年度盈利）')
+    # 股数核验：净利/股本 = 每股净利（无披露 EPS 时至少验证股本存在与数量级）
+    share_note = None
+    if eq and eq['capitalization'] and latest:
+        eps_implied = latest['net_profit'] * 1e8 / eq['capitalization']
+        share_note = f'股本 {eq["capitalization"]/1e8:.2f} 亿股（{eq["change_date"]}）；隐含EPS {eps_implied:.2f} 元（净利/股本，非披露值）'
+    return {
+        'stock_code': stock_code, 'name': name, 'method': 'Earnings Quality Check',
+        'latest': latest, 'alerts': alerts, 'flags': flags, 'share_note': share_note,
+    }
+
+
+# ═══════════════════════════════════════════
+# 6. 现金流与股东回报 (Cashflow & Returns) —— v1.2 新增
+# ═══════════════════════════════════════════
+
+def cashflow_analysis(stock_code):
+    """现金流与股东回报：FCF自算核验 / 经营现金流 / 资本配置 / 股本变动"""
+    db = get_db()
+    qs = db.execute('''SELECT report_date, free_cash_flow FROM stock_financials_quarterly
+        WHERE stock_code=? ORDER BY report_date DESC LIMIT 6''', (stock_code,)).fetchall()
+    ann = db.execute('''SELECT report_date, operating_cash_flow, free_cash_flow,
+        revenue FROM stock_financials_annual
+        WHERE stock_code=? ORDER BY report_date DESC LIMIT 2''', (stock_code,)).fetchall()
+    eqs = db.execute('''SELECT change_date, capitalization, change_reason
+        FROM stock_equity_change WHERE stock_code=? ORDER BY change_date DESC LIMIT 3''', (stock_code,)).fetchall()
+    name_row = db.execute('SELECT name FROM stock_basic WHERE stock_code=?', (stock_code,)).fetchone()
+    name = name_row['name'] if name_row else stock_code
+    # v1.2 bugfix：上年同期 FCF（必须在 db.close 前查）
+    prev_y_cum = None
+    if qs:
+        this_d = qs[0]['report_date']
+        last_y = f'{int(this_d[:4]) - 1}{this_d[4:]}'
+        r2 = db.execute('''SELECT free_cash_flow FROM stock_financials_quarterly
+            WHERE stock_code=? AND report_date=?''', (stock_code, last_y)).fetchone()
+        prev_y_cum = r2['free_cash_flow'] / 1e8 if r2 and r2['free_cash_flow'] else None
+    db.close()
+
+    # FCF：理杏仁 quarterly free_cash_flow 为年内累计（单调递增已验证）
+    q_list = list(reversed(qs))
+    fcf_series = []
+    prev = None
+    for r in q_list:
+        if r['free_cash_flow'] is None:
+            continue
+        if prev is not None:
+            fcf_series.append({'report_date': r['report_date'], 'fcf_cum': round(r['free_cash_flow'] / 1e8, 1),
+                               'fcf_qoq_inc': round((r['free_cash_flow'] - prev) / 1e8, 1)})
+        prev = r['free_cash_flow']
+    latest_cum = qs[0]['free_cash_flow'] / 1e8 if qs and qs[0]['free_cash_flow'] else None
+
+    # 年度口径
+    ann_list = []
+    for a in ann:
+        ocf = a['operating_cash_flow']
+        fcf = a['free_cash_flow']
+        capex = (ocf - fcf) / 1e8 if ocf and fcf is not None else None
+        ann_list.append({'year': a['report_date'][:4], 'ocf': round(ocf / 1e8, 1) if ocf else None,
+                         'fcf': round(fcf / 1e8, 1) if fcf is not None else None,
+                         'capex_est': round(capex, 1) if capex is not None else None})
+    # 股本变动
+    eq_changes = [{'date': e['change_date'], 'cap': e['capitalization'] / 1e8 if e['capitalization'] else None,
+                   'reason': e['change_reason']} for e in eqs]
+    return {
+        'stock_code': stock_code, 'name': name, 'method': 'Cashflow & Shareholder Returns',
+        'fcf_latest_cum': round(latest_cum, 1) if latest_cum is not None else None,
+        'fcf_report_date': qs[0]['report_date'] if qs else None,
+        'fcf_yoy': round((latest_cum / prev_y_cum - 1) * 100, 1) if latest_cum is not None and prev_y_cum else None,
+        'fcf_series': fcf_series,
+        'annual': ann_list,
+        'equity_changes': eq_changes,
+        'note': 'FCF为理杏仁累计口径（年内单调累计）；资本开支=OCF-FCF估算',
+    }

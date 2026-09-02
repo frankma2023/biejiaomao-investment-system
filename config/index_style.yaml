@@ -851,7 +851,7 @@ categories:
     name: 碳中和ETF广发
   - code: '159690'
     name: 有色矿业ETF招商
-  - code: '515790'
+  - code: '512760'
     name: 芯片ETF国泰
   - code: '515790'
     name: 光伏ETF华泰柏瑞
@@ -867,3 +867,9 @@ categories:
     name: 有色ETF
   - code: '510170'
     name: 大宗商品ETF国联安
+  - code: '512000'
+    name: 券商ETF华宝
+  - code: '159934'
+    name: 黄金ETF易方达
+  - code: '159326'
+    name: 电网设备ETF华夏
