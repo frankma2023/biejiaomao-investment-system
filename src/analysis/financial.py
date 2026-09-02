@@ -403,6 +403,9 @@ def comps_analysis(stock_code, peer_codes=None):
     names = db.execute(f'''SELECT stock_code, name FROM stock_basic
         WHERE stock_code IN ({ph2})''', all_codes).fetchall()
     name_map = {n['stock_code']: n['name'] for n in names}
+    # B1：目标公司 TTM 分子（近4季滚动；db 关闭前查）
+    tgt_tq = db.execute('''SELECT revenue_single, net_profit_single FROM stock_financials_quarterly
+        WHERE stock_code=? ORDER BY report_date DESC LIMIT 4''', (stock_code,)).fetchall()
     db.close()
 
     # 构建可比表格
@@ -457,10 +460,8 @@ def comps_analysis(stock_code, peer_codes=None):
     tgt_equity = (mult_data.get(stock_code, {}) or {}).get('total_equity')
 
     # 估值（单位：亿元；v1.3：目标分子同口径 TTM——med_TTM倍数 × TTM绝对值，避免"TTM倍数×年报绝对值"混搭低估 40%）
-    tq = db.execute('''SELECT revenue_single, net_profit_single FROM stock_financials_quarterly
-        WHERE stock_code=? ORDER BY report_date DESC LIMIT 4''', (stock_code,)).fetchall()
-    ttm_target_rev = sum((r['revenue_single'] or 0) for r in tq) if len(tq) == 4 else None
-    ttm_target_np = sum((r['net_profit_single'] or 0) for r in tq) if len(tq) == 4 else None
+    ttm_target_rev = sum((r['revenue_single'] or 0) for r in tgt_tq) if len(tgt_tq) == 4 else None
+    ttm_target_np = sum((r['net_profit_single'] or 0) for r in tgt_tq) if len(tgt_tq) == 4 else None
     ann_target_np = ann_data.get(stock_code, {}).get('net_profit', 0) or 0
     valuations = {}
     pe_base_np = ttm_target_np if ttm_target_np and ttm_target_np > 0 else (ann_target_np if ann_target_np > 0 else None)
