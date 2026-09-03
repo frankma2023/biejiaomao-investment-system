@@ -670,9 +670,11 @@ function renderEval(data){
   h+='<div class="metric-item"><div class="val">'+(mm.pe||'—')+'x</div><div class="lbl">中位PE</div></div>';
   h+='<div class="metric-item"><div class="val">'+(mm.pb||'—')+'x</div><div class="lbl">中位PB</div></div>';
   h+='<div class="metric-item"><div class="val">'+(mm.ps||'—')+'x</div><div class="lbl">中位PS</div></div>';
-  if(c.val_basis){h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:4px">口径：'+c.val_basis+'</div>'}
   h+='</div>';
-  if(c.peers&&c.peers.length>1){h+='<table class="mini-table" style="margin-top:8px"><tr><th>公司</th><th>近4季营收合计</th><th>增长(滚动同比)</th><th>PE(TTM)</th><th>PB</th></tr>';c.peers.slice(0,6).forEach(function(p){var isSelf=p.code===code;h+='<tr'+(isSelf?' style="background:rgba(254,44,85,0.04);font-weight:700"':'')+'><td>'+(isSelf?'▶ ':'')+p.name+'</td><td class="mono">'+fmtNum(p.revenue)+'</td><td class="mono">'+(p.revenue_growth||'—')+'%</td><td class="mono">'+(p.pe||'—')+'</td><td class="mono">'+(p.pb||'—')+'</td></tr>'});h+='</table><div style="font-size:0.55rem;color:var(--muted);margin-top:3px">* 滚动同比 = 近4季合计 ÷ 再前4季合计 − 1（一整年比一整年，窗口随季前移，非单季非环比）；毛利率同为近4季口径；ROE/无季报股回退年报</div>'}  h+='</div>';
+  if(c.peers&&c.peers.length>1){h+='<table class="mini-table" style="margin-top:8px"><tr><th>公司</th><th>近4季营收合计</th><th>增长(滚动同比)</th><th>PE(TTM)</th><th>PB</th></tr>';c.peers.slice(0,6).forEach(function(p){var isSelf=p.code===code;h+='<tr'+(isSelf?' style="background:rgba(254,44,85,0.04);font-weight:700"':'')+'><td>'+(isSelf?'▶ ':'')+p.name+'</td><td class="mono">'+fmtNum(p.revenue)+'</td><td class="mono">'+(p.revenue_growth||'—')+'%</td><td class="mono">'+(p.pe||'—')+'</td><td class="mono">'+(p.pb||'—')+'</td></tr>'});h+='</table>'}
+  h+='<div style="font-size:0.55rem;color:var(--muted);margin-top:4px">* 滚动同比 = 近4季合计 ÷ 再前4季合计 − 1（一整年比一整年，窗口随季前移，非单季非环比）；毛利率同为近4季口径；ROE/无季报股回退年报</div>';
+  if(c.val_basis){h+='<div style="font-size:0.55rem;color:var(--muted);margin-top:3px">* 口径：'+c.val_basis+'</div>'}
+  h+='</div>';
 
   // ═══ Earnings ═══
   var lt=e.latest||{};
