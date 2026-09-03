@@ -146,6 +146,29 @@ async function load() {
       redHtml += '</div>';
     });
     redHtml += '</div>';
+    // 2026-09-03 定投回测结论（一次性/标准/RSI/估值四策略 + 起点敏感性 + 实操纪律）
+    redHtml += '<div class="section-hdr">📊 红利指数怎么投：定投策略回测结论（2026-09-03）</div>';
+    redHtml += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
+    redHtml += '<div style="font-weight:600;color:var(--text-primary)">一、背景：RSI 择时争论的两派都对，只是错位</div>';
+    redHtml += '<div style="padding-left:14px;color:var(--muted)">市场争论“红利该不该用 RSI 逢低买”：论点派主张红利有股息率锤（涨多了自然回调、跌深了收益资金接手），回测派证明 RSI 定投不优于标准定投。两派其实都成立——机制的载体选错了工具：<b style="color:#ef4444">红利适合“温度计”（月/年级估值锤），不适合“秒表”（日线动量）</b>。</div>';
+    redHtml += '<div style="font-weight:600;color:var(--text-primary);margin-top:6px">二、四策略回测（H30269 红利低波全收益 · 2017-2026 · 100万 · 116期月度）</div>';
+    redHtml += '<table style="width:100%;border-collapse:collapse;font-size:0.66rem;margin:4px 0"><tr style="color:var(--muted)"><th style="padding:4px 6px;border-bottom:1px solid var(--border);text-align:left">策略</th><th style="padding:4px 6px;border-bottom:1px solid var(--border);text-align:right">期末资产</th><th style="padding:4px 6px;border-bottom:1px solid var(--border);text-align:right">年化</th><th style="padding:4px 6px;border-bottom:1px solid var(--border);text-align:right">实际投入IRR</th></tr>';
+    redHtml += '<tr><td style="padding:3px 6px;border-bottom:1px solid var(--border)">一次性买入（基准）</td><td style="padding:3px 6px;border-bottom:1px solid var(--border);text-align:right"><b style="color:#ef4444">230.3万</b></td><td style="padding:3px 6px;border-bottom:1px solid var(--border);text-align:right">9.01%</td><td style="padding:3px 6px;border-bottom:1px solid var(--border);text-align:right">9.01%</td></tr>';
+    redHtml += '<tr><td style="padding:3px 6px;border-bottom:1px solid var(--border)">标准定投（期期全投）</td><td style="padding:3px 6px;border-bottom:1px solid var(--border);text-align:right">160.7万</td><td style="padding:3px 6px;border-bottom:1px solid var(--border);text-align:right">5.03%</td><td style="padding:3px 6px;border-bottom:1px solid var(--border);text-align:right">9.50%</td></tr>';
+    redHtml += '<tr><td style="padding:3px 6px;border-bottom:1px solid var(--border)">RSI定投（RSI14&lt;40才买）</td><td style="padding:3px 6px;border-bottom:1px solid var(--border);text-align:right">118.4万</td><td style="padding:3px 6px;border-bottom:1px solid var(--border);text-align:right">1.77%</td><td style="padding:3px 6px;border-bottom:1px solid var(--border);text-align:right"><b style="color:#ef4444">27.79%</b></td></tr>';
+    redHtml += '<tr><td style="padding:3px 6px;border-bottom:1px solid var(--border)">估值定投（股息率分位调度）</td><td style="padding:3px 6px;border-bottom:1px solid var(--border);text-align:right"><b style="color:#ef4444">179.3万</b></td><td style="padding:3px 6px;border-bottom:1px solid var(--border);text-align:right">6.23%</td><td style="padding:3px 6px;border-bottom:1px solid var(--border);text-align:right">10.43%</td></tr>';
+    redHtml += '</table>';
+    redHtml += '<div style="padding-left:14px;color:var(--muted)">① RSI 定投输在<b>资金利用率黑洞</b>：信号本身准（低位买入每笔都赚，IRR 27.8% 全场最高），但 116 月只触发 32 次，10 年仅投出 27.6 万——72 万现金闲置。阈值放宽收益单调上升（&lt;40→&lt;60：118→142 万）：<b style="color:var(--text-primary)">RSI 定投的损失全部来自等待（踏空），而非信号失效</b>。② 估值定投是唯一跑赢标准定投的规则（+11.6%）：便宜月（分位≥75%）双倍投，把贵月省下的钱砸进低位——<b style="color:var(--text-primary)">价值锤调度把“等待”变“攒弹药”，动量锤把“等待”变“踏空”</b>。③ 定投 IRR 9.5% ≈ 一次性 9.0%：<b style="color:var(--text-primary)">定投输的不是买入能力，是钱分批在场的时间</b>。</div>';
+    redHtml += '<div style="font-weight:600;color:var(--text-primary);margin-top:6px">三、一次性买入 8 起点（2017-2024）全胜——但不是“无脑”，有三个前提</div>';
+    redHtml += '<div style="padding-left:14px;color:var(--muted)">全胜源于资产结构：股息率锤 = 自动泡沫上限，红利低波几乎没有“高位套牢十年”的场景，长期收益均值回归强——择时与分批没有发挥空间。前提：① <b style="color:var(--text-primary)">存量长钱</b>（10 年不动用；工资现金流者无一次性选项）；② <b style="color:var(--text-primary)">回撤全程扛</b>（2018 约 -20%、2024 后 15%+ 级别回调）；③ <b style="color:var(--text-primary)">入场时点先过估值</b>（回测起点都在便宜/合理区；PE 分位 &gt;80% 的极值带不在该规律样本内）。</div>';
+    redHtml += '<div style="font-weight:600;color:var(--text-primary);margin-top:6px">四、可执行纪律（存量资金 · 当前 2026-09 为高位临界区）</div>';
+    redHtml += '<div style="padding-left:14px;color:var(--muted)">当前红利低波距 250 日高点仅 3%、PE 分位 79%（临界）、股息率分位 27%（历史偏低）；PE 绝对值 8.6、PB 0.88、股息 4.27%、息差 2.6pp——<b style="color:var(--text-primary)">不是坏时机，但是“高位临界”窗口，不是“任意起点都赢”的代表起点</b>。</div>';
+    redHtml += '<div style="padding-left:14px;color:var(--text-primary)">▶ 现在投入 40-60%（吃绝对收益与息差保护，回调有股息垫底）</div>';
+    redHtml += '<div style="padding-left:14px;color:var(--muted)">▶ 余 40-60% 等两类信号：a) 回撤 -10~15% 或股息率分位回升至 50%+；b) 时间上限——一年内不回调则按估值定投规则 12 个月投完（防踏空）</div>';
+    redHtml += '<div style="padding-left:14px;color:var(--muted)">▶ 之后长持 + 年度再平衡，不做日/月频择时（战术再平衡回测同样证明：择时在红利上是负贡献）</div>';
+    redHtml += '<div style="background:rgba(239,68,68,.05);border-radius:8px;padding:8px 12px;margin-top:6px;color:var(--text-primary);font-weight:600">一句话：红利适合“温度计”不适合“秒表”；存量长钱早投入优于一切分批，但要在估值分位合理的窗口投入——当前临界区，用保险丝结构分批。这是资产结构决定的长赢逻辑，不是找买卖点的博弈。</div>';
+    redHtml += '<div style="font-size:0.6rem;color:var(--muted);margin-top:8px">ⓘ 本结论基于系统自有数据回测（H30269 全收益 2016-2026，脚本 analysis/dca_rsi_vs_valuation.py + dca_start_sensitivity.py，2026-09-03 生成）。数据窗口有限、市场结构会变，未来积累更多数据后若产生新结论，将与此处结论并列展示、相互印证。</div>';
+    redHtml += '</div>';
 
     // 自由现金流（多指数：980092 + 932365）
     const fcfList = (fa && fa.indices && fa.indices.length) ? fa.indices : (fa && fa.code ? [fa] : []);
