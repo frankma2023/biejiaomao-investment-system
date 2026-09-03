@@ -403,6 +403,13 @@ def comps_analysis(stock_code, peer_codes=None):
     names = db.execute(f'''SELECT stock_code, name FROM stock_basic
         WHERE stock_code IN ({ph2})''', all_codes).fetchall()
     name_map = {n['stock_code']: n['name'] for n in names}
+    # v1.3.1：peers 全行 TTM 口径——批量取各 code 季度营收/毛利率（近4季 vs 再前4季）
+    qall = db.execute(f'''SELECT stock_code, report_date, revenue_single, gross_margin_single
+        FROM stock_financials_quarterly WHERE stock_code IN ({ph2})
+        ORDER BY stock_code, report_date DESC''', all_codes).fetchall()
+    ttm_map = {}
+    for r in qall:
+        ttm_map.setdefault(r['stock_code'], []).append(r)
     # B1：目标公司 TTM 分子（近4季滚动；db 关闭前查）
     tgt_tq = db.execute('''SELECT revenue_single, net_profit_single FROM stock_financials_quarterly
         WHERE stock_code=? ORDER BY report_date DESC LIMIT 4''', (stock_code,)).fetchall()
@@ -412,6 +419,21 @@ def comps_analysis(stock_code, peer_codes=None):
     def get_metric(code, mkey, fmt='.1f'):
         v = mult_data.get(code, {}).get(mkey)
         return round(v, 1) if v else None
+
+    def ttm_stats(code):
+        """近4季 vs 再前4季：营收/TTM同比/毛利率（无季报回退 None）"""
+        rows = ttm_map.get(code, [])
+        r4 = rows[:4] if len(rows) >= 4 else []
+        r8 = rows[4:8] if len(rows) >= 8 else []
+        rev4 = sum((x['revenue_single'] or 0) for x in r4)
+        rev8 = sum((x['revenue_single'] or 0) for x in r8)
+        if not r4 or rev4 <= 0:
+            return None, None, None
+        yoy = round((rev4 / rev8 - 1) * 100, 1) if r8 and rev8 > 0 else None
+        # TTM 毛利率 ≈ 近4季毛利和/营收和（按单季毛利率×营收加权）
+        wsum = sum(((x['gross_margin_single'] or 0) * (x['revenue_single'] or 0)) for x in r4)
+        gm_ttm = round(wsum / rev4, 1) if wsum and wsum > 0 else None
+        return round(rev4, 1), yoy, gm_ttm
 
     peers_table = []
     pe_vals, pb_vals, ps_vals, rev_growth_vals, roe_vals = [], [], [], [], []
@@ -423,12 +445,15 @@ def comps_analysis(stock_code, peer_codes=None):
         ps = get_metric(code, 'ps_ttm')
         rg = a.get('revenue_yoy')
         roe_val = a.get('roe')
+        rev_ttm, yoy_ttm, gm_ttm = ttm_stats(code)
 
         row = {
             'code': code, 'name': name_map.get(code, code),
-            'revenue': round(a.get('revenue', 0) or 0, 1),
-            'revenue_growth': round(rg, 1) if rg else None,
-            'gross_margin': round(a.get('gross_margin', 0) or 0, 1),
+            # v1.3.1：营收/增长/毛利率 TTM 口径（同 PE 列一致），无季报回退年报
+            'revenue': rev_ttm if rev_ttm else round(a.get('revenue', 0) or 0, 1),
+            'revenue_growth': yoy_ttm if yoy_ttm is not None else (round(rg, 1) if rg else None),
+            'growth_basis': 'ttm' if yoy_ttm is not None else ('annual' if rg else None),
+            'gross_margin': gm_ttm if gm_ttm is not None else round(a.get('gross_margin', 0) or 0, 1),
             'roe': round(roe_val, 1) if roe_val else None,
             'pe': pe, 'pb': pb, 'ps': ps,
         }

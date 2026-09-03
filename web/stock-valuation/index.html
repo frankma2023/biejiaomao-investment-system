@@ -594,8 +594,7 @@ function renderEval(data){
   h+='<div class="metric-item"><div class="val">'+(mm.ps||'—')+'x</div><div class="lbl">中位PS</div></div>';
   if(c.val_basis){h+='<div style="font-size:0.58rem;color:var(--muted);margin-top:4px">口径：'+c.val_basis+'</div>'}
   h+='</div>';
-  if(c.peers&&c.peers.length>1){h+='<table class="mini-table" style="margin-top:8px"><tr><th>公司</th><th>营收</th><th>增长</th><th>PE</th><th>PB</th></tr>';c.peers.slice(0,6).forEach(function(p){var isSelf=p.code===code;h+='<tr'+(isSelf?' style="background:rgba(254,44,85,0.04);font-weight:700"':'')+'><td>'+(isSelf?'▶ ':'')+p.name+'</td><td class="mono">'+fmtNum(p.revenue)+'</td><td class="mono">'+(p.revenue_growth||'—')+'%</td><td class="mono">'+(p.pe||'—')+'</td><td class="mono">'+(p.pb||'—')+'</td></tr>'});h+='</table>'}
-  h+='</div>';
+  if(c.peers&&c.peers.length>1){h+='<table class="mini-table" style="margin-top:8px"><tr><th>公司</th><th>营收(TTM)</th><th>增长(TTM同比)</th><th>PE(TTM)</th><th>PB</th></tr>';c.peers.slice(0,6).forEach(function(p){var isSelf=p.code===code;h+='<tr'+(isSelf?' style="background:rgba(254,44,85,0.04);font-weight:700"':'')+'><td>'+(isSelf?'▶ ':'')+p.name+'</td><td class="mono">'+fmtNum(p.revenue)+'</td><td class="mono">'+(p.revenue_growth||'—')+'%</td><td class="mono">'+(p.pe||'—')+'</td><td class="mono">'+(p.pb||'—')+'</td></tr>'});h+='</table><div style="font-size:0.55rem;color:var(--muted);margin-top:3px">* 营收/增长/毛利率为近4季 TTM 口径（同比再前4季）；ROE 为年报；估值列理杏仁每日 TTM</div>'}  h+='</div>';
 
   // ═══ Earnings ═══
   var lt=e.latest||{};
