@@ -4929,6 +4929,51 @@ def api_quarterly_fcf():
     })
 
 
+@app.route('/api/quarterly-financials')
+def api_quarterly_financials():
+    """个股季度营收/净利 + TTM 滚动 + 年度净利（供盈利质量 tab 柱+线图）
+    单季营收=revenue_single、单季净利=net_profit_single；TTM=近4季滚动合计（前3季为 null）；年度净利=年报"""
+    code = request.args.get('code', '600519')
+    db = get_db()
+    rows = db.execute('''SELECT report_date, revenue_single, net_profit_single
+        FROM stock_financials_quarterly
+        WHERE stock_code=? AND (revenue_single IS NOT NULL OR net_profit_single IS NOT NULL)
+        ORDER BY report_date''', (code,)).fetchall()
+    if len(rows) > 80:
+        rows = rows[-80:]
+    dates, rev_s, np_s, rev_ttm, np_ttm = [], [], [], [], []
+    for i, r in enumerate(rows):
+        d = r['report_date']
+        rv = (r['revenue_single'] or 0) / 1e8
+        nv = (r['net_profit_single'] or 0) / 1e8
+        dates.append(d)
+        rev_s.append(round(rv, 1)); np_s.append(round(nv, 1))
+        if i >= 3:  # 近4季滚动
+            w = rows[i-3:i+1]
+            if all((x['revenue_single'] is not None or x['revenue_single'] == 0) for x in w):
+                rev_ttm.append(round(sum((x['revenue_single'] or 0) for x in w) / 1e8, 1))
+            else:
+                rev_ttm.append(None)
+            if all(x['net_profit_single'] is not None for x in w):
+                np_ttm.append(round(sum((x['net_profit_single'] or 0) for x in w) / 1e8, 1))
+            else:
+                np_ttm.append(None)
+        else:
+            rev_ttm.append(None); np_ttm.append(None)
+    arows = db.execute('''SELECT report_date, net_profit FROM stock_financials_annual
+        WHERE stock_code=? AND net_profit IS NOT NULL ORDER BY report_date''', (code,)).fetchall()
+    if len(arows) > 12:
+        arows = arows[-12:]
+    return jsonify({
+        'code': code,
+        'dates': dates,
+        'rev_single': rev_s, 'np_single': np_s,
+        'rev_ttm': rev_ttm, 'np_ttm': np_ttm,
+        'annual_dates': [r['report_date'] for r in arows],
+        'annual_np': [round((r['net_profit'] or 0) / 1e8, 1) for r in arows],
+    })
+
+
 @app.route('/api/stock-financials')
 def api_stock_financials():
     """个股年度财务数据：ROE/毛利率/净利率/EPS/营收增速/净利增速/FCF/资产负债率等"""

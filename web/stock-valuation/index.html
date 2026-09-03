@@ -78,6 +78,9 @@ html[data-theme] .down{color:#10b981!important}
   <!-- Tab2: 盈利质量 -->
   <div class="tab-content" id="tab-profit">
     <div class="chart-grid">
+      <div class="chart-card"><div class="chart-title">季度营业收入（亿）<span style="font-size:9px;color:var(--muted)">柱=单季 · 线=近4季TTM</span></div><div id="chart-qrev" style="height:300px"></div><div id="text-qrev" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="chart-title">季度净利润（亿）<span style="font-size:9px;color:var(--muted)">柱=单季 · 线=近4季TTM</span></div><div id="chart-qnp" style="height:300px"></div><div id="text-qnp" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="chart-title">年度净利润（亿）</div><div id="chart-anp" style="height:300px"></div><div id="text-anp" class="analysis-text"></div></div>
       <div class="chart-card"><div class="chart-title">ROE (%)</div><div id="chart-roe" style="height:260px"></div><div id="text-roe" class="analysis-text"></div></div>
       <div class="chart-card"><div class="chart-title">EPS（元）</div><div id="chart-eps" style="height:260px"></div><div id="text-eps" class="analysis-text"></div></div>
       <div class="chart-card"><div class="chart-title">净利增速（%）</div><div id="chart-peg" style="height:260px"></div><div id="text-peg" class="analysis-text"></div></div>
@@ -247,6 +250,7 @@ async function loadFinancials(code){
   var resp=await fetch(API+'/api/stock-financials?code='+code);
   var d=await resp.json();
   if(!d.dates||!d.dates.length)return;
+  loadQuarterlyFin(code);  // v1.3.2：季度营收/净利+TTM线+年度净利 3 图
   buildBar('chart-roe','ROE %',d.dates,d.roe,'#4ECDC4');genFText('text-roe','ROE',d.roe,'%');
   buildBar('chart-eps','EPS',d.dates,d.eps,'#FF6B6B');genFText('text-eps','EPS',d.eps,'元');
   buildBar('chart-peg','净利增速 %',d.dates,d.net_profit_yoy,'#8B5CF6');genFText('text-peg','净利增速',d.net_profit_yoy,'%');
@@ -372,6 +376,80 @@ function buildBigBar(id,name,dates,vals,unit){
       {name:'均值',type:'line',data:vals.map(function(){return (avg/1e8).toFixed(1)}),symbol:'none',lineStyle:{color:'#E8A838',width:1,type:'dashed'}}
     ]
   });dom._echart=ch;
+}
+// v1.3.2：柱(单季)+线(TTM滚动)混合图；柱色按正负（盈利红/亏损绿，A股语义）
+function buildBarTTM(id, title, dates, bars, ttm, barPos, barNeg, ttmColor){
+  var dom=document.getElementById(id);if(dom._echart)dom._echart.dispose();
+  var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark';
+  var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
+  var ttmData=[];
+  for(var i=0;i<dates.length;i++){var t=ttm[i];ttmData.push(t!=null?t:null)}
+  ch.setOption({
+    backgroundColor:'transparent',
+    tooltip:{trigger:'axis',formatter:function(ps){
+      var n=ps[0].name,h='<b>'+n+'</b><br/>';
+      ps.forEach(function(x){if(x.value!=null)h+=x.marker+x.seriesName+': '+x.value+'亿<br/>'});
+      return h;
+    }},
+    legend:{data:[title,'TTM近4季'],bottom:2,textStyle:{color:tx,fontSize:9},itemWidth:12,itemHeight:8},
+    grid:{left:'12%',right:'4%',top:10,bottom:34},
+    xAxis:{type:'category',data:dates,axisLabel:{color:tx,fontSize:9,interval:Math.max(0,Math.floor(dates.length/12)-1)},axisLine:{lineStyle:{color:sp}}},
+    yAxis:{type:'value',axisLabel:{color:tx,fontSize:9,formatter:function(v){return v+'亿'}},splitLine:{lineStyle:{color:sp}}},
+    series:[
+      {name:title,type:'bar',barWidth:'45%',data:bars.map(function(v){return v!=null?v:null}),
+        itemStyle:{borderRadius:[3,3,0,0],color:function(p){return p.value!=null&&p.value<0?barNeg:barPos}},
+        label:{show:false}},
+      {name:'TTM近4季',type:'line',data:ttmData,symbol:'none',lineStyle:{color:ttmColor,width:2},
+        label:{show:false}}
+    ]
+  });dom._echart=ch;
+}
+function buildAnnualBar(id, dates, vals, unit){
+  // 年度净利柱（盈利红/亏损绿）+ 均值虚线
+  var dom=document.getElementById(id);if(dom._echart)dom._echart.dispose();
+  var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark';
+  var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
+  var vv=vals.filter(function(v){return v!=null}),avg=vv.reduce(function(a,b){return a+b},0)/vv.length;
+  ch.setOption({
+    backgroundColor:'transparent',tooltip:{trigger:'axis',formatter:function(p){var x=p[0];return x.name+'<br/>'+x.marker+'净利润: '+(x.value!=null?x.value+'亿':'—')}},
+    grid:{left:'12%',right:'4%',top:10,bottom:34},
+    xAxis:{type:'category',data:dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
+    yAxis:{type:'value',axisLabel:{color:tx,fontSize:9,formatter:function(v){return v+unit}},splitLine:{lineStyle:{color:sp}}},
+    series:[
+      {name:'净利润',type:'bar',barWidth:'45%',data:vals.map(function(v){return v!=null?v:null}),
+        itemStyle:{borderRadius:[3,3,0,0],color:function(p){return p.value!=null&&p.value<0?'#10b981':'#ef4444'}},
+        label:{show:true,position:'top',color:tx,fontSize:9,formatter:function(p){return p.value!=null?p.value:' '}}},
+      {name:'均值',type:'line',data:vals.map(function(){return avg}),symbol:'none',lineStyle:{color:'#E8A838',width:1,type:'dashed'}}
+    ]
+  });dom._echart=ch;
+}
+// 盈利质量 tab 新增 3 图（季度营收/净利 + TTM线 + 年度净利）
+async function loadQuarterlyFin(code){
+  try{
+    var resp=await fetch(API+'/api/quarterly-financials?code='+code);
+    var d=await resp.json();
+    if(!d.dates||!d.dates.length)return;
+    var qLabels=d.dates.map(function(x){var y=x.substring(2,4);var q=parseInt(x.substring(5,7));return '\''+y+'Q'+((q-1)/3+1)});
+    buildBarTTM('chart-qrev','季度营收',qLabels,d.rev_single,d.rev_ttm,'#539BF5','#2d6cdf','#E8A838');
+    buildBarTTM('chart-qnp','季度净利',qLabels,d.np_single,d.np_ttm,'#ef4444','#10b981','#8B5CF6');
+    // 文字：最新单季 + TTM + 同比
+    var rv=d.rev_single,np=d.np_single;
+    var lrv=null,lnp=null,i;
+    for(i=rv.length-1;i>=0;i--){if(rv[i]!=null){lrv=rv[i];break}}
+    for(i=np.length-1;i>=0;i--){if(np[i]!=null){lnp=np[i];break}}
+    var rt=d.rev_ttm,nt=d.np_ttm,lrt=null,lnt=null;
+    for(i=rt.length-1;i>=0;i--){if(rt[i]!=null){lrt=rt[i];break}}
+    for(i=nt.length-1;i>=0;i--){if(nt[i]!=null){lnt=nt[i];break}}
+    if(lrv!=null)document.getElementById('text-qrev').innerHTML='<b>最新单季营收：</b>'+lrv+'亿，<b>TTM近4季：</b>'+(lrt!=null?lrt:'—')+'亿（柱体叠加可见TTM窗口随季度滚动）';
+    if(lnp!=null)document.getElementById('text-qnp').innerHTML='<b>最新单季净利：</b>'+lnp+'亿，<b>TTM近4季：</b>'+(lnt!=null?lnt:'—')+'亿';
+    // 年度净利
+    if(d.annual_np&&d.annual_np.length){
+      var ay=d.annual_dates.map(function(x){return x.substring(0,4)});
+      buildAnnualBar('chart-anp',ay,d.annual_np,'亿');
+      var an=d.annual_np.filter(function(v){return v!=null});
+      if(an.length)document.getElementById('text-anp').innerHTML='<b>最近年度净利：</b>'+an[an.length-1]+'亿，近'+an.length+'年均值 '+ (an.reduce(function(a,b){return a+b},0)/an.length).toFixed(1)+' 亿';
+    }
+  }catch(e){console.error('quarterly-financials failed',e)}
 }
 function genFText(id,name,vals,unit){
   var vv=vals.filter(function(v){return v!=null});if(!vv.length){document.getElementById(id).innerHTML='';return}
