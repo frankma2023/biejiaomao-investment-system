@@ -429,7 +429,7 @@ async function loadQuarterlyFin(code){
     var resp=await fetch(API+'/api/quarterly-financials?code='+code);
     var d=await resp.json();
     if(!d.dates||!d.dates.length)return;
-    var qLabels=d.dates.map(function(x){var y=x.substring(2,4);var q=parseInt(x.substring(5,7));return '\''+y+'Q'+((q-1)/3+1)});
+    var qLabels=d.dates.map(function(x){var y=x.substring(2,4);var m=parseInt(x.substring(5,7));return '\''+y+'Q'+Math.ceil(m/3)});  // 9月→Q3：ceil(9/3)=3
     buildBarTTM('chart-qrev','季度营收',qLabels,d.rev_single,d.rev_ttm,'#539BF5','#2d6cdf','#E8A838');
     buildBarTTM('chart-qnp','季度净利',qLabels,d.np_single,d.np_ttm,'#ef4444','#10b981','#8B5CF6');
     // 文字：最新单季 + TTM + 同比
