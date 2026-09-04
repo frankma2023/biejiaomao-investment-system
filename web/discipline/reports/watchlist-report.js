@@ -86,7 +86,7 @@
     const kindTag = card.kind === 'index' ? '<span class="kind-tag">指数</span>' : card.kind === 'etf' ? '<span class="kind-tag">ETF</span>' : '';
     const err = card.error ? '<div class="err-line">⚠️ ' + esc(card.error) + '</div>' : '';
     const chg = card.change_pct != null
-      ? '<span style="color:' + (card.change_pct >= 0 ? '#ef4444' : '#10b981') + '">' + pct(card.change_pct) + '</span>' : '';
+      ? '<span style="color:' + (card.change_pct >= 0 ? '#ef4444' : '#10b981') + '">' + pct(card.change_pct * 100) + '</span>' : '';  // change_pct 库内为比率(0.0036=0.36%)，显示 ×100
     return '<div class="r-card" style="border-color:' + lv.bd + '">' +
       '<div class="r-head"><span class="r-name">' + esc(card.name) + kindTag + '</span>' +
       '<span class="r-code">' + esc(card.code) + '</span>' +

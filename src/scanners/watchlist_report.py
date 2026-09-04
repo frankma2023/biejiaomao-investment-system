@@ -128,7 +128,7 @@ def build_context(klines):
         'high_250': hi,
         'gain_from_low': gain_from_low,
         'fib_levels': [round(f, 2) for f in fib],
-        'change_pct': klines[-1].get('change_pct'),
+        'change_pct': klines[-1].get('change_pct'),  # 语义：比率(0.0036=+0.36%)，前端 ×100 展示（历史落盘同口径，勿改）
     }
 
 
