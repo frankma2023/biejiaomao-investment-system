@@ -15,8 +15,10 @@
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
   function pct(v, plus = true) {
-    if (v == null || isNaN(v)) return '—';
-    return (plus && v > 0 ? '+' : '') + v + '%';
+    if (v == null || isNaN(Number(v))) return '—';
+    var n = Math.round(Number(v) * 100) / 100;  // 去浮点尾差(0.0199×100=1.9900000000000002)并保留2位
+    if (n === 0) n = 0;
+    return (plus && n > 0 ? '+' : '') + n + '%';
   }
   function fmtPrice(v) {
     if (v == null || isNaN(v)) return '—';
