@@ -25,6 +25,16 @@ def main():
     ap.add_argument('--members', action='store_true', help='拉申万2021一级成分表建 个股→新版行业 映射')
     args = ap.parse_args()
     conn = sqlite3.connect(DB)
+    # W2: 自检——数据不足或映射缺失时醒目警告（industry_rs 会静默归零）
+    try:
+        _chk = conn.execute("SELECT COUNT(DISTINCT stock_code) n, MAX(date) d FROM sw_index_kline").fetchone()
+        _mem = conn.execute("SELECT COUNT(*) n FROM sw2021_members").fetchone()
+        if _chk and (_chk[0] < 31 or _chk[1] is None):
+            print(f'⚠️ sw_index_kline 数据不足({_chk[0]}行业/最新{_chk[1]})——先跑 --full 否则 industry_rs 全市场归零')
+        if _mem and _mem[0] < 3000:
+            print(f'⚠️ sw2021_members 仅 {_mem[0]} 条——先跑 --members 否则个股行业归属缺失')
+    except Exception:
+        pass
     conn.execute("""CREATE TABLE IF NOT EXISTS sw_index_kline (
         stock_code TEXT, stock_name TEXT, date TEXT,
         open REAL, high REAL, low REAL, close REAL, volume REAL, amount REAL,
@@ -71,7 +81,7 @@ def main():
             if args.full:
                 df = df.tail(400)
             else:
-                df = df.tail(10)
+                df = df.tail(30)  # O3: 30 日抗停机缺口翻三倍
             rows = []
             for _, r in df.iterrows():
                 rows.append((code, name, str(r['日期'])[:10],

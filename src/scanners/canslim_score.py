@@ -393,7 +393,7 @@ def score_l(db, stock_code, target_date, p):
     try:
         m = db.execute("SELECT industry_code, industry_name FROM sw2021_members WHERE stock_code=?", (stock_code,)).fetchone()
         if m:
-            krows = db.execute("SELECT date, close FROM sw_index_kline WHERE stock_code=? ORDER BY date DESC LIMIT 25", (m['industry_code'],)).fetchall()
+            krows = db.execute("SELECT date, close FROM sw_index_kline WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 25", (m['industry_code'], target_date)).fetchall()
             if len(krows) >= 21:
                 krows = list(reversed(krows))
                 ret20 = (krows[-1]['close'] / krows[-21]['close'] - 1) * 100
@@ -494,7 +494,7 @@ def score_i(db, stock_code, target_date, p):
     ld = cfg.get('analyst_lookback_days', 90)
     ar = None
     try:
-        ar = db.execute("""SELECT org_count, first_coverage, upgrade_count, source
+        ar = db.execute("""SELECT org_count, upgrade_count, source
             FROM stock_analyst_reports
             WHERE stock_code=? AND lookback_days=? AND source='sina'
             ORDER BY date DESC LIMIT 1""", (stock_code, ld)).fetchone()

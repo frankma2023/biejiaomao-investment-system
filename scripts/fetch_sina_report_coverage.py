@@ -103,6 +103,16 @@ def compute(reports, code, lookback_days=90):
 
 
 def save(code, result, lookback_days):
+    conn = sqlite3.connect(DB_PATH, timeout=30)  # W4: busy_timeout 防 8 线程撞写
+    conn.execute("""CREATE TABLE IF NOT EXISTS stock_analyst_reports (
+        stock_code TEXT, date TEXT, lookback_days INTEGER,
+        report_count INTEGER, org_count INTEGER, first_coverage INTEGER,
+        upgrade_count INTEGER, downgrade_count INTEGER, maintain_count INTEGER,
+        buy_count INTEGER, overweight_count INTEGER, neutral_count INTEGER,
+        reduce_count INTEGER, orgs_json TEXT, top_orgs_json TEXT,
+        lx_pe_ttm REAL, lx_pb REAL, lx_ps_ttm REAL, lx_shareholders_num REAL,
+        lx_mc REAL, lx_shn REAL, lx_shn_change REAL, updated_at TEXT, source TEXT,
+        PRIMARY KEY (stock_code, date, source))""")
     conn = sqlite3.connect(DB_PATH)
     conn.execute("ALTER TABLE stock_analyst_reports ADD COLUMN source TEXT DEFAULT 'lx'"
                  if not [c for c in conn.execute('PRAGMA table_info(stock_analyst_reports)') if c[1] == 'source']
@@ -150,8 +160,11 @@ def main():
         codes = args[args.index('--codes') + 1].split(',')
     elif '--watchlist' in args:
         conn = sqlite3.connect(DB_PATH)
+        # B1(review)：watchlist_report_daily 无 stock_code 列；观察池为 discipline_observation_pool 且每日快照累积——取最新日期
         codes = [r[0] for r in conn.execute(
-            "SELECT DISTINCT stock_code FROM watchlist_report_daily UNION SELECT stock_code FROM observation_pool").fetchall()]
+            "SELECT stock_code FROM watchlist WHERE removed_at IS NULL "
+            "UNION SELECT stock_code FROM discipline_observation_pool "
+            "WHERE date=(SELECT MAX(date) FROM discipline_observation_pool)").fetchall()]
         conn.close()
     elif '--all' in args:
         # 全市场（每周一新浪全量——研报低频，90 天窗口周更足够）
@@ -176,6 +189,8 @@ def main():
     from concurrent.futures import ThreadPoolExecutor
     def _work(code):
         try:
+            import random, time as _t
+            _t.sleep(random.uniform(0.05, 0.35))  # W3: 线程抖动限速防新浪风控
             run(code, days)
         except Exception as e:
             print('%s 失败: %s' % (code, e))

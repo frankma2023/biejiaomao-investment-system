@@ -32,7 +32,7 @@
   基本面层：
     18. 个股基本面增量  (fetch_fundamental_nonfinancial)
     19. 机构持股(周一)  (fetch_institutional_holdings)
-    20. 研报(周一)      (fetch_stock_reports)
+    20. 新浪研报每日      (fetch_sina: watchlist+top200, 周一全市场 --all)
     21. 回购(周一)      (fetch_buyback)
   选股评分层：
     22. CANSLIM评分     (batch_canslim_score)
@@ -80,6 +80,8 @@ if TARGET_DATE:
     today_str = TARGET_DATE
 else:
     today_str = date.today().strftime("%Y-%m-%d")
+# W5(review)：周一判定用目标日期（回填 --date 时按目标日而非今天）
+WEEKDAY = date.fromisoformat(today_str).weekday()
 
 # ── 日志 ──
 LOG_FILE = os.path.join(PROJECT_DIR, "data", "daily_update.log")
@@ -203,7 +205,7 @@ TASKS.append(("💰 18.个股基本面", [PYTHON_EXE, "scripts/fetch_fundamental
 # 18b. 季度财报明细（披露窗口内每天覆盖拉取：早披露早入库，晚披露自动补；
 #      fetch_stock_financials.py --recent 只拉披露窗口内的报告期，覆盖写幂等）
 TASKS.append(("💰 18b.季度财报", [PYTHON_EXE, "scripts/fetch_stock_financials.py", "--quarters-only", "--recent"]))
-if date.today().weekday() == 0:
+if WEEKDAY == 0:
     # 19. 机构持股（每季更新，周一拉取）
     TASKS.append(("🏦 19.机构持股", [PYTHON_EXE, "scripts/fetch_institutional_holdings.py"]))
 else:
@@ -215,7 +217,7 @@ TASKS.append(("🏭 19b.申万行业指数", [PYTHON_EXE, "scripts/fetch_sw_inde
 # 每日：自选池+观察池+TOP200 重点池新鲜；周一：新浪全市场（研报低频，90 天窗口周更足够）
 TASKS.append(("📝 20a.新浪研报覆盖", [PYTHON_EXE, "scripts/fetch_sina_report_coverage.py", "--watchlist", "--threads", "8"]))
 TASKS.append(("📝 20b.新浪研报TOP200", [PYTHON_EXE, "scripts/fetch_sina_report_coverage.py", "--top", "200", "--threads", "8"]))
-if date.today().weekday() == 0:
+if WEEKDAY == 0:
     TASKS.append(("📝 20c.新浪研报全市场", [PYTHON_EXE, "scripts/fetch_sina_report_coverage.py", "--all", "--threads", "8"]))
     TASKS.append(("🔄 21.回购数据", [PYTHON_EXE, "scripts/fetch_buyback.py"]))
 else:
