@@ -150,11 +150,12 @@ def score_a(db, stock_code, target_date, p):
     # TTM 盈利趋势（v3.4：最近披露 4 季净利 vs 再前 4 季——滚动年度化，反映最新季报）
     qs8 = get_quarterly(db, stock_code, target_date, 8)
     ttm_sc = 0
-    if len(qs8) >= 8:
-        ttm_now = sum((q.get('net_profit_single') or 0) for q in qs8[:4])
-        ttm_prev = sum((q.get('net_profit_single') or 0) for q in qs8[4:8])
-        if ttm_prev > 0 and ttm_now >= 0:
-            ttm_yoy = (ttm_now / ttm_prev - 1) * 100
+    # W1(review)：None 不得静默当 0——与全库 TTM 口径一致（financial.py/server.py 均要求全非 None）
+    if len(qs8) >= 8 and all(q.get('net_profit_single') is not None for q in qs8):
+        ttm_cur_sum = sum(q['net_profit_single'] for q in qs8[:4])
+        ttm_prev_sum = sum(q['net_profit_single'] for q in qs8[4:8])
+        if ttm_prev_sum > 0 and ttm_cur_sum >= 0:
+            ttm_yoy = (ttm_cur_sum / ttm_prev_sum - 1) * 100
             tt = cfg.get('ttm_yoy_tiers', [25, 15, 5])
             ts = cfg.get('ttm_yoy_scores', [4, 2, 1])
             for i, t in enumerate(tt):
@@ -162,9 +163,11 @@ def score_a(db, stock_code, target_date, p):
             bd['ttm_yoy'] = {'value': round(ttm_yoy, 1), 'score': ttm_sc}
             detail.append('TTM YoY {:.0f}%'.format(ttm_yoy))
         else:
-            bd['ttm_yoy'] = {'value': None, 'score': 0, 'note': 'TTM 基数异常'}
+            # O1(review)：区分两种异常——基数非正 vs 当期亏损
+            note = 'TTM 基数为负/零' if ttm_prev_sum <= 0 else 'TTM 当期亏损'
+            bd['ttm_yoy'] = {'value': None, 'score': 0, 'note': note}
     else:
-        bd['ttm_yoy'] = {'value': None, 'score': 0, 'note': '季度数据不足 8 期'}
+        bd['ttm_yoy'] = {'value': None, 'score': 0, 'note': '季度数据不足 8 期或存在未披露期'}
     score += ttm_sc
 
     # Positive years
@@ -596,9 +599,9 @@ if __name__ == '__main__':
     else:
         r = score_stock(args.stock, args.date, save=args.save)
         print('{} @ {}'.format(args.stock, args.date))
-        print('  C: {}/23  ({})'.format(r['C']['score'], r['C']['detail']))
-        print('  A: {}/17  ({})'.format(r['A']['score'], r['A']['detail']))
-        print('  N: {}/14  ({})'.format(r['N']['score'], r['N']['detail']))
+        print('  C: {}/22  ({})'.format(r['C']['score'], r['C']['detail']))
+        print('  A: {}/19  ({})'.format(r['A']['score'], r['A']['detail']))
+        print('  N: {}/17  ({})'.format(r['N']['score'], r['N']['detail']))
         print('  S: {}/9   ({})'.format(r['S']['score'], r['S']['detail']))
         print('  L: {}/21  ({})'.format(r['L']['score'], r['L']['detail']))
         print('  I: {}/18  ({})'.format(r['I']['score'], r['I']['detail']))
