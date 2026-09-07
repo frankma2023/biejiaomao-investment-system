@@ -89,7 +89,7 @@ function renderResults(d) {
        {key: 'industry_rs', label: '行业RS评级'},
        {key: 'excess', label: '近期超额收益'}
      ]},
-    {key: 'I', name: 'I 机构认同', max: 17, color: '#795548', cls: 'dim-i',
+    {key: 'I', name: 'I 机构认同', max: 18, color: '#795548', cls: 'dim-i',
      subs: [
        {key: 'inst_holding', label: '机构持股比例'},
        {key: 'inst_change', label: '机构数量变化'},
