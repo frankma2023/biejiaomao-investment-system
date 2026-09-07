@@ -147,6 +147,26 @@ def score_a(db, stock_code, target_date, p):
     bd['eps_cagr_3y'] = {'value': round(cagr, 1), 'score': cagr_sc}
     detail.append('3Y CAGR {:.0f}%'.format(cagr))
 
+    # TTM 盈利趋势（v3.4：最近披露 4 季净利 vs 再前 4 季——滚动年度化，反映最新季报）
+    qs8 = get_quarterly(db, stock_code, target_date, 8)
+    ttm_sc = 0
+    if len(qs8) >= 8:
+        ttm_now = sum((q.get('net_profit_single') or 0) for q in qs8[:4])
+        ttm_prev = sum((q.get('net_profit_single') or 0) for q in qs8[4:8])
+        if ttm_prev > 0 and ttm_now >= 0:
+            ttm_yoy = (ttm_now / ttm_prev - 1) * 100
+            tt = cfg.get('ttm_yoy_tiers', [25, 15, 5])
+            ts = cfg.get('ttm_yoy_scores', [4, 2, 1])
+            for i, t in enumerate(tt):
+                if ttm_yoy >= t: ttm_sc = ts[i]; break
+            bd['ttm_yoy'] = {'value': round(ttm_yoy, 1), 'score': ttm_sc}
+            detail.append('TTM YoY {:.0f}%'.format(ttm_yoy))
+        else:
+            bd['ttm_yoy'] = {'value': None, 'score': 0, 'note': 'TTM 基数异常'}
+    else:
+        bd['ttm_yoy'] = {'value': None, 'score': 0, 'note': '季度数据不足 8 期'}
+    score += ttm_sc
+
     # Positive years
     pos = sum(1 for i in range(len(anns)-1) if (anns[i].get('net_profit') or 0) > (anns[i+1].get('net_profit') or 0))
     pos_s = cfg.get('positive_years_score', [4, 2])
@@ -167,7 +187,7 @@ def score_a(db, stock_code, target_date, p):
             score += 1
             bd['stability'] = {'value': round(cv, 1), 'score': 1}
 
-    return {"score": min(score, 15), "detail": ", ".join(detail), "breakdown": bd}
+    return {"score": min(score, 19), "detail": ", ".join(detail), "breakdown": bd}
 
 
 def score_n(db, stock_code, target_date, p, klines=None, signals=None):

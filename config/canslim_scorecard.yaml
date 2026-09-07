@@ -24,6 +24,14 @@ a_annual_earnings:
   - 8
   - 5
   - 2
+  ttm_yoy_tiers:
+  - 25
+  - 15
+  - 5
+  ttm_yoy_scores:
+  - 4
+  - 2
+  - 1
   stability_cv_threshold: 30
 n_new:
   high52_tiers:

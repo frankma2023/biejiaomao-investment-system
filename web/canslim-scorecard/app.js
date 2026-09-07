@@ -64,9 +64,10 @@ function renderResults(d) {
        {key: 'revenue_yoy', label: '营收同比增速'},
        {key: 'nonrecurring', label: '扣非占比'}
      ]},
-    {key: 'A', name: 'A 年度盈利', max: 15, color: '#FF9800', cls: 'dim-a',
+    {key: 'A', name: 'A 年度盈利', max: 19, color: '#FF9800', cls: 'dim-a',
      subs: [
        {key: 'eps_cagr_3y', label: '3年EPS CAGR'},
+       {key: 'ttm_yoy', label: 'TTM盈利趋势(4季滚动)'},
        {key: 'pos_years', label: '正增长年数'},
        {key: 'stability', label: '盈利稳定性'}
      ]},
@@ -225,7 +226,9 @@ function loadConfig() {
               ['c_current_earnings.revenue_yoy_scores', '对应得分', '4,2'],
               ['c_current_earnings.nonrecurring_ratio', '扣非占比阈值(%)', '90']],
         'a': [['a_annual_earnings.eps_cagr_3y_tiers', '3年CAGR阈值', '25,15,5'],
-              ['a_annual_earnings.eps_cagr_scores', '对应得分', '9,6,3'],
+              ['a_annual_earnings.eps_cagr_scores', '对应得分', '8,5,2'],
+              ['a_annual_earnings.ttm_yoy_tiers', 'TTM同比阈值(%)', '25,15,5'],
+              ['a_annual_earnings.ttm_yoy_scores', '对应得分', '4,2,1'],
               ['a_annual_earnings.stability_cv_threshold', '稳定性CV阈值(%)', '30']],
         'n': [['n_new.high52_tiers', '52周高点阈值', '-5,-15'],
               ['n_new.high52_scores', '对应得分', '7,5'],
