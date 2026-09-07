@@ -220,7 +220,7 @@ def score_n(db, stock_code, target_date, p, klines=None, signals=None):
         bd['high52'] = {'value': round(pct, 1), 'score': high_sc}
         detail.append('52W {:.0f}%'.format(pct))
 
-    # Form breakout (engines)
+    # Form breakout (engines) — v3.5 重构：四档分级 + 族内去重 + 跨族共振上限 + MW 质量分段
     if signals is None:
         try:
             from engine_registry import run_all_engines
@@ -232,42 +232,87 @@ def score_n(db, stock_code, target_date, p, klines=None, signals=None):
         all_sigs = signals
 
     eng_cfg = cfg.get('engine_scores', {})
+    mw_q = cfg.get('mw_quality', {})
     decay = cfg.get('decay_factors', [1.0, 0.8, 0.6, 0.4, 0.4])
     lookback = cfg.get('high_lookback_days', 5)
+    fams = cfg.get('signal_families', {
+        'base': ['base_breakout_v2', 'base_breakout', 'double_bottom', 'flat_base', 'saucer_base', 'cup_handle'],
+        'pivot': ['pocket_pivot_v2', 'pocket_pivot'],
+        'mw': ['mw_signal'],
+        'misc': ['box_breakout', 'cdl', 'talib'],
+    })
+    fam_of = {}
+    for fam, srcs in fams.items():
+        for s in srcs:
+            fam_of[s] = fam
     target_dt = datetime.strptime(target_date, '%Y-%m-%d')
-    form_sc = 0.0
-    cdl_sum = 0
-    ta_sum = 0
 
+    # 收集 5 天窗口内 bullish 信号 → 按日分组 (fam, src, base, days)
+    day_signals = {}
     for sig in all_sigs:
         try:
             sig_dt = datetime.strptime(sig['date'], '%Y-%m-%d')
         except:
             continue
         days = (target_dt - sig_dt).days
-        if days < 0 or days >= lookback: continue
-        factor = decay[min(days, len(decay)-1)]
+        if days < 0 or days >= lookback:
+            continue
+        if sig.get('type') != 'bullish':
+            continue
         src = sig.get('source', '')
-        tp = sig.get('type', 'bullish')
-        if tp != 'bullish': continue
-
-        if src in eng_cfg:
-            base = eng_cfg[src]
-            form_sc += base * factor
+        dt = sig['date']
+        fam = fam_of.get(src, 'other')
+        base = 0.0
+        if src == 'mw_signal':
+            q = ((sig.get('details') or {}).get('score'))
+            try:
+                q = float(q) if q is not None else None
+            except Exception:
+                q = None
+            q_t = mw_q.get('tiers', [85, 70, 55])
+            q_s = mw_q.get('scores', [6, 5, 3, 2])
+            if q is not None:
+                base = q_s[-1]
+                for i, t in enumerate(q_t):
+                    if q >= t:
+                        base = q_s[i]
+                        break
+            else:
+                base = q_s[-1]
+        elif src in eng_cfg:
+            base = float(eng_cfg[src])
         elif src == 'cdl':
-            base = eng_cfg.get('cdl_bullish', 2)
-            if cdl_sum < eng_cfg.get('cdl_bullish_max', 4):
-                cdl_sum += base * factor
-                form_sc += base * factor
+            base = float(eng_cfg.get('cdl_bullish', 2))
         elif src == 'talib':
-            base = eng_cfg.get('talib_bullish', 1)
-            if ta_sum < eng_cfg.get('talib_bullish_max', 3):
-                ta_sum += base * factor
-                form_sc += base * factor
+            base = float(eng_cfg.get('talib_bullish', 1))
+        if base <= 0:
+            continue
+        day_signals.setdefault(dt, []).append((fam, src, base, days))
+
+    # 逐日：族内去重取最高 + 跨族共振加成（额外族 +1/个，最多 +3）
+    form_sc = 0.0
+    day_parts = []
+    day_cap = cfg.get('day_cap', 10)
+    for dt, sigs in sorted(day_signals.items()):
+        by_fam = {}
+        for fam, src, base, days in sigs:
+            if fam not in by_fam or base > by_fam[fam][2]:
+                by_fam[fam] = (fam, src, base, days)
+        fam_max = max((v[2] for v in by_fam.values()), default=0)
+        extra = len(by_fam) - 1 if by_fam else 0
+        day_raw = fam_max + min(extra, 3)
+        day_raw = min(day_raw, day_cap)
+        days_ago = min(max(v[3] for v in by_fam.values()), len(decay) - 1) if by_fam else 0
+        factor = decay[days_ago]
+        day_score = day_raw * factor
+        form_sc += day_score
+        day_parts.append((dt, round(day_raw, 1), round(factor, 2), round(day_score, 1)))
 
     form_sc = min(form_sc, 17)
     score += round(form_sc, 1)
     bd['form_breakout'] = {'value': round(form_sc, 1), 'score': round(form_sc, 1)}
+    if day_parts:
+        bd['form_days'] = [{'date': d, 'raw': r, 'decay': f, 'scored': s} for d, r, f, s in day_parts]
 
     return {"score": min(score, 17), "detail": ", ".join(detail), "breakdown": bd}
 

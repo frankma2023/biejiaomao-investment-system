@@ -46,7 +46,7 @@ def detect(klines, indicators=None):
         rows = conn.execute("""
             SELECT b2_date, b1_date, h_date, l_date, score, score_v2,
                    is_plus, confidence, confidence_v2, decline_pct,
-                   b1_return_pct, b2_return_pct, h_price, l_price
+                   b1_return_pct, b2_return_pct, h_price, l_price, tech_score_v4
             FROM mw_signal_daily
             WHERE stock_code = ?
               AND (
@@ -90,6 +90,7 @@ def detect(klines, indicators=None):
                     'details': {
                         'signal_type': 'MW-B1',
                         'b1_return_pct': row_dict.get('b1_return_pct'),
+                        'score': row_dict.get('tech_score_v4'),  # B1 关注分 v3.5（质量分段用）
                         'note': '首次突破日（需B2确认）'
                     }
                 })

@@ -41,9 +41,46 @@ n_new:
   - 6
   - 4
   high_lookback_days: 5
+  day_cap: 10
   engine_scores:
-    base_breakout: 5
+    base_breakout_v2: 7
+    pocket_pivot_v2: 7
     pocket_pivot: 5
+    box_breakout: 3
+    base_breakout: 3
+    double_bottom: 2
+    flat_base: 2
+    saucer_base: 2
+    cup_handle: 2
+    cdl_bullish: 2
+    talib_bullish: 1
+  mw_quality:
+    tiers:
+    - 85
+    - 70
+    - 55
+    scores:
+    - 6
+    - 5
+    - 3
+    - 2
+  signal_families:
+    base:
+    - base_breakout_v2
+    - base_breakout
+    - double_bottom
+    - flat_base
+    - saucer_base
+    - cup_handle
+    pivot:
+    - pocket_pivot_v2
+    - pocket_pivot
+    mw:
+    - mw_signal
+    misc:
+    - box_breakout
+    - cdl
+    - talib
 s_supply_demand:
   market_cap_tiers:
   - 50
