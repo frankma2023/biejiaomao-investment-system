@@ -226,7 +226,8 @@ def score_n(db, stock_code, target_date, p, klines=None, signals=None):
             from engine_registry import run_all_engines
             ind = _compute_indicators(klines)
             all_sigs = run_all_engines(klines=klines, indicators=ind, silent=True)
-        except:
+        except Exception as _e:
+            print(f'[canslim_score] run_all_engines 失败，N 形态分归 0: {_e}')
             all_sigs = []
     else:
         all_sigs = signals
@@ -248,6 +249,7 @@ def score_n(db, stock_code, target_date, p, klines=None, signals=None):
     target_dt = datetime.strptime(target_date, '%Y-%m-%d')
 
     # 收集 5 天窗口内 bullish 信号 → 按日分组 (fam, src, base, days)
+    # v3.5.1(B1-review)：引擎输出契约不一（部分引擎信号不带 type 字段）——改为：显式 bearish 过滤 + 配分表白名单双保险
     day_signals = {}
     for sig in all_sigs:
         try:
@@ -257,8 +259,8 @@ def score_n(db, stock_code, target_date, p, klines=None, signals=None):
         days = (target_dt - sig_dt).days
         if days < 0 or days >= lookback:
             continue
-        if sig.get('type') != 'bullish':
-            continue
+        if sig.get('type') == 'bearish':
+            continue  # 只挡显式看跌；无 type 字段的引擎（base_breakout 等）默认可参与
         src = sig.get('source', '')
         dt = sig['date']
         fam = fam_of.get(src, 'other')
@@ -266,7 +268,7 @@ def score_n(db, stock_code, target_date, p, klines=None, signals=None):
         if src == 'mw_signal':
             q = ((sig.get('details') or {}).get('score'))
             try:
-                q = float(q) if q is not None else None
+                q = float(q) if q is not None and str(q).strip() != '' else None
             except Exception:
                 q = None
             q_t = mw_q.get('tiers', [85, 70, 55])
@@ -278,7 +280,9 @@ def score_n(db, stock_code, target_date, p, klines=None, signals=None):
                         base = q_s[i]
                         break
             else:
-                base = q_s[-1]
+                # B2-review：无质量分（tech_score_v4 空/未回填）≠ 质量差——不给保底分，记 note 0 分
+                base = 0.0
+                bd.setdefault('mw_note', []).append({'date': dt, 'note': 'MW 信号无质量分(tech_score_v4 空)'})
         elif src in eng_cfg:
             base = float(eng_cfg[src])
         elif src == 'cdl':

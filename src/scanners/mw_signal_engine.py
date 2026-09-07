@@ -61,7 +61,10 @@ def detect(klines, indicators=None):
 
             if row_dict['b2_date']:
                 is_plus = bool(row_dict.get('is_plus', 0))
-                score = row_dict.get('score_v2') or row_dict.get('score', 0)
+                sv = row_dict.get('score_v2')
+                if sv is None or str(sv).strip() == '':
+                    sv = row_dict.get('score', 0)  # 仅当 score_v2 空才回退旧分（review：0 值不回退）
+                score = sv
                 conf = row_dict.get('confidence_v2') or row_dict.get('confidence', 'mid')
                 signals.append({
                     'date': row_dict['b2_date'],

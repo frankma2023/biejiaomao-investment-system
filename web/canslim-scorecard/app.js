@@ -179,37 +179,56 @@ function saveResults() {
 }
 
 function saveConfig() {
-  var config = {};
-  document.querySelectorAll('.param-card-bd input').forEach(function(inp) {
-    var path = inp.dataset.path;
-    var val = inp.value;
-    if (val.indexOf(',') >= 0) {
-      val = val.split(',').map(function(s) { var n = parseFloat(s.trim()); return isNaN(n) ? s.trim() : n; });
-    } else {
-      var n = parseFloat(val);
-      if (!isNaN(n)) val = n;
-    }
-    var keys = path.split('.');
-    var obj = config;
-    for (var i = 0; i < keys.length - 1; i++) {
-      if (!obj[keys[i]]) obj[keys[i]] = {};
-      obj = obj[keys[i]];
-    }
-    obj[keys[keys.length - 1]] = val;
-  });
+  // W2-review：先 GET 现有 config 做 deep-merge（页面只编辑部分键，直接覆盖会丢 saucer_base/signal_families 等）
+  fetch(API_CFG)
+    .then(function(r) { return r.json(); })
+    .then(function(existing) {
+      var edits = {};
+      document.querySelectorAll('.param-card-bd input').forEach(function(inp) {
+        var path = inp.dataset.path;
+        var val = inp.value;
+        if (val.indexOf(',') >= 0) {
+          val = val.split(',').map(function(s) { var n = parseFloat(s.trim()); return isNaN(n) ? s.trim() : n; });
+        } else {
+          var n = parseFloat(val);
+          if (!isNaN(n)) val = n;
+        }
+        var keys = path.split('.');
+        var obj = edits;
+        for (var i = 0; i < keys.length - 1; i++) {
+          if (!obj[keys[i]]) obj[keys[i]] = {};
+          obj = obj[keys[i]];
+        }
+        obj[keys[keys.length - 1]] = val;
+      });
+      var merged = deepMerge(existing || {}, edits);
+      return fetch(API_CFG, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain'},
+        body: JSON.stringify(merged)
+      });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      var btn = event.target;
+      btn.textContent = '✅ 已保存';
+      setTimeout(function() { btn.textContent = '⚙️ 保存配置'; }, 2000);
+    });
+}
 
-  // 直接发送 config dict，不用 wrapper
-  fetch(API_CFG, {
-    method: 'POST',
-    headers: {'Content-Type': 'text/plain'},
-    body: JSON.stringify(config)
-  })
-  .then(function(r) { return r.json(); })
-  .then(function() {
-    var btn = event.target;
-    btn.textContent = '✅ 已保存';
-    setTimeout(function() { btn.textContent = '⚙️ 保存配置'; }, 2000);
+function deepMerge(base, edit) {
+  // 对象递归合并（保留 base 中 edit 未覆盖的键）；数组/标量整体替换
+  var out = {};
+  Object.keys(base).forEach(function(k) { out[k] = base[k]; });
+  Object.keys(edit).forEach(function(k) {
+    var e = edit[k];
+    if (e && typeof e === 'object' && !Array.isArray(e) && base[k] && typeof base[k] === 'object' && !Array.isArray(base[k])) {
+      out[k] = deepMerge(base[k], e);
+    } else {
+      out[k] = e;
+    }
   });
+  return out;
 }
 
 function loadConfig() {
