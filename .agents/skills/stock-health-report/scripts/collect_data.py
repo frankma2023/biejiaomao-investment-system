@@ -150,11 +150,20 @@ try:
         print(f'- RPS20 {rs["rps_20"]} / RPS60 {rs["rps_60"]} / RPS120 {rs["rps_120"]} / RPS250 {rs["rps_250"]}（{rs["date"]}）')
 except Exception:
     pass
+# 行业归属（申万口径）与产业 RS（中证 L2 口径，两者不同体系需分开标注）
+try:
+    sw = one('SELECT industry_name FROM stock_sw_industry WHERE stock_code=?', CODE)
+    if sw:
+        print(f'- 申万一级行业: {sw["industry_name"]}')
+    else:
+        print('- 申万一级行业: 无记录')
+except Exception:
+    print('- 申万行业: 表不可用')
 try:
     ind = q('SELECT ir.stock_code, ir.date, ir.rs_20, ir.rs_60, ir.rs_120 FROM index_rs_daily ir WHERE ir.stock_code IN (SELECT ind_code FROM mw_signal_daily WHERE stock_code=? ORDER BY scan_date DESC LIMIT 1) ORDER BY ir.date DESC LIMIT 1', CODE)
     if ind:
         r = ind[0]
-        print(f'- 所属行业RS({r["stock_code"]}): RS20 {r["rs_20"]} / RS60 {r["rs_60"]} / RS120 {r["rs_120"]}')
+        print(f'- 中证L2产业指数RS({r["stock_code"]}，名称见 index_style.yaml sector_l2): RS20 {r["rs_20"]} / RS60 {r["rs_60"]} / RS120 {r["rs_120"]}（口径:中证产业分类，非申万行业）')
 except Exception:
     pass
 
