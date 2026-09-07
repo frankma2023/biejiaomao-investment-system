@@ -209,12 +209,17 @@ if date.today().weekday() == 0:
 else:
     log(f"⏭️  跳过机构持股（非周一，weekday={date.today().weekday()}）")
 
-# 步骤 20~21：研报/回购（每周一）
+# 步骤 19b：申万一级行业指数日线增量（industry_rs 申万 RS 基准）
+TASKS.append(("🏭 19b.申万行业指数", [PYTHON_EXE, "scripts/fetch_sw_index.py"]))
+# 步骤 20：新浪研报覆盖（每日，CANSLIM I 因子主源——数量/机构数，不下载研报本身）+ 周一东财全量备源 + 回购
+# 每日：自选池+观察池 sina 刷新（CANSLIM 每日评分对象的重点关注池）；周一附加东财全市场批处理备源
+TASKS.append(("📝 20a.新浪研报覆盖", [PYTHON_EXE, "scripts/fetch_sina_report_coverage.py", "--watchlist", "--threads", "8"]))
+TASKS.append(("📝 20b.新浪研报TOP200", [PYTHON_EXE, "scripts/fetch_sina_report_coverage.py", "--top", "200", "--threads", "8"]))
 if date.today().weekday() == 0:
-    TASKS.append(("📝 20.研报拉取", [PYTHON_EXE, "scripts/fetch_stock_reports.py"]))
+    TASKS.append(("📝 20c.东财研报全量", [PYTHON_EXE, "scripts/fetch_stock_reports.py"]))
     TASKS.append(("🔄 21.回购数据", [PYTHON_EXE, "scripts/fetch_buyback.py"]))
 else:
-    log(f"⏭️  跳过研报/回购（非周一）")
+    log(f"⏭️  跳过东财研报全量/回购（非周一）")
 
 # 步骤 22~24：选股评分层（依赖 RS + 基本面 + 形态信号全部就位）
 # 22. CAN SLIM 全量评分

@@ -388,30 +388,30 @@ def score_l(db, stock_code, target_date, p):
     score += rs20_bonus
     bd['rs_20_bonus'] = {'value': rs20, 'score': rs20_bonus}
 
-    # Industry RS — 取所属全部指数中 RS_20 最高值
+    # Industry RS（v3.6：申万 2021 一级行业指数口径——sw2021_members 归属 + sw_index_kline 行情 ret20）
+    # 修正：旧实现取"所属指数成分 MAX(rs)"（虚高，万华材料产业弱却得 92）——现用真实申万行业指数涨跌
     try:
-        ind_rs_row = db.execute("""
-            SELECT MAX(rs.rs_20) as best_rs
-            FROM index_constituents ic
-            JOIN index_rs_daily rs ON ic.index_code = rs.stock_code
-                AND rs.date = (SELECT MAX(date) FROM index_rs_daily WHERE stock_code=ic.index_code)
-            WHERE ic.stock_code=?
-        """, (stock_code,)).fetchone()
-        if ind_rs_row and ind_rs_row['best_rs'] is not None:
-            ind_rs = ind_rs_row['best_rs']
-            th = cfg.get('industry_rs_threshold', 80)
-            if ind_rs >= th:
-                score += cfg.get('industry_rs_score_high', 4)
-                bd['industry_rs'] = {'value': ind_rs, 'score': cfg.get('industry_rs_score_high', 4)}
-            elif ind_rs >= 70:
-                score += cfg.get('industry_rs_score_mid', 2)
-                bd['industry_rs'] = {'value': ind_rs, 'score': cfg.get('industry_rs_score_mid', 2)}
+        m = db.execute("SELECT industry_code, industry_name FROM sw2021_members WHERE stock_code=?", (stock_code,)).fetchone()
+        if m:
+            krows = db.execute("SELECT date, close FROM sw_index_kline WHERE stock_code=? ORDER BY date DESC LIMIT 25", (m['industry_code'],)).fetchall()
+            if len(krows) >= 21:
+                krows = list(reversed(krows))
+                ret20 = (krows[-1]['close'] / krows[-21]['close'] - 1) * 100
+                th = cfg.get('industry_ret20_threshold', 3.0)
+                if ret20 >= th:
+                    score += cfg.get('industry_ret20_score_high', 4)
+                    bd['industry_rs'] = {'value': round(ret20, 1), 'ind': m['industry_name'], 'score': cfg.get('industry_ret20_score_high', 4)}
+                elif ret20 >= 0:
+                    score += cfg.get('industry_ret20_score_mid', 2)
+                    bd['industry_rs'] = {'value': round(ret20, 1), 'ind': m['industry_name'], 'score': cfg.get('industry_ret20_score_mid', 2)}
+                else:
+                    bd['industry_rs'] = {'value': round(ret20, 1), 'ind': m['industry_name'], 'score': 0}
             else:
-                bd['industry_rs'] = {'value': ind_rs, 'score': 0}
+                bd['industry_rs'] = {'value': '-', 'score': 0, 'note': 'sw_index_kline 数据不足'}
         else:
-            bd['industry_rs'] = {'value': '-', 'score': 0, 'note': 'no index data'}
+            bd['industry_rs'] = {'value': '-', 'score': 0, 'note': 'sw2021_members 无归属'}
     except sqlite3.OperationalError:
-        bd['industry_rs'] = {'value': '-', 'score': 0, 'note': 'no table'}
+        bd['industry_rs'] = {'value': '-', 'score': 0, 'note': 'no table'}    
 
     # Excess return
     rows = db.execute("""SELECT close FROM daily_kline

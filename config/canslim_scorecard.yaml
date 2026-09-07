@@ -110,6 +110,9 @@ l_leader:
   - 5
   - 2
   excess_return_threshold: 5
+  industry_ret20_threshold: 3.0
+  industry_ret20_score_high: 4
+  industry_ret20_score_mid: 2
 i_institutional:
   inst_holding_tiers:
   - 12

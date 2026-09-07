@@ -141,8 +141,11 @@ def main():
     args = sys.argv[1:]
     days = 90
     codes = None
+    threads = 8
     if '--days' in args:
         days = int(args[args.index('--days') + 1])
+    if '--threads' in args:
+        threads = int(args[args.index('--threads') + 1])
     if '--codes' in args:
         codes = args[args.index('--codes') + 1].split(',')
     elif '--watchlist' in args:
@@ -150,15 +153,36 @@ def main():
         codes = [r[0] for r in conn.execute(
             "SELECT DISTINCT stock_code FROM watchlist_report_daily UNION SELECT stock_code FROM observation_pool").fetchall()]
         conn.close()
+    elif '--top' in args:
+        # CANSLIM 高分候选池：RPS250 前 N——与 batch 全市场评分的重点关注对齐
+        n = int(args[args.index('--top') + 1])
+        conn = sqlite3.connect(DB_PATH)
+        codes = [r[0] for r in conn.execute(
+            "SELECT stock_code FROM stock_rs_daily WHERE date=(SELECT MAX(date) FROM stock_rs_daily) ORDER BY rps_250 DESC LIMIT ?", (n,)).fetchall()]
+        conn.close()
     elif args and not args[0].startswith('-'):
         codes = [args[0]]
 
     if not codes:
-        print('用法: fetch_sina_report_coverage.py <code> | --codes a,b,c | --watchlist [--days N]')
+        print('用法: fetch_sina_report_coverage.py <code> | --codes a,b,c | --watchlist | --top N [--days N] [--threads N]')
         return
-    for code in codes:
-        run(code, days)
-        time.sleep(0.8)
+
+    from concurrent.futures import ThreadPoolExecutor
+    def _work(code):
+        try:
+            run(code, days)
+        except Exception as e:
+            print('%s 失败: %s' % (code, e))
+        return code
+
+    print('新浪研报覆盖拉取: %d 只, threads=%d, days=%d' % (len(codes), threads, days))
+    if threads > 1 and len(codes) > 1:
+        with ThreadPoolExecutor(max_workers=threads) as ex:
+            list(ex.map(_work, codes))
+    else:
+        for code in codes:
+            _work(code)
+            time.sleep(0.8)
 
 
 if __name__ == '__main__':
