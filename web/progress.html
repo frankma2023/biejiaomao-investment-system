@@ -540,5 +540,19 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 </script>
 <script src="shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
+
+<div class="pg-section">
+<div class="section-title">📌 2026-09-07 收尾 · CANSLIM 重构 + 个股体检 Skill</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-done"></span></td><td>CANSLIM A 因子新增 TTM 盈利趋势子项（v3.4，A 满分 15→19）——滚动 4 季同比反映最新季报</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>CANSLIM N 因子形态评分重设计（v3.5）：19 引擎四档分级 + MW 质量分段 + 族内去重 + 跨族共振上限；v3.5.1 review 修复引擎 type 过滤 B1（7 引擎被静默丢弃）与 MW 质量分空白 B2</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>CANSLIM I 因子重构（v3.6）：删首次覆盖；持股 5+增减 8+覆盖 5；rating_up 降展示；研报唯一源=新浪（东财退役——万华 lx 2 家 vs 新浪 17 家实锤坏数据）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>L 因子 industry_rs 改申万 2021 一级行业指数口径（sw_index_kline + sw2021_members 两新表入库）——修正旧"成分 MAX"虚高（万华 92→真实 -1.5%）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>个股体检 Skill v1.0（.agents/skills/stock-health-report）：四层体检+七大师奇数投票+主持人终裁；万华/卫星双验证</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>红利定投三策略回测 + 起点敏感性（一次性 8 起点全胜=资产结构使然）——结论上红利首页（2026-09-03）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>财务评估 tab TTM 化 v1.3 + peers 全行 TTM + 盈利质量 3 图（本会话早期）</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td>待验证：新浪全市场 --all 5000 只批量是否被限流（周一首跑实测）；MW 回填等早期待办</td></tr>
+</table>
+</div>
 </body>
 </html>
