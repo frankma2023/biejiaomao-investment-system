@@ -41,6 +41,9 @@ n_new:
   - 6
   - 4
   high_lookback_days: 5
+  engine_scores:
+    base_breakout: 5
+    pocket_pivot: 5
 s_supply_demand:
   market_cap_tiers:
   - 50
