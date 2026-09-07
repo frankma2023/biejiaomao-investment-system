@@ -153,6 +153,12 @@ def main():
         codes = [r[0] for r in conn.execute(
             "SELECT DISTINCT stock_code FROM watchlist_report_daily UNION SELECT stock_code FROM observation_pool").fetchall()]
         conn.close()
+    elif '--all' in args:
+        # 全市场（每周一新浪全量——研报低频，90 天窗口周更足够）
+        conn = sqlite3.connect(DB_PATH)
+        codes = [r[0] for r in conn.execute(
+            "SELECT stock_code FROM stock_basic WHERE listing_status='normally_listed' AND name NOT LIKE '%ST%' AND name NOT LIKE '%*ST%'").fetchall()]
+        conn.close()
     elif '--top' in args:
         # CANSLIM 高分候选池：RPS250 前 N——与 batch 全市场评分的重点关注对齐
         n = int(args[args.index('--top') + 1])
@@ -164,7 +170,7 @@ def main():
         codes = [args[0]]
 
     if not codes:
-        print('用法: fetch_sina_report_coverage.py <code> | --codes a,b,c | --watchlist | --top N [--days N] [--threads N]')
+        print('用法: fetch_sina_report_coverage.py <code> | --codes a,b,c | --watchlist | --top N | --all [--days N] [--threads N]')
         return
 
     from concurrent.futures import ThreadPoolExecutor

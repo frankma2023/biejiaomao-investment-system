@@ -490,7 +490,7 @@ def score_i(db, stock_code, target_date, p):
         else:
             bd['inst_change'] = {'value': '{}'.format(delta), 'score': 0}
 
-    # Analyst coverage (table may not exist)；主源=sina（新浪研报，实时准确），备源=lx（东财批处理）
+    # Analyst coverage（唯一源=新浪研报——东财备源已退役 2026-09，质量差一个量级：万华 lx 2家 vs 新浪17家）
     ld = cfg.get('analyst_lookback_days', 90)
     ar = None
     try:
@@ -498,15 +498,13 @@ def score_i(db, stock_code, target_date, p):
             FROM stock_analyst_reports
             WHERE stock_code=? AND lookback_days=? AND source='sina'
             ORDER BY date DESC LIMIT 1""", (stock_code, ld)).fetchone()
-        if not ar:
-            ar = db.execute("""SELECT org_count, first_coverage, upgrade_count, source
-                FROM stock_analyst_reports
-                WHERE stock_code=? AND lookback_days=?
-                ORDER BY date DESC LIMIT 1""", (stock_code, ld)).fetchone()
     except sqlite3.OperationalError:
         pass
 
-    if ar:
+    if not ar:
+        bd['analyst'] = {'value': '-', 'score': 0, 'note': '无新浪研报覆盖(待周一全量/非重点池)'}
+        bd['rating_up'] = {'value': '-', 'score': 0}
+    else:
         oc = ar['org_count'] or 0
         at = cfg.get('analyst_coverage_tiers', [3, 1])
         if oc >= at[0]:
@@ -519,13 +517,9 @@ def score_i(db, stock_code, target_date, p):
             bd['analyst'] = {'value': '{}covers'.format(oc), 'score': 0}
         detail.append('Analyst {}'.format(oc))
 
-        # v3.6 终版：rating_up 降为展示项（新浪源无评级字段、东财 upgrade 未解析→恒 0，不占权重）
+        # v3.6 终版：rating_up 降为展示项（新浪源无评级字段→恒 0，不占权重）
         uc = ar['upgrade_count'] or 0
         bd['rating_up'] = {'value': '+{}'.format(uc) if uc > 0 else '0', 'score': 0, 'note': '数据源限制(新浪无评级)'}
-    else:
-        bd['analyst'] = {'value': '-', 'score': 0, 'note': 'run fetch script'}
-        bd['first_cov'] = {'value': '-', 'score': 0}
-        bd['rating_up'] = {'value': '-', 'score': 0}
 
     # v3.2：负债率移出 I 维度（2026-08-27）——语义错置（I 度量机构态度，负债率是公司质量）；
     # 原 2 分拨给首次覆盖(+1)与研报覆盖(+1)。负债率如需风险检查，另设门禁（未启用）
