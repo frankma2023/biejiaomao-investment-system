@@ -272,10 +272,12 @@ function loadConfig() {
         'l': [['l_leader.rs250_tiers', 'RS250阈值', '95,90,80,70'],
               ['l_leader.rs250_scores', '对应得分', '11,9,6,3'],
               ['l_leader.excess_return_threshold', '超额收益阈值(%)', '5']],
-        'i': [['i_institutional.inst_holding_tiers', '机构持股阈值(%)', '15,5,1'],
+        'i': [['i_institutional.inst_holding_tiers', '机构持股阈值(%)', '12,5,1'],
               ['i_institutional.inst_holding_scores', '对应得分', '5,3,1'],
+              ['i_institutional.inst_count_score', '机构增减分(增≥10/增)', '8,4'],
               ['i_institutional.analyst_coverage_tiers', '研报覆盖阈值', '3,1'],
-              ['i_institutional.debt_ratio_warning', '负债率警告(%)', '60']]
+              ['i_institutional.analyst_coverage_score', '覆盖高分(≥3家)', '5'],
+              ['i_institutional.analyst_coverage_score_low', '覆盖低分(1-2家)', '2']]
       };
 
       Object.keys(sections).forEach(function(key) {

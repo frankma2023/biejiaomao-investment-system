@@ -482,7 +482,7 @@ def score_i(db, stock_code, target_date, p):
         cur = irs[0]['fund_count'] + irs[0]['top10_inst_count']
         prev = irs[1]['fund_count'] + irs[1]['top10_inst_count']
         delta = cur - prev
-        inc_s = cfg.get('inst_count_score', [5, 2])
+        inc_s = cfg.get('inst_count_score', [8, 4])
         if delta >= cfg.get('inst_count_increase', 10):
             score += inc_s[0]; bd['inst_change'] = {'value': '+{}'.format(delta), 'score': inc_s[0]}
         elif delta > 0:
@@ -510,27 +510,18 @@ def score_i(db, stock_code, target_date, p):
         oc = ar['org_count'] or 0
         at = cfg.get('analyst_coverage_tiers', [3, 1])
         if oc >= at[0]:
-            score += cfg.get('analyst_coverage_score', 3)
-            bd['analyst'] = {'value': '{}covers'.format(oc), 'score': cfg.get('analyst_coverage_score', 3)}
+            score += cfg.get('analyst_coverage_score', 5)
+            bd['analyst'] = {'value': '{}covers'.format(oc), 'score': cfg.get('analyst_coverage_score', 5)}
         elif oc >= at[1]:
-            score += 1
-            bd['analyst'] = {'value': '{}covers'.format(oc), 'score': 1}
+            score += cfg.get('analyst_coverage_score_low', 2)
+            bd['analyst'] = {'value': '{}covers'.format(oc), 'score': cfg.get('analyst_coverage_score_low', 2)}
         else:
             bd['analyst'] = {'value': '{}covers'.format(oc), 'score': 0}
         detail.append('Analyst {}'.format(oc))
 
-        if ar['first_coverage']:
-            score += cfg.get('first_coverage_score', 2)
-            bd['first_cov'] = {'value': 'yes', 'score': cfg.get('first_coverage_score', 2)}
-        else:
-            bd['first_cov'] = {'value': 'no', 'score': 0}
-
+        # v3.6 终版：rating_up 降为展示项（新浪源无评级字段、东财 upgrade 未解析→恒 0，不占权重）
         uc = ar['upgrade_count'] or 0
-        if uc > 0:
-            score += cfg.get('rating_upgrade_score', 1)
-            bd['rating_up'] = {'value': '+{}'.format(uc), 'score': cfg.get('rating_upgrade_score', 1)}
-        else:
-            bd['rating_up'] = {'value': '0', 'score': 0}
+        bd['rating_up'] = {'value': '+{}'.format(uc) if uc > 0 else '0', 'score': 0, 'note': '数据源限制(新浪无评级)'}
     else:
         bd['analyst'] = {'value': '-', 'score': 0, 'note': 'run fetch script'}
         bd['first_cov'] = {'value': '-', 'score': 0}
