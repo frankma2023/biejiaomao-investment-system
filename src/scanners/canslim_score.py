@@ -543,17 +543,25 @@ def score_stock(stock_code, target_date, params=None, save=False, signals=None):
     if params is None: params = load_params()
     db = sqlite3.connect(DB_PATH); db.row_factory = sqlite3.Row
 
+    # 性能(2026-09-07)：K 线 LIMIT 1200——CANSLIM 各因子/引擎只需近期窗口(high52 250日、引擎≤500)，全历史 5000+ 根拖慢 4-10x
     rows = db.execute("""SELECT date, open, high, low, close, volume FROM daily_kline
-        WHERE stock_code=? AND date<=? ORDER BY date""",
+        WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1200""",
         (stock_code, target_date)).fetchall()
+    rows = list(reversed(rows))
     klines = [dict(r) for r in rows]
 
+    # N 因子计分引擎白名单（v3.5 性能）：只跑 bullish 配分引擎，bearish 引擎（box_breakdown/top_pattern 等）不参与 N 计分不跑——002001 实测省 ~5s/只
+    n_engines = ('base_breakout_v2', 'base_breakout', 'pocket_pivot_v2', 'pocket_pivot',
+                 'box_breakout', 'double_bottom', 'flat_base', 'saucer_base', 'cup_handle',
+                 'cdl', 'talib', 'mw_signal')
     if signals is None and len(klines) >= 50:
         try:
             from engine_registry import run_all_engines
             ind = _compute_indicators(klines)
-            signals = run_all_engines(klines=klines, indicators=ind, silent=True)
-        except: pass
+            signals = run_all_engines(klines=klines, indicators=ind, whitelist=list(n_engines), silent=True)
+        except Exception as _e:
+            print(f'[canslim_score] run_all_engines 失败: {_e}')
+            signals = []
 
     c = score_c(db, stock_code, target_date, params)
     a = score_a(db, stock_code, target_date, params)

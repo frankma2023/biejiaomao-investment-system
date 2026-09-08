@@ -10,7 +10,7 @@
 import os, sys, time, sqlite3, argparse
 from datetime import datetime, timedelta, date
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_DIR))
@@ -72,21 +72,13 @@ def get_all_signals(klines):
 
 
 def score_one(code, name, target_date, params):
-    """对单只股票评分并入库"""
-    db = sqlite3.connect(str(DB_PATH))
-    db.row_factory = sqlite3.Row
+    """对单只股票评分并入库（v3.5：直调 score_stock——内部已做 K线 LIMIT 1200 + N因子引擎白名单优化，
+    统一信号源；旧版自拉全量K线+仅 base/pocket 信号的 get_all_signals 已弃用——那是 batch N form 缺信号的根源）"""
     try:
-        klines = get_stock_klines(db, code, target_date)
-        if len(klines) < 50:
-            return None
-
-        signals = get_all_signals(klines)
-        result = score_stock(code, target_date, params, save=True, signals=signals)
+        result = score_stock(code, target_date, params, save=True)
         return result
-    except Exception as e:
+    except Exception:
         return None
-    finally:
-        db.close()
 
 
 def get_stocks(limit=None):
@@ -123,7 +115,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--force', action='store_true')
     parser.add_argument('--limit', type=int, default=0)
-    parser.add_argument('--workers', type=int, default=1)
+    parser.add_argument('--workers', type=int, default=os.cpu_count() or 4)
     parser.add_argument('--date', type=str, default=None)
     args = parser.parse_args()
 
@@ -131,7 +123,7 @@ def main():
     print(f"Date: {target_date}")
 
     stocks = get_stocks(args.limit or None)
-    skip_set = set() if args.force else get_skip_set()
+    skip_set = set() if args.force else get_skip_set(days=1)  # 每日全评(2026-09-07): N/L 因子日频输入不能 7 天滞后
     to_score = [(c, n) for c, n in stocks if c not in skip_set]
     print(f"Stocks: {len(stocks)} total, {len(skip_set)} skip, {len(to_score)} to score")
 
@@ -144,11 +136,15 @@ def main():
     done = 0; scored = 0
 
     if args.workers > 1:
-        with ThreadPoolExecutor(max_workers=args.workers) as ex:
+        with ProcessPoolExecutor(max_workers=args.workers) as ex:
             futures = {ex.submit(score_one, c, n, target_date, params): c for c, n in to_score}
             for future in as_completed(futures):
                 done += 1
-                if future.result():
+                try:
+                    if future.result(timeout=40):  # 单票 40s 超时——慢票/卡票跳过不拖死整批
+                        scored += 1
+                except Exception as e:
+                    print(f'⏭️ {futures[future]} 评分失败/超时: {str(e)[:60]}', flush=True)
                     scored += 1
                 if done % 50 == 0:
                     elapsed = time.time() - t0
