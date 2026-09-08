@@ -224,8 +224,9 @@ def score_n(db, stock_code, target_date, p, klines=None, signals=None):
     if signals is None:
         try:
             from engine_registry import run_all_engines
-            ind = _compute_indicators(klines)
-            all_sigs = run_all_engines(klines=klines, indicators=ind, silent=True)
+            k_eng = klines[-600:]  # 性能：引擎输入截断 600（同 score_stock）
+            ind = _compute_indicators(k_eng)
+            all_sigs = run_all_engines(klines=k_eng, indicators=ind, silent=True)
         except Exception as _e:
             print(f'[canslim_score] run_all_engines 失败，N 形态分归 0: {_e}')
             all_sigs = []
@@ -554,11 +555,14 @@ def score_stock(stock_code, target_date, params=None, save=False, signals=None):
     n_engines = ('base_breakout_v2', 'base_breakout', 'pocket_pivot_v2', 'pocket_pivot',
                  'box_breakout', 'double_bottom', 'flat_base', 'saucer_base', 'cup_handle',
                  'cdl', 'talib', 'mw_signal')
+    # 引擎输入截断 600 根（v3.6 性能）：box_breakout 等引擎全历史事件扫描 O(n²)——评分只需近 5 天信号，
+    # 600 根(2.4年)覆盖 52 周高点判断+箱体形成期。实测引擎 0.8s→0.25s（box_breakout 0.51s→0.13s）
+    klines_eng = klines[-600:]
     if signals is None and len(klines) >= 50:
         try:
             from engine_registry import run_all_engines
-            ind = _compute_indicators(klines)
-            signals = run_all_engines(klines=klines, indicators=ind, whitelist=list(n_engines), silent=True)
+            ind = _compute_indicators(klines_eng)
+            signals = run_all_engines(klines=klines_eng, indicators=ind, whitelist=list(n_engines), silent=True)
         except Exception as _e:
             print(f'[canslim_score] run_all_engines 失败: {_e}')
             signals = []
