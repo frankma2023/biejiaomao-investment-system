@@ -78,11 +78,12 @@ def get_klines(conn, code, min_date, max_date=None):
     return [dict(r) for r in rows]
 
 
-def scan_stock(klines, scan_date, code=None, conn=None):
+def scan_stock(klines, scan_date, code=None, conn=None, market_bull=False):
     """
     扫描单只股票,返回 (passed, result_dict)
     passed: True/False
     result_dict: 信号详情或 None
+    market_bull (v5.4): 市场为牛市(000985>MA200)时禁止新增 B1（已入库 B1 的 B2 更新放行）
     """
     n = len(klines)
     if n < 150:
@@ -144,7 +145,7 @@ def scan_stock(klines, scan_date, code=None, conn=None):
         
         future_low = min(klines[j]['close'] for j in range(top_idx+1, n)) if top_idx+1 < n else top_price
         decline = (top_price - future_low)/top_price if top_price > 0 else 0
-        if decline < 0.10: continue
+        if decline < 0.40: continue  # v5.4: decline 硬门槛 10%→40%（回测:<40%超额全负,≥40%拐点+0.86%）
         
         pre60_start = max(0, top_idx-60)
         pre60_low = min(klines[j]['close'] for j in range(pre60_start, top_idx)) if pre60_start < top_idx else top_price
@@ -220,8 +221,14 @@ def scan_stock(klines, scan_date, code=None, conn=None):
         if ret >= 0.02 and b1_vol_ok and b1_ma_ok and k['close'] > max(klines[j]['close'] for j in range(c_start, c_end+1)):
             b1_idx = i; break
     if b1_idx is None: return False, None
-
     b1_date_str = dates[b1_idx]
+
+    if market_bull and conn is not None:
+        # v5.4 市场门禁：牛市不新增 B1——已入库(该股票该B1日)则放行（B2 更新路径）
+        ex = conn.execute("SELECT 1 FROM mw_signal_daily WHERE stock_code=? AND b1_date=?",
+                          (code, b1_date_str)).fetchone()
+        if not ex:
+            return False, None
 
     # ── 5. 找 B2 ──
     # 先记录 B1 日的 MA 状态,B2 必须在此基础上有趋势结构升级
@@ -353,8 +360,8 @@ def scan_stock(klines, scan_date, code=None, conn=None):
             h_rs20 = row[0]
             h_rs250 = row[1]
 
-    # v3.0 硬门禁：前高 RS250 ≥ 50，不满足则不出 B1
-    if h_rs250 is None or h_rs250 < 50:
+    # v5.4: h_rs250≥50 硬门禁废除（回测零区分力——全档超额 43%± 无单调；仅保留数据缺失拒发）
+    if h_rs250 is None:
         return False, None
 
     # ── 7. 行业共振 + 个股RS强度评分 ──
@@ -968,11 +975,24 @@ def run_scan(scan_date, fast=False, silent=False):
     signals = []
     b1_count = 0
 
+    # v5.4 市场环境门禁：000985 收盘 > MA200 = 牛市 → 不新增 B1（已入库 B1 的 B2 更新放行）
+    market_bull = False
+    try:
+        idx_rows = conn.execute(
+            "SELECT date, close FROM index_daily_kline WHERE stock_code='000985' AND date<=? ORDER BY date DESC LIMIT 200",
+            (scan_date,)).fetchall()
+        if len(idx_rows) >= 200:
+            idx_rows = list(reversed(idx_rows))
+            _ma = sum(r['close'] for r in idx_rows) / 200
+            market_bull = idx_rows[-1]['close'] > _ma
+    except Exception:
+        pass
+
     for i, code in enumerate(stocks):
         klines = get_klines(conn, code, min_date, scan_date)
         if len(klines) < 150: continue
 
-        passed, result = scan_stock(klines, scan_date, code, conn)
+        passed, result = scan_stock(klines, scan_date, code, conn, market_bull=market_bull)
         if result:
             b1_count += 1
         if passed:
