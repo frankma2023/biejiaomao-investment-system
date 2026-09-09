@@ -416,7 +416,7 @@ def scan_stock(klines, scan_date, code=None, conn=None, market_bull=False):
         if not use_set:
             # 查 stock_sw_industry 获取申万行业
             if not hasattr(scan_stock, '_sw_map'):
-                import yaml
+                import yaml, os as _os  # 自带 _os（勿依赖 L386 分支的隐式绑定——worker 缓存命中时 L386 不执行会 UnboundLocalError）
                 _sw_cfg = yaml.safe_load(open(_os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))), 'config', 'sw_to_index.yaml'), 'r', encoding='utf-8'))
                 scan_stock._sw_map = _sw_cfg
             sw_row = conn.execute(
@@ -1071,14 +1071,15 @@ def _scan_worker(stock_codes, scan_date, db_path, market_bull=False):
     ).fetchall():
         mw._kline_cache[r['stock_code']].append(dict(r))
 
-    # ── 2. 缠论笔 ──
+    # ── 2. 缠论笔（v5.4-backfill：精确取当日笔快照 WHERE scan_date=?；原 MAX(scan_date) 对历史回填=最新笔未来偏差；固定 0% 兜底与主路径一致）──
+    mw._disable_fallback = True
     try:
         import orjson as _ojson
     except ImportError:
         import json as _ojson
     for row in conn.execute(
-        f"SELECT stock_code, bi_json FROM chanlun_bi_json WHERE stock_code IN ({ph}) GROUP BY stock_code HAVING scan_date=MAX(scan_date)",
-        codes
+        f"SELECT stock_code, bi_json FROM chanlun_bi_json WHERE scan_date=? AND stock_code IN ({ph})",
+        [scan_date] + codes
     ).fetchall():
         try:
             mw._chanlun_cache[(row['stock_code'], scan_date)] = _ojson.loads(row['bi_json'])

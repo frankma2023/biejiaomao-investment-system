@@ -185,9 +185,23 @@ def preload_all(scan_date, verbose=True):
     return n_bi, n_bi_failed
 
 
-def scan_single_date(scan_date, allow_fallback=False):
-    """扫描单个日期。返回 (total, b1, b2, pre_t, scan_t, skipped_bi, skipped_fb, bi_failed)"""
+def scan_single_date(scan_date, allow_fallback=False, workers=0):
+    """扫描单个日期。返回 (total, b1, b2, pre_t, scan_t, skipped_bi, skipped_fb, bi_failed)
+    workers>1 时走 run_scan_parallel（单日 40-60s vs 单进程 3-5min）；并行固定 0% 兜底（等同实盘）
+    """
     import scanners.mw_signal as mw
+    if workers and workers > 1:
+        from scanners.mw_signal import run_scan_parallel
+        t1 = time.time()
+        run_scan_parallel(scan_date, n_workers=workers, silent=True)
+        scan_t = time.time() - t1
+        # 并行模式统计简化（不做逐日细统计——总 B1/B2 在表里可查）
+        conn = sqlite3.connect(DB)
+        total = conn.execute("SELECT COUNT(*) FROM mw_signal_daily WHERE scan_date=?", (scan_date,)).fetchone()[0]
+        b1 = conn.execute("SELECT COUNT(*) FROM mw_signal_daily WHERE b1_date=?", (scan_date,)).fetchone()[0]
+        b2 = conn.execute("SELECT COUNT(*) FROM mw_signal_daily WHERE b2_date=?", (scan_date,)).fetchone()[0]
+        conn.close()
+        return (total, b1, b2, 0, scan_t, 0, 0, 0)
     from scanners.mw_signal import run_scan
     
     # 重置计数器 + 设置兜底策略
@@ -263,7 +277,7 @@ def run_staggered(allow_fallback=False):
             print(f"\n✅ 所有股票笔数据来自预加载缓存，0%兜底，完全等同实盘。")
 
 
-def run_sequential(dates, allow_fallback=False, skip_existing=False):
+def run_sequential(dates, allow_fallback=False, skip_existing=False, workers=0):
     """逐日模式（v3.1：--skip-existing 断点续跑）"""
     if skip_existing:
         conn = sqlite3.connect(DB)
@@ -276,7 +290,7 @@ def run_sequential(dates, allow_fallback=False, skip_existing=False):
             print('全部已回填，无需执行')
             return
     total_dates = len(dates)
-    fb_label = '允许兜底' if allow_fallback else '0%兜底'
+    fb_label = ('允许兜底' if allow_fallback else '0%兜底') + (' | %d进程并行' % workers if workers and workers > 1 else '')
     print(f"逐日模式: {total_dates} 个交易日 ({dates[0]} ~ {dates[-1]}) | {fb_label}")
     print(f"{'日期':<12} {'预加载':>6} {'扫描':>6} {'B1':>6} {'B2':>6} {'总信号':>7} {'跳过':>6} {'累计':>10} {'ETA':>8}")
     print("-" * 83)
@@ -287,7 +301,7 @@ def run_sequential(dates, allow_fallback=False, skip_existing=False):
     
     for i, d in enumerate(dates):
         try:
-            total, b1, b2, pre_t, scan_t, skipped_bi, skipped_fb, bi_failed = scan_single_date(d, allow_fallback)
+            total, b1, b2, pre_t, scan_t, skipped_bi, skipped_fb, bi_failed = scan_single_date(d, allow_fallback, workers)
             grand_total += total
             grand_b1 += b1
             grand_b2 += b2
@@ -332,6 +346,7 @@ if __name__ == '__main__':
     parser.add_argument('--start', type=str, required=True)
     parser.add_argument('--end', type=str, required=True)
     parser.add_argument('--staggered', action='store_true')
+    parser.add_argument('--workers', type=int, default=0, help='多进程并行(8: 单日40-60s); 并行固定0%兜底')
     parser.add_argument('--skip-existing', action='store_true',
                         help='跳过 mw_signal_daily 已有 scan_date（断点续跑）')
     parser.add_argument('--allow-fallback', action='store_true',
@@ -351,4 +366,4 @@ if __name__ == '__main__':
         if not dates:
             print("区间无交易日")
             sys.exit(0)
-        run_sequential(dates, allow_fallback=args.allow_fallback, skip_existing=args.skip_existing)
+        run_sequential(dates, allow_fallback=args.allow_fallback, skip_existing=args.skip_existing, workers=args.workers)
