@@ -152,6 +152,11 @@
         <button onclick="computeSnapshot()" style="margin-left:auto;font-size:10px;padding:4px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer;font-family:var(--font-body)">🔄 刷新计算</button>
       </div>
       <div id="content"></div>
+      <div id="microcap-bar" style="display:flex;gap:14px;align-items:center;margin:2px 0 10px;padding:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:14px;flex-wrap:wrap;cursor:pointer" onclick="window.open('microcap.html')" title="点击进入微盘股指数详情">
+        <span style="font-family:var(--font-display);font-size:0.75rem;font-weight:800;color:#ef4444">🔬 微盘水温</span>
+        <span style="font-size:0.6rem;color:var(--muted)" id="mc-load">加载中…</span>
+        <span style="margin-left:auto;font-size:0.56rem;color:var(--muted)">自建 400 只等权 · 月频调仓 · 非交易标的 →</span>
+      </div>
     </div>
     <div class="modal-overlay" id="breakout-modal" onclick="if(event.target===this)closeBreakoutModal()">
       <div class="modal-box"><button class="modal-close" onclick="closeBreakoutModal()">✕</button><h2>🚀 放量突破个股</h2><div class="modal-sub" id="breakout-meta"></div><div id="breakout-table"></div></div>
@@ -189,6 +194,17 @@
     };
     function fm(v){if(v==null)return'—';if(v>=1e8)return(v/1e8).toFixed(2)+'亿';if(v>=1e4)return(v/1e4).toFixed(0)+'万';return v.toString();}
 
+    async function loadMicrocapBar(){
+      try{
+        const j = await fetch(API_BASE+'/api/microcap/watertemp').then(r=>r.json());
+        const d = j && j['400'];
+        const el = document.getElementById('mc-load');
+        if(!d){el.textContent='暂无数据';return;}
+        const cls = d.drawdown < -25 ? '#ef4444' : (d.drawdown < -15 ? '#f59e0b' : '#10b981');
+        el.innerHTML = '400指数 <b>'+Number(d.point).toFixed(0)+'</b> ｜ 当日 '+(d.pct_change>=0?'+':'')+Number(d.pct_change||0).toFixed(2)+'% ｜ <span style="color:'+cls+'">距高点 '+d.drawdown+'%</span> ｜ 平均市值 <b>'+(d.avg_mkt_cap||'—')+'</b> 亿';
+      }catch(e){ var el2=document.getElementById('mc-load'); if(el2) el2.textContent='数据不可用'; }
+    }
+
     async function load(specificDate) {
       const div=document.getElementById('content');
       try{
@@ -205,6 +221,7 @@
         hr.fcf_advice=fcfa;
         render(hr,pr,sr);
         loadMajorIndices();
+        loadMicrocapBar();
       }catch(e){div.innerHTML='<div class="no-data">📡 数据加载失败</div>';}
     }
 

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="theme-color" content="#0d0d12">
+<title>微盘股指数 · 自建水温计</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<script src="../shared/js/echarts.min.js"></script>
+<style>
+  .layout{max-width:1200px;margin:0 auto;padding-bottom:40px}
+  .hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px}
+  .hdr h1{font-family:var(--font-display);font-size:1.15rem;font-weight:800;color:var(--text-primary)}
+  .hdr .sub{font-size:0.62rem;color:var(--muted)}
+  .tabs{display:inline-flex;gap:4px}
+  .tab{padding:4px 14px;border-radius:10px;font-size:0.66rem;border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;background:var(--card);font-family:var(--font-body)}
+  .tab.on{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.4);color:#ef4444;font-weight:600}
+  .wt-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:8px 0 10px}
+  .wt{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px 14px}
+  .wt .k{font-size:0.58rem;color:var(--muted);letter-spacing:.06em}
+  .wt .v{font-family:var(--font-display);font-size:1.15rem;font-weight:800;margin-top:2px;color:var(--text-primary)}
+  .wt .v.danger{color:#ef4444}.wt .v.ok{color:#10b981}
+  .wt .note{font-size:0.55rem;color:var(--muted);margin-top:2px}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:8px}
+  .panel h3{font-size:0.72rem;font-weight:700;color:var(--text-secondary);margin-bottom:8px}
+  .chart{width:100%;height:340px}
+  .chart.h{height:260px}
+  .foot{font-size:0.56rem;color:var(--muted);line-height:1.7;margin-top:6px;padding:0 4px}
+  .legend-chip{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}
+  .up{color:#ef4444}.down{color:#10b981}
+  table{width:100%;border-collapse:collapse;font-size:0.66rem}
+  th{text-align:left;padding:5px 8px;border-bottom:1px solid var(--divider);color:var(--muted);font-size:0.58rem;cursor:pointer;white-space:nowrap}
+  td{padding:4px 8px;border-bottom:1px solid var(--divider);color:var(--text-secondary)}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .comp-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px}
+  .comp-head .info{font-size:0.6rem;color:var(--muted)}
+  .scroll{max-height:420px;overflow-y:auto}
+  @media(max-width:700px){.layout{padding:0 8px 20px}.chart{height:260px}.chart.h{height:200px}}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<script>(function(){var c=document.getElementById("bg-canvas"),w=c.width=window.innerWidth,h=c.height=window.innerHeight;var ctx=c.getContext("2d"),N=50;var p=[];for(var i=0;i<N;i++)p.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*1.5+.3,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:Math.random()*.4+.1});function draw(){ctx.clearRect(0,0,w,h);for(var i=0;i<N;i++){var P=p[i];P.x+=P.vx;P.y+=P.vy;if(P.x<0)P.x=w;if(P.x>w)P.x=0;if(P.y<0)P.y=h;if(P.y>h)P.y=0;ctx.beginPath();ctx.arc(P.x,P.y,P.r,0,2*Math.PI);ctx.fillStyle='rgba(255,255,255,'+P.o+')';ctx.fill()}};setInterval(draw,50)})();</script>
+<div class="app-container">
+  <nav id="top-nav"></nav>
+  <div class="layout">
+    <div class="hdr">
+      <h1>🔬 微盘股指数 <span style="font-size:0.55rem;color:var(--muted);font-weight:400">自建 · 万得口径复刻 · 月频调仓等权</span></h1>
+      <div class="tabs">
+        <span class="tab on" id="tab400" onclick="setType('400')">400 只（官方口径）</span>
+        <span class="tab" id="tab100" onclick="setType('100')">100 只（极端）</span>
+      </div>
+    </div>
+    <div class="wt-cards" id="wt-cards"></div>
+
+    <div class="panel"><h3>走势 · 点位 <span id="chart-title" style="color:var(--muted);font-weight:400"></span></h3>
+      <div class="chart" id="chart-main"></div>
+    </div>
+    <div class="panel"><h3>风格对照 · 归一化（2018-08 = 1，932000 数据起点）</h3>
+      <div class="chart h" id="chart-cmp"></div>
+    </div>
+    <div class="panel">
+      <div class="comp-head"><h3 style="margin:0">成分股明细 <span id="comp-type"></span></h3>
+        <span class="info" id="comp-info"></span>
+        <select id="eff-select" style="font-family:var(--font-body);font-size:0.6rem;padding:3px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text-primary)" onchange="loadComp(this.value)"></select>
+      </div>
+      <div class="scroll"><table id="comp-table">
+        <thead><tr><th onclick="sortComp('stock_code')">代码</th><th onclick="sortComp('name')">名称</th><th onclick="sortComp('mkt_cap')">总市值(亿)</th><th onclick="sortComp('weight')">权重</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+    <div class="foot">
+      <b>口径声明</b>：自建微盘指数对齐万得 868008（月频调仓/等权/总市值最小 400/100 只）。差异：次新按上市&lt;60 自然日近似、ST 历史段未剔（无历史状态数据，避免前视）、月末最后交易日定池。选池用真实收盘×当日总股本；点位用前复权收益等权连乘。历史回算 2016-01-04 = 1000。仅供风格/水温观测，<b>非可交易标的</b>。
+    </div>
+  </div>
+</div>
+<script src="../shared/js/nav.js"></script>
+<script>
+let TYPE = '400';
+let allDaily = {};
+let compCache = {};
+let charts = {};
+let resizeTimer = null;
+
+function toggleTheme(){ /* 共享 nav.js 已处理 */ }
+
+async function fetchJSON(u){ const r = await fetch(u); return r.json(); }
+
+async function init(){
+  document.getElementById('date-label');
+  await loadDaily();
+  await loadWT();
+  await loadCompDates();
+  window.addEventListener('resize', ()=>{ clearTimeout(resizeTimer); resizeTimer=setTimeout(()=>{Object.values(charts).forEach(c=>{try{c.resize()}catch(e){}})},200); });
+}
+
+async function loadDaily(){
+  for (const t of ['400','100']) {
+    const j = await fetchJSON(`/api/microcap?type=${t}`);
+    allDaily[t] = j.rows || [];
+  }
+  renderMain();
+  renderCmp();
+}
+
+function setType(t){
+  TYPE = t;
+  document.getElementById('tab400').classList.toggle('on', t==='400');
+  document.getElementById('tab100').classList.toggle('on', t==='100');
+  renderMain();
+  loadCompDates();
+  loadWT();
+}
+
+function ma(arr, win){
+  const out = [];
+  for (let i=0;i<arr.length;i++){
+    if (i < win-1) { out.push(null); continue; }
+    let s=0; for (let j=i-win+1;j<=i;j++) s+=arr[j];
+    out.push(s/win);
+  }
+  return out;
+}
+
+function renderMain(){
+  const rows = allDaily[TYPE] || [];
+  if (!rows.length) return;
+  const ds = rows.map(r=>r.date.slice(5));
+  const pts = rows.map(r=>r.point);
+  const el = document.getElementById('chart-main');
+  const ch = charts['main'] = charts['main'] || echarts.init(el);
+  const upColor = '#ef4444', dnColor = '#10b981';
+  ch.setOption({
+    backgroundColor:'transparent',
+    animation:false,
+    grid:{left:8,right:10,top:20,bottom:26,containLabel:true},
+    tooltip:{trigger:'axis',backgroundColor:'rgba(20,20,26,.92)',borderColor:'rgba(255,255,255,.08)',textStyle:{color:'#ddd',fontSize:11},formatter:function(ps){const p=ps[0];return p.axisValue+'<br>'+p.marker+(p.seriesName)+': <b>'+Number(p.value==null?0:p.value).toFixed(1)+'</b>';}},
+    xAxis:{type:'category',data:ds,boundaryGap:false,axisLine:{lineStyle:{color:'rgba(255,255,255,.08)'}},axisLabel:{color:'#888',fontSize:9,interval:Math.floor(rows.length/8)}},
+    yAxis:{type:'value',scale:true,axisLabel:{color:'#888',fontSize:9},splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}}},
+    series:[
+      {name:TYPE+' 指数',type:'line',data:pts,symbol:'none',lineStyle:{width:1.6,color:upColor},areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(239,68,68,.12)'},{offset:1,color:'rgba(239,68,68,0)'}]}}},
+      {name:'MA20',type:'line',data:ma(pts,20),symbol:'none',lineStyle:{width:1,color:'#f59e0b',opacity:.7}},
+      {name:'MA60',type:'line',data:ma(pts,60),symbol:'none',lineStyle:{width:1,color:'#60a5fa',opacity:.6}},
+    ]
+  });
+}
+
+async function renderCmp(){
+  const BASE = '2018-08-15'; // 统一归一化基准（932000 数据起点，三序列均覆盖）
+  const norm = {};
+  for (const t of ['400','100']) {
+    const rows = allDaily[t] || [];
+    if (!rows.length) continue;
+    const bi = rows.findIndex(r=>r.date >= BASE);
+    if (bi < 0) continue;
+    const b = rows[bi].point;
+    norm[t] = {d:rows.slice(bi).map(r=>r.date), v:rows.slice(bi).map(r=>r.point/b)};
+  }
+  const j932 = await (await fetch('/api/kline?stock_code=932000&start=2016-01-01')).json();
+  const j985 = await (await fetch('/api/kline?stock_code=000985&start=2016-01-01')).json();
+  const mkIdx = function(arr, color, name){
+    if (!arr || !arr.length) return null;
+    const bi = arr.findIndex(r=>r.date >= BASE);
+    if (bi < 0) return null;
+    const b = arr[bi].close;
+    return {name, type:'line', symbol:'none', data:arr.slice(bi).map(r=>r.close/b),
+      lineStyle:{width:name.indexOf('微盘')>=0?1.8:1.2, color, opacity:name.indexOf('微盘')>=0?1:.6}};
+  };
+  const el = document.getElementById('chart-cmp');
+  const ch = charts['cmp'] = charts['cmp'] || echarts.init(el);
+  const s = [];
+  if (norm['400']) s.push({name:'400 微盘',type:'line',symbol:'none',data:norm['400'].v,lineStyle:{width:1.8,color:'#ef4444'}});
+  if (norm['100']) s.push({name:'100 微盘',type:'line',symbol:'none',data:norm['100'].v,lineStyle:{width:1.4,color:'#fb923c'}});
+  const zs = mkIdx(j932,'#60a5fa','中证2000'); if (zs) s.push(zs);
+  const ms = mkIdx(j985,'#a3a3a3','000985'); if (ms) s.push(ms);
+  const xd = norm['400'] ? norm['400'].d : [];
+  ch.setOption({
+    backgroundColor:'transparent',animation:false,
+    grid:{left:8,right:10,top:26,bottom:24,containLabel:true},
+    legend:{textStyle:{color:'#999',fontSize:10},top:0,itemWidth:14},
+    tooltip:{trigger:'axis',backgroundColor:'rgba(20,20,26,.92)',borderColor:'rgba(255,255,255,.08)',textStyle:{color:'#ddd',fontSize:11},valueFormatter:v=>v==null?'-':(v*100).toFixed(0)+'x'},
+    xAxis:{type:'category',data:xd,boundaryGap:false,axisLine:{lineStyle:{color:'rgba(255,255,255,.08)'}},axisLabel:{color:'#888',fontSize:9,interval:Math.floor(xd.length/8)}},
+    yAxis:{type:'value',axisLabel:{color:'#888',fontSize:9,formatter:v=>v+'x'},splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}}},
+    series:s
+  });
+}
+
+async function loadWT(){
+  const j = await fetchJSON('/api/microcap/watertemp');
+  const el = document.getElementById('wt-cards');
+  const mk = (t, name, hint) => {
+    const d = j[t];
+    if (!d) return `<div class="wt"><div class="k">${name}</div><div class="v">—</div></div>`;
+    const ddCls = d.drawdown < -25 ? 'danger' : (d.drawdown < -15 ? '' : 'ok');
+    const pcCls = (d.pct_change||0) >= 0 ? 'up' : 'down';
+    return `<div class="wt"><div class="k">${name} · ${d.date.slice(5)}</div>
+      <div class="v">${Number(d.point).toFixed(0)} <span style="font-size:0.6rem;color:var(--muted)">点</span></div>
+      <div class="note ${pcCls}">当日 ${(d.pct_change||0)>=0?'+':''}${(d.pct_change||0).toFixed(2)}% ｜ 平均市值 <b>${d.avg_mkt_cap||'—'}亿</b></div>
+      <div class="note ${ddCls}">距高点 ${d.drawdown}%（高点 ${d.peak_date}）</div>
+      ${hint||''}</div>`;
+  };
+  const hint400 = `<div class="note">参照：万得 2024-01 崩盘 -49%｜本序列 -45.5%</div>`;
+  const hint100 = `<div class="note">100 只口径更极端（波动/回撤更深）</div>`;
+  el.innerHTML = mk('400','400 只指数', hint400) + mk('100','100 只指数', hint100);
+}
+
+async function loadCompDates(){
+  const sel = document.getElementById('eff-select');
+  // 从成分表取所有生效月
+  const j = await fetchJSON('/api/microcap/components?type=' + TYPE);
+  const eff = j.eff_date;
+  sel.innerHTML = `<option value="${eff}">${eff} 起生效</option>`;
+  await loadComp(eff);
+}
+
+async function loadComp(eff){
+  const j = await fetchJSON(`/api/microcap/components?type=${TYPE}&date=${eff}`);
+  compCache[TYPE+eff] = j.rows || [];
+  document.getElementById('comp-info').textContent = `${j.count} 只 · 生效 ${j.eff_date} · 总市值升序`;
+  renderComp();
+}
+
+function renderComp(){
+  const rows = compCache[TYPE + document.getElementById('eff-select').value] || [];
+  const tb = document.querySelector('#comp-table tbody');
+  tb.innerHTML = rows.slice(0, 200).map(r=>`<tr>
+    <td class="code">${r.stock_code}</td><td>${r.name||''}</td><td>${r.mkt_cap==null?'—':Number(r.mkt_cap).toFixed(1)}</td><td>${r.weight==null?'—':(r.weight*100).toFixed(2)+'%'}</td></tr>`).join('');
+  document.querySelector('#comp-table').dataset.rows = JSON.stringify(rows);
+  document.getElementById('comp-info').textContent += ` ｜ 显示前 200 / ${rows.length}`;
+}
+function sortComp(key){
+  const rows = JSON.parse(document.querySelector('#comp-table').dataset.rows || '[]');
+  const dir = (compCache._sortKey===key)?(compCache._sortDir=-compCache._sortDir||1):(compCache._sortKey=key,compCache._sortDir=1);
+  compCache._sortKey = key; compCache._sortDir = dir;
+  rows.sort((a,b)=>(a[key]==null?0:a[key])>(b[key]==null?0:b[key])?dir:-dir);
+  const tb = document.querySelector('#comp-table tbody');
+  tb.innerHTML = rows.slice(0,200).map(r=>`<tr>
+    <td class="code">${r.stock_code}</td><td>${r.name||''}</td><td>${r.mkt_cap==null?'—':Number(r.mkt_cap).toFixed(1)}</td><td>${r.weight==null?'—':(r.weight*100).toFixed(2)+'%'}</td></tr>`).join('');
+}
+init();
+</script>
+</body>
+</html>

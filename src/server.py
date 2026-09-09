@@ -7453,6 +7453,70 @@ def api_market_commodity_detail():
     })
 
 
+@app.route('/api/microcap', methods=['GET'])
+def api_microcap():
+    """微盘股指数日线（自建，PRD: 微盘股指数复刻模块）type=400|100"""
+    db = get_db()
+    typ = request.args.get('type', '400')
+    start = request.args.get('start', None)
+    end = request.args.get('end', None)
+    if typ not in ('400', '100'):
+        return jsonify({'error': 'type 必须为 400 或 100'}), 400
+    q = "SELECT date, point, pct_change, avg_mkt_cap, n FROM microcap_index_daily WHERE index_type=?"
+    args = [typ]
+    if start:
+        q += " AND date>=?"; args.append(start)
+    if end:
+        q += " AND date<=?"; args.append(end)
+    q += " ORDER BY date"
+    rows = db.execute(q, args).fetchall()
+    return jsonify({'type': typ, 'rows': [dict(r) for r in rows], 'count': len(rows)})
+
+
+@app.route('/api/microcap/components', methods=['GET'])
+def api_microcap_components():
+    """微盘指数成分快照（默认最新生效）type=400|100 date=指定生效日"""
+    db = get_db()
+    typ = request.args.get('type', '400')
+    date = request.args.get('date', None)
+    if typ not in ('400', '100'):
+        return jsonify({'error': 'type 必须为 400 或 100'}), 400
+    if not date:
+        date = db.execute("SELECT MAX(eff_date) FROM microcap_index_component WHERE index_type=? AND eff_date<='9999-12-31'", (typ,)).fetchone()[0]
+    rows = db.execute(
+        "SELECT stock_code, name, mkt_cap, weight FROM microcap_index_component WHERE index_type=? AND eff_date=? ORDER BY mkt_cap",
+        (typ, date)).fetchall()
+    return jsonify({'type': typ, 'eff_date': date, 'rows': [dict(r) for r in rows], 'count': len(rows)})
+
+
+@app.route('/api/microcap/watertemp', methods=['GET'])
+def api_microcap_watertemp():
+    """微盘水温卡：400/100 最新点位/回撤/平均市值 + 与 932000 对比（供 market-scan 卡片）"""
+    db = get_db()
+    try:
+        out = {}
+        for typ in ('400', '100'):
+            rows = db.execute(
+                "SELECT date, point, pct_change, avg_mkt_cap FROM microcap_index_daily WHERE index_type=? ORDER BY date",
+                (typ,)).fetchall()
+            rows = [dict(r) for r in rows]
+            if not rows:
+                out[typ] = None
+                continue
+            last = rows[-1]
+            # 历史高点回撤
+            peak = max(r['point'] for r in rows)
+            peak_date = next((r['date'] for r in reversed(rows) if r['point'] == peak), last['date'])
+            dd = last['point'] / peak - 1
+            # 2024-01 崩盘参照段回撤（同型历史极值参考）
+            out[typ] = {'date': last['date'], 'point': last['point'], 'pct_change': last['pct_change'],
+                        'avg_mkt_cap': last['avg_mkt_cap'], 'peak': peak, 'peak_date': peak_date,
+                        'drawdown': round(dd * 100, 1)}
+        return jsonify(out)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     import sys, io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')

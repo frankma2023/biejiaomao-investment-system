@@ -270,6 +270,9 @@ TASKS.append(("🚀 31.投资决策驾驶舱", [PYTHON_EXE, "src/cockpit/pipelin
 # 步骤 32：自选池日报（依赖前序全部步骤：K线/RS/形态/缠论/MW 就位后，扫描自选池生成每日技术面日报）
 TASKS.append(("📋 32.自选池日报", [PYTHON_EXE, "scripts/gen_watchlist_report.py"]))
 
+# 步骤 33：微盘股指数（依赖 K线就位——月末定池/月初生效/日频点位，幂等可重复）
+TASKS.append(("🔬 33.微盘股指数", [PYTHON_EXE, "scripts/build_microcap_index.py", "--incremental"]))
+
 for label, cmd in TASKS:
     lbl, ok, elapsed, _ = run_task(label, cmd)
     tasks.append((lbl, ok, elapsed))
