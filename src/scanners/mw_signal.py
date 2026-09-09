@@ -173,6 +173,17 @@ def scan_stock(klines, scan_date, code=None, conn=None, market_bull=False):
     if h_price == 0:
         return False, None
 
+    # v5.4-review W1：升级后重验 decline——最终 H 到 scan_date 前最低收盘的回撤仍须 ≥40%（升级到更高 H 后回撤变浅的形态排除）
+    try:
+        h_final_idx = h_idx
+        future_min_close = min(klines[j]['close'] for j in range(h_final_idx + 1, n)) if h_final_idx + 1 < n else None
+        if future_min_close is not None and h_price > 0:
+            final_decline = (h_price - future_min_close) / h_price
+            if final_decline < 0.40:
+                return False, None
+    except Exception:
+        pass
+
     # ── 2. 找最低点 L：H 之后最低收盘的缠论笔底 ──
     l_idx = h_idx; l_price = klines[h_idx]['close']
     bots = [(b['sdt'][:10], b['low']) for b in bi_list if b['direction'] == '向上']
@@ -1012,10 +1023,11 @@ def run_scan(scan_date, fast=False, silent=False):
         if not silent: print(f'  {s["code"]} {s["name"]} B1:{s["b1_date"]} B2:{s["b2_date"]} 置信度:{s["confidence"]}({s["score"]}分)')
 
 
-def _scan_worker(stock_codes, scan_date, db_path):
+def _scan_worker(stock_codes, scan_date, db_path, market_bull=False):
     """
     独立进程 worker：加载指定股票的数据并运行 scan_stock。
     必须为模块级函数才能被 ProcessPoolExecutor(pickle) 在 Windows spawn 模式下使用。
+    market_bull (v5.4-review B1)：主进程算好传入——牛市不新增 B1，与主路径一致。
     """
     import os as _os, sys as _sys
     from datetime import datetime, timedelta
@@ -1112,7 +1124,7 @@ def _scan_worker(stock_codes, scan_date, db_path):
         klines = mw.get_klines(conn, code, min_date, scan_date)
         if len(klines) < 150:
             continue
-        passed, result = mw.scan_stock(klines, scan_date, code, conn)
+        passed, result = mw.scan_stock(klines, scan_date, code, conn, market_bull=market_bull)
         if passed and result:
             result['code'] = code
             result['name'] = mw._names_cache.get(code, code)
@@ -1189,13 +1201,26 @@ def run_scan_parallel(scan_date, n_workers=8, fast=False, silent=False):
     actual_workers = len(chunks)
     if not silent:
         print(f'多进程并行: {actual_workers} 进程 × {len(stocks)} 只股票')
-    
+
+    # v5.4-review B1：主进程算 market_bull 传入 worker（与 run_scan 主路径一致）
+    market_bull = False
+    try:
+        idx_rows = conn.execute(
+            "SELECT date, close FROM index_daily_kline WHERE stock_code='000985' AND date<=? ORDER BY date DESC LIMIT 200",
+            (scan_date,)).fetchall()
+        if len(idx_rows) >= 200:
+            idx_rows = list(reversed(idx_rows))
+            _ma = sum(r['close'] for r in idx_rows) / 200
+            market_bull = idx_rows[-1]['close'] > _ma
+    except Exception:
+        pass
+
     # 多进程扫描
     all_signals = []
     t_start = _time.time()
     
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
-        futures = {executor.submit(_scan_worker, chunk, scan_date, DB_PATH): idx 
+        futures = {executor.submit(_scan_worker, chunk, scan_date, DB_PATH, market_bull): idx 
                    for idx, chunk in enumerate(chunks)}
         for future in as_completed(futures):
             idx = futures[future]
