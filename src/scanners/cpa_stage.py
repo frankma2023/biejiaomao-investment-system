@@ -83,6 +83,20 @@ CFG = {
     'd_vr_score': 1.3,                     # VR 评分分档（非门槛）
     'd_resume_days': 0,                    # ⑥b→②/③ 复活：站上 EMA20 即触发
 
+    # ── FTD 快速通道（欧奈尔追盘日，个股适配待验）──
+    'ftd_min_dd': 0.25,                    # 深回撤 ≥25%
+    'ftd_win_min': 4, 'ftd_win_max': 15,   # 反转窗口 4-15 日（补丁四：7 日封顶是洞）
+    'ftd_ret_min': 0.02,                   # 涨幅 ≥2%
+    'ftd_vr_min': 1.3,                     # 放量
+
+    # ── 非对称阈值 + 过渡态（抖动治理，2026-09-10 讨论）──
+    't_in_band': 0.3,      # 进⑥b：close < EMA20 - 0.3×ATR（防守快确认，宁可误报不可漏报）
+    't_in_days': 2,        # 进⑥b 确认天数
+    't_out_band': 0.5,     # 出⑥b：close > EMA20 + 0.5×ATR（进攻慢确认，宁可慢不可假）
+    't_out_win': 3,        # 出⑥b 观察窗口
+    't_out_need': 2,       # 出⑥b 需窗口内 N 日达标（3中2）
+    # 过渡态：[-0.3, +0.5]×ATR 区间 = 判据本来就没答案的地带（独立标签）
+
     # ── invalidated N 值（待校准）──
     'inv_n': {'②→③': 15, '②→④': 40, '③→④': 40, '④→⑤': 30, '⑤→⑥': 30, '→⑥': 12},
 }
@@ -90,8 +104,10 @@ CFG = {
 # 动作方向固定枚举
 ACTIONS = {
     '①': '观察', '①a': '观察', '①b': '观察',
-    '②': '入场', '③': '入场', '④': '加仓',
-    '⑤': '保护利润', '⑥a': '清仓', '⑥b': '观察', '⑥c': '观察',
+    '②': '入场', '②T': '观察',           # ②T = 过渡态（模糊区，不参与）
+    '③': '入场', '④': '加仓',
+    '⑤': '保护利润', '⑥a': '清仓',
+    '⑥b': '观察', '⑥bT': '观察', '⑥c': '观察', '⑥cT': '观察',
 }
 
 
@@ -444,39 +460,85 @@ def judge_reversal(ind, kl, i, tops):
                        **b_detail}}
 
 
+def judge_ftd(ind, kl, i):
+    """FTD 快速通道（欧奈尔追盘日，节点：底部反转确认）
+    条件：深回撤 ≥25% + 低点后 4-15 日 + 涨幅 ≥2% + VR ≥1.3 + 收盘 > EMA20
+    返回 {'hit':bool, 'low_idx':int, 'low':float, 'detail':{...}}
+
+    设计理由（与用户讨论）：FTD 只标记"一个值得跟踪的起点"（证据负担轻）——
+    不需要停顿区/多日确认；而普通复苏（出⑥b）需证明"下降趋势已终结"（证据负担重）——
+    两个判据服务于两种证据负担，冲突自然消解。
+    注：欧奈尔原意 FTD 是指数级信号，个股适用性待验（用户保留态度）。
+    """
+    if i < 1:
+        return {'hit': False}
+    c, c1 = ind['closes'][i], ind['closes'][i - 1]
+    vr, e20 = ind['vr'][i], ind['ema20'][i]
+    if None in (c, c1, vr, e20) or not c1:
+        return {'hit': False}
+    if not (c / c1 - 1 >= 0.02 and vr >= 1.3 and c > e20):
+        return {'hit': False}
+    # 低点：i 前 4~15 日内存在"近 120 日最低收盘"的低点 L，且自 250 日高点回撤 ≥25%
+    for L in range(i - 15, i - 3):
+        if L < 260:
+            continue
+        s = max(0, L + 1 - 120)
+        seg = [kl[j]['adj_close'] for j in range(s, L + 1) if kl[j]['adj_close']]
+        if not seg or kl[L]['adj_close'] != min(seg):
+            continue
+        dd, _ = drawdown_from_high(kl, L, CFG['pctile_win'])
+        if dd is None or dd < CFG['ftd_min_dd']:
+            continue
+        win = i - L
+        low = kl[L]['adj_close']
+        return {'hit': True, 'low_idx': L, 'low': low,
+                'detail': {'path': 'ftd_4_7' if win <= 7 else 'ftd_8_15',
+                           'ftd_win': win, 'ret': round(c / c1 - 1, 3),
+                           'vr': round(vr, 2), 'low': round(low, 2), 'dd': round(dd, 3),
+                           'low_date': kl[L]['date']}}
+    return {'hit': False}
+
+
 def judge_wedge_pop(ind, kl, i, tops):
-    """阶段② 事件判据：收缩/停顿 + 放量突破 + 首次站上 10/20 EMA
-    返回 {'hit':bool, 'pause':{...}, 'detail':{...}}
+    """阶段② 事件判据：
+    路径 B（快速）：FTD 特征（深回撤后 4-15 日放量 +2% 站上 EMA20）——无停顿区要求
+    路径 A（慢速）：收缩/停顿区 + 放量突破 + 首次站上 10/20 EMA
+    返回 {'hit':bool, 'path':str, 'pause':{...}|None, 'low':float, 'detail':{...}}
     """
     c, v = ind['closes'][i], ind['vr'][i]
     e10, e20 = ind['ema10'][i], ind['ema20'][i]
     if c is None or e10 is None or e20 is None or v is None:
-        return {'hit': False, 'pause': None, 'detail': {}}
-    # 条件三：首次站上（此前 20 日多数收盘在 EMA20 下方）
+        return {'hit': False, 'path': None, 'pause': None, 'low': None, 'detail': {}}
+    if not (c > e10 and c > e20):
+        return {'hit': False, 'path': None, 'pause': None, 'low': None, 'detail': {}}
+    # ── 路径 B：FTD 快速通道（无需首次站上/停顿区）──
+    ftd = judge_ftd(ind, kl, i)
+    if ftd['hit']:
+        return {'hit': True, 'path': ftd['detail']['path'], 'pause': None,
+                'low': ftd['low'], 'detail': ftd['detail']}
+    # ── 路径 A：停顿区慢速通道 ──
     below = 0
     for j in range(max(0, i - CFG['w_first_lookback']), i):
         cj, ej = ind['closes'][j], ind['ema20'][j]
         if cj and ej and cj < ej:
             below += 1
     first_above = below >= CFG['w_first_lookback'] * 0.6
-    if not (first_above and c > e10 and c > e20):
-        return {'hit': False, 'pause': None, 'detail': {'first_above': first_above}}
-    # 条件一：收缩/停顿
+    if not first_above:
+        return {'hit': False, 'path': None, 'pause': None, 'low': None, 'detail': {'first_above': False}}
     pause = find_pause_zone(ind, i, CFG['w_win_min'], CFG['w_win_max'],
                             CFG['w_amp_tol'], CFG['w_vol_dry'])
     if not pause:
-        return {'hit': False, 'pause': None, 'detail': {'pause': 'none'}}
-    # 条件二：突破 + 量
+        return {'hit': False, 'path': None, 'pause': None, 'low': None, 'detail': {'pause': 'none'}}
     if not (c > pause['high'] * CFG['w_breakout_buf'] and v >= CFG['w_breakout_vr']):
-        return {'hit': False, 'pause': pause, 'detail': {'break': False, 'vr': round(v, 2)}}
-    # 加分：笔顶收敛（长窗口）
+        return {'hit': False, 'path': None, 'pause': pause, 'low': None,
+                'detail': {'break': False, 'vr': round(v, 2)}}
     bio_conv = None
     if pause['win_len'] >= CFG['w_win_long'] and tops:
         recent = [t for t in tops if t['date'] >= kl[pause['start_idx']]['date']][-3:]
         if len(recent) >= 2:
             bio_conv = all(recent[j + 1]['price'] <= recent[j]['price'] * 1.01 for j in range(len(recent) - 1))
-    return {'hit': True, 'pause': pause,
-            'detail': {'vr': round(v, 2), 'amp': round(pause['amp'], 3),
+    return {'hit': True, 'path': 'pause', 'pause': pause, 'low': pause['low'],
+            'detail': {'path': 'pause', 'vr': round(v, 2), 'amp': round(pause['amp'], 3),
                        'win': pause['win_len'], 'dry': pause['vol_dry_ok'],
                        'shrink': pause['shrink_ok'], 'bi_conv': bio_conv,
                        'breakout': round(c, 2), 'pause_low': round(pause['low'], 2)}}
@@ -517,10 +579,10 @@ def judge_crossback(ind, kl, i, ctx):
     slope = slope_up(ind['ema10'], i, CFG['slope_lag'])
     if hold < CFG['cb_hold_days'] or not slope:
         return {'hit': False, 'phase': phase, 'detail': {'hold': hold, 'slope': slope}}
-    # 深度上限：回踩 low ≥ ② 停顿区最高点
-    pause_high = (ctx.get('w_pause') or {}).get('high')
-    if pause_high and l < pause_high:
-        return {'hit': False, 'phase': phase, 'detail': {'depth_fail': round(l, 2), 'pause_high': round(pause_high, 2)}}
+    # 深度上限：回踩 low ≥ 入口结构低点（FTD 入口=FTD 前低点；慢速入口=停顿区低点）
+    entry_low = ctx.get('entry_low') or (ctx.get('w_pause') or {}).get('high')
+    if entry_low and l < entry_low:
+        return {'hit': False, 'phase': phase, 'detail': {'depth_fail': round(l, 2), 'entry_low': round(entry_low, 2)}}
     return {'hit': True, 'phase': phase,
             'detail': {'days_since_②': gap, 'vr': round(v, 2), 'hold': hold,
                        'slope_up': slope, 'stop': round(line, 2)}}
@@ -694,11 +756,8 @@ def max_gain_since(kl, i0, i1):
     return peak / b - 1
 
 
-def below_ma_confirmed(ind, i, n=2, band_atr=0.5):
-    """连续 n 日收盘 < EMA20 - band*ATR20
-    滞后带（hysteresis）：防止价格在 EMA20 附近震荡时状态反复横跳
-    （测试驱动新增：EMA20±0.5ATR 为死区，带内不迁移）
-    """
+def below_ma_confirmed(ind, i, n=2, band_atr=0.3):
+    """连续 n 日收盘 < EMA20 - band*ATR20（非对称：进⑥b 用紧带 0.3，防守快确认）"""
     cnt = 0
     for j in range(max(0, i - n + 1), i + 1):
         c, e, a = ind['closes'][j], ind['ema20'][j], ind['atr20'][j]
@@ -707,14 +766,28 @@ def below_ma_confirmed(ind, i, n=2, band_atr=0.5):
     return cnt >= n
 
 
-def above_ma_confirmed(ind, i, n=2, band_atr=0.5):
-    """连续 n 日收盘 > EMA20 + band*ATR20（滞后带对称）"""
+def above_ma_confirmed(ind, i, n=3, band_atr=0.5, need=2):
+    """n 日窗口内 need 日收盘 > EMA20 + band*ATR20（非对称：出⑥b 用宽带 0.5 + 3中2，进攻慢确认）"""
     cnt = 0
     for j in range(max(0, i - n + 1), i + 1):
         c, e, a = ind['closes'][j], ind['ema20'][j], ind['atr20'][j]
         if c is not None and e is not None and a and c > e + band_atr * a:
             cnt += 1
-    return cnt >= n
+    return cnt >= need
+
+
+def in_transition_zone(ind, i, stage):
+    """过渡态判定：处于 ②/⑥b/⑥c 且价格在模糊带 [-0.3, +0.5]×ATR 内
+    → 判据本来就没答案的地带（回测已证：低收益垃圾时间区）
+    """
+    if stage not in ('②', '⑥b', '⑥c'):
+        return False
+    c, e, a = ind['closes'][i], ind['ema20'][i], ind['atr20'][i]
+    if None in (c, e, a) or not a:
+        return False
+    lo = e - CFG['t_in_band'] * a
+    hi = e + CFG['t_out_band'] * a
+    return lo <= c <= hi
 
 
 def run_state_machine(conn, code, kl, ind, tops, warmup=260):
@@ -766,13 +839,15 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
             if w['hit']:
                 stage = '②'
                 ctx.update({'w_date_idx': i, 'w_pause': w['pause'], 'entry_idx': i,
+                            'entry_low': w['low'], 'entry_path': w['path'],
                             'stage_start_idx': i, 'cb_low': None, 'box': None})
                 detail = w['detail']
 
         elif stage == '②':
-            # ②失效判据：跌破停顿区低点 / 结构支撑位 / EMA20（三选一即失效）
+            # ②失效判据：跌破【入口结构低点】（FTD前低点/停顿区低点）/ 结构支撑 / 连续2日破EMA20
+            entry_low = ctx.get('entry_low')
             pl = (ctx.get('w_pause') or {}).get('low')
-            fail_low = pl or structure_support
+            fail_low = entry_low or pl or structure_support
             if below_ma_confirmed(ind, i, 2):
                 # 连续 2 日跌破 EMA20：底部反转区间结束 → ⑥ 判定
                 r6 = judge_wedge_drop(ind, kl, i, ctx, structure_support, tops)
@@ -780,10 +855,11 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
                 ctx.update({'stage_start_idx': i, 'w_pause': None, 'w_date_idx': None})
                 detail = {'reason': '②区间跌破EMA20(2日确认)', **r6['detail']}
             elif fail_low and c < fail_low:
-                # 未破 EMA20 但跌破结构低点 → 反转被部分证伪，回观察段
+                # 跌破入口结构低点 → 结构失败（V型底部不成立/突破失败）
                 stage = '①a'
-                ctx.update({'w_pause': None, 'w_date_idx': None, 'stage_start_idx': i})
-                detail = {'reason': '②失效（跌破结构低点）', 'fail_low': round(fail_low, 2)}
+                ctx.update({'w_pause': None, 'w_date_idx': None, 'entry_low': None, 'stage_start_idx': i})
+                detail = {'reason': '②失效（跌破入口结构低点）', 'entry_low': round(fail_low, 2),
+                          'entry_path': ctx.get('entry_path')}
             else:
                 r5 = judge_exhaustion(ind, kl, i, ctx)
                 r4 = judge_base_break(ind, kl, i, ctx)
@@ -880,17 +956,25 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
                    'nd20': round(ind['nd20'][i], 2) if ind['nd20'][i] is not None else None,
                    'vr': round(ind['vr'][i], 2) if ind['vr'][i] else None,
                    'ema10': round(e10, 2), 'ema20': round(e20, 2)}
+        if stage == '②' and ctx.get('entry_path'):
+            metrics['entry_path'] = ctx['entry_path']   # 溯源字段（补丁一）
         if ctx.get('init_flag'):
             metrics['init_flag'] = True
             ctx.pop('init_flag', None)
         if detail:
             metrics['detail'] = detail
 
-        daily.append((code, d, stage, prev_stage if prev_stage != stage else None,
+        # 过渡态标签（非对称阈值的自然死区，独立标签不入迁移）
+        stage_out = stage
+        if in_transition_zone(ind, i, stage):
+            stage_out = stage + 'T'
+            metrics['transition_zone'] = True
+
+        daily.append((code, d, stage_out, prev_stage if prev_stage != stage else None,
                       kl[ctx['stage_start_idx']]['date'], i - ctx['stage_start_idx'],
                       round(structure_support, 2) if structure_support else None,
                       round(invalid, 2) if invalid else None,
-                      ACTIONS.get(stage, '观察'), c, json.dumps(metrics, ensure_ascii=False)))
+                      ACTIONS.get(stage_out, '观察'), c, json.dumps(metrics, ensure_ascii=False)))
         if stage != prev_stage:
             trans.append((code, d, prev_stage, stage, json.dumps(detail, ensure_ascii=False)))
 
@@ -928,6 +1012,56 @@ def mark_invalidated(conn, code=None):
     return n_inv
 
 
+def collapse_states(daily_rows, min_days=5):
+    """数据层折叠（PRD §9 三层治理第二层）：把短命状态段并入前后主导状态
+
+    用途：回测/信号门禁消费前调用，消除横跳区间噪声；
+          折叠区保留 original 标记（不丢信息）。
+    返回 [(date, stage, orig_stage), ...]
+    """
+    if not daily_rows:
+        return []
+    # 1) 提取连续状态段
+    segs = []
+    cur = daily_rows[0][2]
+    start = 0
+    for k in range(1, len(daily_rows)):
+        if daily_rows[k][2] != cur:
+            segs.append([cur, start, k - 1])
+            cur, start = daily_rows[k][2], k
+    segs.append([cur, start, len(daily_rows) - 1])
+    # 2) 短命段（<min_days）若与前后段同主状态 → 合并
+    changed = True
+    while changed:
+        changed = False
+        out = []
+        for s in segs:
+            dur = s[2] - s[1] + 1
+            if dur < min_days and out and len(segs) > 1:
+                # 与前段同主状态（去 T 后缀比较）
+                if s[0].rstrip('T') == out[-1][0].rstrip('T'):
+                    out[-1][2] = s[2]
+                    changed = True
+                    continue
+            out.append(s)
+        if changed:
+            segs = out
+            # 再次合并相邻同状态段
+            merged = []
+            for s in segs:
+                if merged and merged[-1][0] == s[0]:
+                    merged[-1][2] = s[2]
+                else:
+                    merged.append(s)
+            segs = merged
+    # 3) 展开
+    out_rows = []
+    for (st, a, b) in segs:
+        for k in range(a, b + 1):
+            out_rows.append((daily_rows[k][1], st, daily_rows[k][2]))
+    return out_rows
+
+
 # ── [6] 回算主流程 —— 待实现 ──
 if __name__ == '__main__':
-    print('CPA 引擎：指标层 + 判据层 + 状态机就绪；回算主流程待实现')
+    print('CPA 引擎：指标层 + 判据层 + 状态机 + 数据层折叠就绪；回算主流程待实现')
