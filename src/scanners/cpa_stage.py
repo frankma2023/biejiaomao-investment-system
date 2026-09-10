@@ -114,9 +114,9 @@ CFG = {
 ACTIONS = {
     '①': '观察', '①a': '观察', '①b': '观察',
     '②': '入场', '②T': '观察',           # ②T = 过渡态（模糊区，不参与）
-    '③': '入场', '④': '加仓',
-    '⑤': '保护利润', '⑥a': '清仓',
-    '⑥b': '观察', '⑥bT': '观察', '⑥c': '观察', '⑥cT': '观察',
+    '③': '入场', '④': '加仓', '持有': '持有',
+    '⑤': '保护利润', '⑥w': '减仓',        # ⑥w = 预警态（衰竭未破位，Spec B6）
+    '⑥a': '清仓', '⑥b': '观察', '⑥bT': '观察', '⑥c': '观察', '⑥cT': '观察',
 }
 
 
@@ -357,12 +357,16 @@ def compute_indicators(kl):
     }
 
 
-def find_pause_zone(ind, i, win_min, win_max, amp_tol, vol_dry):
+def find_pause_zone(ind, i, win_min, win_max, amp_tol, vol_dry, tops=None, kl=None):
     """找以 i 为突破日的【收缩/停顿区】（阶段②/④ 共用）
-    返回 dict(high, low, start_idx, end_idx, win_len, vol_dry_ok, amp_ok, shrink_ok) 或 None
+    返回 dict(...) 或 None
 
-    修正（测试驱动）：加【结构合理性】约束——停顿区必须是"无明显方向的窄幅震荡"，
-    否则单边大涨区间（amp 可达 100%+）会被误判为停顿区（因 shrink_ok 单独通过）。
+    判据（PRD §4 四种证据满足任一）：
+      a. 区间振幅 ≤ amp_tol（长窗口）
+      b. 振幅收缩比（短窗口）
+      c. 量能干涸
+      d. 【笔顶收敛】（长窗口，Spec review B4 补实现）
+    约束：短窗口（<w_win_long）必须含量能证据（PRD §4 判据可用性自适应）
     """
     best = None
     for w in range(win_max, win_min - 1, -1):   # 从长到短找（优先长窗口）
@@ -408,32 +412,49 @@ def find_pause_zone(ind, i, win_min, win_max, amp_tol, vol_dry):
         if len(a_recent) >= 3 and len(a_prior) >= 8:
             shrink_ok = (sum(a_recent) / len(a_recent)) <= (sum(a_prior) / len(a_prior)) * CFG['w_amp_shrink']
         amp_ok = amp <= amp_tol
-        if dry_ok or amp_ok or shrink_ok:
+        # 笔顶收敛（PRD §4 证据之一，Spec B4）：长窗口且笔可用
+        bi_conv = None
+        if tops and kl and w >= CFG['w_win_long']:
+            recent = [t for t in tops if kl[s]['date'] <= t['date'] <= kl[i - 1]['date']][-3:]
+            if len(recent) >= 2:
+                bi_conv = all(recent[j + 1]['price'] <= recent[j]['price'] * 1.01
+                              for j in range(len(recent) - 1))
+        # 短窗口必须含量能证据（PRD §4）
+        if w < CFG['w_win_long'] and not dry_ok:
+            continue
+        if dry_ok or amp_ok or shrink_ok or bi_conv:
             cand = {'high': zh, 'low': zl, 'start_idx': s, 'end_idx': i - 1,
                     'win_len': w, 'vol_dry_ok': dry_ok, 'amp_ok': amp_ok,
-                    'shrink_ok': shrink_ok, 'amp': amp}
+                    'shrink_ok': shrink_ok, 'bi_conv': bi_conv, 'amp': amp}
             # 优先条件更充分者，其次更长窗口
-            score = (dry_ok + amp_ok + shrink_ok, w)
+            score = (dry_ok + amp_ok + shrink_ok + bool(bi_conv), w)
             if best is None or score > best[0]:
                 best = (score, cand)
     return best[1] if best else None
 
 
-def judge_reversal(ind, kl, i, tops):
-    """阶段① 判据。返回 {'a':bool, 'b':bool, 'detail':{...}}"""
+def judge_reversal(ind, kl, i, tops, rps_map=None):
+    """阶段① 判据。返回 {'a':bool, 'b':bool, 'detail':{...}}
+    rps_map: {date: rps_250}（状态机预加载；前置闸门 c 条件用）
+    """
     c = ind['closes'][i]
     if c is None or ind['ema20'][i] is None or not ind['atr20'][i]:
         return {'a': False, 'b': False, 'detail': {}}
     dd, hi_idx = drawdown_from_high(kl, i, CFG['pctile_win'])
     if dd is None or hi_idx is None:
         return {'a': False, 'b': False, 'detail': {}}
-    # 前置闸门：强势股
+    # 前置闸门：强势股（PRD §3：a 必要；b/c 至少一条）
     gate_gain = max_gain_in(kl, max(0, hi_idx - 250), hi_idx)
     gate_recent = (i - hi_idx) <= CFG['r_high_recency']
     gate_a = (gate_gain is not None and gate_gain >= CFG['r_strong_gain'])
     if not gate_a:
         return {'a': False, 'b': False, 'detail': {'gate': 'strong_gain_fail', 'gain': gate_gain}}
-    # ①a
+    # c：高点时 RPS250 ≥ 70（rps_map 由状态机预加载并传入；b/c 至少一条）
+    rps_high = (rps_map or {}).get(kl[hi_idx]['date'])
+    gate_c = (rps_high is not None and rps_high >= CFG['r_h_rps250'])
+    if not (gate_recent or gate_c):
+        return {'a': False, 'b': False, 'detail': {'gate': 'b_and_c_fail', 'days_since_high': i - hi_idx}}
+    # ①a：深度回撤 + EMA 下方极值（ATR 归一为主，固定百分比为辅）
     nd20 = ind['nd20'][i]
     d20 = (c / ind['ema20'][i] - 1) if ind['ema20'][i] else None
     deep = dd >= CFG['r_drawdown_min']
@@ -447,7 +468,7 @@ def judge_reversal(ind, kl, i, tops):
             panic = True
             break
     a_ok = bool(deep and ext and panic and gate_recent)
-    # ①b 衰竭迹象
+    # ①b 衰竭迹象（任一）：长下影 / 反转日 / 两日确认（Spec W2 补全）
     b_ok = False
     b_detail = {}
     if a_ok:
@@ -463,6 +484,18 @@ def judge_reversal(ind, kl, i, tops):
                 pl, ph = kl[i - 1].get('low_adj'), kl[i - 1].get('high_adj')
                 if pl and ph and l < pl and cl > ph:
                     b_ok, b_detail = True, {'type': 'reversal_day'}
+            # 两日确认：前一日长下影/反转日 + 今日收盘站上前日高点（Spec W2）
+            if not b_ok and i > 0:
+                pk = kl[i - 1]
+                po, ph2, pl2, pc = pk.get('open_adj'), pk.get('high_adj'), pk.get('low_adj'), pk.get('adj_close')
+                atr_prev = ind['atr20'][i - 1]
+                if None not in (po, ph2, pl2, pc) and atr_prev:
+                    body2 = abs(pc - po)
+                    lower2 = min(po, pc) - pl2
+                    prev_trace = (body2 > 0 and lower2 >= body2 * CFG['r_lower_shadow_ratio']
+                                  and lower2 >= atr_prev * CFG['r_lower_shadow_atr'])
+                    if prev_trace and cl > ph2:
+                        b_ok, b_detail = True, {'type': 'two_day_confirm'}
     return {'a': a_ok, 'b': b_ok,
             'detail': {'drawdown': round(dd, 3), 'nd20': round(nd20, 2) if nd20 else None,
                        'panic': panic, 'gate_gain': round(gate_gain, 3) if gate_gain else None,
@@ -535,7 +568,7 @@ def judge_wedge_pop(ind, kl, i, tops):
     if not first_above:
         return {'hit': False, 'path': None, 'pause': None, 'low': None, 'detail': {'first_above': False}}
     pause = find_pause_zone(ind, i, CFG['w_win_min'], CFG['w_win_max'],
-                            CFG['w_amp_tol'], CFG['w_vol_dry'])
+                            CFG['w_amp_tol'], CFG['w_vol_dry'], tops=tops, kl=kl)
     if not pause:
         return {'hit': False, 'path': None, 'pause': None, 'low': None, 'detail': {'pause': 'none'}}
     if not (c > pause['high'] * CFG['w_breakout_buf'] and v >= CFG['w_breakout_vr']):
@@ -575,8 +608,12 @@ def judge_crossback(ind, kl, i, ctx):
         return {'hit': False}
     phase = 'standard' if std else 'deep'
     line = e10 if phase == 'standard' else e20
-    # 缩量
-    if v > CFG['cb_vol_max']:
+    # 缩量：VR ≤ cb_vol_max 或 回踩期均量 < 突破日量×0.7（PRD §5 双口径，Spec W3）
+    v_win = [x for x in ind['vols'][max(0, i - 2):i + 1] if x]
+    v_avg = (sum(v_win) / len(v_win)) if v_win else None
+    v_w = ctx.get('w_vol')
+    vol_ok = (v <= CFG['cb_vol_max']) or (v_avg is not None and v_w and v_avg < v_w * 0.7)
+    if not vol_ok:
         return {'hit': False, 'phase': phase, 'detail': {'vol_fail': round(v, 2)}}
     # 持续守住：回踩期 ≥2 日 close 在该均线上方（含当日与之前几日）
     hold = 0
@@ -588,10 +625,11 @@ def judge_crossback(ind, kl, i, ctx):
     slope = slope_up(ind['ema10'], i, CFG['slope_lag'])
     if hold < CFG['cb_hold_days'] or not slope:
         return {'hit': False, 'phase': phase, 'detail': {'hold': hold, 'slope': slope}}
-    # 深度上限：回踩 low ≥ 入口结构低点（FTD 入口=FTD 前低点；慢速入口=停顿区低点）
-    entry_low = ctx.get('entry_low') or (ctx.get('w_pause') or {}).get('high')
-    if entry_low and l < entry_low:
-        return {'hit': False, 'phase': phase, 'detail': {'depth_fail': round(l, 2), 'entry_low': round(entry_low, 2)}}
+    # 深度上限（PRD §5：回踩 low ≥ 停顿区最高点）；FTD 入口无停顿区 → 用 FTD 前低点作替代（PRD 待补记）
+    pause_high = (ctx.get('w_pause') or {}).get('high')
+    depth_limit = pause_high if pause_high else ctx.get('entry_low')
+    if depth_limit and l < depth_limit:
+        return {'hit': False, 'phase': phase, 'detail': {'depth_fail': round(l, 2), 'depth_limit': round(depth_limit, 2)}}
     return {'hit': True, 'phase': phase,
             'detail': {'days_since_②': gap, 'vr': round(v, 2), 'hold': hold,
                        'slope_up': slope, 'stop': round(line, 2)}}
@@ -629,7 +667,7 @@ def find_box(ind, kl, i, prior_gain_start_idx):
         # 深度门槛
         prior_gain = None
         if prior_gain_start_idx is not None and prior_gain_start_idx < s:
-            base_close = kl[prior_gain_start_idx].get('close')
+            base_close = kl[prior_gain_start_idx].get('adj_close')   # 复权口径统一（PRD §2）
             if base_close and base_close > 0:
                 prior_gain = zh / base_close - 1
         depth_ok = (prior_gain is not None and depth <= prior_gain * CFG['b_depth_ratio']) or depth <= 0.15
@@ -657,11 +695,12 @@ def judge_base_break(ind, kl, i, ctx):
         return {'hit': False, 'box': None}
     # 前置：自最后有效入场点涨幅 ≥20%
     if start_idx is not None:
-        base_c = kl[start_idx].get('close')
+        base_c = kl[start_idx].get('adj_close')   # 复权口径统一（PRD §2）
         if base_c and base_c > 0:
             gain = box['high'] / base_c - 1
             if gain < CFG['b_prior_gain_min']:
-                return {'hit': False, 'box': box, 'detail': {'prior_gain': round(gain, 3), 'note': '涨幅不足→边界样本'}}
+                return {'hit': False, 'box': box, 'detail': {'prior_gain': round(gain, 3),
+                                                            'boundary': 'low_prior_gain'}}
     if not (c > box['high'] * CFG['b_breakout_buf'] and v >= CFG['b_breakout_vr']):
         return {'hit': False, 'box': box, 'detail': {'vr': round(v, 2)}}
     return {'hit': True, 'box': box,
@@ -680,11 +719,20 @@ def judge_exhaustion(ind, kl, i, ctx):
     wi = ctx.get('w_date_idx')
     if wi is None:
         return {'hit': False}
-    base = kl[wi].get('close')
+    base = kl[wi].get('adj_close')   # 复权口径统一（PRD §2）
     if not base or base <= 0:
         return {'hit': False}
-    peak = max([x for x in ind['closes'][wi:i + 1] if x] or [base])
-    peak_gain = peak / base - 1
+    # 峰值涨幅 = 区间最大涨幅（PRD §2：低点到后续高点的最大涨幅，非起点收盘到峰值）
+    lo = None
+    peak_gain = 0.0
+    for j in range(wi, i + 1):
+        px = ind['closes'][j]
+        if px is None:
+            continue
+        if lo is None or px < lo:
+            lo = px
+        if lo and lo > 0:
+            peak_gain = max(peak_gain, px / lo - 1)
     if peak_gain < CFG['e_peak_gain_min']:
         return {'hit': False, 'detail': {'peak_gain': round(peak_gain, 3)}}
     nd10 = (c - e10) / a20
@@ -810,6 +858,26 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
     n = len(kl)
     if n <= warmup:
         return daily, trans
+    # RPS250 预加载（前置闸门 c 条件用）
+    rps_map = {}
+    if conn is not None:
+        try:
+            for _r in conn.execute("SELECT date, rps_250 FROM stock_rs_daily WHERE stock_code=?", (code,)):
+                if _r[1] is not None:
+                    rps_map[_r[0]] = _r[1]
+        except Exception:
+            pass
+    # MW B1/B2 对照预加载（PRD §9.10 交叉验证，独立计算不作条件）
+    b1_dates, b2_dates = set(), set()
+    if conn is not None:
+        try:
+            for _b in conn.execute("SELECT b1_date, b2_date FROM mw_signal_daily WHERE stock_code=?", (code,)):
+                if _b[0]:
+                    b1_dates.add(_b[0])
+                if _b[1]:
+                    b2_dates.add(_b[1])
+        except Exception:
+            pass
 
     stage, ctx = init_stage(ind, kl, warmup - 1)
     ctx = dict(ctx)
@@ -839,7 +907,7 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
 
         # ═══ 迁移判定（按状态分支）═══
         if stage in ('①a', '①b'):
-            r1 = judge_reversal(ind, kl, i, tops)
+            r1 = judge_reversal(ind, kl, i, tops, rps_map=rps_map)
             sub = '①b' if r1['b'] else ('①a' if r1['a'] else stage)
             if sub != stage:
                 stage = sub; ctx['stage_start_idx'] = i; detail = r1['detail']
@@ -877,7 +945,11 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
                 elif r4['hit']:
                     stage = '④'; ctx['box'] = r4['box']; ctx['entry_idx'] = i; ctx['stage_start_idx'] = i; detail = r4['detail']
                 elif r3['hit']:
-                    stage = '③'; ctx['cb_low'] = kl[i].get('close'); ctx['entry_idx'] = i; ctx['stage_start_idx'] = i; detail = r3['detail']
+                    stage = '③'
+                    _lows = [x for x in ind['lows'][max(0, i - 2):i + 1] if x]
+                    ctx['cb_low'] = min(_lows) if _lows else l   # 回踩低点用 low（Spec W5）
+                    ctx['w_vol'] = ind['vols'][ctx['w_date_idx']] if ctx.get('w_date_idx') is not None else None
+                    ctx['entry_idx'] = i; ctx['stage_start_idx'] = i; detail = r3['detail']
 
         elif stage == '③':
             if below_ma_confirmed(ind, i, CFG['t_in_days'], CFG['t_in_band']):
@@ -930,10 +1002,17 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
             dd, _ = drawdown_from_high(kl, i, CFG['pctile_win'])
             # 趋势复活：窗口 t_out_win 内 t_out_need 日站上 EMA20+t_out_band×ATR → 回 ② 区间
             if above_ma_confirmed(ind, i, CFG['t_out_win'], CFG['t_out_band'], CFG['t_out_need']) and stage in ('⑥a', '⑥b', '⑥c'):
-                stage = '②'; ctx.update({'stage_start_idx': i, 'w_date_idx': i, 'w_pause': None, 'cb_low': None})
+                stage = '②'
+                ctx.update({'stage_start_idx': i, 'w_date_idx': i, 'w_pause': None, 'cb_low': None,
+                            'entry_low': None, 'entry_path': 'revive'})   # 清理旧入口上下文（Spec W13）
                 detail = {'reason': '趋势复活（站上EMA20）→回②区间'}
             else:
-                r1 = judge_reversal(ind, kl, i, tops)
+                # ⑥b/⑥c 升级确认（Spec W12）：三条件齐 → ⑥a（清仓）
+                if stage in ('⑥b', '⑥c'):
+                    r6 = judge_wedge_drop(ind, kl, i, ctx, structure_support, tops)
+                    if r6['confirm']:
+                        stage = '⑥a'; detail = {'reason': '⑥b/c 升级确认（三条件齐）', **r6['detail']}
+                r1 = judge_reversal(ind, kl, i, tops, rps_map=rps_map)
                 if r1['a']:   # ①a 全条件满足
                     stage = '①b' if r1['b'] else '①a'
                     ctx['stage_start_idx'] = i; ctx['w_pause'] = None; ctx['w_date_idx'] = None
@@ -966,15 +1045,32 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
                    'ema10': round(e10, 2), 'ema20': round(e20, 2)}
         if stage == '②' and ctx.get('entry_path'):
             metrics['entry_path'] = ctx['entry_path']   # 溯源字段（补丁一）
+        # 交叉验证（独立计算，不作条件；Spec W10）
+        if stage in ('②', '③'):
+            _win = [kl[j]['date'] for j in range(max(0, i - 2), min(n, i + 3))]
+            metrics['b1_overlap'] = any(d in b1_dates for d in _win)
+            metrics['b2_overlap'] = any(d in b2_dates for d in _win)
+        if detail.get('boundary') == 'low_prior_gain':
+            metrics['boundary_sample'] = 'low_prior_gain'   # ④ 边界样本独立标记（Spec W6）
         if ctx.get('init_flag'):
             metrics['init_flag'] = True
             ctx.pop('init_flag', None)
         if detail:
             metrics['detail'] = detail
 
-        # 过渡态标签（非对称阈值的自然死区，独立标签不入迁移）
+        # 预警态（PRD §8.4）：衰竭迹象（高点不抬高 + EMA10 斜率转负）出现但未破位 → 减仓
+        warn_now = False
+        if stage in ('②', '③', '④', '⑤'):
+            _tp = [t for t in tops if t['date'] <= kl[i]['date']][-3:]
+            _hl = len(_tp) >= 2 and all(_tp[j + 1]['price'] <= _tp[j]['price'] * 1.01 for j in range(len(_tp) - 1))
+            _sl = slope_up(ind['ema10'], i, CFG['slope_lag'])
+            warn_now = bool(_hl and _sl is False)
+        # 过渡态 / 预警态标签（不改内部状态机，仅输出层）
         stage_out = stage
-        if in_transition_zone(ind, i, stage):
+        if warn_now:
+            stage_out = '⑥w'
+            metrics['warn_from'] = stage
+        elif in_transition_zone(ind, i, stage):
             stage_out = stage + 'T'
             metrics['transition_zone'] = True
 
@@ -990,7 +1086,21 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
 
 
 def mark_invalidated(conn, code=None):
-    """事后标记 invalidated（PRD §9.5）：迁移后 N 日内出现反向/失效迁移 → invalidated=1"""
+    """事后标记 invalidated（PRD §9.5）：迁移后 N 日内出现【回退型】迁移 → invalidated=1
+
+    修复（Spec review B2）：
+      1. 阶段名归一化（⑥a/⑥b/⑥c → ⑥）后再查 N 值——原实现键不匹配导致⑥永不标记
+      2. 去掉 int(N*1.5) 的无依据窗口放大（直接用 N 个交易日 ≈ N*1.45 日历日）
+      3. 只把"回退型"迁移（stage_rank 变小）算失效——正向推进（②→③→④）不是失效
+    """
+    def _rank(s):
+        s = (s or '').replace('T', '')
+        if s.startswith('①'):
+            return 1
+        if s.startswith('⑥'):
+            return 6
+        return {'②': 2, '③': 3, '④': 4, '⑤': 5}.get(s, 0)
+
     q = "SELECT stock_code, transition_date, from_stage, to_stage FROM cpa_stage_transitions"
     args = ()
     if code:
@@ -1000,21 +1110,29 @@ def mark_invalidated(conn, code=None):
     n_inv = 0
     for r in rows:
         sc, td, fs, ts = r[0], r[1], r[2], r[3]
-        key = '%s→%s' % (fs, ts)
-        N = CFG['inv_n'].get(key) or CFG['inv_n'].get('→%s' % ts)
+        norm_to = ts.replace('T', '')
+        if norm_to.startswith('⑥'):
+            norm_to = '⑥'
+        key = '%s→%s' % ((fs or '').replace('T', ''), norm_to)
+        N = CFG['inv_n'].get(key) or CFG['inv_n'].get('→%s' % norm_to)
         if not N:
             continue
-        limit = (datetime.strptime(td, '%Y-%m-%d') + timedelta(days=int(N * 1.5))).strftime('%Y-%m-%d')
-        # 反向/失效：N 日内又发生一次迁移（离开该阶段）
-        nxt = conn.execute(
-            """SELECT MIN(transition_date) FROM cpa_stage_transitions
-               WHERE stock_code=? AND transition_date>? AND transition_date<=?""",
-            (sc, td, limit)).fetchone()
-        if nxt and nxt[0]:
+        limit = (datetime.strptime(td, '%Y-%m-%d') + timedelta(days=int(N * 1.45))).strftime('%Y-%m-%d')
+        rank_to = _rank(ts)
+        # 找出 N 日窗口内的后续迁移，判断是否有回退
+        nxt_rows = conn.execute(
+            """SELECT transition_date, to_stage FROM cpa_stage_transitions
+               WHERE stock_code=? AND transition_date>? AND transition_date<=?
+               ORDER BY transition_date""", (sc, td, limit)).fetchall()
+        inv_date = None
+        for nr in nxt_rows:
+            if _rank(nr[1]) < rank_to:
+                inv_date = nr[0]
+                break
+        if inv_date:
             conn.execute(
                 """UPDATE cpa_stage_transitions SET invalidated=1, invalidated_date=?
-                   WHERE stock_code=? AND transition_date=?""",
-                (nxt[0], sc, td))
+                   WHERE stock_code=? AND transition_date=?""", (inv_date, sc, td))
             n_inv += 1
     conn.commit()
     return n_inv
