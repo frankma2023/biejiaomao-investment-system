@@ -98,13 +98,33 @@ var ALL = [], DATE = '', FILTER_STAGE = '', charts = {}, sortKey = '', sortDir =
 var STAGE_COLOR = {'①a':'#6b7280','①b':'#9ca3af','②':'#ef4444','③':'#f97316','④':'#dc2626','⑤':'#a855f7',
                    '⑥a':'#065f46','⑥b':'#10b981','⑥c':'#34d399'};
 function stgColor(s){ var base = (s||'').replace('T',''); var c = STAGE_COLOR[base] || '#888'; return (s||'').indexOf('T')>=0 ? c+'99' : c; }
+// 主题色变量（hanako-glass 深浅适配）
+function themeVars(){
+  var light = document.documentElement.dataset.theme === 'light';
+  return { tx: light?'#52525b':'#888', sp: light?'rgba(0,0,0,.06)':'rgba(255,255,255,.05)',
+           tipBg: light?'rgba(255,255,255,.96)':'rgba(20,20,26,.92)',
+           tipBd: light?'rgba(0,0,0,.10)':'rgba(255,255,255,.08)',
+           tipTx: light?'#27272a':'#ddd' };
+}
 
-function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
+function toggleTheme(){
+  var h = document.documentElement;
+  h.setAttribute('data-theme-switching','');
+  var n = h.dataset.theme === 'dark' ? 'light' : 'dark';
+  h.dataset.theme = n; localStorage.setItem('theme', n);
+  setTimeout(function(){ h.removeAttribute('data-theme-switching'); }, 60);
+  setTimeout(function(){ Object.keys(charts).forEach(function(k){ delete charts[k]; }); load(); }, 80);
+}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 
 async function load(){
+  try{
   var j = await (await fetch('/api/cpa/summary')).json();
-  DATE = j.date; document.getElementById('date-label').textContent = DATE + ' · 六阶段状态机';
+  DATE = j.date; document.getElementById('date-label').textContent = (DATE||'—') + ' · 六阶段状态机';
+  if (!j.date || !(j.stages||[]).length) {
+    document.getElementById('stage-cards').innerHTML = '<span style="font-size:0.68rem;color:var(--muted)">📡 暂无 CPA 数据（请先跑 python src/scanners/cpa_stage.py --incremental）</span>';
+    ALL = []; renderTable(); return;
+  }
   var total = (j.stages||[]).reduce(function(a,b){return a+b.count;},0);
   var html = '<span class="sc'+(FILTER_STAGE===''?' on':'')+'" onclick="setStage(\'\')">全部<b>'+total+'</b></span>';
   (j.stages||[]).forEach(function(s){
@@ -114,6 +134,9 @@ async function load(){
   var q = await (await fetch('/api/cpa/stages?limit=2000'+(FILTER_STAGE?'&stage='+encodeURIComponent(FILTER_STAGE):''))).json();
   ALL = q.rows || [];
   renderTable();
+  }catch(e){
+    document.getElementById('stage-cards').innerHTML = '<span style="font-size:0.68rem;color:var(--muted)">⚠️ 数据加载失败：'+e.message+'</span>';
+  }
 }
 function setStage(s){ FILTER_STAGE = s; load(); }
 function renderTable(){
@@ -129,7 +152,7 @@ function renderTable(){
   if (sortKey) rows.sort(function(a,b){ var x=a[sortKey], y=b[sortKey];
     if (x==null) return 1; if (y==null) return -1; return (x>y?1:-1)*sortDir; });
   document.getElementById('count').textContent = rows.length + ' / ' + ALL.length + ' 只';
-  document.querySelector('#main-table tbody').innerHTML = rows.slice(0,600).map(function(r){
+  document.querySelector('#main-table tbody').innerHTML = rows.slice(0,1500).map(function(r){
     return '<tr><td class="code" onclick="showStock(\''+r.code+'\')">'+r.code+'</td><td>'+(r.name||'')+'</td>'+
       '<td><span class="stg" style="background:'+stgColor(r.stage)+'22;color:'+stgColor(r.stage)+'">'+r.stage+'</span></td>'+
       '<td>'+r.days+'</td><td>'+(r.support==null?'—':r.support)+'</td><td>'+(r.invalid==null?'—':r.invalid)+'</td>'+
@@ -143,6 +166,7 @@ async function showStock(code){
   panel.style.display = 'block';
   document.getElementById('d-title').textContent = '📈 ' + code + ' 阶段轨迹';
   var j = await (await fetch('/api/cpa/stock?code='+code)).json();
+  var V = themeVars();
   var ds = [], ps = [], areas = [];
   (j.daily||[]).forEach(function(r){ ds.push(r.date); ps.push(r.close); });
   // 阶段色带（连续同阶段合并；展示层：连续 >=3 日才着色）
@@ -158,13 +182,13 @@ async function showStock(code){
   ch.setOption({
     backgroundColor:'transparent', animation:false,
     grid:{left:8,right:10,top:14,bottom:40,containLabel:true},
-    tooltip:{trigger:'axis',backgroundColor:'rgba(20,20,26,.92)',borderColor:'rgba(255,255,255,.08)',textStyle:{color:'#ddd',fontSize:11}},
-    xAxis:{type:'category',data:ds,boundaryGap:false,axisLabel:{color:'#888',fontSize:9,interval:Math.floor(ds.length/10)}},
-    yAxis:{type:'value',scale:true,axisLabel:{color:'#888',fontSize:9},splitLine:{lineStyle:{color:'rgba(255,255,255,.05)'}}},
+    tooltip:{trigger:'axis',backgroundColor:V.tipBg,borderColor:V.tipBd,textStyle:{color:V.tipTx,fontSize:11}},
+    xAxis:{type:'category',data:ds,boundaryGap:false,axisLabel:{color:V.tx,fontSize:9,interval:Math.floor(ds.length/10)}},
+    yAxis:{type:'value',scale:true,axisLabel:{color:V.tx,fontSize:9},splitLine:{lineStyle:{color:V.sp}}},
     dataZoom:[{type:'inside',start:60,end:100}],
     series:[{type:'line',data:ps,symbol:'none',lineStyle:{width:1.4,color:'#ef4444'},
       markArea:{silent:true,data:areas}}]
-  });
+  }, true);
   document.getElementById('d-sub').textContent = (j.transitions||[]).length + ' 次迁移';
   document.getElementById('d-trans').innerHTML = (j.transitions||[]).slice(-40).reverse().map(function(t){
     var cls = t.invalidated ? 'inv' : '';
@@ -174,6 +198,9 @@ async function showStock(code){
   }).join('');
 }
 window.addEventListener('resize', function(){ Object.values(charts).forEach(function(c){try{c.resize()}catch(e){}}); });
+// 主题切换重绘（hanako-glass 规范）
+new MutationObserver(function(){ Object.keys(charts).forEach(function(k){ delete charts[k]; }); if (DATE) load(); })
+  .observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
 load();
 </script>
 </body>

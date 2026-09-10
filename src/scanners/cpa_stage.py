@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-CPA 阶段判定引擎 v1.0
+CPA 阶段判定引擎 v1.1
 ════════════════════════════════════════════════════════════
 PRD: docs/product/CPA阶段判定引擎_产品需求书.md
 
@@ -13,11 +13,15 @@ PRD: docs/product/CPA阶段判定引擎_产品需求书.md
 
 本文件结构：
   [1] 配置（所有阈值集中于此，便于回测校准）
-  [2] 指标层（EMA/ATR/VR/分位/斜率/箱体）
-  [3] 数据层（复权 K 线、缠论笔顶、结构支撑位）
-  [4] 判据层（六阶段，待实现）
-  [5] 状态机（迁移 + 优先级 + invalidated，待实现）
-  [6] 回算主流程（全量/增量，待实现）
+  [2] 指标层（EMA/ATR/VR/分位/斜率）
+  [3] 数据层（复权 K 线、缠论笔顶、建表）
+  [4] 判据层（六阶段）
+  [5] 状态机（迁移 + 优先级 + 过渡态 + invalidated）
+  [6] 回算主流程（全量/增量）+ 数据层折叠
+
+用法：
+  python src/scanners/cpa_stage.py --start 2016-01-01 --workers 8   # 全量回算
+  python src/scanners/cpa_stage.py --incremental                     # 每日增量
 """
 import os, sys, json, sqlite3
 from datetime import datetime, timedelta
@@ -37,6 +41,11 @@ CFG = {
     'ema_fast': 10,
     'ema_slow': 20,
     'slope_lag': 3,            # EMA 斜率比较滞后
+
+    # ── 停顿区识别通用 ──
+    'pause_amp_max': 0.30,     # 停顿区振幅上限（防单边行情误判）
+    'pause_mid_gap': 0.10,     # 前后半段中枢差异上限（无单边方向）
+    'data_min_ratio': 0.8,     # 窗口数据完整度下限
 
     # ── 阶段① Reversal Extension ──
     'r_drawdown_min': 0.30,    # 自 250 日高点回撤 ≥30%
@@ -139,8 +148,8 @@ def sma_series(values, n):
     return out
 
 
-def atr_series(highs, lows, wins, n):
-    """ATR（用复权 high/low 的均值幅度近似 true range 简化版：high-low）"""
+def atr_series(highs, lows, n):
+    """ATR（用复权 high/low 的均值幅度近似：high-low 的 n 日均值）"""
     out = [None] * len(highs)
     for i in range(len(highs)):
         if i + 1 < n:
@@ -153,7 +162,7 @@ def atr_series(highs, lows, wins, n):
                 ok = False
                 break
             s += (h - l)
-        if ok and wins is not None:
+        if ok:
             out[i] = s / n
     return out
 
@@ -279,7 +288,7 @@ def load_bi_tops(conn, code):
 
 
 def load_bi_by_date(conn, code, date):
-    """加载指定日期的笔数据（回填用——严格当日快照，避免未来信息）"""
+    """加载指定日期的笔数据（预留：严格当日快照防未来函数——回填路径当前用最新快照 load_bi_tops）"""
     row = conn.execute(
         """SELECT bi_json FROM chanlun_bi_json WHERE stock_code=? AND scan_date=?""",
         (code, date)).fetchone()
@@ -292,7 +301,7 @@ def load_bi_by_date(conn, code, date):
 
 
 def load_rps250(conn, code, date, win=250):
-    """RPS250 近似：用 stock_rs_daily.rps_250（若表有该日）"""
+    """RPS250（预留：阶段① 前置闸门 c 条件用；当前实现用"250日最大涨幅"替代）"""
     try:
         row = conn.execute(
             "SELECT rps_250 FROM stock_rs_daily WHERE stock_code=? AND date=?",
@@ -333,11 +342,11 @@ def compute_indicators(kl):
     vols = [k['volume'] for k in kl]
     ema10 = ema_series(closes, 10)
     ema20 = ema_series(closes, 20)
-    atr20 = atr_series(highs, lows, closes, 20)
+    atr20 = atr_series(highs, lows, 20)
     return {
         'closes': closes, 'highs': highs, 'lows': lows, 'vols': vols,
         'ema10': ema10, 'ema20': ema20, 'atr20': atr20,
-        'atr60': atr_series(highs, lows, closes, 60),
+        'atr60': atr_series(highs, lows, 60),
         'vr': vr_series(vols, 20),
         'nd10': [(c - e) / a if (e and a and a > 0) else None
                  for c, e, a in zip(closes, ema10, atr20)],
@@ -363,7 +372,7 @@ def find_pause_zone(ind, i, win_min, win_max, amp_tol, vol_dry):
         seg_high = [x for x in ind['highs'][s:i] if x is not None]
         seg_low = [x for x in ind['lows'][s:i] if x is not None]
         seg_c = [x for x in ind['closes'][s:i] if x is not None]
-        if len(seg_high) < w * 0.8 or len(seg_low) < w * 0.8:
+        if len(seg_high) < w * CFG['data_min_ratio'] or len(seg_low) < w * CFG['data_min_ratio']:
             continue
         zh, zl = max(seg_high), min(seg_low)
         if zl <= 0:
@@ -374,10 +383,10 @@ def find_pause_zone(ind, i, win_min, win_max, amp_tol, vol_dry):
             mid = len(seg_c) // 2
             avg1 = sum(seg_c[:mid]) / mid
             avg2 = sum(seg_c[mid:]) / (len(seg_c) - mid)
-            if avg1 <= 0 or abs(avg2 / avg1 - 1) > 0.10:
+            if avg1 <= 0 or abs(avg2 / avg1 - 1) > CFG['pause_mid_gap']:
                 continue          # 单边行情，不是停顿
         # ── 振幅上限（必要，防单边/大涨区间误判）──
-        if amp > 0.30:
+        if amp > CFG['pause_amp_max']:
             continue
         # 量能干涸：突破前 3-5 日均量 vs 之前 20 日均量
         v_recent = [x for x in ind['vols'][max(0, i - 5):i] if x]
@@ -476,10 +485,10 @@ def judge_ftd(ind, kl, i):
     vr, e20 = ind['vr'][i], ind['ema20'][i]
     if None in (c, c1, vr, e20) or not c1:
         return {'hit': False}
-    if not (c / c1 - 1 >= 0.02 and vr >= 1.3 and c > e20):
+    if not (c / c1 - 1 >= CFG['ftd_ret_min'] and vr >= CFG['ftd_vr_min'] and c > e20):
         return {'hit': False}
-    # 低点：i 前 4~15 日内存在"近 120 日最低收盘"的低点 L，且自 250 日高点回撤 ≥25%
-    for L in range(i - 15, i - 3):
+    # 低点：i 前 ftd_win_min~ftd_win_max 日内存在"近 120 日最低收盘"的低点 L，且自 250 日高点回撤 ≥25%
+    for L in range(i - CFG['ftd_win_max'], i - CFG['ftd_win_min'] + 1):
         if L < 260:
             continue
         s = max(0, L + 1 - 120)
@@ -757,7 +766,6 @@ def max_gain_since(kl, i0, i1):
 
 
 def below_ma_confirmed(ind, i, n=2, band_atr=0.3):
-    """连续 n 日收盘 < EMA20 - band*ATR20（非对称：进⑥b 用紧带 0.3，防守快确认）"""
     cnt = 0
     for j in range(max(0, i - n + 1), i + 1):
         c, e, a = ind['closes'][j], ind['ema20'][j], ind['atr20'][j]
@@ -848,12 +856,12 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
             entry_low = ctx.get('entry_low')
             pl = (ctx.get('w_pause') or {}).get('low')
             fail_low = entry_low or pl or structure_support
-            if below_ma_confirmed(ind, i, 2):
-                # 连续 2 日跌破 EMA20：底部反转区间结束 → ⑥ 判定
+            if below_ma_confirmed(ind, i, CFG['t_in_days'], CFG['t_in_band']):
+                # n 日跌破 EMA20-band：底部反转区间结束 → ⑥ 判定
                 r6 = judge_wedge_drop(ind, kl, i, ctx, structure_support, tops)
                 stage = '⑥a' if r6['confirm'] else '⑥b'
                 ctx.update({'stage_start_idx': i, 'w_pause': None, 'w_date_idx': None})
-                detail = {'reason': '②区间跌破EMA20(2日确认)', **r6['detail']}
+                detail = {'reason': '②区间跌破EMA20(n日确认)', **r6['detail']}
             elif fail_low and c < fail_low:
                 # 跌破入口结构低点 → 结构失败（V型底部不成立/突破失败）
                 stage = '①a'
@@ -872,8 +880,8 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
                     stage = '③'; ctx['cb_low'] = kl[i].get('close'); ctx['entry_idx'] = i; ctx['stage_start_idx'] = i; detail = r3['detail']
 
         elif stage == '③':
-            if below_ma_confirmed(ind, i, 2):
-                # 连续 2 日跌破 EMA20 → 进 ⑥ 判定（confirm→⑥a；否则⑥b）
+            if below_ma_confirmed(ind, i, CFG['t_in_days'], CFG['t_in_band']):
+                # n 日跌破 EMA20 → 进 ⑥ 判定（confirm→⑥a；否则⑥b）
                 r6 = judge_wedge_drop(ind, kl, i, ctx, structure_support, tops)
                 stage = '⑥a' if r6['confirm'] else '⑥b'
                 ctx.update({'stage_start_idx': i, 'cb_low': None})
@@ -920,8 +928,8 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
 
         elif stage in ('⑥a', '⑥b', '⑥c'):
             dd, _ = drawdown_from_high(kl, i, CFG['pctile_win'])
-            # 趋势复活：连续 2 日站上 EMA20 → 回 ② 区间（⑥a/⑥b/⑥c 均可复活）
-            if above_ma_confirmed(ind, i, 2) and stage in ('⑥a', '⑥b', '⑥c'):
+            # 趋势复活：窗口 t_out_win 内 t_out_need 日站上 EMA20+t_out_band×ATR → 回 ② 区间
+            if above_ma_confirmed(ind, i, CFG['t_out_win'], CFG['t_out_band'], CFG['t_out_need']) and stage in ('⑥a', '⑥b', '⑥c'):
                 stage = '②'; ctx.update({'stage_start_idx': i, 'w_date_idx': i, 'w_pause': None, 'cb_low': None})
                 detail = {'reason': '趋势复活（站上EMA20）→回②区间'}
             else:
@@ -1076,25 +1084,32 @@ def _stock_codes(conn, start, end=None):
 
 
 def _backfill_worker(codes):
-    """多进程 worker：独立连接，处理一批股票（模块级函数才能 pickle）"""
+    """多进程 worker：独立连接，处理一批股票（模块级函数才能 pickle）
+    返回 (daily_rows, trans_rows, skipped)
+    """
     import sqlite3 as _sq
-    conn = _sq.connect(DB_PATH)
+    conn = _sq.connect(DB_PATH, timeout=30)
     conn.row_factory = _sq.Row
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA journal_mode=WAL")
     daily_all, trans_all = [], []
+    skipped = []
     for code in codes:
         try:
             kl = load_klines(conn, code, '2014-01-01')
             if len(kl) < 320:
+                skipped.append(code)
                 continue
             ind = compute_indicators(kl)
             tops = load_bi_tops(conn, code)
             d, t = run_state_machine(conn, code, kl, ind, tops)
             daily_all += d
             trans_all += t
-        except Exception:
+        except Exception as e:
+            skipped.append('%s(%s)' % (code, str(e)[:40]))
             continue
     conn.close()
-    return daily_all, trans_all
+    return daily_all, trans_all, skipped
 
 
 def backfill(start='2016-01-01', end=None, workers=8, purge=True):
@@ -1104,10 +1119,12 @@ def backfill(start='2016-01-01', end=None, workers=8, purge=True):
     import time as _t
     from concurrent.futures import ProcessPoolExecutor, as_completed
     t0 = _t.time()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA journal_mode=WAL")
     ensure_tables(conn)
-    codes = _stock_codes(conn, '2016-01-01', end)
+    codes = _stock_codes(conn, start, end)
     print('股票池: %d 只 | 区间 %s ~ %s | %d 进程' % (len(codes), start, end or '最新', workers), flush=True)
     if purge:
         conn.execute("DELETE FROM cpa_stage_daily")
@@ -1117,12 +1134,14 @@ def backfill(start='2016-01-01', end=None, workers=8, purge=True):
     n = max(1, len(codes) // (workers * 4))
     chunks = [codes[i:i + n] for i in range(0, len(codes), n)]
     n_daily = n_trans = 0
+    all_skipped = []
     done = 0
     with ProcessPoolExecutor(max_workers=workers) as ex:
         futures = {ex.submit(_backfill_worker, c): i for i, c in enumerate(chunks)}
         for fut in as_completed(futures):
             try:
-                d, t = fut.result()
+                d, t, skipped = fut.result()
+                all_skipped += skipped
             except Exception as e:
                 print('  ! chunk 失败: %s' % str(e)[:80]); continue
             if d:
@@ -1141,8 +1160,10 @@ def backfill(start='2016-01-01', end=None, workers=8, purge=True):
     print('标记 invalidated...', flush=True)
     n_inv = mark_invalidated(conn)
     conn.close()
-    print('回算完成: 日线 %d 行 | 迁移 %d 条 | 已失效标记 %d | 耗时 %.0fs' % (
-        n_daily, n_trans, n_inv, _t.time() - t0))
+    print('回算完成: 日线 %d 行 | 迁移 %d 条 | 已失效标记 %d | 跳过 %d 只 | 耗时 %.0fs' % (
+        n_daily, n_trans, n_inv, len(all_skipped), _t.time() - t0))
+    if all_skipped:
+        print('  跳过明细(前10): %s' % ', '.join(str(s) for s in all_skipped[:10]))
 
 
 def incremental():
