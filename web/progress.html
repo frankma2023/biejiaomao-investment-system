@@ -552,7 +552,13 @@
     <div class="lesson-card"><div class="ln">98. 矛盾消解优于折衷（先问是否同一个抽屉）</div><div class="ld">FTD 要快（≤2 天）与复活要慢（宁可慢不可假）看似冲突——但两者服务于不同证据负担（FTD 只标记起点、复活要证明趋势终结），拆开抽屉后冲突自然消失。遇到"两个要求打架"，先问它们是否在同一个抽屉里。</div></div>
     <div class="lesson-card"><div class="ln">99. 自设参数即待验证假设</div><div class="ld">欧奈尔原文说"第 4 天或之后"，我们自加了"7 日封顶"——数据证明 8-15 日窗口的 FTD 质量更好（H20 +2.16% vs +1.56%，胜率 51% vs 46%，样本近翻倍）。凡是我们自己加的约束（而非原文要求的），都要当成待验证假设，不固化。</div></div>
     <div class="lesson-card"><div class="ln">100. 跨体系借用概念必须核对口径</div><div class="ld">欧奈尔的 FTD 是**指数级**信号，individual 股 FTD ≠ 指数 FTD（个股 H20 胜率 46-51% 属正常）；同理 MW B1 ≠ CPA Wedge Pop（B1 无"首次站上均线"约束，58% 的 B1 日 low 在 EMA10 上方）。跨体系对照前先核口径，否则验证结论无效。</div></div>
-    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">93. 事件失效的 key 匹配必须容差化——箱体带随数据演化，精确 key 会漏拦</div><div class="ld">v1.4 的 expired 用精确下沿价位做 key（50.27），8-11 识别出 52.86 带（同箱体演化值）时匹配不上 → 失效机制形同虚设，重复信号照报。修复：expired 匹配改 band_tol×2（6%）容差遍历。教训：任何"记录历史状态并按标识符匹配"的机制，标识符若来自动态聚类值就必须容差匹配，否则就是假失效。</div></div>
+    <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">93. 事件失效的 key 匹配必须容差化——箱体带随数据演化，精确 key 会漏拦</div><div class="ld">v1.4 的 expired 用精确下沿价位做 key（50.27），8-11 识别出 52.86 带（同箱体演化值）时匹配不上 → 失效机制形同虚设，重复信号照报。修复：expired 匹配改 band_tol×2（6%）容差遍历。教训：任何"记录历史状态并按标识符匹配"的机制，标识符若来自动态聚类值就必须容差匹配，否则就是假失效。</div>
+    <div class="lesson-card"><div class="ln">101. 双轴 review 抓出 6 个"静默失真"级 Blocker</div><div class="ld">复权口径混用（3 处）、invalidated 键不匹配+误标正向迁移、闸门语义被改写、笔顶收敛只记录不判定、⑥ 预警态整条缺失。这类 bug 跑得通、看不出来、结论全错——没 review 就上回测，得到的是毒药（"先审计再回测"纪律的再次验证）。</div></div>
+    <div class="lesson-card"><div class="ln">102. 修 bug 的次生伤害——大范围 edit 后必须立即编译+冒烟</div><div class="ld">修闸门语义时误删了 ①a 的 deep/ext 定义（会直接崩溃），侥幸当场发现。教训：批量 edit 后不编译就继续改，等于把隐蔽崩溃埋进引擎。</div></div>
+    <div class="lesson-card"><div class="ln">103. 配置集中管理要真的接上（声明≠使用）</div><div class="ld">CFG 声明了 7 个配置键但代码硬编码同值——校准者改 CFG 毫无效果，会得出"参数不敏感"的错误结论。任何"配置驱动"的引擎必须有声明→使用核对。</div></div>
+    <div class="lesson-card"><div class="ln">104. 口径一致性检查清单</div><div class="ld">复权 vs 未复权｜交易日 vs 日历日｜收盘 vs 最低｜adj vs raw——同一比较式里混用两个口径是最高频的隐蔽错误（本次 B1 三处 + W5 一处）。写比较式前先问："两边同一口径吗？"</div></div>
+    <div class="lesson-card"><div class="ln">105. 回看字段的三重陷阱</div><div class="ld">invalidated 类回看字段：① 键匹配（子状态需归一化：⑥a/⑥b/⑥c → ⑥）② 窗口依据（不能凭空放大 1.5 倍）③ 方向判定（正向推进 ≠ 失效，只有回退型才算）。三处错一个，回看字段就变成噪声。</div></div>
+</div>
 
 </div>
 <script>
