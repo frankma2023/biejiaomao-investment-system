@@ -1062,6 +1062,103 @@ def collapse_states(daily_rows, min_days=5):
     return out_rows
 
 
-# ── [6] 回算主流程 —— 待实现 ──
+# ── [6] 回算主流程 ──
+def _stock_codes(conn, start, end=None):
+    """回算范围内的股票池（有足够历史的）"""
+    q = """SELECT stock_code, COUNT(*) n FROM daily_kline
+           WHERE date>=? GROUP BY stock_code HAVING n>=320"""
+    args = [start]
+    if end:
+        q = """SELECT stock_code, COUNT(*) n FROM daily_kline
+               WHERE date>=? AND date<=? GROUP BY stock_code HAVING n>=320"""
+        args = [start, end]
+    return [r[0] for r in conn.execute(q, args)]
+
+
+def _backfill_worker(codes):
+    """多进程 worker：独立连接，处理一批股票（模块级函数才能 pickle）"""
+    import sqlite3 as _sq
+    conn = _sq.connect(DB_PATH)
+    conn.row_factory = _sq.Row
+    daily_all, trans_all = [], []
+    for code in codes:
+        try:
+            kl = load_klines(conn, code, '2014-01-01')
+            if len(kl) < 320:
+                continue
+            ind = compute_indicators(kl)
+            tops = load_bi_tops(conn, code)
+            d, t = run_state_machine(conn, code, kl, ind, tops)
+            daily_all += d
+            trans_all += t
+        except Exception:
+            continue
+    conn.close()
+    return daily_all, trans_all
+
+
+def backfill(start='2016-01-01', end=None, workers=8, purge=True):
+    """全量回算 2016-2026 全市场（多进程）
+    purge=True：先清空两表（全量重建）；False：只追加（增量）
+    """
+    import time as _t
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    t0 = _t.time()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    ensure_tables(conn)
+    codes = _stock_codes(conn, '2016-01-01', end)
+    print('股票池: %d 只 | 区间 %s ~ %s | %d 进程' % (len(codes), start, end or '最新', workers), flush=True)
+    if purge:
+        conn.execute("DELETE FROM cpa_stage_daily")
+        conn.execute("DELETE FROM cpa_stage_transitions")
+        conn.commit()
+    # 分块
+    n = max(1, len(codes) // (workers * 4))
+    chunks = [codes[i:i + n] for i in range(0, len(codes), n)]
+    n_daily = n_trans = 0
+    done = 0
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        futures = {ex.submit(_backfill_worker, c): i for i, c in enumerate(chunks)}
+        for fut in as_completed(futures):
+            try:
+                d, t = fut.result()
+            except Exception as e:
+                print('  ! chunk 失败: %s' % str(e)[:80]); continue
+            if d:
+                conn.executemany("INSERT OR REPLACE INTO cpa_stage_daily VALUES (?,?,?,?,?,?,?,?,?,?,?)", d)
+            if t:
+                conn.executemany("""INSERT OR REPLACE INTO cpa_stage_transitions
+                    (stock_code, transition_date, from_stage, to_stage, trigger_detail_json, invalidated, invalidated_date)
+                    VALUES (?,?,?,?,?,0,NULL)""", t)
+            conn.commit()
+            n_daily += len(d or [])
+            n_trans += len(t or [])
+            done += 1
+            print('  chunk %d/%d 完成 (日线 %d, 迁移 %d) %.0fs' % (
+                done, len(chunks), n_daily, n_trans, _t.time() - t0), flush=True)
+    # invalidated 事后标记
+    print('标记 invalidated...', flush=True)
+    n_inv = mark_invalidated(conn)
+    conn.close()
+    print('回算完成: 日线 %d 行 | 迁移 %d 条 | 已失效标记 %d | 耗时 %.0fs' % (
+        n_daily, n_trans, n_inv, _t.time() - t0))
+
+
+def incremental():
+    """每日增量：全市场重跑（单股全历史仅 ~0.3s，全市场 ~3min——比上下文恢复更简单可靠）"""
+    backfill(start='2016-01-01', workers=8, purge=True)
+
+
 if __name__ == '__main__':
-    print('CPA 引擎：指标层 + 判据层 + 状态机 + 数据层折叠就绪；回算主流程待实现')
+    import argparse as _ap
+    p = _ap.ArgumentParser(description='CPA 阶段判定引擎回算')
+    p.add_argument('--start', default='2016-01-01')
+    p.add_argument('--end', default=None)
+    p.add_argument('--workers', type=int, default=8)
+    p.add_argument('--incremental', action='store_true', help='每日增量（等价全量重跑）')
+    a = p.parse_args()
+    if a.incremental:
+        incremental()
+    else:
+        backfill(a.start, a.end, a.workers)

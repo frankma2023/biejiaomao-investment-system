@@ -273,6 +273,9 @@ TASKS.append(("📋 32.自选池日报", [PYTHON_EXE, "scripts/gen_watchlist_rep
 # 步骤 33：微盘股指数（依赖 K线就位——月末定池/月初生效/日频点位，幂等可重复）
 TASKS.append(("🔬 33.微盘股指数", [PYTHON_EXE, "scripts/build_microcap_index.py", "--incremental"]))
 
+# 步骤 34：CPA 阶段判定（依赖 K线+笔数据——六阶段状态机全量重跑，~3min，幂等）
+TASKS.append(("🎯 34.CPA阶段判定", [PYTHON_EXE, "src/scanners/cpa_stage.py", "--incremental"]))
+
 for label, cmd in TASKS:
     lbl, ok, elapsed, _ = run_task(label, cmd)
     tasks.append((lbl, ok, elapsed))

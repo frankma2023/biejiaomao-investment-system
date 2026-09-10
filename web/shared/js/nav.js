@@ -57,6 +57,7 @@
     { href: '../discipline/watchlist-report.html', label: '自选日报', page: 'watchlist-report' },
     { href: '../discipline/trades.html', label: '交易记录',  page: 'trades' },
     { href: '../discipline/monitor.html', label: '持仓监控', page: 'monitor' },
+    { href: '../discipline/cpa-stages.html', label: '🎯 CPA阶段', page: 'cpa-stages' },
   ];
 
   var CHANLUN_ITEMS = [

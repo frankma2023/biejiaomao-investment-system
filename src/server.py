@@ -7489,6 +7489,78 @@ def api_microcap_components():
     return jsonify({'type': typ, 'eff_date': date, 'rows': [dict(r) for r in rows], 'count': len(rows)})
 
 
+@app.route('/api/cpa/summary', methods=['GET'])
+def api_cpa_summary():
+    """CPA 阶段分布汇总（最新交易日）"""
+    db = get_db()
+    try:
+        date = request.args.get('date') or db.execute("SELECT MAX(date) FROM cpa_stage_daily").fetchone()[0]
+        rows = db.execute("SELECT stage, COUNT(*) n FROM cpa_stage_daily WHERE date=? GROUP BY stage ORDER BY n DESC", (date,)).fetchall()
+        return jsonify({'date': date, 'stages': [{'stage': r[0], 'count': r[1]} for r in rows]})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/cpa/stages', methods=['GET'])
+def api_cpa_stages():
+    """CPA 阶段列表（主表）：stage=②,③|action=入场|date=YYYY-MM-DD"""
+    db = get_db()
+    try:
+        stage = request.args.get('stage', '')
+        action = request.args.get('action', '')
+        limit = min(int(request.args.get('limit', 300)), 2000)
+        date = request.args.get('date') or db.execute("SELECT MAX(date) FROM cpa_stage_daily").fetchone()[0]
+        q = """SELECT d.stock_code, b.name, d.stage, d.prior_stage, d.stage_start_date,
+                      d.days_in_stage, d.structure_support, d.invalid_level, d.action, d.close, d.metrics_json
+               FROM cpa_stage_daily d LEFT JOIN stock_basic b ON b.stock_code=d.stock_code
+               WHERE d.date=?"""
+        args = [date]
+        if stage:
+            stages = [s for s in stage.split(',') if s]
+            q += " AND d.stage IN (%s)" % ','.join('?' * len(stages))
+            args += stages
+        if action:
+            q += " AND d.action=?"
+            args.append(action)
+        q += " ORDER BY d.stage, d.days_in_stage DESC LIMIT ?"
+        args.append(limit)
+        rows = db.execute(q, args).fetchall()
+        out = []
+        for r in rows:
+            m = {}
+            try:
+                m = json.loads(r['metrics_json']) if r['metrics_json'] else {}
+            except Exception:
+                pass
+            out.append({'code': r['stock_code'], 'name': r['name'], 'stage': r['stage'],
+                        'prior': r['prior_stage'], 'start': r['stage_start_date'],
+                        'days': r['days_in_stage'], 'support': r['structure_support'],
+                        'invalid': r['invalid_level'], 'action': r['action'], 'close': r['close'],
+                        'entry_path': m.get('entry_path'), 'transition_zone': m.get('transition_zone', False)})
+        return jsonify({'date': date, 'rows': out, 'count': len(out)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/cpa/stock', methods=['GET'])
+def api_cpa_stock():
+    """个股 CPA 阶段轨迹（含变迁历史）"""
+    db = get_db()
+    code = request.args.get('code', '')
+    start = request.args.get('start', '2016-01-01')
+    if not code:
+        return jsonify({'error': 'code 必填'}), 400
+    try:
+        rows = db.execute("""SELECT date, stage, days_in_stage, structure_support, invalid_level, action, close
+            FROM cpa_stage_daily WHERE stock_code=? AND date>=? ORDER BY date""", (code, start)).fetchall()
+        trans = db.execute("""SELECT transition_date, from_stage, to_stage, trigger_detail_json, invalidated, invalidated_date
+            FROM cpa_stage_transitions WHERE stock_code=? AND transition_date>=? ORDER BY transition_date""", (code, start)).fetchall()
+        return jsonify({'code': code, 'daily': [dict(r) for r in rows],
+                        'transitions': [dict(r) for r in trans]})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/microcap/watertemp', methods=['GET'])
 def api_microcap_watertemp():
     """微盘水温卡：400/100 最新点位/回撤/平均市值 + 与 932000 对比（供 market-scan 卡片）"""
