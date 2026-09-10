@@ -63,7 +63,7 @@ def main():
         if not last or last >= dates[-1]:
             print('已是最新, 无需增量'); return
         dates = [d for d in dates if d > last]
-        print('增量 %s ~ %s (%d 天)' % (dates[0], dates[-1], len(dates)))
+        print('增量 %s ~ %s (%d 天, 承接 %s)' % (dates[0], dates[-1], len(dates), last))
     else:
         conn.execute("DELETE FROM microcap_index_daily")
         conn.execute("DELETE FROM microcap_index_component")
@@ -110,6 +110,56 @@ def main():
     prev_adj = {t: {} for t in ('400', '100')}
     prev_point = {t: None for t in ('400', '100')}
     daily_rows, comp_rows = [], []
+    # ── 增量模式：恢复状态（点位连续性 + 当前池 + 跨月衔接）──
+    if args.incremental:
+        last = conn.execute("SELECT MAX(date) FROM microcap_index_daily").fetchone()[0]
+        last_kmap = {}
+        for r in conn.execute("SELECT stock_code, close, adj_close FROM daily_kline WHERE date=?", (last,)):
+            last_kmap[r[0]] = (r[1], r[2])
+
+        def _prev_adj_of(code):
+            """基准复权价：优先 last 日, 停牌则回溯最近交易日（消除与全量的停牌股偏差）"""
+            if code in last_kmap:
+                return last_kmap[code][1] if last_kmap[code][1] is not None else last_kmap[code][0]
+            row2 = conn.execute(
+                "SELECT adj_close, close FROM daily_kline WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1",
+                (code, last)).fetchone()
+            if not row2:
+                return None
+            return row2[0] if row2[0] is not None else row2[1]
+
+        for t in ('400', '100'):
+            p = conn.execute("SELECT point FROM microcap_index_daily WHERE index_type=? AND date=?", (t, last)).fetchone()
+            prev_point[t] = p[0] if p else None
+            eff = conn.execute("SELECT MAX(eff_date) FROM microcap_index_component WHERE index_type=? AND eff_date<='9999-12-31' AND eff_date<=?", (t, dates[0])).fetchone()[0]
+            codes = []
+            if eff:
+                codes = [r[0] for r in conn.execute("SELECT stock_code FROM microcap_index_component WHERE index_type=? AND eff_date=? ORDER BY mkt_cap", (t, eff))]
+            if codes:
+                pools[t] = codes
+                prev_adj[t] = {c: _prev_adj_of(c) for c in codes}
+        # 跨月衔接：增量首日为新月份 → 用 last 日全市场排序定本月初生效池
+        if dates[0][:7] != last[:7]:
+            print('  跨月: 用 %s 数据定 %s 生效池' % (last, dates[0]), flush=True)
+            _d0 = datetime.strptime(last, '%Y-%m-%d')
+            _rank = []
+            for c, (ipo, delist, _n) in basic.items():
+                if delist and delist < last: continue
+                if ipo > last: continue
+                if (_d0 - datetime.strptime(ipo, '%Y-%m-%d')).days < NEW_DAYS: continue
+                kl = last_kmap.get(c)
+                if not kl or not kl[0]: continue
+                _cap = cap_at(c, last)
+                if not _cap: continue
+                _rank.append((c, _cap * kl[0]))
+            _rank.sort(key=lambda x: x[1])
+            _cmap = dict(_rank)
+            for t, n in (('400', 400), ('100', 100)):
+                _codes = [x[0] for x in _rank[:n]]
+                for c in _codes:
+                    comp_rows.append((t, dates[0], c, basic[c][2], round(_cmap[c] / 1e8, 2), round(1.0 / len(_codes), 6)))
+                pools[t] = _codes
+                prev_adj[t] = {c: _prev_adj_of(c) for c in _codes}
 
     def rank_all(d, kmap):
         """全市场市值排序（升序）: [(code, mcap)]"""
@@ -188,10 +238,10 @@ def main():
         daily_rows.append((t, d, round(point, 2), round(ret * 100, 3),
                            round(avg_cap, 2) if avg_cap else None, len(pool)))
 
-    # 流式逐日
+    # 流式逐日（增量时从增量首日起查, 避免全表扫描）
     it = conn.execute(
         "SELECT stock_code, date, close, adj_close FROM daily_kline WHERE date >= ? "
-        "ORDER BY date, stock_code", (START,))
+        "ORDER BY date, stock_code", (dates[0],))
     row = it.fetchone()
     for di, d in enumerate(dates):
         kmap = {}
