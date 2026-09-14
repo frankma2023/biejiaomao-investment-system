@@ -75,9 +75,15 @@ CFG = {
     'cb_hold_days': 2,                           # ≥2 日收盘在均线上
 
     # ── 阶段④ Base 'n Break ──
+    # 2026-09-14 校准（PRD §12.2 #13/#14），全量 5,310 个 ④ 事件的 H20 超额：
+    #   深度严格单调：≤3% +5.43%/52% ｜ 3~5% −0.07% ｜ 5~8% −0.11% ｜ 8~12% −0.60% ｜ >12% −1.77%
+    #   前置涨幅严格递增坏：<20% +2.65%/45% ｜ 20~30% +1.86% ｜ 30~50% −0.20% ｜ 50~100% −1.31% ｜ ≥100% −4.49%/33%
+    # → 深度改绝对上限（原相对口径「≤前段涨幅50%」随 #14 一并取消）
+    # → 前置涨幅由下界改上界（原 ≥20% 恰好排除了最好的一组）
     'b_win_min': 10, 'b_win_max': 40,      # 箱体时长
-    'b_depth_ratio': 0.5,                  # 深度 ≤ 前段涨幅 50%
-    'b_prior_gain_min': 0.20,              # 前置涨幅 ≥20%（待校准）
+    'b_depth_max': 0.05,                   # 箱体深度 ≤5%（绝对，2026-09-14）
+    'b_prior_gain_max': 0.30,              # 前置涨幅 ≤30%（上界，2026-09-14 反向）
+    'b_vcp_score': False,                  # VCP 收缩度不参与评分（实测无区分力，PRD §12.2 #11）
     'b_breakout_buf': 1.005,
     'b_breakout_vr': 1.5,
     'b_touch_band': 0.005,                 # 触碰判定带宽 ±0.5%
@@ -101,9 +107,15 @@ CFG = {
     # ── 非对称阈值 + 过渡态（抖动治理，2026-09-10 讨论）──
     't_in_band': 0.3,      # 进⑥b：close < EMA20 - 0.3×ATR（防守快确认，宁可误报不可漏报）
     't_in_days': 2,        # 进⑥b 确认天数
-    't_out_band': 0.5,     # 出⑥b：close > EMA20 + 0.5×ATR（进攻慢确认，宁可慢不可假）
-    't_out_win': 3,        # 出⑥b 观察窗口
-    't_out_need': 2,       # 出⑥b 需窗口内 N 日达标（3中2）
+    't_out_band': 0.0,     # 出⑥b 门槛：close > EMA20 + 0×ATR = **纯 EMA20**（2026-09-13 回落）
+    # ⚠ 原为 0.5×ATR（2026-09-10 拖动治理时自设），因为没有验证基础，且 ATR 口径本身还在待定（#28），
+    #   用户决定先退回传统形式“站上 EMA20”。参数保留在这里：将来若要加回 ATR 带，只改这一个数。
+    #   副作用：过渡态模糊带的上界就是这个参数，所以改成 0 后过渡带变为 [-0.3, 0]×ATR。
+    # 出⑥b（趋势复活）确认：#30 校准，由 3中2 收紧为 **4中3**（2026-09-13 用户拍定）。
+    # 理由：下跌趋势逆转不能因两天反弹就确认（“三阳改三观”）；宁愿谨慎。
+    # ⚠ 这是自设参数，实测发现不准还要调。
+    't_out_win': 4,        # 出⑥b 观察窗口
+    't_out_need': 3,       # 出⑥b 需窗口内 N 日达标（4中3）
     # 过渡态：[-0.3, +0.5]×ATR 区间 = 判据本来就没答案的地带（独立标签）
 
     # ── invalidated N 值（待校准）──
@@ -114,10 +126,24 @@ CFG = {
 ACTIONS = {
     '①': '观察', '①a': '观察', '①b': '观察',
     '②': '入场', '②T': '观察',           # ②T = 过渡态（模糊区，不参与）
-    '③': '入场', '④': '加仓', '持有': '持有',
+    '③': '入场', '④': '观察', '持有': '持有',   # ④: 2026-09-14 由「加仓」降级（整体 −0.58%/40% 负期望，PRD §12.2 #11）
     '⑤': '保护利润', '⑥w': '减仓',        # ⑥w = 预警态（衰竭未破位，Spec B6）
     '⑥a': '清仓', '⑥b': '观察', '⑥bT': '观察', '⑥c': '观察', '⑥cT': '观察',
 }
+
+
+def _action_of(stage_out, metrics):
+    """动作 = 阶段标签的函数；例外项由回测校准（PRD §12.2）
+
+    · ③ 深档 → 观察（#7）：深档 H20 −0.72%/41%，负期望，不应挂「入场」
+    · ④ 的动作已在 ACTIONS 里直接改为「观察」（#11）
+    """
+    act = ACTIONS.get(stage_out, '观察')
+    if stage_out == '③':
+        d = (metrics or {}).get('detail') or {}
+        if d.get('phase') == 'deep':
+            return '观察'
+    return act
 
 
 # ═══════════════════════════════════════════════════════════
@@ -240,8 +266,9 @@ def load_klines(conn, code, min_date='2014-01-01'):
     复权因子 = adj_close / close（当日统一比例）
     """
     rows = conn.execute(
-        """SELECT date, open, high, low, close, adj_close, volume, amount
-           FROM daily_kline WHERE stock_code=? AND date>=? ORDER BY date""",
+        """SELECT date, raw_open AS open, raw_high AS high, raw_low AS low,
+                  raw_close AS close, close AS adj_close, volume, amount
+           FROM daily_kline_adj WHERE stock_code=? AND date>=? ORDER BY date""",
         (code, min_date)).fetchall()
     out = []
     for r in rows:
@@ -260,20 +287,14 @@ def load_klines(conn, code, min_date='2014-01-01'):
     return out
 
 
-def load_bi_tops(conn, code):
+def _parse_tops(bi_json):
+    """从 bi_json 提取笔顶序列（按日期升序）。
+    约定（同 MW 引擎）：笔顶 = direction='向下' 的笔（从顶开始向下）→ sdt 为顶部日期、high 为顶部价。
     """
-    加载缠论笔顶序列（用于阶段② 收缩收敛 / 阶段⑥ 高点不抬高）。
-    约定（同 MW 引擎）：每笔有 direction('向上'/'向下')、sdt、high、low。
-      笔顶 = direction='向下' 的笔（从顶开始向下）→ sdt 为顶部日期、high 为顶部价。
-    返回 [{'date':..., 'price':...}, ...]（按日期升序）
-    """
-    row = conn.execute(
-        """SELECT bi_json FROM chanlun_bi_json WHERE stock_code=?
-           ORDER BY scan_date DESC LIMIT 1""", (code,)).fetchone()
-    if not row or not row[0]:
+    if not bi_json:
         return []
     try:
-        bi = json.loads(row[0])
+        bi = json.loads(bi_json)
     except Exception:
         return []
     tops = []
@@ -287,17 +308,38 @@ def load_bi_tops(conn, code):
     return tops
 
 
-def load_bi_by_date(conn, code, date):
-    """加载指定日期的笔数据（预留：严格当日快照防未来函数——回填路径当前用最新快照 load_bi_tops）"""
+def load_bi_tops(conn, code):
+    """加载**最新快照**的笔顶序列。
+
+    阶段② 收缩收敛 / 阶段⑥ 高点不抬高用。
+    ⚠ 只适合「算今天」：拿它跑历史日期是未来函数（见 load_bi_tops_by_date）。
+    """
     row = conn.execute(
-        """SELECT bi_json FROM chanlun_bi_json WHERE stock_code=? AND scan_date=?""",
-        (code, date)).fetchone()
+        """SELECT bi_json FROM chanlun_bi_json WHERE stock_code=?
+           ORDER BY scan_date DESC LIMIT 1""", (code,)).fetchone()
     if not row or not row[0]:
         return []
-    try:
-        return json.loads(row[0])
-    except Exception:
-        return []
+    return _parse_tops(row[0])
+
+
+def load_bi_tops_by_date(conn, code, dates):
+    """返回 {date: 笔顶列表}——每个日期取它**当日快照**里可见的笔顶（防未来函数）。
+
+    为什么需要它：`max_bi_num=50` 封顶后，一份最新快照只保留最近约 25 个笔顶
+    （实测覆盖约 5 年）。对 2018 年的某日而言，最新快照里的笔顶**全部在该日之后**。
+    回填历史时用最新快照 = 拿未来数据算过去。
+
+    代价：每个日期一次点查 + 一次 JSON 解析（本机约 0.5ms/日）。
+    """
+    out = {}
+    for d in dates:
+        if d in out:
+            continue
+        row = conn.execute(
+            "SELECT bi_json FROM chanlun_bi_json WHERE stock_code=? AND scan_date=?",
+            (code, d)).fetchone()
+        out[d] = _parse_tops(row[0] if row else None)
+    return out
 
 
 def load_rps250(conn, code, date, win=250):
@@ -343,13 +385,17 @@ def compute_indicators(kl):
     ema10 = ema_series(closes, 10)
     ema20 = ema_series(closes, 20)
     atr20 = atr_series(highs, lows, 20)
+    atr60 = atr_series(highs, lows, CFG['atr_win_slow'])   # ⑤ 专用慢口径（PRD §12.2 #16）
     return {
         'closes': closes, 'highs': highs, 'lows': lows, 'vols': vols,
         'ema10': ema10, 'ema20': ema20, 'atr20': atr20,
-        'atr60': atr_series(highs, lows, 60),
+        'atr60': atr60,
         'vr': vr_series(vols, 20),
         'nd10': [(c - e) / a if (e and a and a > 0) else None
                  for c, e, a in zip(closes, ema10, atr20)],
+        # ⑤ 用慢口径（2026-09-14）：ATR20 会被延伸行情自己的大阳线抬高 → 分母虚大 → 漏报
+        'nd10_slow': [(c - e) / a if (e and a and a > 0) else None
+                      for c, e, a in zip(closes, ema10, atr60)],
         'nd20': [(c - e) / a if (e and a and a > 0) else None
                  for c, e, a in zip(closes, ema20, atr20)],
         'd10': [(c / e - 1) if (e and e > 0) else None
@@ -576,7 +622,10 @@ def judge_wedge_pop(ind, kl, i, tops):
                 'detail': {'break': False, 'vr': round(v, 2)}}
     bio_conv = None
     if pause['win_len'] >= CFG['w_win_long'] and tops:
-        recent = [t for t in tops if t['date'] >= kl[pause['start_idx']]['date']][-3:]
+        # 上界不能省：只写下界会让 [-3:] 取到全序列最后 3 个笔顶（即未来数据）。
+        # 修正前 tops 是「最新快照」，这个缺陷让阶段② 的收缩判据一直在看未来。
+        recent = [t for t in tops
+                  if kl[pause['start_idx']]['date'] <= t['date'] <= kl[i]['date']][-3:]
         if len(recent) >= 2:
             bio_conv = all(recent[j + 1]['price'] <= recent[j]['price'] * 1.01 for j in range(len(recent) - 1))
     return {'hit': True, 'path': 'pause', 'pause': pause, 'low': pause['low'],
@@ -632,7 +681,8 @@ def judge_crossback(ind, kl, i, ctx):
         return {'hit': False, 'phase': phase, 'detail': {'depth_fail': round(l, 2), 'depth_limit': round(depth_limit, 2)}}
     return {'hit': True, 'phase': phase,
             'detail': {'days_since_②': gap, 'vr': round(v, 2), 'hold': hold,
-                       'slope_up': slope, 'stop': round(line, 2)}}
+                       'slope_up': slope, 'stop': round(line, 2),
+                       'phase': phase}}   # 2026-09-14：档位写入 detail，供动作层判定（PRD §12.2 #7）
 
 
 def find_box(ind, kl, i, prior_gain_start_idx):
@@ -670,7 +720,9 @@ def find_box(ind, kl, i, prior_gain_start_idx):
             base_close = kl[prior_gain_start_idx].get('adj_close')   # 复权口径统一（PRD §2）
             if base_close and base_close > 0:
                 prior_gain = zh / base_close - 1
-        depth_ok = (prior_gain is not None and depth <= prior_gain * CFG['b_depth_ratio']) or depth <= 0.15
+        # 深度门槛（2026-09-14，PRD §12.2 #13）：改绝对上限。
+        # 原「≤前段涨幅×50% 或 ≤15%」的相对口径随 #14 取消前置涨幅下界而失去基准。
+        depth_ok = depth <= CFG['b_depth_max']
         if not (vol_ok and depth_ok):
             continue
         # 触碰次数（质量评分）
@@ -693,27 +745,33 @@ def judge_base_break(ind, kl, i, ctx):
     box = find_box(ind, kl, i, start_idx)
     if not box:
         return {'hit': False, 'box': None}
-    # 前置：自最后有效入场点涨幅 ≥20%
+    # 前置：自最后有效入场点涨幅（2026-09-14 由「≥20% 下界」反向为「≤30% 上界」，PRD §12.2 #14）
+    gain = None
     if start_idx is not None:
         base_c = kl[start_idx].get('adj_close')   # 复权口径统一（PRD §2）
         if base_c and base_c > 0:
             gain = box['high'] / base_c - 1
-            if gain < CFG['b_prior_gain_min']:
+            # 原「≥20%」恰好排除了最好的一组（<20%：+2.65%/45%），纳入了最差的一组（≥100%：−4.49%/33%）
+            if gain > CFG['b_prior_gain_max']:
                 return {'hit': False, 'box': box, 'detail': {'prior_gain': round(gain, 3),
-                                                            'boundary': 'low_prior_gain'}}
+                                                            'boundary': 'high_prior_gain'}}
     if not (c > box['high'] * CFG['b_breakout_buf'] and v >= CFG['b_breakout_vr']):
         return {'hit': False, 'box': box, 'detail': {'vr': round(v, 2)}}
     return {'hit': True, 'box': box,
             'detail': {'box_high': round(box['high'], 2), 'box_low': round(box['low'], 2),
                        'win': box['win_len'], 'depth': round(box['depth'], 3),
-                       'touch_top': box['touch_top'], 'vr': round(v, 2)}}
+                       'touch_top': box['touch_top'], 'vr': round(v, 2),
+                       # 2026-09-14：命中路径也记录前置涨幅（原只在拒绝路径记，
+                       # 导致事后无法校验 #14 的上界是否生效，也无法做分组回测）
+                       'prior_gain': round(gain, 3) if gain is not None else None}}
 
 
 def judge_exhaustion(ind, kl, i, ctx):
     """阶段⑤ 判据：前置峰值涨幅 + 延伸极值（双口径取或 + 分位）"""
     c = ind['closes'][i]
     e10, a20 = ind['ema10'][i], ind['atr20'][i]
-    if None in (c, e10, a20) or e10 <= 0 or a20 <= 0:
+    nd10_slow = ind['nd10_slow'][i]
+    if None in (c, e10, a20, nd10_slow) or e10 <= 0 or a20 <= 0:
         return {'hit': False}
     # 前置：自 ② 以来峰值涨幅 ≥30%
     wi = ctx.get('w_date_idx')
@@ -735,10 +793,14 @@ def judge_exhaustion(ind, kl, i, ctx):
             peak_gain = max(peak_gain, px / lo - 1)
     if peak_gain < CFG['e_peak_gain_min']:
         return {'hit': False, 'detail': {'peak_gain': round(peak_gain, 3)}}
-    nd10 = (c - e10) / a20
+    # 2026-09-14：⑤ 的归一化分母改用 ATR60（PRD §12.2 #16）。
+    # ATR20 会被延伸行情自己的大阳线抬高 → 分母虚大 → 归一化偏离被压小 → 漏报。
+    # 实测漏判率 ATR20 55.3% → ATR60 28.7%；与百分比口径重叠率 44.7% → 71.3%。
+    # ⚠ 只改 ⑤：nd10（ATR20 口径）在 ① 的下影线、③ 的容差上继续使用，不动。
+    nd10 = nd10_slow
     d10 = c / e10 - 1
     hit_ext = (nd10 >= CFG['e_nd10_min']) or (d10 >= CFG['e_d10_pct_min'])
-    pctl = pctile_of(ind['nd10'], i, CFG['pctile_win'], nd10)
+    pctl = pctile_of(ind['nd10_slow'], i, CFG['pctile_win'], nd10)
     hit_pctl = pctl is not None and pctl >= CFG['e_pctile_min']
     if not (hit_ext and hit_pctl):
         return {'hit': False, 'detail': {'nd10': round(nd10, 2), 'd10': round(d10, 3),
@@ -767,10 +829,12 @@ def judge_wedge_drop(ind, kl, i, ctx, structure_support, tops):
     slope = slope_up(ind['ema10'], i, CFG['slope_lag'])
     neg = (slope is False)
     warn = bool(hl and neg)
-    # ③ 趋势破坏：close < EMA20 且 close < 结构支撑位
+    # ③ 趋势破坏：close < EMA20（2026-09-14 起不再要求同时击穿结构支撑位，PRD §12.2 #20）
+    # 实测要求 below_sup 反而使后续更强（③全 +0.76% vs 仅破MA −0.02%）——
+    # 原 PRD 把结构破坏当作“一票否决”，数据不支持。below_sup 保留为记录项，不作门槛。
     below_ma = c < e20
     below_sup = (structure_support is not None and c < structure_support)
-    confirm = bool(below_ma and below_sup and warn)
+    confirm = bool(below_ma and warn)
     vr = ind['vr'][i]
     return {'warn': warn, 'confirm': confirm,
             'detail': {'high_lower': hl, 'slope_neg': neg, 'close': round(c, 2),
@@ -822,8 +886,13 @@ def below_ma_confirmed(ind, i, n=2, band_atr=0.3):
     return cnt >= n
 
 
-def above_ma_confirmed(ind, i, n=3, band_atr=0.5, need=2):
-    """n 日窗口内 need 日收盘 > EMA20 + band*ATR20（非对称：出⑥b 用宽带 0.5 + 3中2，进攻慢确认）"""
+def above_ma_confirmed(ind, i, n=4, band_atr=0.0, need=3):
+    """n 日窗口内 need 日收盘 > EMA20 + band*ATR20
+
+    非对称：出⑥b 用 **4中3**（#30 校准，原为 3中2）——进攻慢确认，
+    不接受单日/两日脉冲（“三阳改三观”）。
+    band_atr 默认 0.0 = 纯 EMA20（2026-09-13 回落，原 0.5×ATR）；默认值与 CFG 一致。
+    """
     cnt = 0
     for j in range(max(0, i - n + 1), i + 1):
         c, e, a = ind['closes'][j], ind['ema20'][j], ind['atr20'][j]
@@ -833,8 +902,9 @@ def above_ma_confirmed(ind, i, n=3, band_atr=0.5, need=2):
 
 
 def in_transition_zone(ind, i, stage):
-    """过渡态判定：处于 ②/⑥b/⑥c 且价格在模糊带 [-0.3, +0.5]×ATR 内
-    → 判据本来就没答案的地带（回测已证：低收益垃圾时间区）
+    """过渡态判定：处于 ②/⑥b/⑥c 且价格在模糊带 [-t_in_band, +t_out_band]×ATR 内
+    （即“进”与“出”两道门槛之间的地带 = 判据本来就没答案的地带）
+    → 回测已证：低收益垃圾时间区。当前 t_out_band=0，模糊带是 [-0.3, 0]×ATR。
     """
     if stage not in ('②', '⑥b', '⑥c'):
         return False
@@ -884,9 +954,13 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
     ctx.update({'stage_start_idx': warmup - 1, 'entry_idx': None, 'w_date_idx': None,
                 'w_pause': None, 'cb_low': None, 'box': None, 'exh_start_idx': None})
     structure_support = None
+    # tops 可能是 {date: 笔顶列表}（回填路径，防未来函数）或 list（最新快照语义）。
+    # 在这里一元化：循环每轮把 tops 重绑成「当日可见的笔顶」，下游 7 个判据调用点不动。
+    _tops_src = tops
 
     for i in range(warmup, n):
         d = kl[i]['date']
+        tops = _tops_src.get(d, []) if isinstance(_tops_src, dict) else _tops_src
         c = ind['closes'][i]
         e10, e20, a20 = ind['ema10'][i], ind['ema20'][i], ind['atr20'][i]
         if c is None or e10 is None or e20 is None or not a20:
@@ -1078,7 +1152,7 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
                       kl[ctx['stage_start_idx']]['date'], i - ctx['stage_start_idx'],
                       round(structure_support, 2) if structure_support else None,
                       round(invalid, 2) if invalid else None,
-                      ACTIONS.get(stage_out, '观察'), c, json.dumps(metrics, ensure_ascii=False)))
+                      _action_of(stage_out, metrics), c, json.dumps(metrics, ensure_ascii=False)))
         if stage != prev_stage:
             trans.append((code, d, prev_stage, stage, json.dumps(detail, ensure_ascii=False)))
 
@@ -1219,7 +1293,9 @@ def _backfill_worker(codes):
                 skipped.append(code)
                 continue
             ind = compute_indicators(kl)
-            tops = load_bi_tops(conn, code)
+            # 按日期取笔顶（防未来函数）：每个日期用它自己那天的快照，
+            # 而不是一份最新快照跑 2016-2026 全历史（见 PRD §9.16）
+            tops = load_bi_tops_by_date(conn, code, [k['date'] for k in kl])
             d, t = run_state_machine(conn, code, kl, ind, tops)
             daily_all += d
             trans_all += t

@@ -1,0 +1,559 @@
+# CPA 阶段判定引擎 —— 定义校准回测结果
+# ══════════════════════════════════════════════════════════════════
+# 用途：记录"每个判据/阈值是否有数据依据"，供调参与仓位模块参考。
+# 更新流程（项目铁律）：回测 → 确认数据 → 更新本文件 → git commit
+#
+# ⚠ 与其它策略 YAML 的差异：本文件记录的不是单一策略的收益，而是**判据校准测试**。
+#   因此没有 kelly / monthly 字段（这些测试的目的不是优化收益，而是验证定义）。
+#   数值口径统一为：超额 = 个股 − 000985 同期，已扣 0.3% 交易成本。
+# ══════════════════════════════════════════════════════════════════
+
+engine: CPA阶段判定引擎
+methodology: Oliver Kell 价格周期（六阶段）
+data_version: cpa_stage_daily @ band=0 + 4中3（2026-09-13 重算后）
+sample: 800 只随机（seed 42），2016-01-01 起
+entry_convention: T+1 复权开盘入场 / 扣 0.3% / 超额 − 000985 / 同股去重 20 交易日
+updated: 2026-09-13
+prd_ref: docs/product/CPA阶段判定引擎_产品需求书.md §11.2
+
+tests:
+
+  # ── #5 状态机整体（⚠ 数据版本较旧：跑于 band=0.5+3中2 期间，标签已变，待重跑）──
+  stage_backtest:
+    status: stale                # 需在 band=0+4中3 标签上重跑
+    key_results:
+      stage_3_vs_2: {mean_3: 0.30, mean_2: 0.43, verdict: "③ 并不优于 ②（差 -0.13pp）"}
+      stage_1b_vs_2: {mean_1b: 5.62, mean_2: 0.43, diff_pp: 5.19, win_diff_pp: 19.4,
+                      verdict: "①b >> ② 经独立口径交叉验证"}
+      stage_5: {mean: -0.13, win_rate: 0.37, median: -6.93, verdict: "最危险状态"}
+      stage_family_6_vs_1a: {diff_pp: -3.56, win_diff_pp: -10.9, verdict: "⑥ 族整体劣于 ①a"}
+    conclusion: "A 股「抄底」优于「追突破」，与 Kell 叙事相反；① 信号强度 >> ②"
+
+  # ── #7 ③ 标准档 vs 深档 ──
+  crossback_tier:
+    status: done
+    script: scripts/bt_cpa_07_crossback_tier.py
+    question: "「浅回踩质量更高」是否成立"
+    standard_touch_ema10: {H10: {n: 15856, win: 0.48, mean: 0.65, median: -0.33},
+                           H20: {n: 15706, win: 0.46, mean: 0.63, median: -0.75},
+                           H60: {n: 15319, win: 0.46, mean: 1.86, median: -1.75}}
+    deep_touch_ema20:     {H10: {n: 2375, win: 0.44, mean: -0.34, median: -0.97},
+                           H20: {n: 2363, win: 0.41, mean: -0.72, median: -2.28},
+                           H60: {n: 2327, win: 0.44, mean: 1.37, median: -2.33}}
+    diff_pp: {H10: {mean: 0.98, win: 4.0}, H20: {mean: 1.35, win: 5.6}, H60: {mean: 0.49, win: 1.7}}
+    tier_ratio: "15922 : 2389 = 6.7 : 1"
+    verdict: "「浅回踩质量更高」成立；但深档本身负期望（-0.72%/41%），不应与标准档共用「入场」动作"
+    action_suggested: "深档动作降为「观察」（未实施，待统一处理）"
+
+  # ── #16 / #17 ATR 分母：ATR20 vs ATR60 ──
+  atr_denominator:
+    status: done
+    script: scripts/bt_cpa_16_atr_denominator.py
+    applies_to: "阶段⑤ 的延伸极值判据 N_D10 ≥4（PRD §7）"
+    sample_days: 1634956
+    hit_counts: {D10_ge_16pct: 11654, N20_ge_4: 7404, N60_ge_4: 13003}
+    miss_rate: {ATR20: 0.553, ATR60: 0.287}
+    overlap_with_pct: {ATR20: 0.447, ATR60: 0.713}
+    forward_H20: {"仅N60达标": {n: 1869, win: 0.36, mean: -1.39},
+                  "仅N20达标": {n: 390, win: 0.37, mean: 0.03},
+                  "仅D10达标": {n: 1731, win: 0.36, mean: -1.65},
+                  "三不达标": {n: 81250, win: 0.46, mean: 0.66}}
+    verdict: "应用 ATR60 作分母（漏判率 28.7% vs 55.3%，且它分出的组后续更差 = 更准的风险信号）"
+    action_suggested: "⑤ 的归一化分母改用 ATR60；不动 ① 下影线、③ 容差里的 ATR20"
+
+  # ── #18 ⑤ 前置峰值涨幅阈值（现 30%）──
+  peak_gain:
+    status: done
+    script: scripts/bt_cpa_18_peak_gain.py
+    sample_events: 16343
+    buckets_H20:
+      "30~40%": {n: 1074, win: 0.38, mean: -0.74, median: -7.10}
+      "40~50%": {n: 517,  win: 0.39, mean: 1.64,  median: -6.14}
+      "50~75%": {n: 365,  win: 0.40, mean: 2.50,  median: -5.19}
+      ">=75%":  {n: 130,  win: 0.35, mean: -3.11, median: -8.51}
+    verdict: "无法用现有数据校准阈值——因为 <30% 的样本数为 0（30% 是入场前置条件本身）。
+              在 >=30% 内部不呈单调关系（50~75% 最好、>=75% 最差），
+              「涨得越多后续越差」这一前提不成立，只在极端段(>=75%)才转坏。
+              另：⑤ 各桶中位超额均为 -5% ~ -8.5%，信号确实标记了恶化区。"
+    action_suggested: "阈值校准需引擎级实验（放宽前置后重跑对比），不能靠事后分组"
+
+  # ── #9 / #10 MW 信号 × CPA 阶段的重叠度 ──
+  mw_overlap:
+    status: done
+    script: scripts/bt_cpa_0910_mw_overlap.py
+    overlap_window: "同股同日；宽松版为 ±2 交易日"
+    wedge_pop_vs_mw:
+      events: 48741
+      with_b1: {same_day: 1023, within_2d: 1731, total_pct: 0.057}
+      with_b2: {total_pct: 0.006}
+      standalone_pct: 0.938
+    crossback_vs_mw:
+      events: 21607
+      with_b1_pct: 0.016
+      with_b2_pct: 0.006
+      standalone_pct: 0.979
+    forward_H20:
+      "②单独":       {n: 45150, win: 0.46, mean: 0.62, median: -0.92}
+      "②+B1同日":    {n: 1015,  win: 0.46, mean: 0.77, median: -1.20}
+      "②+B1近邻":    {n: 1714,  win: 0.51, mean: 2.64, median: 0.24}
+      "②+B2近邻":    {n: 184,   win: 0.52, mean: 4.48, median: 0.36}
+      "③单独":       {n: 20820, win: 0.45, mean: 0.34, median: -1.03}
+      "③+B1近邻":    {n: 282,   win: 0.53, mean: 3.01, median: 0.88}
+      "③+B2近邻":    {n: 99,    win: 0.56, mean: 3.61, median: 1.68}
+    verdict: "两套体系几乎不相交（② 93.8% 单独、③ 97.9% 单独），
+              但交集信号明显优于任一单独信号：均值从 +0.62% 提到 +2.64%（②+B1），
+              从 +0.34% 提到 +3.01%（③+B1）；**且中位数由负转正**（-0.92% → +0.24%）。
+              中位转正意味着不是“少数大赢家拉高均值”，而是概率结构真的变了。"
+    caveat: "②+B2 (n=184) 与 ③+B2 (n=99) 样本偏小；②+B1 (n=1714) 与 ③+B1 (n=282) 可信度高。"
+    action_suggested: "共振（CPA阶段 × MW信号）可以当作独立的置信度维度（现有系统已有此思路，本次是数据验证）"
+
+  # ── CPA 阶段 × 其它信号源的交叉回测（通用框架）──
+  signal_cross_meta:
+    status: framework_ready
+    script: scripts/bt_cpa_sigmatrix.py
+    data_source: signal_events
+    mask_map: {1: MW_B1, 2: MW_B2, 8: PP_V1, 16: PP_V2, 32: BO_V2}
+    pipeline_caveat: "signal_events 日期覆盖 2016-01-04 ~ 2026-07-03，**缺最近两个月**；
+                      基部突破 V1/V2、箱体突破/跌破 **不在本表**（未回填，需先补数据才能回测）"
+    usage: "python scripts/bt_cpa_sigmatrix.py --mask 8 --name PP_V1"
+
+  signal_cross_PP_V1:
+    status: done
+    mask: 8
+    events_in_sample: 52512
+    forward_H20_by_stage:
+      # 格式：{n, win, mean, median} 对比 阶段单独
+      "②":  {sig: {n: 23340, win: 0.45, mean: 0.24, median: -1.20}, stage: {n: 37640, mean: 0.73}}
+      "③":  {sig: {n: 12367, win: 0.42, mean: -0.29, median: -1.76}, stage: {n: 24274, mean: 0.33}}
+      "⑥b": {sig: {n: 6003,  win: 0.45, mean: 0.59,  median: -1.25}, stage: {n: 34212, mean: 0.36}}
+      "⑥c": {sig: {n: 5594,  win: 0.44, mean: 0.29,  median: -1.44}, stage: {n: 27648, mean: 0.85}}
+      "①a": {sig: {n: 4092,  win: 0.45, mean: -0.05, median: -1.33}, stage: {n: 8391,  mean: 1.67}}
+      "④":  {sig: {n: 547,   win: 0.46, mean: 2.39,  median: -1.26}, stage: {n: 1900,  mean: 0.07}}
+      "①b": {sig: {n: 172,   win: 0.47, mean: 2.43,  median: -0.94}, stage: {n: 705,   mean: 3.42}}
+      "⑤":  {sig: {n: 132,   win: 0.23, mean: -9.16, median: -10.97}, stage: {n: 2297, mean: -0.35}}
+    overall_increment_pp: {H10: -0.22, H20: -0.47, H60: -0.64}
+    verdict: "❌ 与 MW 交叉的结果相反：PP_V1 **整体不增加价值，反而减分**（H20 -0.47pp）。
+              原因：它触发太密（全市场 40.9 万个事件，是 MW_B1 的 8 倍），不具备选择性，
+              在 ②/③/①a 上都把阶段本身的收益拉低。
+              唯一明显有效的位置是 **④（基部突破）**：+2.39% vs 阶段单独 +0.07%（n=547），
+              与 MEMORY 里「PP_V1 与 MW B1 互为确认」的印象不同——它在 CPA 坐标系里不是一个好的交叉维度。"
+    action_suggested: "若要用 PP_V1，只在 ④ 阶段作为过滤器；其余阶段不建议叠加"
+
+  signal_cross_PP_V2:
+    status: done
+    mask: 16
+    events_in_sample: 10437
+    overall_increment_pp: {H10: -0.75, H20: -1.33, H60: -1.99}
+    note: "**比 PP_V1 更差**：每一个阶段都被拖低（② -1.03% vs +0.73%；
+           ③ -0.44% vs +0.33%；①a -1.30% vs +1.67%；⑥c -2.12% vs +0.85%）。
+           特殊：PP_V2 只 3.9 万个事件（与 MW_B1 的 4.9 万同级），**低频但更差**，
+           说明不是“触发太密”能解释的，而是它的判据本身在 CPA 坐标系里指向了坏位置。"
+    verdict: "❌ 不建议作为 CPA 的交叉维度"
+
+  signal_cross_BO_V2:
+    status: done
+    mask: 32
+    events_in_sample: 39567
+    overall_increment_pp: {H10: -0.22, H20: -0.21, H60: -0.07}
+    forward_H20_by_stage:
+      "③":  {sig: {n: 8651, win: 0.45, mean: 0.55, median: -0.92}, stage: {n: 24274, mean: 0.33}}
+      "⑤":  {sig: {n: 412,  win: 0.47, mean: 3.18, median: -2.00}, stage: {n: 2297, mean: -0.35}}
+      "②":  {sig: {n: 9428, win: 0.44, mean: 0.28, median: -1.45}, stage: {n: 37640, mean: 0.73}}
+      "④":  {sig: {n: 473,  win: 0.47, mean: -2.08, median: -0.87}, stage: {n: 1900, mean: 0.07}}
+    verdict: "≈ 整体中性（增量 -0.21pp），不值得作为通用交叉维度。
+              例外：**⑤ +3.18% vs 阶段单独 -0.35%**（n=412）——基部突破V2 在衰竭段出现时反而不错；
+              反向：④ -2.08% vs +0.07%（n=473）——在基部突破阶段再出现基部突破V2 是坏信号。"
+    # 三个买入类信号的横向对比（在 CPA 坐标系里）
+  signal_cross_summary_buy_signals:
+    status: done
+    table:
+      MW_B1: {events: 49330, increment_H20_pp: "+2.02（②+B1近邻）", verdict: "✅ 有效，中位转正"}
+      MW_B2: {events: 16928, increment_H20_pp: "+3.86（②+B2近邻）", verdict: "✅ 有效（样本偏薄）"}
+      PP_V1: {events: 339590, increment_H20_pp: -0.47, verdict: "❌ 减分（仅在 ④ 有效）"}
+      PP_V2: {events: 39489, increment_H20_pp: -1.33, verdict: "❌ 最差"}
+      BO_V2: {events: 300744, increment_H20_pp: -0.21, verdict: "≈ 中性（仅在 ⑤ 有效）"}
+    conclusion: "在 CPA 坐标系里，**只有 MW 信号是有效的交叉维度**；三个买入型形态信号（口袋支点/基部突破）
+                 与 CPA 阶段高度重叠且不加分。原因不是频率（PP_V2 与 MW_B1 同样低频却最差），
+                 而是它们与 CPA 阶段在**语义上不同轴**：MW 测的是前高/量能结构，口袋支点测的是基部内的大阳线，
+                 两者与“阶段”的对话方式不一样。"
+
+  signal_cross_resonance:
+    status: done
+    events_in_sample: 12605
+    overall_increment_pp: {H10: -0.44, H20: -1.04, H60: -0.94}
+    verdict: "❌ 「任意 ≥2 信号共振」整体为负（H20 -1.04pp）。
+              但这是**组成效应**：共振集合被数量占优的 PP_V1/BO_V2 组合主导，
+              而 MW 参与的组合很稀有。所以“共振≥2”本身不是加分项。"
+
+  signal_cross_mw_pairs:
+    status: done
+    method: "与运算（同时具备两位），非或运算"
+    "MW_B1 & PP_V1":  {n: 4982, increment_H20_pp: -0.25, verdict: "中性——PP_V1 的拖累抵消了 MW_B1 的增益"}
+    "MW_B1 & BO_V2":  {n: 324, increment_H20_pp: -2.54, verdict: "❌ 比 MW_B1 单独差得多"}
+    conclusion: "**MW 的价值是“阶段相关”的**：#9/#10 里 ②/③ 入场日 ∩ MW_B1 达 +2.64%，
+                 但把 MW_B1 当作跨阶段的日级过滤器时只有中性甚至负值。
+                 → MW 信号不能当通用过滤器用，只应在“阶段入场日”附近作为确认。"
+
+  # ── 领先-滞后修正（推翻前面同日口径的结论）──
+  signal_lead_lag:
+    status: done
+    script: scripts/bt_cpa_siglead.py
+    trigger: |
+      用户提出反例：002648 在 2026-07-20 出现基部突破 + 口袋支点V1，
+      07-22 才进入 ② 突破后运行（差 2 天）——因为 ② 的复活确认需要 4中3。
+      他指出：信号不重合不等于不相关，只是可能有确认延迟。
+    design: "对每个信号日 T，看 T+1..T+15 内是否出现向上涨阶段（②/③/④）的迁移；
+             再从**信号日**（不是迁移日）计算 H10/20/60 超额"
+    hit_rate: {BO_V2: 0.459, note: "命中时的滞后中位 6 个交易日（P25=3, P75=10）"}
+    results_H20:
+      BO_V2: {lead_to_transition: {n: 18428, win: 0.55, mean: 2.63, median: 1.06},
+              no_transition:     {n: 21703, win: 0.37, mean: -1.55, median: -2.69},
+              all:               {n: 40131, win: 0.45, mean: 0.37,  median: -0.96}, diff_pp: 4.18}
+      MW_B1: {lead_to_transition: {n: 7406, win: 0.44, mean: 0.40, median: -1.89},
+              no_transition:     {n: 6509, win: 0.37, mean: -1.52, median: -4.24},
+              all:               {n: 13915, win: 0.41, mean: -0.50, median: -2.87}, diff_pp: 1.92}
+      PP_V1: {lead_to_transition: {n: 28334, win: 0.46, mean: 0.51, median: -0.98},
+              no_transition:     {n: 26057, win: 0.42, mean: -0.35, median: -2.02},
+              all:               {n: 54391, win: 0.44, mean: 0.10,  median: -1.46}, diff_pp: 0.86}
+    verdict: |
+      ✅ **用户判断成立，且推翻了同日口径的结论**。
+      三个信号全部呈现同一结构：信号 + 后续 CPA 迁移 >> 信号但无迁移。
+      · 同日口径下 BO_V2 看着“中性（-0.21pp）”，实际是混了两个相反群体：
+        导致迁移的一半 +2.63%（中位 +1.06%），不导致迁移的一半 -1.55%。
+      · 排序也变了：同日口径下 BO_V2 最差，领先口径下它**最强**（+4.18pp）。
+      → 教训：**信号是“证据”、阶段是“确认”**，两者本来就有确认延迟；
+        用同日重合去测，会系统性低估所有需要确认的信号。
+    caveat: |
+      ⚠️ 这个划分用了未来信息（“15 日内是否出现迁移”在信号日 T 无法知道），
+      所以 +2.63% 不能被直接收割。
+      可交易版本应当是：**信号出现 → 等 CPA 确认（迁移日）→ 在迁移日入场**，
+      这是一个时序的共振策略，需单独回测（从迁移日算收益，而非从信号日）。
+    next_action: "补做「信号→等确认→迁移日入场」的可交易版本"
+
+  # ── 阶段内确认度框架（用户提出的思路，待跑）──
+  stage_confirmation_framework:
+    status: designed_not_run
+    script: scripts/bt_cpa_stage_signal.py
+    trigger: |
+      用户提出：CPA 阶段基于自己的规则（以价格结构为主，与成交量关系不大），
+      而自定义买卖信号主要以价格+成交量的变化为主；
+      两者的关系不是“预告”，而是**信号在阶段内部强化/削弱该阶段的确认度**。
+      他给的 002648 实例：
+        · 12-25 口袋支点在 ② 内 → 强化 ② 的确认
+        · 01-05/06 口袋支点在 ③ 内 → 强化 ③ 的确认
+        · 04-27 铁轨线在 ⑥b 内 → 强化 ⑥b 的确定性
+        · 07-20 前后一串口袋支点 → 强化从 07-22 开始的上涨阶段
+      目标：不改 CPA 定义，而是找出「信号 × 阶段」的可量化关系，为提高胜率提供依据。
+    design: |
+      对每个 (股票, 交易日 T) 取所处阶段 S，统计近 6 个交易日（用户给的极限窗口）内：
+        n_bull = 看涨信号数（signal_events 全掩码）
+        has_bear = 是否出现看跌形态（pattern_scan_signals 的 bearish）
+      按 (S, n_bull, has_bear) 分组看 H20 超额 → 得到可量化规则表。
+    window_decision: "用户明确说 15 日太宽，极限是 6 个交易日"
+
+  # ── 数据管道缺口（本次发现，阻塞上面的框架）──
+  data_pipeline_gap:
+    status: fixed_partially
+    findings:
+      - |
+        signal_events（聚合表）原本停在 2026-07-03；
+        用 backtest_signals.py --step 1 重建后已到 2026-09-11（813,442 事件）。
+      - |
+        **pocket_pivot_daily 的 V1 版本停在 2026-07-09**（V2 正常到 09-11）。
+        也就是说日常管道在跑 V2、但没在跑 V1 → 用户在 page 上看到的 PP_V1 信号
+        （页面实时计算）在库里缺了最近两个月。已重启 backfill_all_signals_v2.py 补齐。
+      - |
+        **market_breakout_v2_daily（基部突破 V2）也停在 2026-07-30** —— 同一个类型的缺口，
+        说明日常管道同时漏了 PP_V1 与 BO_V2 两个引擎（PP_V2 与 MW 是正常的）。
+        两者都在本次回填中补齐（2026-09-14 进行中）。
+      - "箱体突破/跌破 根本没入库，也未在 backfill 的引擎清单里 → 需专用回填"
+    verification_of_user_cases:
+      - "12-25 口袋支点@②：✅ 属实"
+      - "01-05/01-06 口袋支点@③：✅ 属实（01-08 库里无 PP_V1）"
+      - "04-27 铁轨线@⑥b：⚠ 阶段属实，但形态记录里是 double_top，不是铁轨线"
+      - "07-20 起那一串：⬜ 待 PP_V1 回填完成后核对"
+
+  pending_signal_cross:
+    note: 用户要求逐一跑完，本清单为队列
+    todo:
+      - {item: PP_V2, mask: 16, status: pending}
+      - {item: BO_V2, mask: 32, status: pending}
+      - {item: 基部突破V1, mask: null, status: blocked, reason: "不在 signal_events，需先回填"}
+      - {item: 基部突破V2, mask: null, status: blocked, reason: "同上"}
+      - {item: 箱体突破, mask: null, status: blocked, reason: "同上"}
+      - {item: 箱体跌破, mask: null, status: blocked, reason: "同上"}
+      - {item: 缠论买卖点, mask: null, status: pending, reason: "可用 chanlun_scan_daily 单独接"}
+      - {item: 双顶/三重顶/头肩顶, mask: null, status: pending, reason: "可用 pattern_scan_signals 单独接"}
+
+  # ── #20 ⑥ 四条件 AND ──
+  wedge_drop_conditions:
+    status: done
+    script: scripts/bt_cpa_20_wedge_drop_conditions.py
+    formula: "confirm = high_lower AND slope_neg AND below_ma AND below_sup"
+    total_events: 269503
+    confirm_rate: 0.002          # 535 / 269503 → ⑥a 实际不可达
+    top_groups:
+      "②only+仅破MA":    {events: 22216, H20: {n: 21955, win: 0.44, mean: 0.12, median: -1.36}}
+      "①②齐+仅破MA":     {events: 9215,  H20: {n: 9074,  win: 0.45, mean: -0.02, median: -1.12}}
+      "②only+③全":       {events: 1157,  H20: {n: 1147,  win: 0.48, mean: 0.95, median: -0.43}}
+      "①②齐+③全(现行⑥a)": {events: 535,   H20: {n: 521,   win: 0.46, mean: 0.76, median: -0.78}}
+    binding_constraint: below_sup
+    verdict: "AND 过严：⑥a 只占 0.2%，⑥a/⑥b 子状态区分数据上形同虚设；
+              below_sup 是起约束的那条，且加它之后信号反而变好（+0.76% vs -0.02%），
+              与 PRD「破坏证据、一票否决」的定位相反。"
+    caveat: "「③全」各组仅 521/1147/5 个事件，方向一致但统计基础弱于万级大组"
+    action_suggested: "below_sup 从 AND 中移除（降为评分项）；重新考虑 ⑥a/⑥b 是否需要两个子状态"
+
+  # ── #21 缩量 vs 放量下跌 ──
+  drop_volume:
+    status: done
+    script: scripts/bt_cpa_21_drop_volume.py
+    gate: "CFG d_vr_score = 1.3"
+    volume_up:   {H10: {n: 17133, win: 0.47, mean: 0.04}, H20: {n: 17051, win: 0.48, mean: 0.85, median: -0.46},
+                  H60: {n: 16636, win: 0.47, mean: 2.14}}
+    volume_down: {H10: {n: 42289, win: 0.47, mean: 0.14}, H20: {n: 42036, win: 0.46, mean: 0.62, median: -0.76},
+                  H60: {n: 41106, win: 0.47, mean: 2.39}}
+    diff_pp: {H10: -0.10, H20: 0.23, H60: -0.25}
+    verdict: "分档几乎不携带信息（差异 <=0.25pp 且符号在三个持有期上不稳定）。
+              应保持「非门槛」（现状正确），但不值得升为判据、也不值得在 UI 上占位置。"
+    side_finding: "⑥ 期间下跌日的原始收益全为正，但超额中位数始终为负 → 右偏。
+                   ⑥ 是「跑输市场」的区域，不是「绝对下跌」的区域。"
+
+  # ── #22 invalidated N 值 ──
+  invalidated_n:
+    status: done
+    script: scripts/bt_cpa_22_invalidated_n.py
+    current_values: {"②→③": 15, "②→④": 40, "③→④": 40, "④→⑤": 30, "⑤→⑥": 30, "→⑥": 12}
+    failure_rate: {"②→⑥": 0.98, "⑥b→⑥": 0.98, "③→⑥": 0.98, "⑥a→⑥": 0.97, "⑤→⑥": 1.00}
+    coverage_at_current_N:
+      "②→⑥": {n: 25976, coverage: 0.44, lag_p25: 10, lag_med: 21, lag_p75: 41}
+      "⑥b→⑥": {n: 19320, coverage: 0.41, lag_p25: 10, lag_med: 22, lag_p75: 42}
+      "③→⑥": {n: 8080,  coverage: 0.45, lag_p25: 10, lag_med: 21, lag_p75: 40}
+      "②→③": {n: 21840, coverage: 0.63, lag_p25: 3,  lag_med: 10, lag_p75: 42}
+      "②→④": {n: 426,   coverage: 0.86}
+      "③→④": {n: 279,   coverage: 0.87}
+      "⑤→⑥": {n: 2248,  coverage: 0.99}
+    verdict: "1) 对「进入⑥」的迁移，invalidated 标记退化——⑥ rank 最高，离开它就算「回退」，
+              所以失败率恒为 97~100%，标记不携带信息；
+              2) N=12/15 只能捕获 41~63% 的实际失败，漏标过半；P75 普遍在 40 日历日附近，对应 N≈28。
+              但没有客观最优值：N 放大会把「自然转向」也归因给迁移。"
+    action_suggested: "→⑥ 类迁移从 invalidated 标记中排除；或把 invalidated 由布尔改为
+                      「距首次回退的交易日数」，把归因判断交给消费方"
+
+  # ══════════════════════════════════════════════════════════
+  # 【阶段 × 阶段内确认度】—— 用户框架：信号不是“预告”，是在阶段内部强化/削弱确认度
+  # ══════════════════════════════════════════════════════════
+  stage_confirmation_v2:
+    status: done
+    date: '2026-09-14'
+    script: scripts/bt_cpa_stage_signal.py
+    helper: scripts/build_bearish_events.py
+    question: "同一个信号放在不同阶段，胜率差多少？提升的是「阶段胜率」还是「信号胜率」？"
+    method:
+      window: "近 6 交易日（窗口内出现过则计 1）"
+      dedup: "同股同（阶段×看涨数×看跌）组合 20 交易日"
+      entry: "T+1 复权开盘；H20；扣 0.3%；超额 = 个股 − 000985"
+      sample: "800 只随机（seed42）；样本日 231,037"
+    data_fix:
+      problem: "pattern_scan_signals 的 date 是「扫描日」不是「信号日」，
+                且卖出引擎有预筛选（近60日涨>15% 或距高点10%内）——
+                '该行含 bearish' 实测在测「该股近期是否强势」，96% 的行都含 bearish。"
+      solution: "从 sign_json 提取每条信号**自带的 signal_date**，
+                 按（source, signal_type/pattern, signal_date）去重，
+                 产出 bearish_signal_events（1,497,431 条，8 个家族）。"
+      families: "top_pattern（双顶/三顶/头肩）/ railroad_tracks（铁轨线）/ talib /
+                 cdl / volume_divergence / distribution_day / breakout_failure / pivot"
+    bearish_source_used: "strong = 三重顶 + 头肩顶 + 铁轨线（181,108 条 / 5,423 只）"
+    bearish_excluded: "双重顶 1,261,127 条（每只 232 次，当事件用会饱和）；
+                      talib/cdl/volume_divergence 仅 2026-04 起，历史太短"
+
+    finding_1_bearish_universal: |
+      三重顶/头肩顶/铁轨线在**全部 9 个阶段都是负贡献**，无一例外。
+      这是本项回测最强的结论。
+    bearish_universal_table:
+      - {stage: ①a, clean: "+1.59%/51%", with_bear: "+0.81%/45%", dwr: -6, dret: -0.78}
+      - {stage: ①b, clean: "+2.96%/55%", with_bear: "-0.03%/46%", dwr: -9, dret: -2.99}
+      - {stage: ②,  clean: "+0.89%/47%", with_bear: "-1.01%/39%", dwr: -8, dret: -1.90}
+      - {stage: ③,  clean: "+0.45%/46%", with_bear: "-1.08%/39%", dwr: -7, dret: -1.53}
+      - {stage: ④,  clean: "+0.57%/44%", with_bear: "+0.58%/40%", dwr: -4, dret: +0.01}
+      - {stage: ⑤,  clean: "+1.97%/42%", with_bear: "-1.44%/40%", dwr: -2, dret: -3.41}
+      - {stage: ⑥b, clean: "+0.38%/45%", with_bear: "-0.42%/42%", dwr: -3, dret: -0.80}
+      - {stage: ⑥c, clean: "+0.90%/48%", with_bear: "+0.39%/45%", dwr: -3, dret: -0.51}
+      - {stage: ⑥w, clean: "+0.29%/45%", with_bear: "-0.84%/39%", dwr: -6, dret: -1.13}
+
+    finding_2_bullish_regime_dependent: |
+      同一批看涨信号，在不同阶段的方向相反：
+        ①a / ② / ③ / ⑤ —— 信号越多越差（晚期/高潮特征）
+        ⑥b / ⑥c        —— 信号越多越好（恐慌/反转特征）
+      与 #5「信号强度 >> ②、A股拄底优于追突破」一致。
+    bullish_monotone:
+      stage_2: {no_sig: "+0.89%", up1: "+0.61%", up2: "+0.18%", up3: "-0.33%", up4: "-0.58%", trend: declining}
+      stage_3: {no_sig: "+0.45%", up1: "+0.19%", up2: "-0.17%", up3: "-0.44%", trend: declining}
+      stage_6b: {no_sig: "+0.38%/45%", up3: "+2.70%/53%", up5: "+2.97%/52%", trend: increasing}
+      stage_6c: {no_sig: "+0.90%/48%", up3: "+2.10%/55%", trend: increasing}
+      stage_6w: {no_sig: "+0.29%/45%", up3: "-0.57%", trend: none}
+
+    worst_combos:
+      - {stage: ⑤, combo: "看涨2+看跌", n: 90, ret: "-7.79%", wr: "24%"}
+      - {stage: ⑤, combo: "看涨1+看跌", n: 207, ret: "-5.22%", wr: "31%"}
+      - {stage: ①a, combo: "看涨3+看跌", n: 50, ret: "-4.10%", wr: "30%"}
+      - {stage: ②, combo: "看涨4+看跌", n: 82, ret: "-2.81%", wr: "39%"}
+    best_combos:
+      - {stage: ⑥b, combo: "看涨5", n: 228, ret: "+2.97%", wr: "52%"}
+      - {stage: ⑥b, combo: "看涨3", n: 413, ret: "+2.70%", wr: "53%"}
+      - {stage: ⑥c, combo: "看涨3", n: 401, ret: "+2.10%", wr: "55%"}
+
+    answer_to_question: |
+      两者都提升，但主导的是「阶段胜率」：
+        · 看跌形态压阶段：②③ −7~−8pp（n 千级，可托）；⑤ −2pp 胜率但 −3.4% 均值
+        · 看涨信号抬信号：⑥b 看涨3 +2.7%/53% vs 本底 +0.38%/45%
+      同一个看涨3信号：② 43% ←→ ⑥b 53%，差 10pp；⑥c 55%，差 12pp。
+      结论：**阶段是信号的必要上下文，单独用信号胜率会系统性错配**。
+    caveats:
+      - "看跌信号日用的是 signal_date（形态自身完成日）。回填时检测日可能晚于它，
+         实盘日频跑当天即可检出，但此处存在轻微前视风险（待用 detected_date 敏感性验证）"
+      - "④ / ⑤ / ⑥a 的样本偏小（百级），结论強度不如 ①②③⑥b⑥c（万级）"
+      - "看涨信号未区分子类型（MW_B1/MW_B2/PP_V1/PP_V2/BO_V2 混算），
+         下一步应拆掩码看哪个家族在哪个阶段有效"
+    next: "拆掩码：对每个阶段，分别算 MW_B1 / PP_V1 / BO_V2 的单独贡献"
+
+    family_breakdown:
+      status: done
+      interpretation: |
+        对每个阶段，算每个信号家族触发（近 6 日窗口内）的 H20 超额 vs 该阶段全部样本日。
+        陷阱：PP_V1 占全部事件的 51%，在 ② 里覆盖 75% 的样本日，
+        “PP_V1 日”≈“全部日”，所以它的 delta 被稀释，接近 0 不代表无效。
+        本表对稀有家族（MW_B2 / BO_V2 / MW_B1）公平，对高频家族不公平。
+      stage_2_all_negative: |
+        ② 里**所有看涨家族都是负贡献**（MW_B1 −0.36 / MW_B2 −1.93 /
+        PP_V1 −0.17 / PP_V2 −1.38 / BO_V2 −0.24）。
+        → 「突破后运行期不买信号」，这一条没有例外。
+      stage_5_mw_negative: |
+        ⑤ 里 MW 系全线为负（MW_B1 −2.78pp / MW_B2 −2.33pp），
+        PP_V2 −1.39pp；反而 BO_V2 +1.35pp / PP_V1 +0.22pp 是正的。
+      stage_6b_all_positive: |
+        ⑥b 里家族全为正（MW_B1 +0.54 / PP_V2 +0.76 / BO_V2 +0.91）。
+      mw_b2_worst: |
+        MW_B2 几乎全线为负：② −1.93pp / ④ −6.68pp / ⑤ −2.33pp /
+        ⑥b −0.56pp / ⑥w −1.14pp；只在 ⑥c 深跌里翻正（+2.34pp，n=101）。
+        与 #9/#10 MW 交叉结论一致。
+      family_best_stage:
+        MW_B1: {best: ⑥c, delta: "+0.92pp", worst: ⑤, worst_delta: "-2.78pp"}
+        MW_B2: {best: ⑥c, delta: "+2.34pp", worst: ④, worst_delta: "-6.68pp"}
+        PP_V1: {best: ④, delta: "+0.91pp", note: "高频，delta 被稀释"}
+        PP_V2: {best: ⑥w, delta: "+1.22pp", worst: ②, worst_delta: "-1.38pp"}
+        BO_V2: {best: ⑤, delta: "+1.35pp", alt: "⑥b +0.91pp", worst: ④, worst_delta: "-2.51pp"}
+      action_suggested: |
+        1) MW_B2 在②④⑤ 三个阶段应从买入候选中排除（负期望）；
+        2) BO_V2 的信号在 ⑤/⑥b 才值得看，在②③④ 无效；
+        3) 「② 不买信号」可以作为硬规则入驾驶舱。
+        均为建议，未改代码。
+
+  # ══════════════════════════════════════════════════════════
+  # 【阶段④ Base 'n Break 专项】—— 一次覆盖 PRD #11 / #13 / #14 / #15
+  # ══════════════════════════════════════════════════════════
+  base_n_break:
+    status: done
+    date: '2026-09-14'
+    script: scripts/bt_cpa_04_base.py
+    sample: "全量（进入④事件 5,326 个，去重 20 日后保留 5,310）"
+    baseline: {n: 5310, wr: '40%', mean: '-0.58%', median: '-3.64%'}
+    headline: |
+      **④ 整体是负期望（−0.58% / 40%），而 PRD 给它的动作是「加仓」。**
+      与 #5（拄底优于追突破）、#7（深档负期望不应挂入场）同向。
+      注：④ 样本偏向“已涨过一段的晚期突破”，不是中性样本。
+
+    test_14_prior_gain:
+      question: "PRD 前置要求：自最后一次有效入场点起涨幅 ≥20%（待校准）"
+      method: "代理口径：箱体起点前 120 日内最低收盘 → 箱底 的涨幅"
+      buckets:
+        - {bucket: '<20%',  n: 220,  wr: '45%', mean: '+2.65%', median: '-1.18%'}
+        - {bucket: '20~30%', n: 698,  wr: '45%', mean: '+1.86%', median: '-1.63%'}
+        - {bucket: '30~50%', n: 2047, wr: '40%', mean: '-0.20%', median: '-3.11%'}
+        - {bucket: '50~100%', n: 1869, wr: '39%', mean: '-1.31%', median: '-4.73%'}
+        - {bucket: '>=100%', n: 476,  wr: '33%', mean: '-4.49%', median: '-8.53%'}
+      verdict: |
+        **完全单调递减，且现行门槛方向相反**：≥20% 恰好排除了最好的一组（<20%，+2.65%）、
+        纳入了最差的一组（≥100%，−4.49%）。
+        均值极差 7.1pp、胜率极差 12pp，n 三级都在千级，可信。
+      action_suggested: "前置涨幅从“≥20% 门槛”改为“<30% 偏好”或直接取消下界；若保留门槛，应反向设为上界（≤30%）"
+
+    test_13_box_depth:
+      question: "存在性硬门槛：深度 ≤阈值（或 ≤前段涨幅 50%）（待校准）"
+      buckets:
+        - {bucket: '<=3%',   n: 92,   wr: '52%', mean: '+5.43%', median: '+0.90%'}
+        - {bucket: '3~5%',   n: 583,  wr: '43%', mean: '-0.07%', median: '-2.50%'}
+        - {bucket: '5~8%',   n: 1530, wr: '41%', mean: '-0.11%', median: '-2.97%'}
+        - {bucket: '8~12%',  n: 1802, wr: '39%', mean: '-0.60%', median: '-3.63%'}
+        - {bucket: '>12%',   n: 1303, wr: '38%', mean: '-1.77%', median: '-6.42%'}
+      verdict: |
+        单调递减，方向正确，但**现行门槛太松**。
+        真正的分界在 5% 附近（≤5% 两组均值 ≥−0.07%，>5% 三组全负）。
+        只有 ≤3% 一组是真正期望（+5.43%/52%，但 n=92 偏薄）。
+      action_suggested: "深度阈值从现行值收紧到 5%；≤3% 可另标“优质基部”"
+
+    test_11_vcp:
+      question: "质量评分：VCP 收缩度——加上它有没有用？"
+      method: "箱体前半段 vs 后半段：区间收缩比（r2<r1）+ 均量收缩比（<1）双条件"
+      buckets:
+        - {bucket: 'VCP(双收缩)', n: 736,  wr: '40%', mean: '-1.02%', median: '-4.13%'}
+        - {bucket: '仅深度收缩', n: 168,  wr: '42%', mean: '-0.95%', median: '-2.23%'}
+        - {bucket: '仅量能收缩', n: 2339, wr: '38%', mean: '-1.00%', median: '-4.53%'}
+        - {bucket: '无收缩',     n: 2067, wr: '42%', mean: '+0.08%', median: '-2.79%'}
+      verdict: |
+        **VCP 无效，且双收缩是最差的一组（−1.02% vs 无收缩 +0.08%）。**
+        四组胜率都在 38~42%，没有区分力。
+      action_suggested: "从 ④ 的质量评分里去掉 VCP 收缩度（或降为记录项）"
+
+    test_15_boundary:
+      question: "边界样本：涨幅<20% 平台突破 → 独立类别统计"
+      verdict: |
+        **答案：它不仅是独立类别，还是最好的一类。**
+        <20%（n=220）均值 +2.65% / 45%，胜率高于达标的 20~30% 组（同为 45%）
+        与 30~50% 组（40%）。建议升为正式入场子类，而非“边界样本”。
+
+    control_from_stage:
+      rows:
+        - {from: '②', n: 3258, wr: '40%', mean: '-0.28%'}
+        - {from: '③', n: 2052, wr: '40%', mean: '-1.07%'}
+      note: "两类胜率相同，③ 来源的均值更差；样本量足够，不算显著"
+
+    caveats:
+      - "prior_gain 用的是“箱体起点前 120 日最低收盘 → 箱底”代理，与 PRD 原文“自最后一次有效入场点起”不完全一致（实际入场点未入库）"
+      - "VCP 用的是箱体内部前后半段的区间/均量收缩比，是标准 VCP 的简化代理，不是涛波级收缩链（三次递缩）的完整实现"
+      - "④ 事件总量 5,326 偏少，分桶后 ≤3% / <20% 两组只有百级"
+    action_summary: |
+      四条建议（均为建议，未改代码）：
+        1) ④ 的动作由“加仓”降为“观察/轻仓”（整体 −0.58%，不是加仓质量）；
+        2) 前置涨幅门槛反向（现行 ≥20% 排除了最好的组）；
+        3) 箱体深度阈值收紧到 5%；
+        4) 去掉 VCP 收缩度评分项。
+      ⚠️ 改后需全量重算 cpa_stage_daily；建议与 #16(ATR60) / #20(去 below_sup) 打包一次重算。
+
+  # ══════════════════════════════════════════════════════════
+  # 【#23 init_flag 初值影响评估】
+  # ══════════════════════════════════════════════════════════
+  init_flag:
+    status: done
+    date: '2026-09-14'
+    script: scripts/bt_cpa_23_initflag.py
+    sample: "600 只随机（seed42）/ 106 万行日快照"
+    volume: "init_flag=true 仅 322 行（0.03%）"
+    stage_distribution:
+      note: "init 行集中在 ⑥c(1.97x) / ⑥cT(2.91x) / ②(1.62x)；③①a④⑤①b⑥a 全为 0 行"
+      rows:
+        - {stage: ⑥c, all: '24.47%', init: '48.14%', ratio: 1.97}
+        - {stage: ②, all: '20.87%', init: '33.85%', ratio: 1.62}
+        - {stage: ⑥b, all: '17.18%', init: '7.14%', ratio: 0.42}
+        - {stage: ⑥cT, all: '2.35%', init: '6.83%', ratio: 2.91}
+    forward_return:
+      rows:
+        - {group: 事件驱动, n: 52497, wr: '46%', mean: '+0.63%', median: '-0.88%'}
+        - {group: init倒推, n: 322, wr: '46%', mean: '+0.42%', median: '-1.00%'}
+    verdict: |
+      **init_flag 是个伪问题**：只占 0.03%，收益与事件驱动组相差 0.21pp，胜率相同。
+      **不需要在回测里排除**；保留标记做溯源即可。
+    side_finding: |
+      PRD §9.6 初始状态规则 #1（250 日高位 → ⑤）与 #2（箱体 → ④）
+      在实测数据中**从未被触发**（init 行里 ⑤ 与 ④ 均为 0）。
+      倒推初值实际只落在 ② / ⑥b / ⑥c / ① 四类。实现与 PRD 文本不一致，待核。
