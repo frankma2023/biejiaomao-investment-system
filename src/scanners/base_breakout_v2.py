@@ -225,7 +225,7 @@ if __name__ == '__main__':
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    table = 'index_daily_kline' if args.mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if args.mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if args.mode == 'index' else ''
     rows = conn.execute(f"""
         SELECT date, open, high, low, close, volume, amount FROM {table}

@@ -23,9 +23,8 @@ ENGINE_NAMES = ('base_breakout', 'pocket_pivot_v2')
 def load_kline(code):
     db = sqlite3.connect(DB)
     db.row_factory = sqlite3.Row
-    rows = db.execute("""SELECT date, COALESCE(adj_open, open) as open, COALESCE(adj_high, high) as high,
-        COALESCE(adj_low, low) as low, COALESCE(adj_close, close) as close, volume, amount, change_pct
-        FROM daily_kline WHERE stock_code=? AND date>=? AND date<=? ORDER BY date""",
+    rows = db.execute("""SELECT date, open, high, low, close, volume, amount, change_pct
+        FROM daily_kline_adj WHERE stock_code=? AND date>=? AND date<=? ORDER BY date""",
         (code, KLINE_START, END_DATE)).fetchall()
     db.close()
     return [dict(r) for r in rows]
@@ -83,7 +82,7 @@ def main():
 
     db = sqlite3.connect(DB)
     codes = [r[0] for r in db.execute(
-        "SELECT DISTINCT stock_code FROM daily_kline WHERE date >= ? AND date <= ?",
+        "SELECT DISTINCT stock_code FROM daily_kline_adj WHERE date >= ? AND date <= ?",
         (SIGNAL_START, END_DATE)).fetchall()]
     db.close()
     # 排除北交所（8/4 开头）与已退市？

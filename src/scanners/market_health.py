@@ -165,7 +165,7 @@ def compute_ad_ratio(conn, target_date):
         FROM (
             SELECT date, close,
                    LAG(close) OVER (PARTITION BY stock_code ORDER BY date) as prev_close
-            FROM daily_kline
+            FROM daily_kline_adj
             WHERE date >= date(?, '-10 days') AND date <= ?
         )
         WHERE prev_close IS NOT NULL
@@ -204,7 +204,7 @@ def compute_limit_counts(conn, target_date):
           SUM(CASE WHEN (change_pct <= -0.099 AND (stock_code LIKE '60%' OR stock_code LIKE '00%'))
                     OR (change_pct <= -0.199 AND (stock_code LIKE '30%' OR stock_code LIKE '68%'))
                    THEN 1 ELSE 0 END) as dn_cnt
-        FROM daily_kline WHERE date = ?
+        FROM daily_kline_adj WHERE date = ?
     """, (target_date,)).fetchone()
     return (r['up_cnt'] or 0, r['dn_cnt'] or 0)
 
@@ -224,7 +224,7 @@ def compute_hl_ratio(conn, target_date):
             SELECT date, stock_code, high, low,
                    MAX(high) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 252 PRECEDING AND 1 PRECEDING) as max_252_high,
                    MIN(low)  OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 252 PRECEDING AND 1 PRECEDING) as min_252_low
-            FROM daily_kline
+            FROM daily_kline_adj
             WHERE date >= date(?, '-400 days') AND date <= ?
         )
         WHERE max_252_high IS NOT NULL
@@ -257,7 +257,7 @@ def compute_ma50_above(conn, target_date):
         FROM (
             SELECT date, stock_code, close,
                    AVG(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) as ma50
-            FROM daily_kline
+            FROM daily_kline_adj
             WHERE date >= date(?, '-100 days') AND date <= ?
         )
         WHERE ma50 IS NOT NULL
@@ -284,7 +284,7 @@ def compute_vol_breakout(conn, target_date):
             SELECT date, stock_code, close, volume,
                    AVG(volume) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) as vol_ma50,
                    MAX(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 20 PRECEDING AND 1 PRECEDING) as max_20_close
-            FROM daily_kline
+            FROM daily_kline_adj
             WHERE date >= date(?, '-120 days') AND date <= ?
         )
         WHERE vol_ma50 > 0 AND max_20_close IS NOT NULL
@@ -315,7 +315,7 @@ def compute_vol_breakout(conn, target_date):
                    AVG(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) as ma50,
                    AVG(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 119 PRECEDING AND CURRENT ROW) as ma120,
                    AVG(close) OVER (PARTITION BY stock_code ORDER BY date ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) as ma200
-            FROM daily_kline
+            FROM daily_kline_adj
             WHERE date >= date(?, '-250 days') AND date <= ?
         )
         WHERE date = ?
@@ -730,7 +730,7 @@ def _compute_sector_ma50_above(conn, target_date, stock_weights):
     
     rows = conn.execute(f"""
         SELECT stock_code, date, close
-        FROM daily_kline
+        FROM daily_kline_adj
         WHERE stock_code IN ({placeholders})
           AND date >= date(?, '-60 days')
           AND date <= ?
@@ -780,7 +780,7 @@ def _compute_sector_ad_ratio(conn, target_date, stock_weights):
         FROM (
             SELECT k.date, k.close, sw.weight,
                    LAG(k.close) OVER (PARTITION BY k.stock_code ORDER BY k.date) as prev_close
-            FROM daily_kline k
+            FROM daily_kline_adj k
             JOIN (SELECT val as code, {len(codes)} as dummy FROM (SELECT 1))
             LEFT JOIN (VALUES {','.join('('+str(i)+','+str(w)+')' for i,w in enumerate(stock_weights.values()))}) 
         )
@@ -804,7 +804,7 @@ def _compute_sector_ad_ratio_simple(conn, target_date, stock_weights):
     rows = conn.execute(f"""
         SELECT k.date, k.stock_code, k.close,
                LAG(k.close) OVER (PARTITION BY k.stock_code ORDER BY k.date) as prev_close
-        FROM daily_kline k
+        FROM daily_kline_adj k
         WHERE k.stock_code IN ({placeholders})
           AND k.date >= date(?, '-10 days')
           AND k.date <= ?
@@ -847,7 +847,7 @@ def _compute_sector_hl_ratio(conn, target_date, stock_weights):
     # 一次性拉取所有需要的K线（最近300天），在Python里算252日高低
     rows = conn.execute(f"""
         SELECT stock_code, date, close
-        FROM daily_kline
+        FROM daily_kline_adj
         WHERE stock_code IN ({placeholders})
           AND date >= date(?, '-300 days')
           AND date <= ?
@@ -917,11 +917,11 @@ def _compute_sector_vol_breakout(conn, target_date, stock_weights):
     day50 = day50_dt.strftime('%Y-%m-%d')
     rows = conn.execute(f"""
         SELECT k.stock_code, k.close, k.volume,
-               (SELECT AVG(sub.volume) FROM daily_kline sub
+               (SELECT AVG(sub.volume) FROM daily_kline_adj sub
                 WHERE sub.stock_code=k.stock_code AND sub.date<k.date AND sub.date>=? ) as vol_ma50,
-               (SELECT MAX(sub.close) FROM daily_kline sub
+               (SELECT MAX(sub.close) FROM daily_kline_adj sub
                 WHERE sub.stock_code=k.stock_code AND sub.date<k.date AND sub.date>=date(k.date, '-20 days')) as max_20
-        FROM daily_kline k
+        FROM daily_kline_adj k
         WHERE k.date = ? AND k.stock_code IN ({placeholders})
           AND k.close > 0 AND k.volume > 0
     """, (day50, target_date, *codes)).fetchall()

@@ -170,7 +170,7 @@ class SentimentEngine:
 
         # 近5日
         rows = conn.execute(
-            "SELECT close FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 6",
+            "SELECT close FROM daily_kline_adj WHERE stock_code=? ORDER BY date DESC LIMIT 6",
             (stock_code,)
         ).fetchall()
         if len(rows) >= 6 and rows[5]['close'] > 0:

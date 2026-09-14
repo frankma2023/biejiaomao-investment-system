@@ -55,7 +55,7 @@ def main():
     conn.commit()
 
     dates = [r[0] for r in conn.execute(
-        "SELECT DISTINCT date FROM daily_kline WHERE date >= ? ORDER BY date", (START,))]
+        "SELECT DISTINCT date FROM daily_kline_adj WHERE date >= ? ORDER BY date", (START,))]
     if not dates:
         print('无交易日'); return
     if args.incremental:
@@ -114,7 +114,7 @@ def main():
     if args.incremental:
         last = conn.execute("SELECT MAX(date) FROM microcap_index_daily").fetchone()[0]
         last_kmap = {}
-        for r in conn.execute("SELECT stock_code, close, adj_close FROM daily_kline WHERE date=?", (last,)):
+        for r in conn.execute("SELECT stock_code, raw_close AS close, close AS adj_close FROM daily_kline_adj WHERE date=?", (last,)):
             last_kmap[r[0]] = (r[1], r[2])
 
         def _prev_adj_of(code):
@@ -122,7 +122,7 @@ def main():
             if code in last_kmap:
                 return last_kmap[code][1] if last_kmap[code][1] is not None else last_kmap[code][0]
             row2 = conn.execute(
-                "SELECT adj_close, close FROM daily_kline WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1",
+                "SELECT close AS adj_close, raw_close AS close FROM daily_kline_adj WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1",
                 (code, last)).fetchone()
             if not row2:
                 return None
@@ -240,7 +240,7 @@ def main():
 
     # 流式逐日（增量时从增量首日起查, 避免全表扫描）
     it = conn.execute(
-        "SELECT stock_code, date, close, adj_close FROM daily_kline WHERE date >= ? "
+        "SELECT stock_code, date, raw_close AS close, close AS adj_close FROM daily_kline_adj WHERE date >= ? "
         "ORDER BY date, stock_code", (dates[0],))
     row = it.fetchone()
     for di, d in enumerate(dates):

@@ -34,7 +34,7 @@ def load_kline_map(db, codes):
     """{code: {date: close}} 近 400+250 天"""
     out = {}
     for code in codes:
-        rows = db.execute(f"""SELECT date, COALESCE(adj_close, close) as close FROM daily_kline
+        rows = db.execute(f"""SELECT date, close FROM daily_kline_adj
             WHERE stock_code=? AND date >= date('now', '-{N_YEAR + 260} days') ORDER BY date""", (code,)).fetchall()
         out[code] = {r['date']: r['close'] for r in rows}
     return out

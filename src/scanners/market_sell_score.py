@@ -230,11 +230,11 @@ def score_leader_top(conn, target_date):
     fallen_count = 0
     for code in pool_stocks:
         entry_price_row = conn.execute("""
-            SELECT close FROM daily_kline
+            SELECT close FROM daily_kline_adj
             WHERE stock_code = ? AND date <= ? ORDER BY date DESC LIMIT 1
         """, (code, pool_date)).fetchone()
         current_price_row = conn.execute("""
-            SELECT close FROM daily_kline
+            SELECT close FROM daily_kline_adj
             WHERE stock_code = ? AND date <= ? ORDER BY date DESC LIMIT 1
         """, (code, target_date)).fetchone()
 
@@ -261,8 +261,8 @@ def score_junk_rally(conn, target_date):
 
     # 取 target_date 当天全市场股价分位
     prices = conn.execute("""
-        SELECT stock_code, close FROM daily_kline
-        WHERE date = (SELECT MAX(date) FROM daily_kline WHERE date <= ?)
+        SELECT stock_code, close FROM daily_kline_adj
+        WHERE date = (SELECT MAX(date) FROM daily_kline_adj WHERE date <= ?)
         AND close > 0
     """, (target_date,)).fetchall()
 
@@ -286,7 +286,7 @@ def score_junk_rally(conn, target_date):
         low_gains = []
         for code in low_codes[:50]:  # 采样50只
             row = conn.execute("""
-                SELECT close FROM daily_kline
+                SELECT close FROM daily_kline_adj
                 WHERE stock_code = ? AND date <= ? ORDER BY date DESC LIMIT 21
             """, (code, check_date)).fetchall()
             if len(row) >= 21 and row[0]['close'] and row[-1]['close']:
@@ -297,7 +297,7 @@ def score_junk_rally(conn, target_date):
         high_gains = []
         for code in high_codes[:50]:
             row = conn.execute("""
-                SELECT close FROM daily_kline
+                SELECT close FROM daily_kline_adj
                 WHERE stock_code = ? AND date <= ? ORDER BY date DESC LIMIT 21
             """, (code, check_date)).fetchall()
             if len(row) >= 21 and row[0]['close'] and row[-1]['close']:

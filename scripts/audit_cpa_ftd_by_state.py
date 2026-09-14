@@ -72,7 +72,7 @@ def main():
         if len(kl) < 340:
             continue
         ind = cpa.compute_indicators(kl)
-        tops = cpa.load_bi_tops(conn, code)
+        tops = cpa.load_bi_tops_by_date(conn, code, [k['date'] for k in kl])
         try:
             daily, _ = cpa.run_state_machine(conn, code, kl, ind, tops)
         except Exception:

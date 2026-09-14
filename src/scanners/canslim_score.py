@@ -196,7 +196,7 @@ def score_a(db, stock_code, target_date, p):
 def score_n(db, stock_code, target_date, p, klines=None, signals=None):
     cfg = p.get('n_new', {})
     if klines is None:
-        rows = db.execute("""SELECT date, close FROM daily_kline
+        rows = db.execute("""SELECT date, close FROM daily_kline_adj
             WHERE stock_code=? AND date<=? ORDER BY date""",
             (stock_code, target_date)).fetchall()
         klines = [dict(r) for r in rows]
@@ -328,11 +328,11 @@ def score_s(db, stock_code, target_date, p):
 
     # Volume ratio
     row5 = db.execute("""SELECT AVG(volume) as av FROM (
-        SELECT volume FROM daily_kline
+        SELECT volume FROM daily_kline_adj
         WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 5)""",
         (stock_code, target_date)).fetchone()
     row50 = db.execute("""SELECT AVG(volume) as av FROM (
-        SELECT volume FROM daily_kline
+        SELECT volume FROM daily_kline_adj
         WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 50)""",
         (stock_code, target_date)).fetchone()
     if row50 and row50['av'] and row50['av'] > 0 and row5 and row5['av']:
@@ -415,7 +415,7 @@ def score_l(db, stock_code, target_date, p):
         bd['industry_rs'] = {'value': '-', 'score': 0, 'note': 'no table'}    
 
     # Excess return
-    rows = db.execute("""SELECT close FROM daily_kline
+    rows = db.execute("""SELECT close FROM daily_kline_adj
         WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 21""",
         (stock_code, target_date)).fetchall()
     if len(rows) >= 2:
@@ -545,7 +545,7 @@ def score_stock(stock_code, target_date, params=None, save=False, signals=None):
     db = sqlite3.connect(DB_PATH); db.row_factory = sqlite3.Row
 
     # 性能(2026-09-07)：K 线 LIMIT 1200——CANSLIM 各因子/引擎只需近期窗口(high52 250日、引擎≤500)，全历史 5000+ 根拖慢 4-10x
-    rows = db.execute("""SELECT date, open, high, low, close, volume FROM daily_kline
+    rows = db.execute("""SELECT date, open, high, low, close, volume FROM daily_kline_adj
         WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1200""",
         (stock_code, target_date)).fetchall()
     rows = list(reversed(rows))

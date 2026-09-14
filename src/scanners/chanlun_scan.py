@@ -21,6 +21,14 @@ def _connect():
     return conn
 
 
+# 笔数据的「算法 + 口径」版本标记。
+# 引擎读的是 `daily_kline_adj`（理杏仁前复权），所以所有写入路径都必须打这个标记。
+# ⚠ 历史遗留：本文件与 backfill_chanlun.py 曾硬编码 'czsc101'（那是「未复权口径」的标记），
+#   导致内容已是复权价、标记却写着旧口径。后果：--purge-old 会把日常写入的新口径行
+#   当成旧口径一起删掉。2026-09-12 修正。
+CHANLUN_ALGO_VERSION = 'czsc101_adj'
+
+
 def _ensure_table(conn):
     conn.execute("""
         CREATE TABLE IF NOT EXISTS chanlun_scan_daily (
@@ -74,7 +82,7 @@ def get_target_stocks(conn, all_market=False):
         # 全市场模式：所有正常上市 + 流动性过滤
         rows = conn.execute("""
             SELECT DISTINCT k.stock_code, b.name
-            FROM daily_kline k
+            FROM daily_kline_adj k
             INNER JOIN stock_basic b ON k.stock_code=b.stock_code
             WHERE b.listing_status='normally_listed'
             AND b.name NOT LIKE '%ST%'
@@ -116,7 +124,7 @@ def get_stock_name(conn, code):
     """获取股票名称"""
     try:
         row = conn.execute(
-            "SELECT stock_name FROM daily_kline WHERE stock_code=? LIMIT 1", (code,)
+            "SELECT stock_name FROM daily_kline_adj WHERE stock_code=? LIMIT 1", (code,)
         ).fetchone()
         return row[0] if row else code
     except Exception:
@@ -176,30 +184,41 @@ def scan_stock(code, scan_date):
         return None
 
 
-def scan_stock_all(code, dates, limit=1500):
+def scan_stock_all(code, dates):
     """单股全历史增量扫描：1 次加载 K 线 + CZSC 逐根 update，
     每个目标日取当日分析结果（CZSC.update 增量与全量结果一致，已验证）
 
-    窗口策略（W1 修复）：加载截至 max(dates) 的全部历史 K 线（不设 LIMIT），
+    窗口策略（W1 修复）：加载截至 max(dates) 的历史 K 线，上限 **10000 根**
+    （A 股最长约 8,700 根，暂时够用；若将来超了需调大这个上界），
     与单日 analyze(limit=1500) 一致性靠 max_bi_num=50 截断保证——
     只要历史笔数 ≥50，两条路径都截断为最近 50 笔，结果一致；
     不足 50 笔的新股两边都是全量，同样一致。
 
+    初始化根数（2026-09-12 修复）：改为 n_init=1，逐根产出。此前固定用前 50 根
+    做初始化、从 bars[50:] 才开始产出，导致每只股票**最早的 50 个交易日永远
+    拿不到结果**（实测 600309 的前 50 个交易日全空，首个产出在第 51 日），
+    且 K 线不足 50 根的新股（全库 40 只）永远零产出。
+    已验证 n_init=1 与 n_init=50 对第 50 根之后的日期结果完全一致。
+
     Returns:
         list[tuple]: [(date, summary or None)]
     """
+    if not dates:
+        return []
     import pandas as pd
     from scanners.chanlun import analyze_from_czsc
     from czsc import CZSC, RawBar, Freq
     date_set = set(dates)
+    conn = None
     try:
         conn = _connect()
         df = pd.read_sql(f"""
             SELECT date, open, high, low, close, volume, amount
-            FROM daily_kline WHERE stock_code = ? AND date <= ?
+            FROM daily_kline_adj WHERE stock_code = ? AND date <= ?
             ORDER BY date DESC LIMIT 10000
         """, conn, params=(code, max(dates)))
         conn.close()
+        conn = None
         if df.empty:
             return [(d, None) for d in dates]
         df = df.sort_values("date").reset_index(drop=True)
@@ -211,14 +230,23 @@ def scan_stock_all(code, dates, limit=1500):
                 open=row.open, close=row.close, high=row.high, low=row.low,
                 vol=row.volume, amount=row.amount
             ))
-        # 前 50 根初始化，之后逐根增量；max_bi_num 显式钉死截断契约（W1/O5）
-        c = CZSC(bars[:50], max_bi_num=50)
+        # 逐根产出，不跳过任何目标日；max_bi_num 显式钉死截断契约（W1/O5）
+        # n_init=1：以第 1 根为初始状态，之后逐根 update，每根都有结果。
+        # 此前固定 n_init=50 并从 bars[50:] 才开始产出，导致每只股票**最早的 50 个
+        # 交易日永远拿不到结果**（实测 600309 前 50 个交易日全空，首个产出在第 51 日），
+        # K 线不足 50 根的新股（全库 40 只）更是永远零产出。
+        # 已验证：n_init=1 与 n_init=50 对第 50 根之后的日期结果完全一致；
+        # 且不能用「n_init=50 但连预热段也产出」的写法，那会让第 1 天就拿到
+        # 基于 50 根算出的结果（未来函数）。
+        n_init = 1
+        c = CZSC(bars[:n_init], max_bi_num=50)
         out = []
-        for j, bar in enumerate(bars[50:]):
-            c.update(bar)
+        for j, bar in enumerate(bars):
+            if j >= n_init:
+                c.update(bar)
             d = str(bar.dt.date())
             if d in date_set:
-                r = analyze_from_czsc(code, c, freq="D", bars=bars[:51 + j])
+                r = analyze_from_czsc(code, c, freq="D", bars=bars[:j + 1])
                 out.append((d, summarize(code, d, r)))
         # 补齐未覆盖的目标日（数据起点之前的日期）
         got = {d for d, _ in out}
@@ -228,8 +256,14 @@ def scan_stock_all(code, dates, limit=1500):
         out.sort(key=lambda x: x[0])
         return out
     except Exception as e:
-        print(f"  {code} 全历史扫描异常: {e}")
+        print(f"  {code} 全历史扫描异常: {type(e).__name__}: {e}")
         return [(d, None) for d in dates]
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 
@@ -276,7 +310,7 @@ def run_scan(scan_date=None, all_market=False):
                 result["divergence_count"], result["latest_div_type"],
                 result["trade_signal_count"], result["latest_trade_type"],
                 result["latest_trade_side"], result["latest_trade_price"],
-                result["resonance_strength"], 'czsc101'
+                result["resonance_strength"], CHANLUN_ALGO_VERSION
             ))
             if result.get("bi_json"):
                 conn.execute(

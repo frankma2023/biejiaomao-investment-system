@@ -64,8 +64,8 @@ def load_data(conn, target_date=None, start_date=None):
 
     # ── 加载个股K线 ──
     kline_rows = conn.execute("""
-        SELECT stock_code, date, COALESCE(adj_close, close) as adj_close, amount
-        FROM daily_kline
+        SELECT stock_code, date, close as adj_close, amount
+        FROM daily_kline_adj
         WHERE date >= ? AND date <= ?
         ORDER BY stock_code, date
     """, (start_str, end_str)).fetchall()

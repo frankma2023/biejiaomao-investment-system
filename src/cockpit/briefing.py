@@ -220,7 +220,7 @@ class BriefingEngine:
         """计算股票近5日涨跌"""
         try:
             row = self.db.execute(
-                "SELECT close FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 6",
+                "SELECT close FROM daily_kline_adj WHERE stock_code=? ORDER BY date DESC LIMIT 6",
                 (code,)
             ).fetchall()
             if len(row) >= 6:

@@ -184,7 +184,7 @@ def api_screening_backtest():
         if ideal_buy and ideal_buy > 0:
             # 取该日期之后的全部K线
             krows = db.execute("""
-                SELECT date, close FROM daily_kline
+                SELECT date, close FROM daily_kline_adj
                 WHERE stock_code = ? AND date >= ? ORDER BY date
             """, (r['stock_code'], target_date)).fetchall()
 
@@ -1568,12 +1568,12 @@ def _lookup_kline(db, code, asset_type='stock', limit=400):
             return rows
         rows = db.execute("""
             SELECT date, open, high, low, close, volume, amount, change_pct
-            FROM daily_kline WHERE stock_code = ? ORDER BY date DESC LIMIT ?
+            FROM daily_kline_adj WHERE stock_code = ? ORDER BY date DESC LIMIT ?
         """, (code, limit)).fetchall()
     else:
         rows = db.execute("""
             SELECT date, open, high, low, close, volume, amount, change_pct
-            FROM daily_kline WHERE stock_code = ? ORDER BY date DESC LIMIT ?
+            FROM daily_kline_adj WHERE stock_code = ? ORDER BY date DESC LIMIT ?
         """, (code, limit)).fetchall()
         if rows:
             return rows

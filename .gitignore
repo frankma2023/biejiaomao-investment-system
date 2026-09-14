@@ -97,3 +97,8 @@ web/daily-pattern-scan/data.json
 data/backup/
 
 *.err
+
+# 临时/备份大文件（2026-09-14 收尾）：analysis/ 下划线开头的 CSV 产物
+
+# 临时/备份大文件（2026-09-14 收尾）：analysis/ 下划线开头的 CSV 产物
+analysis/_*.csv

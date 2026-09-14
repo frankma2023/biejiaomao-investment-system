@@ -184,8 +184,7 @@ def detect(daily: List[Dict], params: Optional[Dict] = None) -> List[Dict]:
     if params is None:
         params = load_params()
 
-    # 前复权（若调用方已复权则 change_pct 反推结果 ≈ 原值，幂等）
-    daily = _adj_prices([dict(k) for k in daily])
+    # 价格口径：调用方传入的已是复权价（daily_kline_adj 视图），无需再反推
 
     n = len(daily)
     if n < params['min_lookback_days']:
@@ -466,7 +465,7 @@ if __name__ == '__main__':
     conn = sqlite3.connect(DB_PATH)
     try:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute("""SELECT date, open, high, low, close, volume, change_pct FROM daily_kline
+        rows = conn.execute("""SELECT date, open, high, low, close, volume, change_pct FROM daily_kline_adj
             WHERE stock_code=? AND date<=? ORDER BY date""", (args.stock, args.date)).fetchall()
     finally:
         conn.close()

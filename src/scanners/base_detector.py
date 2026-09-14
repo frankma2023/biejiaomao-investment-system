@@ -182,7 +182,7 @@ def detect_for_stock(stock_code, target_date, params=None):
     conn.row_factory = sqlite3.Row
     rows = conn.execute("""
         SELECT date, open, high, low, close, volume
-        FROM daily_kline WHERE stock_code = ? AND date <= ?
+        FROM daily_kline_adj WHERE stock_code = ? AND date <= ?
         ORDER BY date
     """, (stock_code, target_date)).fetchall()
     conn.close()

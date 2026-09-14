@@ -258,7 +258,7 @@ if __name__ == '__main__':
     conn.row_factory = sqlite3.Row
     rows = conn.execute("""
         SELECT date, open, high, low, close, volume
-        FROM daily_kline WHERE stock_code='600519'
+        FROM daily_kline_adj WHERE stock_code='600519'
         AND date>='2024-01-01' AND date<='2026-05-13'
         ORDER BY date
     """).fetchall()

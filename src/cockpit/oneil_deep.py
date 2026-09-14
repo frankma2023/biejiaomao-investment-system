@@ -216,7 +216,7 @@ class ONeilDeepAnalyzer:
             }
 
         # 8. 均线位置
-        kl = db.execute("SELECT close FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 250", (code,)).fetchall()
+        kl = db.execute("SELECT close FROM daily_kline_adj WHERE stock_code=? ORDER BY date DESC LIMIT 250", (code,)).fetchall()
         if kl:
             cs = [k['close'] for k in kl]; p['latest_close'] = cs[0]
             for ma_n in [5,10,20,30,60,120,250]:
@@ -226,7 +226,7 @@ class ONeilDeepAnalyzer:
                     p[f'vs_ma{ma_n}'] = round((cs[0]-ma_v)/ma_v*100, 1)
 
         # 9. 近20天股价
-        kl20 = db.execute("SELECT date, open, high, low, close, volume FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 20", (code,)).fetchall()
+        kl20 = db.execute("SELECT date, open, high, low, close, volume FROM daily_kline_adj WHERE stock_code=? ORDER BY date DESC LIMIT 20", (code,)).fetchall()
         p['klines_20d'] = [{'date': k['date'], 'o': k['open'], 'h': k['high'], 'l': k['low'], 'c': k['close'], 'v': k['volume']} for k in reversed(kl20)]
 
         # 10. 成交量

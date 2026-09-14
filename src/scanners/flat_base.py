@@ -215,7 +215,7 @@ def _check_vol_contraction(klines, base, P):
 
 def detect_for_stock(code, date, params=None):
     conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row
-    rows = conn.execute("SELECT date,open,high,low,close,volume FROM daily_kline WHERE stock_code=? AND date<=? ORDER BY date", (code, date)).fetchall()
+    rows = conn.execute("SELECT date,open,high,low,close,volume FROM daily_kline_adj WHERE stock_code=? AND date<=? ORDER BY date", (code, date)).fetchall()
     conn.close()
     if len(rows) < 750: return []
     return detect([dict(r) for r in rows], params)

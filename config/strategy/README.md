@@ -9,6 +9,7 @@ config/strategy/
 ├── README.md                    # 本文件
 ├── high_conf_pocket_pivot.yaml  # 高置信度口袋支点策略
 ├── plus_b2p2.yaml               # MW PLUS B2+2策略
+├── cpa-stage.yaml               # CPA 阶段判定引擎——定义校准回测
 └── (未来) base_breakout.yaml    # 基部突破V2策略
 ```
 

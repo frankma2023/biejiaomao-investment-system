@@ -134,9 +134,10 @@ class DataLoader:
             # 查询日 K 线，优先用前复权价格
             sql = f"""
                 SELECT stock_code, date,
-                       open, high, low, close, volume, amount,
-                       adj_close
-                FROM daily_kline
+                       raw_open AS open, raw_high AS high, raw_low AS low,
+                       raw_close AS close, volume, amount,
+                       close AS adj_close
+                FROM daily_kline_adj
                 WHERE stock_code IN ({placeholders})
                   AND date >= ? AND date <= ?
                 ORDER BY stock_code, date

@@ -399,6 +399,136 @@ def scan_sell_signals(conn, stocks, scan_date):
     return total_produced
 
 
+# ══════════════════════════════════════════════
+# 箱体信号（放量箱体突破 / 跌破）—— 一次性全历史扫描
+# ══════════════════════════════════════════════
+# 与上面的“按日回填”不同：箱体引擎是**对整条 K 线序列做事件扫描**的纯函数
+#   detect(daily, params) -> List[signal]，每个 signal 自带 signal_date
+# 所以**按股票跑一次**比按日跑高效得多：按股票 ~0.4s/只（全市场约 40 分钟），
+# 按日则每天都得重扫全部股票（~10 小时）。
+#
+# 输入格式与 scan_box_breakdown_2026_result.py 保持一致：
+#   daily_kline 的原始列 + change_pct（引擎内部用自己的 _adj_prices 复权）
+
+BOX_DDL = """
+CREATE TABLE IF NOT EXISTS box_signals (
+    stock_code  TEXT NOT NULL,
+    signal_date TEXT NOT NULL,
+    engine      TEXT NOT NULL,
+    sig_type    TEXT,
+    sig_level   TEXT,
+    band_top    REAL,
+    band_bottom REAL,
+    detail_json TEXT,
+    PRIMARY KEY (stock_code, signal_date, engine, sig_level)
+)
+"""
+
+BOX_INDEX_DDL = "CREATE INDEX IF NOT EXISTS idx_box_signal_date ON box_signals(signal_date)"
+
+
+def _box_one(code):
+    """单个股票：把两个箱体引擎跑一遍全历史，返回待写入的行"""
+    import sqlite3 as _sq
+    from scanners.box_breakout import detect as bo_detect, load_params as bo_params
+    from scanners.box_breakdown import detect as bd_detect, load_params as bd_params
+    conn = _sq.connect(DB, timeout=60)
+    conn.row_factory = _sq.Row
+    try:
+        rows = conn.execute("""SELECT date, open, high, low, close, volume, change_pct
+            FROM daily_kline WHERE stock_code=? ORDER BY date""", (code,)).fetchall()
+    finally:
+        conn.close()
+    if len(rows) < 100:
+        return code, []
+    daily = [dict(r) for r in rows]
+    out = []
+    for eng, det, par in (('box_breakout', bo_detect, bo_params),
+                          ('box_breakdown', bd_detect, bd_params)):
+        try:
+            sigs = det(daily, par())
+        except Exception as e:
+            return code, [('ERR', f'{eng}: {type(e).__name__}: {str(e)[:100]}')]
+        for s in sigs:
+            lvl = str(s.get('signal_level') or '')
+            sd = s.get('signal_date')
+            if not sd:
+                continue
+            out.append((code, str(sd)[:10], eng, str(s.get('type') or ''), lvl,
+                        s.get('band_top'), s.get('band_bottom'),
+                        json.dumps(s, ensure_ascii=False, default=str)))
+    return code, out
+
+
+def scan_box_all(workers=1, limit=None, codes=None):
+    """箱体信号全历史扫描（按股票分片；workers>1 用进程池）"""
+    t0 = time.time()
+    db = sqlite3.connect(DB, timeout=60)
+    db.executescript(BOX_DDL)
+    db.execute(BOX_INDEX_DDL)
+    db.commit()
+    if codes:
+        cl = list(codes)
+    else:
+        cl = [r[0] for r in db.execute(
+            "SELECT DISTINCT stock_code FROM daily_kline_adj ORDER BY stock_code")]
+    if limit:
+        cl = cl[:limit]
+    print(f'  箱体扫描: {len(cl)} 只 × 2 引擎（全历史）', flush=True)
+
+    INS = ("INSERT OR REPLACE INTO box_signals "
+           "(stock_code, signal_date, engine, sig_type, sig_level, band_top, band_bottom, detail_json) "
+           "VALUES (?,?,?,?,?,?,?,?)")
+    n_sig = n_err = n_ok = 0
+    errs = []
+    buf = []
+
+    def _flush():
+        nonlocal buf
+        if buf:
+            db.executemany(INS, buf)
+            db.commit()
+            buf = []
+
+    def _consume(code, rows):
+        nonlocal n_sig, n_err, n_ok
+        if rows and rows[0][0] == 'ERR':
+            n_err += 1
+            errs.append(f'{code}: {rows[0][1]}')
+            return
+        n_ok += 1
+        n_sig += len(rows)
+        buf.extend(rows)
+
+    if workers and workers > 1:
+        import multiprocessing as _mp
+        with _mp.Pool(processes=workers, maxtasksperchild=20) as pool:
+            for i, (code, rows) in enumerate(pool.imap_unordered(_box_one, cl, chunksize=8), 1):
+                _consume(code, rows)
+                if len(buf) > 5000:
+                    _flush()
+                if i % 200 == 0 or i == len(cl):
+                    el = time.time() - t0
+                    print(f'    箱体 {i}/{len(cl)}  信号={n_sig} 失败={n_err}  '
+                          f'{i / el:.2f} 只/秒', flush=True)
+    else:
+        for i, code in enumerate(cl, 1):
+            _consume(code, _box_one(code)[1])
+            if i % 200 == 0 or i == len(cl):
+                _flush()
+                el = time.time() - t0
+                print(f'    箱体 {i}/{len(cl)}  信号={n_sig} 失败={n_err}  '
+                      f'{i / el:.2f} 只/秒', flush=True)
+    _flush()
+    db.close()
+    if errs:
+        with open(os.path.join(PROJECT, 'logs', 'box_scan_errors.log'), 'w', encoding='utf-8') as f:
+            f.write('\n'.join(errs))
+        print(f'  箱体失败 {n_err} 只 → logs/box_scan_errors.log')
+    print(f'  箱体完成: {n_ok} 只 / 写出 {n_sig} 个信号 / 失败 {n_err}｜{time.time() - t0:.0f}s')
+    return n_sig
+
+
 def init_tables():
     db = sqlite3.connect(DB, timeout=30)
     # ── WAL 优化：拉大自动检查点阈值，减少多进程写锁争用 ──
@@ -439,7 +569,18 @@ if __name__ == '__main__':
     parser.add_argument('--skip-sell', action='store_true')
     parser.add_argument('--threads', type=int, default=4, help='并行线程数（默认4）')
     parser.add_argument('--parallel', type=int, default=1, help='多进程并行数（默认1=单进程，>1时自动切分日期范围）')
+    parser.add_argument('--box', action='store_true', help='额外跑箱体信号的全历史扫描（按股票分片，与按日回填独立）')
+    parser.add_argument('--box-only', action='store_true', help='只跑箱体扫描，跳过按日回填')
+    parser.add_argument('--box-limit', type=int, default=None, help='箱体扫描只跑前 N 只（试跑）')
+    parser.add_argument('--box-workers', type=int, default=1, help='箱体扫描的进程数（建议 8）')
     args = parser.parse_args()
+
+    # ── 箱体扫描（独立分支：按股票跑，与按日回填的流程无关）──
+    if args.box or args.box_only:
+        n = scan_box_all(workers=args.box_workers, limit=args.box_limit)
+        print(f'箱体信号已入库 box_signals（{n} 个）')
+        if args.box_only:
+            sys.exit(0)
 
     THREADS = args.threads
 

@@ -49,7 +49,7 @@ def load_klines_batch(db, codes, scan_date):
     cache = defaultdict(list)
     for r in db.execute("""
         SELECT stock_code, date, open, high, low, close, volume, amount
-        FROM daily_kline WHERE date >= ? AND date <= ? ORDER BY stock_code, date
+        FROM daily_kline_adj WHERE date >= ? AND date <= ? ORDER BY stock_code, date
     """, (start, scan_date)).fetchall():
         if r['stock_code'] in code_set:
             cache[r['stock_code']].append(dict(r))
@@ -326,7 +326,7 @@ def scan_date(scan_date):
     
     stocks = db.execute("""
         SELECT DISTINCT k.stock_code, b.name
-        FROM daily_kline k JOIN stock_basic b ON k.stock_code=b.stock_code
+        FROM daily_kline_adj k JOIN stock_basic b ON k.stock_code=b.stock_code
         WHERE b.listing_status='normally_listed' AND b.name NOT LIKE '%ST%'
         AND k.date <= ? AND k.date >= date(?, '-20 days')
         AND k.amount >= ?

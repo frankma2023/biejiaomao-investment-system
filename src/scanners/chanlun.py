@@ -1000,7 +1000,7 @@ def analyze(code, freq="D", limit=500, data_mode="auto", end_date=None):
     
     # 确定数据表：优先用 data_mode，auto 按前缀推断
     if data_mode == 'stock':
-        table = 'daily_kline'
+        table = 'daily_kline_adj'
     elif data_mode == 'index':
         table = 'index_daily_kline'
     else:
@@ -1010,9 +1010,9 @@ def analyze(code, freq="D", limit=500, data_mode="auto", end_date=None):
             conn = _connect()
             cnt = conn.execute("SELECT COUNT(*) FROM index_daily_kline WHERE stock_code=?", (code,)).fetchone()[0]
             conn.close()
-            table = "index_daily_kline" if cnt > 0 else "daily_kline"
+            table = "index_daily_kline" if cnt > 0 else "daily_kline_adj"
         else:
-            table = "daily_kline"
+            table = "daily_kline_adj"
     
     # 日线数据读取范围：按日期回溯，确保三种周期都覆盖约 3 年
     # 回填/日更场景：200 根足够画笔和中枢（标准笔中枢 ≈15根，前高回溯最多半年）
@@ -1166,7 +1166,7 @@ def get_echarts_option(code, freq="D", limit=400, theme="dark", data_mode="auto"
     
     # 确定数据表
     if data_mode == 'stock':
-        table = 'daily_kline'
+        table = 'daily_kline_adj'
     elif data_mode == 'index':
         table = 'index_daily_kline'
     else:
@@ -1174,9 +1174,9 @@ def get_echarts_option(code, freq="D", limit=400, theme="dark", data_mode="auto"
             conn = _connect()
             cnt = conn.execute("SELECT COUNT(*) FROM index_daily_kline WHERE stock_code=?", (code,)).fetchone()[0]
             conn.close()
-            table = "index_daily_kline" if cnt > 0 else "daily_kline"
+            table = "index_daily_kline" if cnt > 0 else "daily_kline_adj"
         else:
-            table = "daily_kline"
+            table = "daily_kline_adj"
     chg_col = "change" if table == "index_daily_kline" else "change_pct"
     
     # 日线需要足够多数据来合成周/月线：按日期范围回溯 3 年

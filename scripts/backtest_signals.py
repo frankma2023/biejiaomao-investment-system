@@ -397,9 +397,10 @@ class BacktestEngine:
         print(f'  加载K线 {load_start}~{load_end}...', end=' ', flush=True)
         t = time.time()
         rows = db.execute("""
-            SELECT stock_code, date, open, high, low, close, volume, amount,
-                   adj_close, adj_open, adj_high, adj_low
-            FROM daily_kline WHERE date >= ? AND date <= ? ORDER BY stock_code, date
+            SELECT stock_code, date, raw_open AS open, raw_high AS high, raw_low AS low,
+                   raw_close AS close, volume, amount,
+                   close AS adj_close, open AS adj_open, high AS adj_high, low AS adj_low
+            FROM daily_kline_adj WHERE date >= ? AND date <= ? ORDER BY stock_code, date
         """, (load_start, load_end)).fetchall()
         
         for r in rows:
@@ -414,7 +415,7 @@ class BacktestEngine:
         # ── 2c. 交易日历 ──
         self.trading_dates = sorted(set(
             r['date'] for r in db.execute("""
-                SELECT DISTINCT date FROM daily_kline 
+                SELECT DISTINCT date FROM daily_kline_adj 
                 WHERE date >= ? AND date <= ? ORDER BY date
             """, (load_start, self.end_date)).fetchall()
         ))

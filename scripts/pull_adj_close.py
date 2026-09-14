@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 """
-scripts/pull_adj_close.py — 全量补拉复权K线数据 + 计算前复权收盘价
+scripts/pull_adj_close.py — ⚠️ 已停用（2026-09-12）
 
-步骤:
-  1. 全量重拉 daily_kline（填充 complex_factor）
-  2. 计算前复权价格: adj_close = close / cf × latest_cf
+【为什么停用】
+本脚本用 `{"date": ..., "type": "lxr_fc_rights"}` 单日全市场查询，
+但理杏仁在 `date` 查询下**会忽略 `type`**（且复权类接口要求传 `adjustForwardDate`，本脚本未传），
+实际拿到的是**不复权**价格，却被写进了 `adj_open/adj_high/adj_low/adj_close` 四列。
+这就是「`adj_*` 四列长期失效（2019 起恒等于 close）」的根因。
 
-用法:
-  python scripts/pull_adj_close.py                    # 全量重拉
-  python scripts/pull_adj_close.py --compute-only     # 仅计算adj_close（已拉完数据后）
+【现在该怎么办】
+个股前复权价请直接用视图 `daily_kline_adj`（底层是 `lxr_fc_*` 四列）：
+    SELECT stock_code, date, open, high, low, close, volume, amount
+    FROM daily_kline_adj WHERE stock_code=? ORDER BY date;
+视图的 `close` 即理杏仁前复权价，`raw_close` 为原始成交价。
+四个口径的维护见 `scripts/fetch_kline_multi_adjust.py` 与 `scripts/fetch_stock_daily_kline.py --caliber`。
+
+如确需重跑（例如做历史对比），加 `--force` 绕过下面的护栏。
 """
 
 import sys
@@ -134,5 +141,10 @@ def compute_adj_close():
 
 
 if __name__ == "__main__":
+    if "--force" not in sys.argv:
+        log.error("⚠️ 本脚本已停用：它用 date 单日查询取不到复权口径，会把不复权价写进 adj_*。")
+        log.error("   个股前复权价请改用视图 daily_kline_adj（close 列即理杏仁前复权价）。")
+        log.error("   确实需要重跑请加 --force。")
+        sys.exit(2)
     total = pull_all()
     log.info(f"完成: {total:,}条前复权数据已写入 adj_* 列")

@@ -109,7 +109,7 @@ def get_forward_returns(db, signals):
     price_cache = {}
     for code in codes:
         rows = db.execute("""
-            SELECT date, close FROM daily_kline
+            SELECT date, close FROM daily_kline_adj
             WHERE stock_code=? AND date >= ?
             ORDER BY date
         """, (code, min_b2)).fetchall()
@@ -530,7 +530,7 @@ def run(start_date, end_date):
     # 构建 price_cache（所有信号的股票K线）
     price_cache = {}
     for code in codes:
-        rows = db.execute("""SELECT date, close FROM daily_kline WHERE stock_code=? AND date >= ? ORDER BY date""",
+        rows = db.execute("""SELECT date, close FROM daily_kline_adj WHERE stock_code=? AND date >= ? ORDER BY date""",
                         (code, start_date)).fetchall()
         price_cache[code] = {r['date']: r['close'] for r in rows}
     baseline = random_baseline(db, signals, price_cache)

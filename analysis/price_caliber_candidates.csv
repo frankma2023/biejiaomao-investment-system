@@ -1,0 +1,704 @@
+file,line,tags,risky_index_mixed,text
+src/server.py,314,OHLC4|close_only,,"rows = db.execute(""""""SELECT stock_code, date, open, high, low, close, volume, amount, change"
+src/server.py,339,OHLC4|close_only,,"rows = db.execute(""""""SELECT stock_code, date, open, high, low, close, volume, amount, change"
+src/server.py,625,close_only,,"""SELECT stock_code, close FROM index_daily_kline WHERE date = ?"", (prev_date,)"
+src/server.py,635,close_only,,"SELECT stock_code, close, change FROM index_daily_kline"
+src/server.py,680,close_only,,"SELECT rs_20, ma50, close FROM index_rs_daily"
+src/server.py,817,close_only,,"""SELECT stock_code, close FROM index_daily_kline WHERE date = ?"", (prev_date,)"
+src/server.py,822,close_only,,"SELECT stock_code, close, change FROM index_daily_kline"
+src/server.py,1164,from_dk,,FROM daily_kline k
+src/server.py,1342,close_only,,"SELECT date, close FROM index_full_return_daily"
+src/server.py,1352,close_only,,"SELECT date, close FROM index_daily_kline"
+src/server.py,1430,close_only,,SELECT close FROM index_full_return_daily
+src/server.py,1510,close_only,,"SELECT date, close FROM index_daily_kline"
+src/server.py,1524,close_only,,"SELECT date, close FROM index_full_return_daily"
+src/server.py,1537,close_only,,"SELECT date, close FROM index_full_return_daily"
+src/server.py,1548,close_only,,"SELECT date, close FROM index_daily_kline"
+src/server.py,1726,close_only,,"SELECT date, close FROM index_daily_kline"
+src/server.py,1760,close_only,,"SELECT date, close FROM index_daily_kline"
+src/server.py,1769,close_only,,"""SELECT date, close FROM index_full_return_daily WHERE stock_code=? AND date<=?"","
+src/server.py,1945,close_only,,"SELECT date, close FROM index_daily_kline"
+src/server.py,2002,close_only,,"SELECT date, close FROM index_daily_kline"
+src/server.py,2214,close_only,,"SELECT date, close FROM index_daily_kline"
+src/server.py,2349,close_only,,"SELECT date, close FROM index_daily_kline"
+src/server.py,2354,close_only,,"SELECT date, close FROM hk_etf_daily"
+src/server.py,2433,close_only,,"rows = db.execute(""""""SELECT date, close FROM index_full_return_daily"
+src/server.py,2437,close_only,,"rows = db.execute(""""""SELECT date, close FROM index_daily_kline"
+src/server.py,2450,close_only,,"rows = db.execute(""SELECT date, close FROM hk_etf_full_return WHERE stock_code=? ORDER BY date"", (code,)).fetchall()"
+src/server.py,2502,close_only,,"tri = db.execute(""SELECT date, close FROM index_full_return_daily WHERE stock_code=? ORDER BY date"", (code,)).fetchall()"
+src/server.py,2503,close_only,,"price = db.execute(""SELECT date, close FROM index_daily_kline WHERE stock_code=? AND kline_type='normal' ORDER BY date"", (code,))."
+src/server.py,2691,close_only,,"SELECT date, close FROM index_daily_kline"
+src/server.py,2713,close_only,,SELECT close FROM index_daily_kline
+src/server.py,2767,close_only,,"SELECT date, close FROM index_daily_kline"
+src/server.py,2817,close_only,,SELECT close FROM index_daily_kline
+src/server.py,2913,close_only,,"SELECT date, close FROM index_full_return_daily"
+src/server.py,3182,OHLC4|close_only|from_var,Y,"rows = db.execute(f""""""SELECT date, open, high, low, close, volume, amount FROM {table}"
+src/server.py,3215,ensure_adj,,def _ensure_adj_prices(klines):
+src/server.py,3216,adj_col,,"""""""前复权：用 change_pct 逆向推算 adj_close，按比例同步缩放 OHLC。"
+src/server.py,3219,adj_col,,1. 从最后一天向前递推 adj_close：prev_adj_close = curr_adj_close / (1 + chg)
+src/server.py,3220,adj_col,,2. 每晚用 adj_close / raw_close 的比例同步缩放当天的 open/high/low
+src/server.py,3228,adj_col,,# Step 1: 从后往前推算 adj_close
+src/server.py,3243,adj_col,,# Step 2: 用 adj_close / raw_close 比例同步 OHLC
+src/server.py,3247,adj_col,,"adj_close = k.get('_adj_close', raw_close)"
+src/server.py,3249,adj_col,,ratio = adj_close / raw_close
+src/server.py,3253,adj_col,,k['close'] = adj_close
+src/server.py,3330,OHLC4|close_only|from_var,Y,"rows = db.execute(f""""""SELECT date, open, high, low, close, volume, amount FROM {table}"
+src/server.py,3424,OHLC4|close_only,,"SELECT date, open, high, low, close, volume"
+src/server.py,3493,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,3531,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,3686,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,3733,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,3857,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,3957,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,3994,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,4028,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,4073,OHLC4|close_only,,"klines = db.execute(""""""SELECT date, open, high, low, close, volume FROM index_daily_kline"
+src/server.py,4091,OHLC4|close_only,,"k985 = db.execute(""""""SELECT date, open, high, low, close, volume FROM index_daily_kline"
+src/server.py,4094,OHLC4|close_only,,"k300 = db.execute(""""""SELECT date, open, high, low, close, volume FROM index_daily_kline"
+src/server.py,4115,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,4141,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,4168,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,4192,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,4219,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,4242,OHLC4|close_only|from_var,Y,"klines = db.execute(f""""""SELECT date, open, high, low, close, volume FROM {table}"
+src/server.py,4404,OHLC4,,"cur.execute(""""""INSERT INTO backtest_signals (run_id,stock_code,date,signal_type,score,open,high,low,close,"
+src/server.py,4633,adj_col,,"'close': row['adj_close'],"
+src/server.py,4675,adj_col,,"'close': row['adj_close'],"
+src/server.py,4708,adj_col,,"'close': stock[""adj_close""].to_list(),"
+src/server.py,4820,close_only|from_dk,,"k = db.execute(""SELECT close FROM daily_kline WHERE stock_code=? AND date>=? ORDER BY date LIMIT 1"","
+src/server.py,5038,close_only|from_dk,,k_row = db.execute('''SELECT close FROM daily_kline
+src/server.py,5431,OHLC4|close_only,,"rows = db.execute(f'''SELECT stock_code, date, open, high, low, close, volume, amount, change"
+src/server.py,5581,from_dk,,FROM daily_kline WHERE stock_code IN ({c_ph})
+src/server.py,5720,OHLC4,,"ohlc = ""open, high, low, close"""
+src/server.py,5723,from_var,Y,FROM {table} WHERE stock_code=? {kf}
+src/server.py,5727,OHLC4|close_only,,"rows = db.execute(f""""""SELECT date, open, high, low, close, volume, amount, {chg_col} as change_pct"
+src/server.py,5728,from_var,Y,FROM {table} WHERE stock_code=? {kf}
+src/server.py,7008,from_dk,,SELECT 1 FROM daily_kline dk
+src/server.py,7012,from_dk,,SELECT 1 FROM daily_kline dk
+src/server.py,7296,close_only,,"rows = db.execute(""""""SELECT date, close FROM index_daily_kline"
+src/server.py,7398,close_only,,"rows = db.execute(""""""SELECT date, close FROM index_daily_kline"
+src/server.py,7549,close_only,,"rows = db.execute(""""""SELECT date, stage, days_in_stage, structure_support, invalid_level, action, close"
+src/analysis/financial.py,135,close_only|from_dk,,kline_row = db.execute('''SELECT close FROM daily_kline
+src/analysis/financial.py,325,from_dk,,AND k.date = (SELECT MAX(date) FROM daily_kline WHERE stock_code=sw.stock_code)
+src/analysis/financial.py,388,close_only|from_dk,,k_row = db.execute('''SELECT close FROM daily_kline
+src/analytics/mw_backtest.py,44,close_only,,"SELECT date, close FROM index_daily_kline"
+src/analytics/mw_backtest.py,515,close_only|from_dk,,"row = db.execute(""SELECT close FROM daily_kline WHERE stock_code=? AND date=?"","
+src/cockpit/briefing.py,170,close_only|from_dk,,"""SELECT close FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 1"","
+src/cockpit/briefing.py,292,close_only,,"""SELECT close FROM index_daily_kline WHERE index_code='000985' ORDER BY date DESC LIMIT 20"""
+src/cockpit/briefing.py,316,OHLC4|close_only|from_dk,,"""SELECT open, high, low, close FROM daily_kline WHERE stock_code=? AND date=?"","
+src/cockpit/briefing.py,324,close_only|from_dk,,"""SELECT close FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 1"","
+src/cockpit/briefing.py,335,from_dk,,"""SELECT low FROM daily_kline WHERE stock_code=? AND date=?"","
+src/cockpit/briefing.py,347,close_only|from_dk,,"""SELECT close FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 10"","
+src/cockpit/market_cap_snapshot.py,68,from_dk,,FROM daily_kline
+src/cockpit/oneil_deep.py,160,close_only,,"idx_k = db.execute(""SELECT close FROM index_daily_kline WHERE stock_code='000985' ORDER BY date DESC LIMIT 250"").fetchall()"
+src/cockpit/oneil_deep.py,178,close_only,,"rows = db.execute(f""SELECT date, close FROM index_daily_kline WHERE stock_code='{ic}' ORDER BY date DESC LIMIT 10"").fetchall()"
+src/cockpit/pipeline.py,337,close_only,,"SELECT stock_code, date, close, change_pct, volume, amount"
+src/cockpit/pipeline.py,650,close_only|from_dk,,"""SELECT close FROM daily_kline WHERE stock_code=? AND date=?"","
+src/cockpit/pipeline.py,657,close_only|from_dk,,"""SELECT close FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 1"","
+src/data/lixr_api/api_stock_minute.py,81,OHLC4,,"DataFrame，列: date, time, open, high, low, close, volume, amount"
+src/data/lixr_api/api_stock_minute.py,90,OHLC4,,"""date,time,code,open,high,low,close,volume,amount,adjustflag"","
+src/data/lixr_api/api_stock_minute.py,100,OHLC4,,"""date,time,code,open,high,low,close,volume,amount,adjustflag"","
+src/data/lixr_api/api_stock_minute.py,144,from_var,Y,"f""SELECT MAX(date) FROM {table} WHERE stock_code=?"", (code,)"
+src/data/lixr_api/api_stock_minute.py,168,OHLC4,,"f""INSERT OR IGNORE INTO {table} (stock_code, date, time, open, high, low, close, volume, amount) """
+src/data/lixr_api/api_stock_minute.py,202,OHLC4|close_only|from_var,Y,"sql = f""SELECT date, time, open, high, low, close, volume, amount FROM {table} WHERE stock_code = ?"""
+src/detectors/index_ad.py,14,OHLC4,,"- pool_klines: {code: [{date, open, high, low, close, amount}]}"
+src/detectors/stock_rs.py,7,adj_col,,RS线: adj_close / 中证全指(000985).close
+src/detectors/stock_rs.py,9,adj_col,,"数据源: daily_kline.adj_close, 中证全指 index_daily_kline"
+src/detectors/stock_rs.py,23,adj_col,,"adj_close REAL,"
+src/detectors/stock_rs.py,46,adj_col,,优先使用 adj_close（前复权），若无则降级到 close。
+src/detectors/stock_rs.py,53,close_only,,"bench = db.execute('''SELECT date, close FROM index_daily_kline"
+src/detectors/stock_rs.py,75,adj_col|close_only,,"rows = db.execute(f'''SELECT stock_code, date, raw_close AS close, close AS adj_close, amount"
+src/detectors/stock_rs.py,106,adj_col,,adj_close = kl[as_of_idx]['adj_close']
+src/detectors/stock_rs.py,110,adj_col,,if not adj_close or adj_close <= 0:
+src/detectors/stock_rs.py,117,adj_col,,past_adj = kl[idx_20]['adj_close']
+src/detectors/stock_rs.py,119,adj_col,,ret_20 = (adj_close / past_adj - 1) * 100
+src/detectors/stock_rs.py,125,adj_col,,past_adj = kl[idx_250]['adj_close']
+src/detectors/stock_rs.py,127,adj_col,,ret_250 = (adj_close / past_adj - 1) * 100
+src/detectors/stock_rs.py,133,adj_col,,rs_line = adj_close / bench_close
+src/detectors/stock_rs.py,135,adj_col,,"results.append((code, actual_date, round(close_val, 2), round(adj_close, 2),"
+src/detectors/stock_rs.py,188,adj_col,,"code, date, close, adj_close, ret_20, ret_250, rs_line, amount, rps_250, rps_20 = r"
+src/detectors/stock_rs.py,189,adj_col,,"rows.append((code, date, close, adj_close,"
+src/detectors/stock_rs.py,194,adj_col,,"(stock_code, date, close, adj_close, ret_20, ret_250, rps_20, rps_250, rs_line, amount, updated_at)"
+src/detectors/stock_rs.py,211,adj_col,,"code, date, close, adj_close, ret_20, ret_250, rs_line, amount, rps_250, rps_20 = r"
+src/discipline/index_screener.py,163,OHLC4|close_only,,"SELECT date, open, high, low, close, volume"
+src/discipline/monitoring.py,44,close_only,,"row = db.execute(""SELECT close FROM index_daily_kline WHERE stock_code = ? ORDER BY date DESC LIMIT 1"", (code,)).fetchone()"
+src/discipline/monitoring.py,46,close_only|from_dk,,"row = db.execute(""SELECT close FROM daily_kline WHERE stock_code = ? ORDER BY date DESC LIMIT 1"", (code,)).fetchone()"
+src/discipline/monitoring.py,48,close_only|from_dk,,"row = db.execute(""SELECT close FROM daily_kline WHERE stock_code = ? ORDER BY date DESC LIMIT 1"", (code,)).fetchone()"
+src/discipline/monitoring.py,50,close_only,,"row = db.execute(""SELECT close FROM index_daily_kline WHERE stock_code = ? ORDER BY date DESC LIMIT 1"", (code,)).fetchone()"
+src/discipline/monitoring.py,187,from_dk,,SELECT volume FROM daily_kline WHERE stock_code = ? ORDER BY date DESC LIMIT 25
+src/discipline/screener.py,266,OHLC4|close_only,,"SELECT date, open, high, low, close, volume"
+src/discipline/screener.py,271,OHLC4|close_only,,"SELECT date, open, high, low, close, volume"
+src/discipline/trades_api.py,268,close_only,,"SELECT date, close FROM index_daily_kline"
+src/discipline/trades_api.py,1564,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount, change AS change_pct"
+src/discipline/trades_api.py,1570,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount, change_pct"
+src/discipline/trades_api.py,1575,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount, change_pct"
+src/discipline/trades_api.py,1581,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount, change AS change_pct"
+src/scanners/base_breakout.py,264,OHLC4|close_only|from_var,Y,"SELECT date, open, high, low, close, volume FROM {table}"
+src/scanners/base_breakout_v2.py,231,OHLC4|close_only|from_var,Y,"SELECT date, open, high, low, close, volume, amount FROM {table}"
+src/scanners/base_detector.py,184,OHLC4|close_only,,"SELECT date, open, high, low, close, volume"
+src/scanners/box_breakout.py,78,ensure_adj,,def _adj_prices(daily: List[Dict]) -> List[Dict]:
+src/scanners/box_breakout.py,79,adj_col|ensure_adj,,"""""""前复权：change_pct 逆向推算 adj_close，OHLC 等比缩放（与 server._ensure_adj_prices 一致）"""""""
+src/scanners/box_breakout.py,83,adj_col,,daily[n-1]['adj_close'] = daily[n-1]['close']
+src/scanners/box_breakout.py,86,adj_col,,daily[i]['adj_close'] = daily[i+1]['adj_close'] / (1 + chg) if chg is not None else daily[i+1]['adj_close']
+src/scanners/box_breakout.py,88,adj_col,,ratio = k['adj_close'] / k['close'] if k['close'] else 1
+src/scanners/box_breakout.py,92,adj_col,,k['close'] = k['adj_close']
+src/scanners/breakout_failure.py,522,OHLC4|close_only|from_var,Y,"SELECT date, open, high, low, close, volume FROM {table}"
+src/scanners/canslim_score.py,397,close_only,,"krows = db.execute(""SELECT date, close FROM sw_index_kline WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 25"", (m['indust"
+src/scanners/canslim_score.py,423,close_only,,"idx_rows = db.execute(""""""SELECT close FROM index_daily_kline"
+src/scanners/cdl_engine.py,49,OHLC4,,"klines: list of dicts with [date, open, high, low, close, volume]"
+src/scanners/cdl_engine.py,115,OHLC4|close_only,,"SELECT date, open, high, low, close, volume"
+src/scanners/chanlun.py,1027,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount"
+src/scanners/chanlun.py,1028,from_var,Y,FROM {table}
+src/scanners/chanlun.py,1035,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount"
+src/scanners/chanlun.py,1036,from_var,Y,FROM {table}
+src/scanners/chanlun.py,1071,OHLC4,,"df: 日线 DataFrame（含 date, open, high, low, close, volume, amount）"
+src/scanners/chanlun.py,1190,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount, {chg_col} as change"
+src/scanners/chanlun.py,1191,from_var,Y,FROM {table}
+src/scanners/chanlun_backtest_compare.py,124,close_only,,SELECT close FROM index_daily_kline
+src/scanners/chanlun_scan.py,198,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount"
+src/scanners/climax_top.py,129,close_only,,"pp = conn.execute(""""""SELECT signal_date, close FROM pocket_pivot_signals"
+src/scanners/cpa_stage.py,239,adj_col,,"date, close(真实), adj_close, low_adj, high_adj, open_adj, volume, amount"
+src/scanners/cpa_stage.py,240,adj_col,,复权因子 = adj_close / close（当日统一比例）
+src/scanners/cpa_stage.py,244,adj_col,,"raw_close AS close, close AS adj_close, volume, amount"
+src/scanners/cpa_stage.py,249,adj_col,,"c, a = r['close'], r['adj_close']"
+src/scanners/cpa_stage.py,254,adj_col,,"'adj_close': a if a else c,"
+src/scanners/cpa_stage.py,340,adj_col,,closes = [k['adj_close'] for k in kl]
+src/scanners/cpa_stage.py,477,adj_col,,"o, h, l, cl = k.get('open_adj'), k.get('high_adj'), k.get('low_adj'), k.get('adj_close')"
+src/scanners/cpa_stage.py,491,adj_col,,"po, ph2, pl2, pc = pk.get('open_adj'), pk.get('high_adj'), pk.get('low_adj'), pk.get('adj_close')"
+src/scanners/cpa_stage.py,529,adj_col,,"seg = [kl[j]['adj_close'] for j in range(s, L + 1) if kl[j]['adj_close']]"
+src/scanners/cpa_stage.py,530,adj_col,,if not seg or kl[L]['adj_close'] != min(seg):
+src/scanners/cpa_stage.py,536,adj_col,,low = kl[L]['adj_close']
+src/scanners/cpa_stage.py,671,adj_col,,base_close = kl[prior_gain_start_idx].get('adj_close')   # 复权口径统一（PRD §2）
+src/scanners/cpa_stage.py,699,adj_col,,base_c = kl[start_idx].get('adj_close')   # 复权口径统一（PRD §2）
+src/scanners/cpa_stage.py,723,adj_col,,base = kl[wi].get('adj_close')   # 复权口径统一（PRD §2）
+src/scanners/cpa_stage.py,1195,from_dk,,"q = """"""SELECT stock_code, COUNT(*) n FROM daily_kline"
+src/scanners/cpa_stage.py,1199,from_dk,,"q = """"""SELECT stock_code, COUNT(*) n FROM daily_kline"
+src/scanners/distribution_day.py,292,OHLC4|close_only,,"klines = conn.execute(""""""SELECT date, open, high, low, close, volume FROM index_daily_kline"
+src/scanners/index_capital_flow.py,83,OHLC4|close_only,,"SELECT stock_code, date, open, high, low, close, volume, amount, change"
+src/scanners/index_rs.py,76,OHLC4|close_only,,"SELECT stock_code, date, open, high, low, close, volume"
+src/scanners/market_health.py,166,close_only,,"SELECT date, close,"
+src/scanners/market_health.py,258,close_only,,"SELECT date, stock_code, close,"
+src/scanners/market_health.py,284,close_only,,"SELECT date, stock_code, close, volume,"
+src/scanners/market_health.py,304,close_only,,"SELECT stock_code, close, change_pct, volume, amount, vol_ma50, amt_ma50,"
+src/scanners/market_health.py,307,close_only,,"SELECT date, stock_code, close, change_pct, volume, amount,"
+src/scanners/market_health.py,403,close_only,,SELECT close FROM index_daily_kline
+src/scanners/market_health.py,530,close_only,,"SELECT close,"
+src/scanners/market_health.py,732,close_only,,"SELECT stock_code, date, close"
+src/scanners/market_health.py,849,close_only,,"SELECT stock_code, date, close"
+src/scanners/market_sell_score.py,108,close_only,,"SELECT date, is_distribution, distribution_type, index_code, close FROM distribution_days_detail"
+src/scanners/market_sell_score.py,126,close_only,,SELECT close FROM index_daily_kline
+src/scanners/market_sell_score.py,350,close_only,,"SELECT date, close, change FROM index_daily_kline"
+src/scanners/market_sell_score.py,397,close_only,,"SELECT date, close FROM index_daily_kline"
+src/scanners/market_sell_score.py,500,close_only,,"SELECT date, close, volume, change FROM index_daily_kline"
+src/scanners/pattern_structure.py,57,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount"
+src/scanners/pocket_pivot_v2.py,35,close_only,,"SELECT date, close, volume FROM index_daily_kline"
+src/scanners/pocket_pivot_v2.py,51,OHLC4|close_only,,"SELECT stock_code, date, open, high, low, close, volume, amount"
+src/scanners/recommend.py,260,OHLC4|close_only,,"SELECT date, open, high, low, close, volume"
+src/scanners/red_dividend_metrics.py,42,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount FROM index_daily_kline"
+src/scanners/saucer_base.py,918,OHLC4|close_only,,"SELECT date, open, high, low, close, volume"
+src/scanners/saucer_base.py,983,OHLC4|close_only,,"SELECT date, open, high, low, close, volume"
+src/scanners/stock_rs.py,67,adj_col,,"SELECT stock_code, date, close as adj_close, amount"
+src/scanners/stock_rs.py,75,close_only,,"SELECT date, close"
+src/scanners/stock_rs.py,92,adj_col,,"[(r[""stock_code""], r[""date""], float(r[""adj_close""] or 0), float(r[""amount""] or 0)) for r in kline_rows],"
+src/scanners/stock_rs.py,93,adj_col,,"schema=[""stock_code"", ""date"", ""adj_close"", ""amount""],"
+src/scanners/stock_rs.py,126,adj_col,,"result_df: Polars DataFrame (stock_code, date, adj_close, amount,"
+src/scanners/stock_rs.py,171,adj_col,,"(pl.col(""adj_close"") / pl.col(""adj_close"").shift(n).over(""stock_code"") - 1)"
+src/scanners/stock_rs.py,210,adj_col,,"(pl.col(""adj_close"") / pl.col(""_idx_close"")).alias(""rs_line_raw"")"
+src/scanners/stock_rs.py,305,adj_col,,"row['adj_close'], row['adj_close'],"
+src/scanners/stock_rs.py,312,adj_col,,"(stock_code, date, close, adj_close, ret_20, ret_60, ret_120, ret_250,"
+src/scanners/talib_engine.py,33,OHLC4,,"klines: list of dicts with [date, open, high, low, close, volume]"
+src/scanners/talib_engine.py,267,OHLC4|close_only,,"SELECT date, open, high, low, close, volume"
+src/scanners/top_pattern.py,728,OHLC4,,"daily: 日线数据列表，每项含 date, open, high, low, close, volume"
+src/scanners/volume_stall.py,189,close_only,,"SELECT date, open, close, high, low, volume, amount, change_pct"
+src/scanners/watchlist_report.py,87,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount, change_pct"
+src/scanners/watchlist_report.py,245,close_only,,"rows = db.execute(""""""SELECT close FROM index_daily_kline WHERE stock_code=?"
+src/scripts/download_minute_kline.py,75,from_var,Y,"row = conn.execute(f""SELECT MAX(date) FROM {table} WHERE stock_code=?"", (code,)).fetchone()"
+src/scripts/download_minute_kline.py,90,OHLC4,,"f""INSERT OR IGNORE INTO {table} (stock_code, date, time, open, high, low, close, volume, amount) """
+scripts/analyze_mw_b1.py,99,OHLC4|adj_col|close_only,,"SELECT stock_code, date, open, high, low, close, volume, amount, adj_close"
+scripts/analyze_mw_b1.py,100,from_dk,,FROM daily_kline
+scripts/analyze_mw_b1.py,109,adj_col,,"'amount': r['amount'], 'adj_close': r['adj_close'],"
+scripts/analyze_mw_tech_factors.py,55,OHLC4|adj_col|close_only,,"SELECT stock_code, date, open, high, low, close, volume, amount, turnover_rate, adj_close"
+scripts/analyze_mw_tech_factors.py,56,from_dk,,FROM daily_kline WHERE date >= '2023-06-01' AND date <= '2026-06-22'
+scripts/analyze_mw_tech_factors.py,66,adj_col,,"'adj_close': r['adj_close'],"
+scripts/analyze_mw_tech_factors.py,101,adj_col,,"closes = np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]], dtype=np.float64)"
+scripts/analyze_plus_delayed.py,37,close_only|from_dk,,"SELECT stock_code, date, open, close FROM daily_kline"
+scripts/analyze_plus_delayed.py,52,from_dk,,SELECT DISTINCT stock_code FROM daily_kline WHERE date >= ?
+scripts/analyze_pp_vol_breakout.py,16,close_only,,"SELECT stock_code, date, close FROM pocket_pivot_daily"
+scripts/analyze_pp_vol_breakout.py,46,close_only|from_dk,,"SELECT date, amount, close FROM daily_kline"
+scripts/append_plus_to_report.py,26,close_only|from_dk,,"rows = db.execute(""SELECT date, open, close FROM daily_kline WHERE stock_code=? AND date >= '2023-01-01' AND date <= '2026-07-31' "
+scripts/audit_adj_integrity.py,6,adj_col,,daily_kline.adj_close 在 2019-2026 全市场等于 close（fac 恒 1.0），2026-05-08 起全市场 NULL。
+scripts/audit_adj_integrity.py,8,ensure_adj,,正确做法 = server._ensure_adj_prices：用 change_pct 从最新日反推前复权。
+scripts/audit_adj_integrity.py,11,adj_col,,P1 adj_close 列健康度（按年）
+scripts/audit_adj_integrity.py,60,adj_col,,# ─────────── P1 adj_close 健康度 ───────────
+scripts/audit_adj_integrity.py,61,adj_col,,"print('P1 adj_close 健康度 ...', flush=True)"
+scripts/audit_adj_integrity.py,65,adj_col,,"SUM(CASE WHEN adj_close IS NULL THEN 1 ELSE 0 END) nul,"
+scripts/audit_adj_integrity.py,66,adj_col,,SUM(CASE WHEN adj_close IS NOT NULL AND close>0 AND abs(adj_close/close-1)>0.001 THEN 1 ELSE 0 END) diff
+scripts/audit_adj_integrity.py,67,from_dk,,"FROM daily_kline GROUP BY y ORDER BY y""""""):"
+scripts/audit_adj_integrity.py,70,adj_col|from_dk,,"r = conn.execute(""SELECT MIN(date) a, MAX(date) b, COUNT(DISTINCT date) n FROM daily_kline WHERE adj_close IS NULL"").fetchone()"
+scripts/audit_adj_integrity.py,72,adj_col|from_dk,,"r = conn.execute(""SELECT COUNT(*) n FROM daily_kline WHERE date=(SELECT MAX(date) FROM daily_kline) AND adj_close IS NOT NULL"").fe"
+scripts/audit_adj_integrity.py,80,close_only|from_dk,,"cur = conn.execute(""SELECT stock_code, date, close, change_pct FROM daily_kline """
+scripts/audit_adj_integrity.py,139,close_only|from_dk,,"""SELECT date, close, change_pct, high, low FROM daily_kline WHERE stock_code=? ORDER BY date"", (code,)).fetchall()"
+scripts/audit_adj_integrity.py,227,adj_col,,L.append('结论先行：`daily_kline.adj_close` 列**自 2019-01-01 起全市场失效**（值恒等于 `close`），')
+scripts/audit_adj_integrity.py,232,adj_col,,L.append('## P1 `adj_close` 列健康度（全市场，按年）\n')
+scripts/audit_adj_integrity.py,239,adj_col,,L.append('NULL 区间：%s ~ %s（%d 个交易日）｜最新交易日 adj_close 非空行数：**%d**\n' % (
+scripts/audit_close_integrity.py,17,close_only,,"SELECT stock_code, date, close, change_pct,"
+scripts/audit_close_integrity.py,20,from_dk,,FROM daily_kline
+scripts/audit_close_integrity.py,49,close_only,,"SELECT stock_code, date, close, change_pct,"
+scripts/audit_close_integrity.py,51,from_dk,,FROM daily_kline WHERE close > 0
+scripts/audit_close_integrity.py,70,close_only,,"SELECT stock_code, date, close, change_pct,"
+scripts/audit_close_integrity.py,72,from_dk,,FROM daily_kline WHERE close > 0
+scripts/audit_cpa_bi_quality.py,146,adj_col|close_only|from_dk,,"""SELECT date, high, low, close, adj_close FROM daily_kline WHERE stock_code=? AND date>=? ORDER BY date"","
+scripts/audit_cpa_bi_quality.py,165,adj_col,,if kr['close'] and kr['adj_close'] and kr['close'] > 0:
+scripts/audit_cpa_bi_quality.py,166,adj_col,,fac = kr['adj_close'] / kr['close']
+scripts/audit_cpa_bi_quality.py,183,adj_col|close_only|from_dk,,"""SELECT date, close, adj_close FROM daily_kline WHERE stock_code=? AND date>=? ORDER BY date"","
+scripts/audit_cpa_bi_quality.py,189,adj_col,,if r['close'] and r['adj_close'] and r['close'] > 0:
+scripts/audit_cpa_bi_quality.py,190,adj_col,,facmap[r['date']] = r['adj_close'] / r['close']
+scripts/audit_cpa_bi_quality.py,265,adj_col,,lines.append('| 笔端点日 adj_close != close（有复权因子） | %d |' % b_stat['adj_altered'])
+scripts/audit_cpa_bi_quality.py,274,OHLC4,,"lines.append('背景：`chanlun.py` 从 `daily_kline` 读**未复权** OHLC 画笔（`SELECT date, open, high, low, close ...`），')"
+scripts/audit_cpa_bi_quality.py,275,adj_col,,lines.append('而 CPA 阶段判据用 `adj_close/high_adj/low_adj`（复权）。')
+scripts/audit_cpa_ftd.py,32,adj_col,,"seg = [kl[j]['adj_close'] for j in range(s, L + 1) if kl[j]['adj_close']]"
+scripts/audit_cpa_ftd.py,33,adj_col,,if not seg or kl[L]['adj_close'] != min(seg):
+scripts/audit_cpa_ftd.py,41,adj_col,,"cj, cj1, vr, e20 = kl[j]['adj_close'], kl[j - 1]['adj_close'], ind['vr'][j], ind['ema20'][j]"
+scripts/audit_cpa_ftd.py,65,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date>='2016-01-01' AND stock_code NOT LIKE '%sentinel%'"")]"
+scripts/audit_cpa_ftd_by_state.py,26,adj_col,,"seg = [kl[j]['adj_close'] for j in range(s, L + 1) if kl[j]['adj_close']]"
+scripts/audit_cpa_ftd_by_state.py,27,adj_col,,if not seg or kl[L]['adj_close'] != min(seg):
+scripts/audit_cpa_ftd_by_state.py,34,adj_col,,"cj, cj1 = kl[j]['adj_close'], kl[j - 1]['adj_close']"
+scripts/audit_cpa_ftd_by_state.py,49,adj_col,,if i + 20 >= len(kl) or not kl[i]['adj_close']:
+scripts/audit_cpa_ftd_by_state.py,51,adj_col,,return kl[i + 20]['adj_close'] / kl[i]['adj_close'] - 1
+scripts/audit_cpa_ftd_by_state.py,63,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date>='2016-01-01' AND stock_code NOT LIKE '%sentinel%'"")]"
+scripts/audit_cpa_jitter.py,35,from_dk,,"""""""SELECT DISTINCT stock_code FROM daily_kline"
+scripts/audit_cpa_jitter.py,104,adj_col,,ret20 = kl[i + 20]['adj_close'] / kl[i]['adj_close'] - 1 if kl[i]['adj_close'] else None
+scripts/audit_cpa_jitter.py,115,adj_col,,"lows5 = [kl[j]['adj_close'] for j in range(i + 1, min(i + 6, len(kl)))]"
+scripts/audit_cpa_jitter.py,116,adj_col,,if not lows5 or min(lows5) < kl[i]['adj_close']:
+scripts/audit_cpa_jitter.py,121,adj_col,,"cj, cj1 = kl[j]['adj_close'], kl[j - 1]['adj_close']"
+scripts/audit_kline_price_usage.py,11,adj_col,,B  adj_*         用 adj_open/adj_close 等（该列已废弃，取值≈不复权）
+scripts/audit_kline_price_usage.py,12,COALESCE_adj|adj_col,,"A  COALESCE(adj_close, close)   旧兜底写法（实际恒等于不复权价）"
+scripts/audit_kline_vs_api.py,3,adj_col,,用单日全市场查询（date 模式）拿不复权原始价，与库内 close / adj_close 对比。
+scripts/audit_kline_vs_api.py,25,adj_col|close_only|from_dk,,"""SELECT stock_code, close, adj_close FROM daily_kline WHERE date=?"", (d,))}"
+scripts/audit_kline_vs_api.py,37,adj_col,,if r['adj_close'] is None:
+scripts/audit_kline_vs_api.py,39,adj_col,,"elif abs(r['adj_close'] - raw) < max(0.011, raw * 0.0002):"
+scripts/b1_score_fine.py,22,adj_col|close_only|from_dk,,"c.execute(""SELECT stock_code, date, adj_close, high, low, close, volume FROM daily_kline WHERE date >= '2023-06-01' AND date <= '2"
+scripts/b1_score_fine.py,25,adj_col,,"kline_by_code[r['stock_code']].append({'date':r['date'],'adj_close':r['adj_close'],'high':r['high'],'low':r['low'],'close':r['clos"
+scripts/b1_score_fine.py,41,adj_col,,"cl = np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]], dtype=np.float64)"
+scripts/b1_tech_scoring.py,33,OHLC4|adj_col|close_only|from_dk,,"c.execute(""SELECT stock_code, date, open, high, low, close, volume, adj_close FROM daily_kline WHERE date >= '2023-06-01' AND date"
+scripts/b1_tech_scoring.py,37,adj_col,,"kline_by_code[r['stock_code']].append({'date': r['date'], 'open': r['open'], 'high': r['high'], 'low': r['low'], 'close': r['close"
+scripts/b1_tech_scoring.py,63,adj_col,,"closes = np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]], dtype=np.float64)"
+scripts/backfill_all_signals.py,23,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/backfill_all_signals.py,120,OHLC4|close_only|from_dk,,"""SELECT stock_code, date, open, high, low, close, volume, amount FROM daily_kline WHERE date>=? AND date<=? ORDER BY stock_code, d"
+scripts/backfill_all_signals.py,141,from_dk,,"""SELECT DISTINCT k.stock_code, b.name FROM daily_kline k JOIN stock_basic b ON k.stock_code=b.stock_code WHERE k.date=?"","
+scripts/backfill_all_signals_v2.py,42,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/backfill_all_signals_v2.py,177,OHLC4|close_only|from_dk,,"""SELECT stock_code, date, open, high, low, close, volume, amount FROM daily_kline WHERE date>=? AND date<=? ORDER BY stock_code, d"
+scripts/backfill_all_signals_v2.py,208,from_dk,,"""SELECT DISTINCT k.stock_code, b.name FROM daily_kline k JOIN stock_basic b ON k.stock_code=b.stock_code WHERE k.date=?"","
+scripts/backfill_base_breakout_v2.py,26,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/backfill_base_breakout_v2.py,82,from_dk,,FROM daily_kline k
+scripts/backfill_base_breakout_v2.py,92,OHLC4|close_only|from_dk,,"""SELECT date,open,high,low,close,volume FROM daily_kline WHERE stock_code=? AND date<=? ORDER BY date"","
+scripts/backfill_chanlun.py,47,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/backfill_chanlun.py,233,from_dk,,FROM daily_kline k
+scripts/backfill_chanlun.py,240,from_dk,,FROM daily_kline k
+scripts/backfill_chanlun.py,342,from_dk,,"stock_rows = db.execute(f""SELECT DISTINCT stock_code FROM daily_kline WHERE date>=? AND date<=? AND stock_code IN ({ph})"", (start_"
+scripts/backfill_chanlun.py,344,from_dk,,"stock_rows = db.execute(""SELECT DISTINCT stock_code FROM daily_kline WHERE date>=? AND date<=?"", (start_date, end_date)).fetchall("
+scripts/backfill_chanlun_gap.py,33,from_dk,,FROM daily_kline k
+scripts/backfill_chanlun_v2.py,24,from_dk,,"rows = db.execute(""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"", (start, end)).fetchall()"
+scripts/backfill_chanlun_v2.py,41,from_dk,,FROM daily_kline k JOIN stock_basic b ON k.stock_code=b.stock_code
+scripts/backfill_chanlun_v3.py,26,from_dk,,"rows = db.execute(""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"", (start, end)).fetchall()"
+scripts/backfill_chanlun_v3.py,46,from_dk,,FROM daily_kline k JOIN stock_basic b ON k.stock_code=b.stock_code
+scripts/backfill_daily_review.py,13,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"", (start, end)).fetchall()]"
+scripts/backfill_mw.py,52,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/backfill_mw.py,145,OHLC4|close_only|from_dk,,"""SELECT stock_code, date, open, high, low, close, volume, amount FROM daily_kline WHERE date>=? AND date<=? ORDER BY stock_code, d"
+scripts/backfill_mw_data.py,123,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date >= ? AND date <= ? ORDER BY date LIMIT 500"","
+scripts/backfill_mw_signals.py,29,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/backfill_mw_signals_v2.py,24,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/backfill_mw_signals_v2.py,109,OHLC4|close_only|from_dk,,"""SELECT stock_code, date, open, high, low, close, volume, amount FROM daily_kline WHERE date>=? AND date<=? ORDER BY stock_code, d"
+scripts/backfill_pocket_pivot_v1.py,28,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/backfill_pocket_pivot_v1.py,63,from_dk,,FROM daily_kline k
+scripts/backfill_pocket_pivot_v2.py,71,from_dk,,SELECT DISTINCT date FROM daily_kline
+scripts/backfill_rs.py,44,adj_col,,"row['adj_close'], row['adj_close'],"
+scripts/backfill_rs.py,51,adj_col,,"(stock_code, date, close, adj_close, ret_20, ret_60, ret_120, ret_250,"
+scripts/backfill_sell_signals.py,31,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/backfill_sell_signals.py,67,OHLC4|close_only|from_dk,,"""SELECT date,open,high,low,close,volume FROM daily_kline WHERE stock_code=? AND date<=? ORDER BY date"","
+scripts/backfill_sell_signals.py,189,from_dk,,"stocks = db.execute(""SELECT DISTINCT stock_code FROM daily_kline WHERE date=?"", (date,)).fetchall()"
+scripts/backfill_tech_score.py,28,adj_col|close_only|from_dk,,"c.execute(""SELECT stock_code,date,adj_close,high,low,close,volume FROM daily_kline WHERE date>='2023-06-01' AND date<='2026-06-22'"
+scripts/backfill_tech_score.py,31,adj_col,,"kline_by_code[r['stock_code']].append({'date':r['date'],'adj_close':r['adj_close'],'high':r['high'],'low':r['low'],'close':r['clos"
+scripts/backfill_tech_score.py,47,adj_col,,"cl=np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]],dtype=np.float64)"
+scripts/backtest_b2_strategy.py,27,close_only|from_dk,,"for r in conn.execute(f""SELECT stock_code,date,open,close FROM daily_kline WHERE date>='2015-11-01' AND date<='2026-08-01' AND sto"
+scripts/backtest_bb_pp2_replay.py,62,COALESCE_adj|adj_col,,"rows = db.execute(""""""SELECT date, COALESCE(adj_open, open) as open,"
+scripts/backtest_bb_pp2_replay.py,63,COALESCE_adj|adj_col,,"COALESCE(adj_high, high) as high, COALESCE(adj_low, low) as low,"
+scripts/backtest_bb_pp2_replay.py,64,COALESCE_adj|adj_col,,"COALESCE(adj_close, close) as close, volume, amount, change_pct"
+scripts/backtest_bb_pp2_replay.py,65,from_dk,,"FROM daily_kline WHERE stock_code=? AND date<=? ORDER BY date"""""","
+scripts/backtest_bb_pp2_replay.py,73,ensure_adj,,# 前复权：change_pct 逆向推算（复刻 server._ensure_adj_prices）
+scripts/backtest_bb_pp2_replay.py,75,adj_col,,kl[n-1]['adj_close'] = kl[n-1]['close']
+scripts/backtest_bb_pp2_replay.py,78,adj_col,,kl[i]['adj_close'] = kl[i+1]['adj_close'] / (1 + chg) if chg is not None else kl[i+1]['adj_close']
+scripts/backtest_bb_pp2_replay.py,80,adj_col,,ratio = k['adj_close'] / k['close'] if k['close'] else 1
+scripts/backtest_bb_pp2_replay.py,83,adj_col,,k['close'] = k['adj_close']
+scripts/backtest_bb_pp2_replay.py,117,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date>=? AND date<=?"","
+scripts/backtest_bb_pp2_replay.py,201,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/backtest_bb_pp2_replay.py,204,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date>=? AND date<=?"","
+scripts/backtest_bb_pp2_replay.py,242,adj_col,,"""""""加载股票前复权收盘价，{code: [(date, adj_close), ...]}"""""""
+scripts/backtest_bb_pp2_replay.py,247,close_only|from_dk,,"rows = db.execute(""""""SELECT date, close, change_pct FROM daily_kline"
+scripts/backtest_high_conf_pp.py,29,close_only|from_dk,,"rows = db.execute(""SELECT date, open, close FROM daily_kline WHERE stock_code=? AND date >= '2023-06-01' AND date <= '2026-07-31' "
+scripts/backtest_mw_exit.py,42,OHLC4|close_only|from_dk,,"f""SELECT stock_code, date, open, high, low, close FROM daily_kline WHERE stock_code IN ({ph}) AND date >= '2016-01-01' AND date <="
+scripts/backtest_mw_external_factors.py,36,OHLC4|close_only|from_dk,,"SELECT date, open, high, low, close, volume FROM daily_kline"
+scripts/backtest_mw_full_S1_data.py,26,OHLC4|close_only,,"SELECT stock_code, date, open, high, low, close, volume, amount,"
+scripts/backtest_mw_full_S1_data.py,28,from_dk,,FROM daily_kline WHERE date >= '2016-01-01' AND date <= '2026-10-31'
+scripts/backtest_mw_full_S1_data.py,73,close_only,,"SELECT stock_code, date, close,"
+scripts/backtest_mw_full_S1_data.py,76,from_dk,,FROM daily_kline WHERE date >= '2015-11-01' AND date <= '2026-07-31'
+scripts/backtest_mw_full_S1_data.py,139,close_only,,"SELECT date, close,"
+scripts/backtest_mw_full_S1_data.py,141,from_dk,,FROM daily_kline WHERE stock_code = '000985' AND date >= '2015-09-01'
+scripts/backtest_mw_L2_returns.py,47,OHLC4|close_only|from_dk,,"""SELECT date, open, high, low, close, volume FROM daily_kline WHERE stock_code=? AND date >= ? AND date <= ? ORDER BY date"","
+scripts/backtest_mw_L3_stratify.py,22,close_only,,"SELECT stock_code, date, open, close,"
+scripts/backtest_mw_L3_stratify.py,24,from_dk,,FROM daily_kline
+scripts/backtest_mw_L4_portfolio.py,20,close_only,,"SELECT stock_code, date, open, close,"
+scripts/backtest_mw_L4_portfolio.py,22,from_dk,,FROM daily_kline WHERE date >= '2016-01-01' AND date <= '2026-09-30'
+scripts/backtest_mw_L4_portfolio.py,129,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date >= ? AND date <= '2026-07-31' ORDER BY date"","
+scripts/backtest_mw_L5_practical.py,26,close_only,,"SELECT stock_code, date, open, close,"
+scripts/backtest_mw_L5_practical.py,28,from_dk,,FROM daily_kline WHERE date >= '2016-01-01' AND date <= '2026-09-30'
+scripts/backtest_mw_multischeme.py,44,OHLC4|close_only|from_dk,,"SELECT date, open, high, low, close, volume FROM daily_kline"
+scripts/backtest_mw_v43.py,46,OHLC4|close_only|from_dk,,"SELECT date, open, high, low, close, volume FROM daily_kline"
+scripts/backtest_mw_v43_ic.py,33,OHLC4|close_only|from_dk,,"rows = conn.execute(""SELECT date, open, high, low, close, volume FROM daily_kline WHERE stock_code=? AND date>=? AND date<=? ORDER"
+scripts/backtest_mw_v44.py,41,OHLC4|close_only|from_dk,,"rows = conn.execute(""SELECT date, open, high, low, close, volume FROM daily_kline WHERE stock_code=? AND date>=? AND date<=? ORDER"
+scripts/backtest_pp_report.py,38,close_only|from_dk,,"rows = db.execute(""SELECT date, open, close FROM daily_kline WHERE stock_code=? AND date >= '2023-01-01' AND date <= '2026-07-31' "
+scripts/backtest_pp_report.py,42,close_only,,"market_rows = db.execute(""SELECT date, close FROM index_daily_kline WHERE stock_code='000985' AND date >= '2023-01-01' ORDER BY da"
+scripts/backtest_pp_vs_mw.py,85,close_only|from_dk,,"SELECT date, close FROM daily_kline"
+scripts/backtest_signals.py,146,OHLC4|adj_col,,"self.kline_idx = {}          # {(code, date): {open,high,low,close,adj_close,amount}}"
+scripts/backtest_signals.py,400,OHLC4|close_only,,"SELECT stock_code, date, open, high, low, close, volume, amount,"
+scripts/backtest_signals.py,401,adj_col,,"adj_close, adj_open, adj_high, adj_low"
+scripts/backtest_signals.py,402,from_dk,,"FROM daily_kline WHERE date >= ? AND date <= ? ORDER BY stock_code, date"
+scripts/backtest_signals.py,409,adj_col,,"'adj_close': r['adj_close'], 'adj_open': r['adj_open'],"
+scripts/backtest_signals.py,410,adj_col,,"'adj_high': r['adj_high'], 'adj_low': r['adj_low'],"
+scripts/backtest_signals.py,417,from_dk,,SELECT DISTINCT date FROM daily_kline
+scripts/backtest_signals.py,426,close_only,,"SELECT date, close FROM index_daily_kline"
+scripts/backtest_signals.py,640,adj_col,,entry_price = entry_kl['adj_close']
+scripts/backtest_signals.py,642,adj_col,,entry_price = entry_kl['adj_open']
+scripts/backtest_signals.py,654,adj_col,,if prev_kl and prev_kl['adj_close'] and prev_kl['adj_close'] > 0:
+scripts/backtest_signals.py,655,adj_col,,gap_pct = (entry_price - prev_kl['adj_close']) / prev_kl['adj_close'] * 100
+scripts/backtest_signals.py,664,adj_col,,if next_kl is None or next_kl.get('adj_open') is None:
+scripts/backtest_signals.py,668,adj_col,,if next_prev_kl and next_prev_kl.get('adj_close') and next_prev_kl['adj_close'] > 0:
+scripts/backtest_signals.py,669,adj_col,,next_gap = (next_kl['adj_open'] - next_prev_kl['adj_close']) / next_prev_kl['adj_close'] * 100
+scripts/backtest_signals.py,671,adj_col,,entry_price = next_kl['adj_open']
+scripts/backtest_signals.py,704,adj_col,,exit_price = exit_kl['adj_close']
+scripts/backtest_signals.py,713,adj_col,,if prev_exit_kl and prev_exit_kl['adj_close'] and prev_exit_kl['adj_close'] > 0:
+scripts/backtest_signals.py,714,adj_col,,gap_pct = (exit_kl['adj_open'] - prev_exit_kl['adj_close']) / prev_exit_kl['adj_close'] * 100
+scripts/backtest_signals.py,723,adj_col,,if next_kl is None or next_kl.get('adj_open') is None:
+scripts/backtest_signals.py,727,adj_col,,if next_prev_kl and next_prev_kl['adj_close'] and next_prev_kl['adj_close'] > 0:
+scripts/backtest_signals.py,728,adj_col,,next_gap = (next_kl['adj_open'] - next_prev_kl['adj_close']) / next_prev_kl['adj_close'] * 100
+scripts/backtest_signals.py,730,adj_col,,exit_price = next_kl['adj_close']
+scripts/backtest_signals.py,747,adj_col,,if tkl and tkl['adj_close'] and entry_price > 0:
+scripts/backtest_signals.py,748,adj_col,,ret_at = (tkl['adj_close'] - entry_price) / entry_price
+scripts/backtest_signal_winrate.py,57,close_only|from_dk,,"kl = db.execute(""""""SELECT close FROM daily_kline WHERE stock_code=? AND date>=?"
+scripts/batch_canslim_score.py,31,OHLC4|close_only|from_dk,,"rows = db.execute(f""""""SELECT date, open, high, low, close, volume FROM daily_kline"
+scripts/bench_chanlun.py,18,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/bench_chanlun.py,30,from_dk,,FROM daily_kline k JOIN stock_basic b ON k.stock_code=b.stock_code
+scripts/box_breakout_proto.py,30,ensure_adj,,"""""""加载前复权 K 线（change_pct 逆向推算，与 server._ensure_adj_prices 一致）"""""""
+scripts/box_breakout_proto.py,33,OHLC4|close_only|from_dk,,"rows = db.execute(""""""SELECT date, open, high, low, close, volume, change_pct FROM daily_kline"
+scripts/box_breakout_proto.py,39,adj_col,,kl[n-1]['adj_close'] = kl[n-1]['close']
+scripts/box_breakout_proto.py,42,adj_col,,kl[i]['adj_close'] = kl[i+1]['adj_close'] / (1 + chg) if chg is not None else kl[i+1]['adj_close']
+scripts/box_breakout_proto.py,44,adj_col,,ratio = k['adj_close'] / k['close'] if k['close'] else 1
+scripts/box_breakout_proto.py,48,adj_col,,k['close'] = k['adj_close']
+scripts/bt_cpa_01_reversal.py,23,close_only,,"rows = conn.execute(""SELECT date, close FROM index_daily_kline WHERE stock_code='000985' ORDER BY date"").fetchall()"
+scripts/bt_cpa_01_reversal.py,91,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date>='2016-01-01' AND stock_code NOT LIKE '%sentinel%'"")]"
+scripts/bt_cpa_01_reversal.py,119,adj_col,,exit_ = kl[i + 21]['adj_close'] if i + 21 < len(kl) else None
+scripts/bt_cpa_025b_aligned.py,20,close_only,,"rows = conn.execute(""SELECT date, close FROM index_daily_kline WHERE stock_code='000985' ORDER BY date"").fetchall()"
+scripts/bt_cpa_025b_aligned.py,68,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date>='2016-01-01' AND stock_code NOT LIKE '%sentinel%'"")]"
+scripts/bt_cpa_025b_aligned.py,98,adj_col,,seq = [(kl[i + 1 + k]['adj_close'] / entry - 1) if (i + 1 + k < len(kl) and kl[i + 1 + k]['adj_close']) else None
+scripts/bt_cpa_025_multiperiod.py,28,close_only,,"rows = conn.execute(""SELECT date, close FROM index_daily_kline WHERE stock_code='000985' ORDER BY date"").fetchall()"
+scripts/bt_cpa_025_multiperiod.py,78,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date>='2016-01-01' AND stock_code NOT LIKE '%sentinel%'"")]"
+scripts/bt_cpa_025_multiperiod.py,109,adj_col,,seq = [(kl[i + 1 + k]['adj_close'] / entry - 1) if (i + 1 + k < len(kl) and kl[i + 1 + k]['adj_close']) else None
+scripts/bt_cpa_02_wedgepop.py,22,close_only,,"rows = conn.execute(""SELECT date, close FROM index_daily_kline WHERE stock_code='000985' ORDER BY date"").fetchall()"
+scripts/bt_cpa_02_wedgepop.py,74,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date>='2016-01-01' AND stock_code NOT LIKE '%sentinel%'"")]"
+scripts/bt_cpa_02_wedgepop.py,108,adj_col,,"entry, exit_ = kl[i + 1]['open_adj'], (kl[i + 21]['adj_close'] if i + 21 < len(kl) else None)"
+scripts/build_change_pct_manifest.py,24,close_only,,"SELECT stock_code, date, close, change_pct,"
+scripts/build_change_pct_manifest.py,26,from_dk,,FROM daily_kline
+scripts/build_change_pct_manifest.py,28,close_only,,"SELECT stock_code, date, close, pc, change_pct"
+scripts/build_microcap_index.py,58,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date >= ? ORDER BY date"", (START,))]"
+scripts/build_microcap_index.py,117,adj_col|close_only|from_dk,,"for r in conn.execute(""SELECT stock_code, close, adj_close FROM daily_kline WHERE date=?"", (last,)):"
+scripts/build_microcap_index.py,125,adj_col|close_only|from_dk,,"""SELECT adj_close, close FROM daily_kline WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1"","
+scripts/build_microcap_index.py,243,adj_col|close_only|from_dk,,"""SELECT stock_code, date, close, adj_close FROM daily_kline WHERE date >= ? """
+scripts/build_microcap_index.py,249,adj_col,,"kmap[row['stock_code']] = (row['close'], row['adj_close'])"
+scripts/combo_precise.py,32,adj_col|close_only|from_dk,,"c.execute(""SELECT stock_code,date,adj_close,high,low,close,volume FROM daily_kline WHERE date>='2023-06-01' AND date<='2026-06-22'"
+scripts/combo_precise.py,35,adj_col,,"kline_by_code[r['stock_code']].append({'date':r['date'],'adj_close':r['adj_close'],'high':r['high'],'low':r['low'],'close':r['clos"
+scripts/combo_precise.py,57,adj_col,,"cl=np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]],dtype=np.float64)"
+scripts/combo_precise.py,85,adj_col,,"cl=np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]],dtype=np.float64)"
+scripts/combo_v2.py,17,adj_col|close_only|from_dk,,"c.execute(""SELECT stock_code,date,adj_close,high,low,close,volume FROM daily_kline WHERE date>='2023-06-01' AND date<='2026-06-22'"
+scripts/combo_v2.py,19,adj_col,,"for r in c.fetchall(): kline_by_code[r['stock_code']].append({'date':r['date'],'adj_close':r['adj_close'],'high':r['high'],'low':r"
+scripts/combo_v2.py,37,adj_col,,"kls=kline_by_code[code];cl=np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]],dtype=np.float64);cn=cl[-1];sc=0"
+scripts/combo_v2.py,62,adj_col,,"kls=kline_by_code[code];cl=np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]],dtype=np.float64);cn=cl[-1];sc=0"
+scripts/common.py,205,from_var,Y,"f""SELECT MAX(date) as d FROM {table} WHERE stock_code = ?"", (stock_code,)"
+scripts/common.py,208,from_var,Y,"row = conn.execute(f""SELECT MAX(date) as d FROM {table}"").fetchone()"
+scripts/compare_bb_pp2_confluence.py,16,close_only|from_dk,,"rows = db.execute(""""""SELECT date, close, change_pct FROM daily_kline"
+scripts/compare_bb_pp2_confluence.py,81,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date >= '2023-08-01' AND date <= ?"","
+scripts/compare_bb_pp2_confluence.py,106,close_only,,"sh = db.execute(""""""SELECT date, close FROM index_daily_kline"
+scripts/compute_market_snapshot.py,147,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount, change"
+scripts/compute_market_snapshot.py,184,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount, change"
+scripts/compute_market_snapshot.py,241,OHLC4|close_only,,"SELECT stock_code, date, open, high, low, close, volume, amount, change"
+scripts/compute_market_snapshot.py,303,OHLC4|close_only,,"SELECT date, open, high, low, close, volume, amount"
+scripts/daily_box_breakdown_scan.py,28,OHLC4|close_only,,"rows = conn.execute(""""""SELECT date, open, high, low, close, volume, change_pct"
+scripts/daily_box_breakdown_scan.py,29,from_dk,,"FROM daily_kline WHERE stock_code=? AND date<=? ORDER BY date"""""","
+scripts/daily_box_breakdown_scan.py,51,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date=(SELECT MAX(date) FROM daily_kline)"").fetchall()"
+scripts/daily_box_breakdown_scan.py,75,from_dk,,"end_date = conn.execute(""SELECT MAX(date) FROM daily_kline"").fetchone()[0]"
+scripts/daily_pattern_scan.py,121,close_only|from_dk,,SELECT close FROM daily_kline
+scripts/daily_pattern_scan.py,157,OHLC4|close_only,,"SELECT date, open, high, low, close, volume"
+scripts/daily_pattern_scan.py,158,from_dk,,FROM daily_kline
+scripts/daily_review.py,41,from_dk,,return db.execute('SELECT MAX(date) FROM daily_kline').fetchone()[0]
+scripts/daily_review.py,45,from_dk,,"r = db.execute('SELECT MAX(date) FROM daily_kline WHERE date<?', (date,)).fetchone()"
+scripts/daily_review.py,177,from_dk,,"codes = [r[0] for r in db.execute('SELECT stock_code FROM daily_kline WHERE date=?', (date,)).fetchall()]"
+scripts/daily_review.py,210,close_only,,"r = db.execute('SELECT close, change FROM index_daily_kline WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1', (code, dat"
+scripts/daily_review.py,213,close_only,,"prev = db.execute('SELECT close FROM index_daily_kline WHERE stock_code=? AND date<? ORDER BY date DESC LIMIT 1', (code, date)).fe"
+scripts/daily_review.py,218,from_dk,,"bd = db.execute('SELECT COUNT(*) as t, SUM(CASE WHEN change_pct>0 THEN 1 ELSE 0 END) as up, SUM(CASE WHEN change_pct<0 THEN 1 ELSE"
+scripts/daily_review.py,219,from_dk,,"vol = db.execute('SELECT SUM(amount) as v FROM daily_kline WHERE date=?', (date,)).fetchone()"
+scripts/daily_update.py,277,from_dk,,"_has_kline = _db.execute(""SELECT COUNT(*) FROM daily_kline WHERE date=?"", (_yesterday,)).fetchone()[0] > 0"
+scripts/debug_2022_root.py,21,from_dk,,"k = db.execute(""SELECT DISTINCT stock_code FROM daily_kline WHERE date=? LIMIT 3"", (scan_date,)).fetchall()"
+scripts/debug_mw_2016.py,13,from_dk,,"total = db.execute(""SELECT COUNT(DISTINCT stock_code) FROM daily_kline WHERE date='2016-01-04'"").fetchone()[0]"
+scripts/debug_mw_2016.py,17,from_dk,,"nulls = db.execute(""SELECT COUNT(*) FROM daily_kline WHERE date='2016-01-04' AND close IS NULL"").fetchone()[0]"
+scripts/debug_mw_one.py,22,OHLC4|close_only|from_dk,,"for r in db.execute(""SELECT stock_code, date, open, high, low, close, volume FROM daily_kline WHERE date>=? AND date<=? ORDER BY s"
+scripts/debug_one_stock.py,27,OHLC4|close_only|from_dk,,"for r in db.execute(""SELECT date, open, high, low, close, volume FROM daily_kline WHERE stock_code=? AND date>=? AND date<=? ORDER"
+scripts/debug_ppv2_2024.py,18,from_dk,,FROM daily_kline k JOIN stock_basic b ON k.stock_code=b.stock_code
+scripts/debug_ppv2_2024.py,29,OHLC4|close_only|from_dk,,"for r in db.execute(""SELECT stock_code, date, open, high, low, close, volume, amount FROM daily_kline WHERE date >= ? AND date <= "
+scripts/deep_pp_analysis.py,37,close_only,,"SELECT date, close FROM index_daily_kline"
+scripts/deep_pp_analysis.py,80,close_only|from_dk,,"rows = db.execute(""SELECT date, close FROM daily_kline WHERE stock_code=? AND date>='2025-06-01' ORDER BY date"", (code,)).fetchall"
+scripts/deep_pp_analysis.py,122,close_only|from_dk,,"rows = db.execute(""SELECT date, close FROM daily_kline WHERE stock_code=? AND date>='2025-06-01' ORDER BY date"", (code,)).fetchall"
+scripts/fetch_full_return_index.py,93,close_only,,"""SELECT date, close FROM index_full_return_daily WHERE stock_code=? ORDER BY date DESC LIMIT 1"","
+scripts/fetch_hk_etf.py,127,OHLC4,,"(stock_code, date, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)"""""", rows)"
+scripts/fetch_kline_adj.py,27,OHLC4,,"stock_kline_adj(stock_code, adj_type, date, open, high, low, close, change)"
+scripts/fetch_kline_adj.py,146,OHLC4,,"""INSERT INTO stock_kline_adj (stock_code, adj_type, date, open, high, low, close, change)"""
+scripts/fetch_kline_adj.py,230,OHLC4,,"""INSERT INTO stock_kline_adj (stock_code, adj_type, date, open, high, low, close, change)"""
+scripts/fetch_kline_adj.py,250,OHLC4|close_only,,"""SELECT date, open, high, low, close, change FROM stock_kline_adj"""
+scripts/fetch_kline_adj.py,253,OHLC4|close_only,,"""SELECT date, open, high, low, close, change FROM stock_kline_adj"""
+scripts/fetch_kline_adj.py,272,OHLC4,,"""INSERT INTO stock_kline_adj (stock_code, adj_type, date, open, high, low, close, change)"""
+scripts/fetch_kline_adj.py,294,close_only,,"""SELECT date, close, change FROM stock_kline_adj WHERE stock_code=? AND adj_type='raw' ORDER BY date"","
+scripts/fetch_kline_adj.py,301,close_only,,"""SELECT date, close FROM stock_kline_adj WHERE stock_code=? AND adj_type=? ORDER BY date"","
+scripts/fetch_kline_adj.py,376,from_dk,,"""SELECT stock_code FROM (SELECT stock_code, MIN(date) a, MAX(date) b FROM daily_kline"""
+scripts/fetch_kline_adj.py,386,from_dk,,"""SELECT stock_code, MIN(date), MAX(date) FROM daily_kline GROUP BY stock_code""):"
+scripts/fetch_kline_adj.py,394,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date >= ? AND date <= ? ORDER BY date"","
+scripts/fetch_kline_multi_adjust.py,176,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date >= ? ORDER BY stock_code"","
+scripts/fetch_kline_multi_adjust.py,309,from_dk,,"n = conn.execute(""SELECT COUNT(*) FROM daily_kline WHERE date >= ? AND date <= ? """
+scripts/fetch_kline_multi_adjust.py,314,OHLC4|close_only|from_dk,,"cur = conn.execute(""SELECT stock_code, date, open, high, low, close FROM daily_kline """
+scripts/fetch_kline_multi_adjust.py,337,from_dk,,"f""SELECT COUNT(*) n, MIN(date) a, MAX(date) b FROM daily_kline """
+scripts/fetch_kline_multi_adjust.py,347,from_dk,,"""FROM daily_kline WHERE date>=? GROUP BY y ORDER BY y"", (DATA_START,)):"
+scripts/fetch_kline_multi_adjust.py,355,close_only|from_dk,,"""SELECT date, close, lxr_fc_close, fc_close, bc_close FROM daily_kline """
+scripts/fetch_kline_multi_adjust.py,432,from_dk,,"""SELECT COUNT(*) FROM daily_kline WHERE date < ? AND ex_close IS NULL"","
+scripts/fetch_margin_daily.py,70,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/fetch_margin_daily.py,80,from_dk,,"r = db.execute(""SELECT MAX(date) FROM daily_kline"").fetchone()"
+scripts/fetch_margin_daily.py,84,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date<=? ORDER BY date DESC LIMIT 3"","
+scripts/fetch_shareholders_num.py,197,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE stock_code NOT LIKE '9%'"").fetchall()]"
+scripts/fetch_stock_daily_kline - 副本.py,137,from_dk,,"row = conn.execute(""SELECT COUNT(*) as cnt FROM daily_kline"").fetchone()"
+scripts/fetch_stock_daily_kline.py,181,from_dk,,"row = conn.execute(""SELECT COUNT(*) as cnt FROM daily_kline"").fetchone()"
+scripts/fetch_stock_daily_kline.py,243,from_dk,,"n = conn.execute(""""""SELECT COUNT(*) FROM daily_kline"
+scripts/fetch_stock_daily_kline.py,245,from_dk,,"AND date >= date((SELECT MAX(date) FROM daily_kline), '-400 days')"""""""
+scripts/fetch_stock_daily_kline.py,291,from_dk,,"f""SELECT date, {close_col} v FROM daily_kline WHERE stock_code=? """
+scripts/fetch_stock_daily_kline.py,293,from_dk,,"first = conn.execute(""SELECT MIN(date) d FROM daily_kline WHERE stock_code=?"","
+scripts/fetch_stock_daily_kline.py,324,from_dk,,"r = conn.execute(f""SELECT {close_col} v FROM daily_kline """
+scripts/fetch_stock_daily_kline.py,410,from_dk,,"last = conn.execute(""SELECT MAX(date) FROM daily_kline"").fetchone()[0]"
+scripts/fetch_stock_daily_kline.py,414,from_dk,,"f""SELECT DISTINCT stock_code FROM daily_kline """
+scripts/fetch_stock_daily_kline.py,420,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline ORDER BY stock_code"")]"
+scripts/fetch_stock_daily_kline.py,441,from_dk,,"r = conn.execute(""""""SELECT COUNT(*) FROM daily_kline"
+scripts/fetch_stock_daily_kline.py,442,from_dk,,"WHERE date >= date((SELECT MAX(date) FROM daily_kline), '-60 days')"
+scripts/fetch_sw_index.py,4,OHLC4,,"表：sw_index_kline (stock_code 6位如801030, stock_name, date, open, high, low, close, volume, amount)"
+scripts/fetch_tdx_kline.py,16,adj_col,,- adj_open/adj_high/adj_low/adj_close: ETF无复权，直接用原价
+scripts/fetch_tdx_kline.py,94,OHLC4,,"(stock_code, date, kline_type, open, high, low, close, volume, amount, change)"
+scripts/fetch_tdx_minute.py,20,OHLC4,,"""""""读通达信1分钟K线，返回 [(datetime, open, high, low, close, volume, amount)]"""""""
+scripts/fetch_tdx_minute.py,123,OHLC4,,"cur.execute(""INSERT OR REPLACE INTO stock_kline_15min (stock_code,date,time,open,high,low,close,volume,amount) VALUES (?,?,?,?,?,?"
+scripts/fetch_tdx_minute.py,126,OHLC4,,"cur.execute(""INSERT OR REPLACE INTO stock_kline_60min (stock_code,date,time,open,high,low,close,volume,amount) VALUES (?,?,?,?,?,?"
+scripts/fix_change_pct_unit.py,67,close_only,,"WITH t AS (SELECT date, close, change_pct,"
+scripts/fix_change_pct_unit.py,69,from_dk,,FROM daily_kline WHERE stock_code=?)
+scripts/fix_change_pct_unit.py,70,close_only,,"SELECT date, close, pc, change_pct FROM t"
+scripts/fix_change_pct_unit.py,106,from_dk,,"n_in = c.execute(""SELECT COUNT(*) n FROM daily_kline WHERE stock_code=? """
+scripts/fix_change_pct_unit.py,134,from_dk,,"for r in c.execute(""SELECT date, change_pct FROM daily_kline """
+scripts/fix_change_pct_unit.py,155,close_only,,"WITH t AS (SELECT rowid AS rid, date, close, change_pct,"
+scripts/fix_change_pct_unit.py,157,from_dk,,FROM daily_kline WHERE stock_code=?)
+scripts/fix_change_pct_unit.py,182,close_only,,"WITH t AS (SELECT date, close, change_pct, LAG(close) OVER (ORDER BY date) pc"
+scripts/fix_change_pct_unit.py,183,from_dk,,FROM daily_kline WHERE stock_code=?)
+scripts/fix_change_pct_unit_leftover.py,13,from_dk,,"r = c.execute(""SELECT change_pct FROM daily_kline WHERE stock_code=? AND date=?"","
+scripts/fix_change_pct_unit_leftover.py,28,close_only,,"rows = c.execute(""""""WITH t AS (SELECT date, close, change_pct,"
+scripts/fix_change_pct_unit_leftover.py,30,from_dk,,FROM daily_kline WHERE stock_code=?)
+scripts/fix_change_pct_unit_leftover.py,45,from_dk,,"n = c.execute(""SELECT COUNT(*) n FROM daily_kline WHERE abs(change_pct) > 0.31"").fetchone()['n']"
+scripts/fix_change_pct_unit_leftover.py,46,from_dk,,"n21 = c.execute(""SELECT COUNT(*) n FROM daily_kline WHERE abs(change_pct) > 0.31 """
+scripts/fix_lxr_fc_ipo_gap.py,23,OHLC4,,"3. 通过校验才回填 lxr_fc_{open,high,low,close} = ex_* × k"
+scripts/fix_lxr_fc_ipo_gap.py,52,from_dk,,SELECT DISTINCT stock_code FROM daily_kline
+scripts/fix_lxr_fc_ipo_gap.py,61,from_dk,,"gap = c.execute(""""""SELECT MIN(date) a, MAX(date) b, COUNT(*) n FROM daily_kline"
+scripts/fix_lxr_fc_ipo_gap.py,65,from_dk,,"seg = c.execute(""""""SELECT date, ex_close, lxr_fc_close FROM daily_kline"
+scripts/fix_lxr_fc_ipo_gap.py,120,from_dk,,"r = c.execute(""""""SELECT COUNT(*) n FROM daily_kline WHERE date>='2016-01-01'"
+scripts/gen_cpa_bi_review.py,24,OHLC4|close_only,,"kl = conn.execute(""""""SELECT date, open, high, low, close, volume, change_pct, complex_factor"
+scripts/gen_cpa_bi_review.py,25,from_dk,,"FROM daily_kline WHERE stock_code=? ORDER BY date"""""", (code,)).fetchall()"
+scripts/gen_cpa_bi_review.py,29,from_dk,,"ex = conn.execute(""""""SELECT date, complex_factor FROM daily_kline"
+scripts/gen_daily_review_skill.py,23,from_dk,,date = db.execute('SELECT MAX(date) FROM daily_kline').fetchone()[0]
+scripts/gen_daily_review_skill.py,30,close_only,,"k = db.execute('SELECT close, change FROM index_daily_kline WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 1', (code, dat"
+scripts/gen_daily_review_skill.py,33,close_only,,"prev = db.execute('SELECT close FROM index_daily_kline WHERE stock_code=? AND date<? ORDER BY date DESC LIMIT 1', (code, date)).fe"
+scripts/gen_daily_review_skill.py,48,from_dk,,"SUM(amount) amt FROM daily_kline WHERE date=?''', (date,)).fetchone()"
+scripts/gen_daily_review_skill.py,54,from_dk,,"FROM daily_kline WHERE date=?''', (date,)).fetchone()"
+scripts/gen_daily_review_skill.py,83,from_dk,,"ge5_cnt = db.execute('SELECT SUM(CASE WHEN change_pct>=0.05 THEN 1 ELSE 0 END) c FROM daily_kline WHERE date=?', (date,)).fetchone"
+scripts/gen_daily_review_skill.py,84,from_dk,,"le5_cnt = db.execute('SELECT SUM(CASE WHEN change_pct<=-0.05 THEN 1 ELSE 0 END) c FROM daily_kline WHERE date=?', (date,)).fetchon"
+scripts/hanako_loader.py,13,adj_col,,daily_kline         → OHLCV + volume + adj_close
+scripts/hanako_loader.py,75,adj_col,,支持前复权价格（adj_close 字段）。
+scripts/hanako_loader.py,117,adj_col,,"fields: 可选字段列表，如 [""open"",""high"",""low"",""close"",""volume"",""adj_close""]"
+scripts/hanako_loader.py,137,OHLC4,,"open, high, low, close, volume, amount,"
+scripts/hanako_loader.py,138,adj_col,,adj_close
+scripts/hanako_loader.py,139,from_dk,,FROM daily_kline
+scripts/hanako_loader.py,156,adj_col,,"df[""close""] = df[""adj_close""].fillna(df[""close""])"
+scripts/hanako_loader.py,157,adj_col,,"df = df.drop(columns=[""adj_close""])"
+scripts/hanako_loader.py,203,close_only,,"SELECT stock_code, date, open, close, high, low, volume, amount"
+scripts/mw_factor_analysis.py,81,OHLC4|close_only,,"SELECT stock_code, date, open, high, low, close, volume"
+scripts/mw_factor_analysis.py,82,from_dk,,FROM daily_kline WHERE date >= '2015-01-01'
+scripts/mw_factor_analysis_v2.py,19,OHLC4|close_only,,"SELECT stock_code, date, open, high, low, close, volume"
+scripts/mw_factor_analysis_v2.py,20,from_dk,,FROM daily_kline WHERE date >= '2015-06-01'
+scripts/mw_factor_analysis_v3.py,36,OHLC4|close_only,,"SELECT date, open, high, low, close, volume"
+scripts/mw_factor_analysis_v3.py,37,from_dk,,FROM daily_kline WHERE stock_code=? AND date <= ?
+scripts/mw_full_backtest_v2.py,77,from_dk,,SELECT DISTINCT date FROM daily_kline
+scripts/mw_full_backtest_v2.py,85,adj_col|from_dk,,"SELECT stock_code, date, adj_open, adj_close FROM daily_kline"
+scripts/mw_full_backtest_v2.py,88,adj_col,,"kline[(r['stock_code'], r['date'])] = (r['adj_open'], r['adj_close'])"
+scripts/pipeline_mw_cross.py,50,close_only,,"c.execute(""SELECT close FROM index_daily_kline WHERE stock_code='000985' AND date<=? ORDER BY date DESC LIMIT 200"", (TODAY,))"
+scripts/pipeline_mw_cross.py,168,from_dk,,"c.execute(""SELECT stock_code, amount FROM daily_kline WHERE date=?"", (TODAY,))"
+scripts/pipeline_mw_cross_v2.py,40,close_only,,"c.execute(""SELECT close FROM index_daily_kline WHERE stock_code='000985' AND date<=? ORDER BY date DESC LIMIT 200"", (TODAY,))"
+scripts/pipeline_mw_cross_v2.py,120,close_only,,"c.execute(""SELECT stock_code, rps_20, rps_250, close FROM stock_rs_daily WHERE date=?"", (TODAY,))"
+scripts/pipeline_mw_cross_v2.py,125,from_dk,,"c.execute(""SELECT stock_code, amount FROM daily_kline WHERE date=?"", (TODAY,))"
+scripts/pipeline_mw_cross_v3.py,31,close_only,,"c.execute(""SELECT close FROM index_daily_kline WHERE stock_code='000985' AND date<=? ORDER BY date DESC LIMIT 200"", (TODAY,))"
+scripts/pipeline_mw_cross_v3.py,74,close_only,,"c.execute(""SELECT stock_code, rps_20, rps_250, close FROM stock_rs_daily WHERE date=?"", (TODAY,))"
+scripts/pipeline_mw_cross_v3.py,76,from_dk,,"c.execute(""SELECT stock_code, amount FROM daily_kline WHERE date=?"", (TODAY,))"
+scripts/pipeline_mw_v3.py,24,close_only,,"c.execute(""SELECT close FROM index_daily_kline WHERE stock_code='000985' AND date<=? ORDER BY date DESC LIMIT 200"", (TODAY,))"
+scripts/pipeline_mw_v3.py,66,close_only,,"c.execute(""SELECT stock_code, rps_20, rps_250, close FROM stock_rs_daily WHERE date=?"", (TODAY,))"
+scripts/pipeline_mw_v3.py,69,from_dk,,"c.execute(""SELECT stock_code, amount FROM daily_kline WHERE date=?"", (TODAY,))"
+scripts/ppv1_backtest.py,175,adj_col|close_only|from_dk,,"c.execute(""SELECT stock_code,date,adj_close,high,low,close,volume FROM daily_kline WHERE date>='2023-06-01' AND date<='2026-06-22'"
+scripts/ppv1_backtest.py,178,adj_col,,"kline_by_code[r['stock_code']].append({'date':r['date'],'adj_close':r['adj_close'],'high':r['high'],'low':r['low'],'close':r['clos"
+scripts/ppv1_backtest.py,192,adj_col,,"cl=np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]],dtype=np.float64)"
+scripts/ppv1_score_validate.py,21,adj_col|close_only|from_dk,,"c.execute(""SELECT stock_code,date,adj_close,high,low,close,volume FROM daily_kline WHERE date>='2023-06-01' AND date<='2026-06-22'"
+scripts/ppv1_score_validate.py,24,adj_col,,"kline_by_code[r['stock_code']].append({'date':r['date'],'adj_close':r['adj_close'],'high':r['high'],'low':r['low'],'close':r['clos"
+scripts/ppv1_score_validate.py,49,adj_col,,"cl = np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]], dtype=np.float64)"
+scripts/ppv1_scoring.py,33,adj_col|close_only|from_dk,,"c.execute(""SELECT stock_code,date,adj_close,high,low,close,volume FROM daily_kline WHERE date>='2023-06-01' AND date<='2026-06-22'"
+scripts/ppv1_scoring.py,36,adj_col,,"kline_by_code[r['stock_code']].append({'date':r['date'],'adj_close':r['adj_close'],'high':r['high'],'low':r['low'],'close':r['clos"
+scripts/ppv1_scoring.py,60,adj_col,,"cl = np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]], dtype=np.float64)"
+scripts/prompt_generator_v2.py,39,close_only|from_dk,,"SELECT close, volume, amount FROM daily_kline"
+scripts/prompt_generator_v2.py,49,close_only|from_dk,,"SELECT date, close FROM daily_kline"
+scripts/prompt_generator_v2.py,99,close_only,,"SELECT date, open, close, high, low, volume"
+scripts/prompt_generator_v2.py,100,from_dk,,FROM daily_kline WHERE stock_code=? AND date<=?
+scripts/prompt_generator_v2.py,130,close_only,,"SELECT stock_code, close FROM index_daily_kline"
+scripts/pull_adj_close.py,7,adj_col,,2. 计算前复权价格: adj_close = close / cf × latest_cf
+scripts/pull_adj_close.py,21,adj_col,,"(stock_code, date, adj_open, adj_high, adj_low, adj_close)"
+scripts/pull_adj_close.py,24,adj_col,,"adj_open=excluded.adj_open, adj_high=excluded.adj_high,"
+scripts/pull_adj_close.py,25,adj_col,,"adj_low=excluded.adj_low, adj_close=excluded.adj_close"""""""
+scripts/pull_adj_close.py,93,adj_col,,"""""""计算前复权收盘价: adj_close = close / cf × latest_cf"""""""
+scripts/pull_adj_close.py,101,from_dk,,FROM daily_kline WHERE complex_factor IS NOT NULL
+scripts/pull_adj_close.py,113,adj_col,,"log.info(""Step 2: 批量计算 adj_close..."")"
+scripts/pull_adj_close.py,118,adj_col,,# 前复权: adj_close = close / cf × latest_cf
+scripts/pull_adj_close.py,120,adj_col,,"SET adj_close = ROUND(close * ? / complex_factor, 4),"
+scripts/pull_adj_close.py,121,adj_col,,"adj_open = ROUND(open * ? / complex_factor, 4),"
+scripts/pull_adj_close.py,122,adj_col,,"adj_high = ROUND(high * ? / complex_factor, 4),"
+scripts/pull_adj_close.py,123,adj_col,,"adj_low = ROUND(low * ? / complex_factor, 4)"
+scripts/recompute_attention.py,40,OHLC4|close_only|from_dk,,"for r in conn.execute(f""SELECT stock_code,date,open,high,low,close FROM daily_kline WHERE date>=? AND stock_code IN ({ph}) ORDER B"
+scripts/recompute_attention_v44.py,47,close_only|from_dk,,"""SELECT date, close FROM daily_kline WHERE stock_code=? AND date>=? AND date<=? ORDER BY date"","
+scripts/replay_watchlist_rules.py,37,COALESCE_adj|adj_col|from_dk,,"rows = db.execute(f""""""SELECT date, COALESCE(adj_close, close) as close FROM daily_kline"
+scripts/scan_bb_pp2_confluence.py,26,COALESCE_adj|adj_col,,"rows = db.execute(""""""SELECT date, COALESCE(adj_open, open) as open, COALESCE(adj_high, high) as high,"
+scripts/scan_bb_pp2_confluence.py,27,COALESCE_adj|adj_col,,"COALESCE(adj_low, low) as low, COALESCE(adj_close, close) as close, volume, amount, change_pct"
+scripts/scan_bb_pp2_confluence.py,28,from_dk,,"FROM daily_kline WHERE stock_code=? AND date>=? AND date<=? ORDER BY date"""""","
+scripts/scan_bb_pp2_confluence.py,35,ensure_adj,,"""""""复刻 server.py _ensure_adj_prices：change_pct 逆向推算前复权"""""""
+scripts/scan_bb_pp2_confluence.py,39,adj_col,,kl[n-1]['adj_close'] = kl[n-1]['close']
+scripts/scan_bb_pp2_confluence.py,42,adj_col,,kl[i]['adj_close'] = kl[i+1]['adj_close'] / (1 + chg) if chg is not None else kl[i+1]['adj_close']
+scripts/scan_bb_pp2_confluence.py,44,adj_col,,ratio = k['adj_close'] / k['close'] if k['close'] else 1
+scripts/scan_bb_pp2_confluence.py,47,adj_col,,k['close'] = k['adj_close']
+scripts/scan_bb_pp2_confluence.py,86,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date >= ? AND date <= ?"","
+scripts/scan_box_breakdown_2026.py,20,OHLC4|close_only|from_dk,,"rows = db.execute(""""""SELECT date, open, high, low, close, volume, change_pct FROM daily_kline"
+scripts/scan_box_breakdown_2026.py,49,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date=?"", (END_DATE,)).fetchall()]"
+scripts/scan_box_breakdown_2026_result.py,50,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date=(SELECT MAX(date) FROM daily_kline)"").fetchall()"
+scripts/scan_box_breakdown_2026_result.py,69,OHLC4|close_only,,"rows = conn.execute(""""""SELECT date, open, high, low, close, volume, change_pct"
+scripts/scan_box_breakdown_2026_result.py,70,from_dk,,"FROM daily_kline WHERE stock_code=? AND date>=? ORDER BY date"""""", (code, KLINE_START)).fetchall()"
+scripts/simulate_plus_b2p2.py,29,close_only|from_dk,,"SELECT stock_code, date, open, close FROM daily_kline"
+scripts/stats_bb_pp2_backfill.py,30,close_only|from_dk,,"rs = db.execute(""""""SELECT date, close, change_pct FROM daily_kline"
+scripts/stats_bb_pp2_confluence.py,16,adj_col,,"""""""加载所有相关股票 K 线（前复权），返回 {code: [(date, adj_close), ...]}"""""""
+scripts/stats_bb_pp2_confluence.py,21,close_only|from_dk,,"rows = db.execute(""""""SELECT date, close, change_pct FROM daily_kline"
+scripts/sync_price_caliber_daily.py,51,from_dk,,"r = conn.execute(""""""SELECT COUNT(*) n FROM daily_kline"
+scripts/sync_price_caliber_daily.py,52,from_dk,,WHERE date >= (SELECT MAX(date) FROM daily_kline) - 30
+scripts/sync_price_caliber_daily.py,54,from_dk,,"tot = conn.execute(""""""SELECT COUNT(*) n FROM daily_kline"
+scripts/sync_price_caliber_daily.py,55,from_dk,,"WHERE date >= (SELECT MAX(date) FROM daily_kline) - 30"""""").fetchone()"
+scripts/sync_price_caliber_daily.py,81,from_dk,,"n1 = conn.execute(""""""SELECT COUNT(*) n FROM daily_kline"
+scripts/sync_price_caliber_daily.py,100,from_dk,,FROM daily_kline k
+scripts/sync_price_caliber_daily.py,101,from_dk,,"JOIN (SELECT stock_code, MAX(date) d FROM daily_kline"
+scripts/sync_price_caliber_daily.py,109,from_dk,,FROM daily_kline
+scripts/tech_co_analysis.py,27,adj_col|close_only|from_dk,,"c.execute(""SELECT stock_code,date,adj_close,high,low,close,volume FROM daily_kline WHERE date>='2023-06-01' AND date<='2026-06-22'"
+scripts/tech_co_analysis.py,30,adj_col,,"kline_by_code[r['stock_code']].append({'date':r['date'],'adj_close':r['adj_close'],'high':r['high'],'low':r['low'],'close':r['clos"
+scripts/tech_co_analysis.py,44,adj_col,,"cl=np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]],dtype=np.float64)"
+scripts/tech_ppv1_precise.py,25,adj_col|close_only|from_dk,,"c.execute(""SELECT stock_code,date,adj_close,high,low,close,volume FROM daily_kline WHERE date>='2023-06-01' AND date<='2026-06-22'"
+scripts/tech_ppv1_precise.py,28,adj_col,,"kline_by_code[r['stock_code']].append({'date':r['date'],'adj_close':r['adj_close'],'high':r['high'],'low':r['low'],'close':r['clos"
+scripts/tech_ppv1_precise.py,50,adj_col,,"cl=np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]],dtype=np.float64)"
+scripts/test_ppv1_batch.py,23,from_dk,,"SELECT DISTINCT k.stock_code, b.name FROM daily_kline k"
+scripts/test_ppv1_batch.py,56,from_dk,,"SELECT DISTINCT k.stock_code, b.name FROM daily_kline k"
+scripts/test_ppv1_batch.py,69,OHLC4|close_only,,"SELECT stock_code, date, open, high, low, close, volume"
+scripts/test_ppv1_batch.py,70,from_dk,,"FROM daily_kline WHERE date >= ? AND date <= ? ORDER BY stock_code, date"
+scripts/test_ppv2_batch.py,48,OHLC4|close_only|from_dk,,"""SELECT stock_code, date, open, high, low, close, volume, amount FROM daily_kline WHERE date>=? AND date<=? ORDER BY stock_code, d"
+scripts/today_decision.py,23,close_only,,SELECT close FROM index_daily_kline
+scripts/today_decision.py,83,from_dk,,"c.execute(""SELECT stock_code, amount FROM daily_kline WHERE date=?"", (TODAY,))"
+scripts/validate_quarter.py,101,from_dk,,"""SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date"","
+scripts/validate_quarter.py,144,table_var,Y,ref_table = 'index_daily_kline' if 'index' in args.table else 'daily_kline'
+scripts/validate_signals.py,19,from_var,Y,"cnt = db.execute(f""SELECT COUNT(DISTINCT {date_col}) FROM {table} {where}"").fetchone()[0]"
+scripts/validate_signals.py,37,from_var,Y,(SELECT COUNT(*) FROM {table} t WHERE t.{date_col}=d.date {('AND ' + extra_where) if extra_where else ''}) as cnt
+scripts/validate_signals.py,38,from_dk,,FROM daily_kline d
+scripts/validate_signals.py,69,from_dk,,"TD = db.execute(f""SELECT COUNT(DISTINCT date) FROM daily_kline WHERE date BETWEEN '{start}' AND '{end}'"").fetchone()[0]"
+scripts/validate_signals.py,131,from_dk,,FROM daily_kline d
+scripts/verify_box_breakdown_v14.py,45,OHLC4|close_only,,"rows = conn.execute(""""""SELECT date, open, high, low, close, volume, change_pct"
+scripts/verify_box_breakdown_v14.py,46,from_dk,,"FROM daily_kline WHERE stock_code=? ORDER BY date"""""", (code,)).fetchall()"
+scripts/verify_box_breakdown_v14.py,95,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date>='2024-01-01' """
+scripts/verify_cpa_ftd_path.py,56,adj_col,,h = (kl[i + 20]['adj_close'] / kl[i]['adj_close'] - 1) if (i is not None and i + 20 < len(kl) and kl[i]['adj_close']) else None
+scripts/verify_cpa_ftd_path.py,61,adj_col,,h = (kl[i + 20]['adj_close'] / kl[i]['adj_close'] - 1) if (i is not None and i + 20 < len(kl) and kl[i]['adj_close']) else None
+scripts/verify_cpa_ftd_path.py,85,from_dk,,"""SELECT DISTINCT stock_code FROM daily_kline WHERE date>='2016-01-01' AND stock_code NOT LIKE '%sentinel%'"")]"
+scripts/winner_turnover.py,27,close_only|from_dk,,"for r in conn.execute(""SELECT stock_code, date, close FROM daily_kline WHERE date>='2015-01-01'""):"
+scripts/_backfill_ts_recent.py,8,adj_col|close_only|from_dk,,"c.execute(""SELECT stock_code,date,adj_close,high,low,close,volume FROM daily_kline WHERE date>='2023-06-01' AND date<='2026-07-03'"
+scripts/_backfill_ts_recent.py,11,adj_col,,"kline_by_code[r['stock_code']].append({'date':r['date'],'adj_close':r['adj_close'],'high':r['high'],'low':r['low'],'close':r['clos"
+scripts/_backfill_ts_recent.py,26,adj_col,,"cl=np.array([k['adj_close'] for k in kls[max(0,idx-260):idx+1]],dtype=np.float64)"
+scripts/_chk_0911.py,7,from_dk,,"print('daily_kline 最新日期:', c.execute('SELECT MAX(date) FROM daily_kline').fetchone()[0])"
+scripts/_chk_0911.py,10,from_dk,,"FROM daily_kline WHERE date='2026-09-11'"""""").fetchone()"
+scripts/_chk_0911.py,12,from_dk,,"r2 = c.execute(""""""SELECT COUNT(*) n FROM daily_kline"
+scripts/_chk_0911.py,18,close_only|from_dk,,"x = c.execute(""""""SELECT date, close, ex_close, lxr_fc_close, fc_close FROM daily_kline"
+scripts/_count_sites.py,2,from_dk,,"""""""统计每个 scanners 文件里 FROM daily_kline 的出现次数，用于写 expect"""""""
+scripts/_count_sites.py,5,from_dk,,FIND = 'FROM daily_kline'
+scripts/_final_check.py,23,from_dk,,"b = c.execute(""""""SELECT lxr_fc_close, fc_close, bc_close FROM daily_kline"
+scripts/_final_check.py,33,from_dk,,"rows = c.execute(""""""SELECT date, lxr_fc_close FROM daily_kline"
+scripts/_final_check.py,53,from_dk,,"SUM(bc_close IS NOT NULL) bc FROM daily_kline WHERE {cond}"""""").fetchone()"
+scripts/_fix_rule.py,19,close_only|from_dk,,"""         find='SELECT date, close FROM daily_kline WHERE stock_code=?',"","
+scripts/_ins_st6.py,16,close_only|from_dk,,"find='SELECT date, close FROM daily_kline\\n            WHERE stock_code=? AND date >= ?',"
+scripts/_ins_st6.py,20,close_only|from_dk,,"find='SELECT date, close FROM daily_kline WHERE stock_code=? AND date >= ? ORDER BY date',"
+scripts/_ins_st6.py,24,close_only|from_dk,,"find='SELECT date, close FROM daily_kline\\n                WHERE stock_code = ? AND date >= ? ORDER BY date',"
+scripts/_ins_st6.py,28,from_dk,,"find='FROM daily_kline WHERE stock_code = ? ORDER BY date DESC LIMIT ?',"
+scripts/_snap.py,15,OHLC4|close_only|from_dk,,"""SELECT stock_code,date,open,high,low,close FROM daily_kline """
+scripts/_verify_2014.py,16,from_dk,,FROM daily_kline WHERE date>='2014-01-01' AND date<='2015-12-31'
+scripts/_verify_2014.py,22,from_dk,,"FROM daily_kline WHERE date < '2016-01-01'"""""").fetchone()"
+scripts/_verify_dri_vs_qfq.py,34,from_dk,,"r = c.execute(f""SELECT {col} v, date FROM daily_kline WHERE stock_code=? AND date>=? """
+scripts/_verify_dri_vs_qfq.py,39,from_dk,,"END_DATE = c.execute(""SELECT MAX(date) d FROM daily_kline"").fetchone()['d']"
+scripts/_verify_dri_vs_qfq.py,44,from_dk,,"r = c.execute(f""SELECT {col} v, date FROM daily_kline WHERE stock_code=? AND date<=? """
+scripts/_verify_lxr_recur.py,19,from_dk,,"rows = c.execute(""""""SELECT date, lxr_fc_close, ex_close, change_pct FROM daily_kline"
+scripts/_verify_lxr_recur.py,45,from_dk,,FROM daily_kline WHERE stock_code=? AND lxr_fc_close IS NOT NULL
+scripts/_verify_mw.py,10,OHLC4|close_only,,"rows = c.execute(""""""SELECT date, open, high, low, close, volume, amount, change_pct"
+scripts/_verify_rs_recaliber.py,4,adj_col,,判据：stock_rs_daily.adj_close 在新口径下 = 复权价（lxr_fc_close），
+scripts/_verify_rs_recaliber.py,13,adj_col,,print('抽样日期：stock_rs_daily.adj_close 更接近哪个口径')
+scripts/_verify_rs_recaliber.py,15,adj_col,,"print(f'{""日期"":<12}{""股票"":<8}{""rs.adj_close"":>13}{""复权价"":>10}{""原始价"":>10}  判定')"
+scripts/_verify_rs_recaliber.py,19,adj_col,,"rs = c.execute(""SELECT adj_close, ret_250 FROM stock_rs_daily WHERE stock_code=? AND date=?"","
+scripts/_verify_rs_recaliber.py,21,from_dk,,"k = c.execute(""SELECT lxr_fc_close, ex_close FROM daily_kline WHERE stock_code=? AND date=?"","
+scripts/_verify_rs_recaliber.py,26,adj_col,,"a, lf, ex = rs['adj_close'], k['lxr_fc_close'], k['ex_close']"
+scripts/_verify_rs_recaliber.py,34,adj_col,,print('全表统计：adj_close 等于复权价的比例（按年）')
+scripts/_verify_rs_recaliber.py,39,adj_col,,"SUM(CASE WHEN abs(rs.adj_close - k.lxr_fc_close) < 1e-4 THEN 1 ELSE 0 END) nf,"
+scripts/_verify_rs_recaliber.py,40,adj_col,,SUM(CASE WHEN abs(rs.adj_close - k.ex_close) < 1e-4 THEN 1 ELSE 0 END) ne
+scripts/_verify_rs_recaliber.py,43,adj_col,,WHERE rs.adj_close IS NOT NULL AND k.lxr_fc_close IS NOT NULL AND k.ex_close IS NOT NULL
+scripts/_verify_seam.py,9,from_dk,,"rows = c.execute(""""""SELECT date, ex_close, lxr_fc_close FROM daily_kline"
+scripts/_verify_seam.py,44,from_dk,,"FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 3"""""","
+scripts/_verify_step2.py,30,from_dk,,"db = c.execute(""""""SELECT date, lxr_fc_close, ex_close FROM daily_kline"
+scripts/_verify_step2.py,32,from_dk,,"lb = c.execute(""""""SELECT date, lxr_fc_close, ex_close FROM daily_kline"
+scripts/_verify_step2.py,47,from_dk,,"db0 = c.execute(""SELECT lxr_fc_close, ex_close FROM daily_kline """
+scripts/_verify_step3.py,54,from_dk,,"ref = c.execute(""SELECT lxr_fc_close a, ex_close b FROM daily_kline """
+scripts/_verify_step4.py,10,from_dk,,"r = c.execute(""SELECT MAX(date) d FROM daily_kline"").fetchone()['d']"
+scripts/_verify_step4.py,12,from_dk,,"e = c.execute(""SELECT ex_close FROM daily_kline WHERE stock_code=? AND date=?"", (CODE, r)).fetchone()"
+scripts/_verify_step4.py,39,close_only|from_dk,,"('monitoring 最新价快照', 'SELECT close, date FROM daily_kline WHERE stock_code = ? ORDER BY date DESC LIMIT 1'),"
+scripts/_verify_step4.py,40,close_only|from_dk,,"('briefing 市值用价', 'SELECT close, date FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 1'),"
+scripts/_verify_step4.py,41,close_only|from_dk,,"('briefing MA10(止损, 暂不改)', 'SELECT close, date FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 10'),"
+scripts/_verify_step4.py,42,OHLC4|close_only|from_dk,,"('briefing 信号日OHLC', 'SELECT open, high, low, close FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 1'),"
+scripts/_verify_step5.py,28,adj_col,,"print('2) cpa_stage.load_klines（特殊改动：close=原始价, adj_close=复权价）')"
+scripts/_verify_step5.py,36,from_dk,,"raw = c.execute(""SELECT ex_close FROM daily_kline WHERE stock_code='600309' AND date=?"", (d,)).fetchone()"
+scripts/_verify_step5.py,38,adj_col,,"print(f'  末根 {d}  close(真实)={last[""close""]}  adj_close(复权)={last[""adj_close""]}')"
+scripts/_verify_step5.py,40,adj_col,,ok = abs(last['close'] - raw['ex_close']) < 1e-6 and abs(last['adj_close'] - adj['close']) < 1e-6
+scripts/_verify_step5.py,47,OHLC4|close_only,,"rows = c.execute(""""""SELECT date, open, high, low, close, volume, change_pct"
+scripts/_verify_step6.py,22,from_dk,,"raw = c.execute(""SELECT ex_close FROM daily_kline WHERE stock_code='600309' AND date='2026-09-11'"").fetchone()['ex_close']"
+scripts/_verify_step6.py,40,close_only|from_dk,,"v = c.execute(""SELECT close FROM daily_kline WHERE stock_code=? AND date=?"","
+scripts/indep_backtest/00_probe.py,49,from_dk,,"kl = c.execute(""SELECT MIN(date), MAX(date), COUNT(*) FROM daily_kline"").fetchone()"
+scripts/indep_backtest/00_probe.py,51,from_dk,,"null_cf = c.execute(""SELECT COUNT(*) FROM daily_kline WHERE complex_factor IS NULL"").fetchone()[0]"
+scripts/indep_backtest/00_probe.py,52,from_dk,,"tot_cf = c.execute(""SELECT COUNT(*) FROM daily_kline"").fetchone()[0]"
+scripts/indep_backtest/00_probe.py,57,from_dk,,"FROM daily_kline GROUP BY y ORDER BY y"""""").fetchall():"
+scripts/indep_backtest/01_build_wide.py,27,OHLC4|close_only,,"""SELECT date, open, high, low, close, change_pct, turnover_rate """
+scripts/indep_backtest/01_build_wide.py,28,from_dk,,"""FROM daily_kline WHERE stock_code=? ORDER BY date"", (code,)"
+scripts/indep_backtest/01_build_wide.py,55,close_only,,"""SELECT date, close FROM index_daily_kline """
+scripts/indep_backtest/02_L1_L2.py,38,close_only,,"rows = con.execute(""SELECT date, close FROM index_daily_kline """
+scripts/indep_backtest/05_entry_sens.py,19,close_only|from_dk,,"rows=con.execute(""SELECT date,open,close,change_pct FROM daily_kline WHERE stock_code=? ORDER BY date"",(code,)).fetchall()"

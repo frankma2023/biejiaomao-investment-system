@@ -124,7 +124,7 @@ def save_stock_results(db_path, code, dates_all, results, max_retry=8):
                          s.get('latest_bi_dir', ''), s.get('latest_bi_power', 0), s.get('divergence_count', 0),
                          s.get('latest_div_type', ''), s.get('trade_signal_count', 0), s.get('latest_trade_type', ''),
                          s.get('latest_trade_side', ''), s.get('latest_trade_price', 0),
-                         s.get('resonance_strength', ''), now, 'czsc101'))
+                         s.get('resonance_strength', ''), now, 'czsc101_adj'))
                     if s.get('bi_json'):
                         db.execute("INSERT OR REPLACE INTO chanlun_bi_json (stock_code, scan_date, bi_json) VALUES (?,?,?)",
                                    (code, d, s['bi_json']))
@@ -154,7 +154,7 @@ def scan_stock_all_worker(args):
                 db.execute("ALTER TABLE chanlun_scan_daily ADD COLUMN algo_version TEXT DEFAULT 'czsc010'")
             except sqlite3.OperationalError:
                 pass
-            rows = db.execute("SELECT scan_date FROM chanlun_scan_daily WHERE stock_code=? AND algo_version='czsc101'", (code,)).fetchall()
+            rows = db.execute("SELECT scan_date FROM chanlun_scan_daily WHERE stock_code=? AND algo_version='czsc101_adj'", (code,)).fetchall()
             db.close()
             done = {r[0] for r in rows}
             dates = [d for d in dates if d not in done]

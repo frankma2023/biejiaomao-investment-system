@@ -264,7 +264,7 @@ def run(target_date=None):
         # 加载 K 线 + 实时扫描引擎获取完整信号
         kline_rows = db.execute("""
             SELECT date, open, high, low, close, volume
-            FROM daily_kline WHERE stock_code=? ORDER BY date DESC LIMIT 400
+            FROM daily_kline_adj WHERE stock_code=? ORDER BY date DESC LIMIT 400
         """, (code,)).fetchall()
         if not kline_rows:
             kline_rows = db.execute("""

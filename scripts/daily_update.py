@@ -96,8 +96,13 @@ def log(msg):
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(line + "\n")
 
-def run_task(label, cmd, timeout=3600):
-    """执行一个子任务，返回 (label, success, elapsed, output)"""
+def run_task(label, cmd, timeout=3600, stream=False):
+    """执行一个子任务，返回 (label, success, elapsed, output)
+
+    stream=True 时实时转发子进程输出。长任务（>几分钟）必开，
+    否则 capture_output 会把输出全部缓冲到结束，跑的过程中看不到任何进度，
+    看起来就像卡死。
+    """
     log(f"▶ {label}")
     log(f"  CMD: {' '.join(cmd)}")
     t0 = time.time()
@@ -106,15 +111,32 @@ def run_task(label, cmd, timeout=3600):
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
 
-        r = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
-        )
+        if stream:
+            p = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding="utf-8", errors="replace", env=env, bufsize=1,
+            )
+            buf, t_start = [], time.time()
+            for line in p.stdout:
+                s = line.rstrip()
+                buf.append(s)
+                if s.strip():
+                    log(f"    {s.strip()}")
+                if time.time() - t_start > timeout:
+                    p.kill()
+                    raise subprocess.TimeoutExpired(cmd, timeout)
+            p.wait()
+            r = subprocess.CompletedProcess(cmd, p.returncode, "\n".join(buf), "")
+        else:
+            r = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+            )
         elapsed = time.time() - t0
         stdout = r.stdout.strip()
         stderr = r.stderr.strip()
@@ -155,6 +177,18 @@ TASKS = [
     # 4. 通达信补K线（ETF + 个股，本地文件读取）
     ("📡 4.通达信ETF+K线",   [PYTHON_EXE, "scripts/fetch_tdx_kline.py"]),
     ("📈 5.个股日K线",       [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py"]),
+    # 5b. 四口径增量（每日）：只跑 lxr_fc（唯一被代码读取的口径，约 22 分钟）
+    #     ex_* 本地推导（0 调用）；lxr_fc 逐只调 API，窗口 30 天 + 重叠日对齐
+    #     调用量 = 股票数 × 口径数，与窗口长度无关；实测 4.8 次/秒
+    #     断点续传：进度入 daily_kline_caliber_progress，同日重跑自动跳过
+    ("🔁 5b.四口径增量(lxr_fc)",
+     [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py", "--caliber", "--types", "lxr_fc"],
+     {"timeout": 3600, "stream": True}),
+    # 5c. fc/bc 是留档口径（无任何代码读取，仅备查），非周一跳过
+    #     不做的话这两列会从 2026-09-11 起永久为空，与文档宣称的「四口径」不符
+    *([("🗄 5c.留档口径(fc/bc)",
+        [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py", "--caliber", "--types", "fc,bc"],
+        {"timeout": 9000, "stream": True})] if date.today().weekday() == 0 else []),
     # 5.5 指数全收益（理杏仁 total_return，8 指数 2016 起，回撤买点基准；替代旧 H00922 单指数脚本）
     ("🧧 5.5全收益指数",     [PYTHON_EXE, "scripts/fetch_index_full_return.py"]),
     # 5.6 国债收益率（红利温度计股债息差用）
@@ -276,8 +310,12 @@ TASKS.append(("🔬 33.微盘股指数", [PYTHON_EXE, "scripts/build_microcap_in
 # 步骤 34：CPA 阶段判定（依赖 K线+笔数据——六阶段状态机全量重跑，~3min，幂等）
 TASKS.append(("🎯 34.CPA阶段判定", [PYTHON_EXE, "src/scanners/cpa_stage.py", "--incremental"]))
 
-for label, cmd in TASKS:
-    lbl, ok, elapsed, _ = run_task(label, cmd)
+for item in TASKS:
+    label, cmd = item[0], item[1]
+    opts = item[2] if len(item) > 2 else {}
+    lbl, ok, elapsed, _ = run_task(label, cmd,
+                                   timeout=opts.get("timeout", 3600),
+                                   stream=opts.get("stream", False))
     tasks.append((lbl, ok, elapsed))
     if not ok:
         failed.append(lbl)

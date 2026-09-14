@@ -899,7 +899,7 @@ def scan_batch(
         """, (date_str, date_str)).fetchall()
     else:
         stocks = conn.execute("""
-            SELECT DISTINCT stock_code FROM daily_kline
+            SELECT DISTINCT stock_code FROM daily_kline_adj
             WHERE date = ? AND volume > 0
         """, (date_str,)).fetchall()
     
@@ -916,7 +916,7 @@ def scan_batch(
         # 获取K线数据（回溯400天）
         klines = conn.execute("""
             SELECT date, open, high, low, close, volume
-            FROM daily_kline
+            FROM daily_kline_adj
             WHERE stock_code = ? AND date <= ? AND date >= date(?, '-400 days')
             ORDER BY date
         """, (code, date_str, date_str)).fetchall()
@@ -981,7 +981,7 @@ if __name__ == '__main__':
         
         klines = conn.execute("""
             SELECT date, open, high, low, close, volume
-            FROM daily_kline
+            FROM daily_kline_adj
             WHERE stock_code = ? AND date <= ? AND date >= date(?, '-400 days')
             ORDER BY date
         """, (args.stock, args.date, args.date)).fetchall()

@@ -604,7 +604,7 @@ if __name__ == '__main__':
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     klines = conn.execute("""
-        SELECT date, open, high, low, close, volume FROM daily_kline
+        SELECT date, open, high, low, close, volume FROM daily_kline_adj
         WHERE stock_code=? AND date<=? AND date>=date(?,'-600 days')
         ORDER BY date
     """, (args.stock, args.date, args.date)).fetchall()

@@ -72,8 +72,8 @@ def compute_returns(stock_klines, benchmark_klines, as_of_date):
         batch = stock_codes[i:i+batch_size]
         ph = ','.join(['?' for _ in batch])
 
-        rows = db.execute(f'''SELECT stock_code, date, close, adj_close, amount
-            FROM daily_kline WHERE stock_code IN ({ph})
+        rows = db.execute(f'''SELECT stock_code, date, raw_close AS close, close AS adj_close, amount
+            FROM daily_kline_adj WHERE stock_code IN ({ph})
             AND date >= date(?, '-{lookback} days') AND date <= ?
             ORDER BY stock_code, date''',
             batch + [as_of_date, as_of_date]).fetchall()

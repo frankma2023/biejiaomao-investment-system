@@ -122,12 +122,12 @@ def _find_baseline(weekly: List[Dict], daily: List[Dict], date_str: str,
             conn.row_factory = sqlite3.Row
             # 查 base_breakout 信号
             bb = conn.execute("""SELECT signal_date, buy_point FROM base_breakout_signals
-                WHERE stock_code=(SELECT stock_code FROM daily_kline WHERE date=? LIMIT 1)
+                WHERE stock_code=(SELECT stock_code FROM daily_kline_adj WHERE date=? LIMIT 1)
                 AND signal_date<=? ORDER BY signal_date DESC LIMIT 1""",
                 (date_str, date_str)).fetchone()
             # 查 pocket_pivot 信号
             pp = conn.execute("""SELECT signal_date, close FROM pocket_pivot_signals
-                WHERE stock_code=(SELECT stock_code FROM daily_kline WHERE date=? LIMIT 1)
+                WHERE stock_code=(SELECT stock_code FROM daily_kline_adj WHERE date=? LIMIT 1)
                 AND signal_date<=? ORDER BY signal_date DESC LIMIT 1""",
                 (date_str, date_str)).fetchone()
             conn.close()
@@ -458,7 +458,7 @@ if __name__ == '__main__':
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
 
-    klines = conn.execute("""SELECT date, open, high, low, close, volume FROM daily_kline
+    klines = conn.execute("""SELECT date, open, high, low, close, volume FROM daily_kline_adj
         WHERE stock_code=? AND date<=? AND date>=date(?, '-600 days')
         ORDER BY date""", (args.stock, args.date, args.date)).fetchall()
     conn.close()

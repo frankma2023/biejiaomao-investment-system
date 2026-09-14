@@ -59,10 +59,8 @@ def _load_full_klines(code, end_date):
     """加载个股全量 K 线（前复权，注入 stock_code），截至 end_date"""
     db = sqlite3.connect(DB, timeout=30)
     db.row_factory = sqlite3.Row
-    rows = db.execute("""SELECT date, COALESCE(adj_open, open) as open,
-        COALESCE(adj_high, high) as high, COALESCE(adj_low, low) as low,
-        COALESCE(adj_close, close) as close, volume, amount, change_pct
-        FROM daily_kline WHERE stock_code=? AND date<=? ORDER BY date""",
+    rows = db.execute("""SELECT date, open, high, low, close, volume, amount, change_pct
+        FROM daily_kline_adj WHERE stock_code=? AND date<=? ORDER BY date""",
         (code, end_date)).fetchall()
     db.close()
     if not rows:
@@ -114,7 +112,7 @@ def phase1(start, end, workers):
             return json.load(f)
     db = sqlite3.connect(DB)
     codes = [r[0] for r in db.execute(
-        "SELECT DISTINCT stock_code FROM daily_kline WHERE date>=? AND date<=?",
+        "SELECT DISTINCT stock_code FROM daily_kline_adj WHERE date>=? AND date<=?",
         (start, end)).fetchall()]
     db.close()
     codes = [c for c in codes if not c.startswith(('8', '4', '9'))]
@@ -198,10 +196,10 @@ def phase2(bb_map, start, end, workers, full_mode):
         # full：全市场 × 逐日（所有交易日）
         db = sqlite3.connect(DB)
         trade_dates = [r[0] for r in db.execute(
-            "SELECT DISTINCT date FROM daily_kline WHERE date>=? AND date<=? ORDER BY date",
+            "SELECT DISTINCT date FROM daily_kline_adj WHERE date>=? AND date<=? ORDER BY date",
             (start, end)).fetchall()]
         codes = [r[0] for r in db.execute(
-            "SELECT DISTINCT stock_code FROM daily_kline WHERE date>=? AND date<=?",
+            "SELECT DISTINCT stock_code FROM daily_kline_adj WHERE date>=? AND date<=?",
             (start, end)).fetchall()]
         db.close()
         codes = [c for c in codes if not c.startswith(('8', '4', '9'))]
@@ -244,7 +242,7 @@ def _load_adj_close_map(codes):
     db.row_factory = sqlite3.Row
     result = {}
     for code in codes:
-        rows = db.execute("""SELECT date, close, change_pct FROM daily_kline
+        rows = db.execute("""SELECT date, close, change_pct FROM daily_kline_adj
             WHERE stock_code=? AND date>=? AND date<=? ORDER BY date""",
             (code, '2021-01-01', '2026-08-07')).fetchall()
         if not rows:

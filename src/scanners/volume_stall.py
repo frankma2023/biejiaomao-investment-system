@@ -187,7 +187,7 @@ def _load_kline(stock_code: str, start: str, end: str) -> List[Dict]:
     conn.row_factory = sqlite3.Row
     rows = conn.execute("""
         SELECT date, open, close, high, low, volume, amount, change_pct
-        FROM daily_kline WHERE stock_code=? AND date>=? AND date<=?
+        FROM daily_kline_adj WHERE stock_code=? AND date>=? AND date<=?
         ORDER BY date
     """, (stock_code, start, end)).fetchall()
     conn.close()

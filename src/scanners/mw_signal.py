@@ -51,7 +51,7 @@ def linear_slope(values):
 def get_all_stocks(conn, scan_date=None):
     """获取候选股票，排除 ST"""
     ref_date = scan_date if scan_date else "date('now')"
-    rows = conn.execute(f"""SELECT DISTINCT k.stock_code FROM daily_kline k INNER JOIN stock_basic b ON k.stock_code=b.stock_code WHERE b.listing_status='normally_listed' AND b.name NOT LIKE '%ST%' AND k.date = ?""", (ref_date,)).fetchall()
+    rows = conn.execute(f"""SELECT DISTINCT k.stock_code FROM daily_kline_adj k INNER JOIN stock_basic b ON k.stock_code=b.stock_code WHERE b.listing_status='normally_listed' AND b.name NOT LIKE '%ST%' AND k.date = ?""", (ref_date,)).fetchall()
     return [r[0] for r in rows]
 
 
@@ -67,12 +67,12 @@ def get_klines(conn, code, min_date, max_date=None):
 
     if max_date:
         rows = conn.execute("""
-            SELECT date, open, high, low, close, volume, amount FROM daily_kline
+            SELECT date, open, high, low, close, volume, amount FROM daily_kline_adj
             WHERE stock_code=? AND date >= ? AND date <= ? ORDER BY date
         """, (code, min_date, max_date)).fetchall()
     else:
         rows = conn.execute("""
-            SELECT date, open, high, low, close, volume, amount FROM daily_kline
+            SELECT date, open, high, low, close, volume, amount FROM daily_kline_adj
             WHERE stock_code=? AND date >= ? ORDER BY date
         """, (code, min_date)).fetchall()
     return [dict(r) for r in rows]
@@ -918,7 +918,7 @@ def run_scan(scan_date, fast=False, silent=False):
         _kline_cache = defaultdict(list)
         kline_min = (datetime.strptime(scan_date, '%Y-%m-%d') - timedelta(days=400)).strftime('%Y-%m-%d')
         for r in conn.execute(
-            "SELECT stock_code, date, open, high, low, close, volume, amount FROM daily_kline WHERE date>=? AND date<=? ORDER BY stock_code, date",
+            "SELECT stock_code, date, open, high, low, close, volume, amount FROM daily_kline_adj WHERE date>=? AND date<=? ORDER BY stock_code, date",
             (kline_min, scan_date)
         ).fetchall():
             _kline_cache[r['stock_code']].append(dict(r))
@@ -1034,7 +1034,7 @@ def _scan_worker(stock_codes, scan_date, db_path):
     kline_min = (datetime.strptime(scan_date, '%Y-%m-%d') - timedelta(days=400)).strftime('%Y-%m-%d')
     ph = ','.join('?' * len(codes))
     for r in conn.execute(
-        f"SELECT stock_code, date, open, high, low, close, volume, amount FROM daily_kline WHERE stock_code IN ({ph}) AND date>=? AND date<=? ORDER BY stock_code, date",
+        f"SELECT stock_code, date, open, high, low, close, volume, amount FROM daily_kline_adj WHERE stock_code IN ({ph}) AND date>=? AND date<=? ORDER BY stock_code, date",
         codes + [kline_min, scan_date]
     ).fetchall():
         mw._kline_cache[r['stock_code']].append(dict(r))

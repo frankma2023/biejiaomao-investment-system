@@ -57,7 +57,7 @@ def get_oneil_advanced(obs_date):
 def get_close_prices(code, since_date):
     conn = sqlite3.connect(DB_PATH)
     rows = conn.execute("""
-        SELECT date, close FROM daily_kline
+        SELECT date, close FROM daily_kline_adj
         WHERE stock_code = ? AND date >= ?
         ORDER BY date
     """, (code, since_date)).fetchall()

@@ -55,7 +55,7 @@ def analyze_structure(code, start_date, end_date):
     extended_start = (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=250)).strftime('%Y-%m-%d')
     rows = conn.execute("""
         SELECT date, open, high, low, close, volume, amount
-        FROM daily_kline
+        FROM daily_kline_adj
         WHERE stock_code=? AND date >= ? AND date <= ?
         ORDER BY date
     """, (code, extended_start, end_date)).fetchall()

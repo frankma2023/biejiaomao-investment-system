@@ -84,17 +84,13 @@ def load_holdings(db):
 # ─────────────────────────────────────────────
 def _load_klines(db, code, scan_date, days=750):
     rows = db.execute(f"""
-        SELECT date, COALESCE(adj_open, open) as open, COALESCE(adj_high, high) as high,
-               COALESCE(adj_low, low) as low, COALESCE(adj_close, close) as close,
-               volume, amount, change_pct
-        FROM daily_kline WHERE stock_code=? AND date<=?
+        SELECT date, open, high, low, close, volume, amount, change_pct
+        FROM daily_kline_adj WHERE stock_code=? AND date<=?
         ORDER BY date DESC LIMIT {days}""", (code, scan_date)).fetchall()
     klines = list(reversed([dict(r) for r in rows]))
     if not klines:
         return []
-    # 前复权兜底（complex_factor 大量 NULL）
-    from src.server import _ensure_adj_prices
-    _ensure_adj_prices(klines)
+    # 价格口径：已由 daily_kline_adj 视图提供理杏仁前复权价，无需兜底
     return klines
 
 
@@ -358,7 +354,7 @@ def generate_report(scan_date=None, weights=None):
     db = get_db()
     db.execute("CREATE TABLE IF NOT EXISTS watchlist_review_state (key TEXT PRIMARY KEY, value TEXT)")
     db.commit()
-    scan_date = scan_date or db.execute("SELECT MAX(date) FROM daily_kline").fetchone()[0]
+    scan_date = scan_date or db.execute("SELECT MAX(date) FROM daily_kline_adj").fetchone()[0]
     weights = weights or load_weights()
     wl = load_watchlist(db)
     holdings = load_holdings(db)

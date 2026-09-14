@@ -74,7 +74,7 @@ for r in c.execute("""
 
 # Trading dates for T+3 calc
 trading_dates = [r[0] for r in c.execute("""
-    SELECT DISTINCT date FROM daily_kline 
+    SELECT DISTINCT date FROM daily_kline_adj 
     WHERE date >= '2024-01-01' AND date <= '2026-07-20' ORDER BY date
 """)]
 date_idx = {d: i for i, d in enumerate(trading_dates)}
@@ -82,7 +82,7 @@ date_idx = {d: i for i, d in enumerate(trading_dates)}
 # K-line for T+3 pricing
 kline = {}
 for r in c.execute("""
-    SELECT stock_code, date, adj_open, adj_close FROM daily_kline
+    SELECT stock_code, date, open AS adj_open, close AS adj_close FROM daily_kline_adj
     WHERE date >= '2024-01-01' AND date <= '2026-07-20'
 """):
     kline[(r['stock_code'], r['date'])] = (r['adj_open'], r['adj_close'])

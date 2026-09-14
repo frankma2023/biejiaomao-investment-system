@@ -125,7 +125,7 @@ def run_scan(db, target_stock=None):
 
         # 4d. 个股走弱检查（近5日连续下跌或跌破50日线）
         recent_klines = db.execute("""
-            SELECT close, date FROM daily_kline
+            SELECT close, date FROM daily_kline_adj
             WHERE stock_code = ? ORDER BY date DESC LIMIT 50
         """, (stock_code,)).fetchall()
 
