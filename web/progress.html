@@ -46,12 +46,12 @@
 
     <header class="panel-header">
       <h1>📋 欧奈尔投资系统 · 项目进展</h1>
-      <p>2026-09-10（阶段收尾 · CPA 阶段判定引擎 v1.1）</p>
+      <p>2026-09-14（阶段收尾 · CPA 回测全清单完成 + v1.4/v1.5 两轮设计变更）</p>
     </header>
 
     <div class="pg-stats">
-      <div class="pg-stat"><div class="n" style="color:#4CAF50">113</div><div class="l">已完成</div></div>
-      <div class="pg-stat"><div class="n" style="color:#FF9800">1</div><div class="l">进行中</div></div>
+      <div class="pg-stat"><div class="n" style="color:#4CAF50">122</div><div class="l">已完成</div></div>
+      <div class="pg-stat"><div class="n" style="color:#FF9800">0</div><div class="l">进行中</div></div>
       <div class="pg-stat"><div class="n">0</div><div class="l">待开发</div></div>
     </div>
 
@@ -59,16 +59,22 @@
     <div class="pg-grid">
 
       <div class="pg-card">
-        <h3>🔬 CPA 阶段判定引擎 <span class="badge" style="background:#FFF3E0;color:#E65100">进行中</span></h3>
+        <h3>🔬 CPA 阶段判定引擎 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
-          <tr><td><span class="pg-dot dot-done"></span>六阶段量化标准（Oliver Kell CPA，PRD v1.1 定稿）</td><td>2026-09-10</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>六阶段量化标准（Oliver Kell CPA）</td><td>2026-09-10</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>引擎骨架（指标/数据/判据/状态机）</td><td>2026-09-10</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>路径B FTD 快速通道 + 五补丁</td><td>2026-09-10</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>抖动治理三层（非对称/过渡态/数据层折叠-61%）</td><td>2026-09-10</td></tr>
           <tr><td><span class="pg-dot dot-done"></span>审计脚本×4（抖动/FTD普查/分场景/路径验证）</td><td>2026-09-10</td></tr>
-          <tr><td><span class="pg-dot dot-wip"></span>回算主流程 + 全量回算 2016-2026</td><td>进行中</td></tr>
-          <tr><td><span class="pg-dot dot-todo"></span>前端 cpa-stages.html（主表+时间轴）</td><td>待开发</td></tr>
-          <tr><td><span class="pg-dot dot-todo"></span>23 项回测裁决（标签可信度达标后）</td><td>待开发</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>全量回算 + API×3 + 前端 cpa-stages.html</td><td>2026-09-12</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>双轴 review 修复（6 Standards + 6 Spec Blockers）</td><td>2026-09-10</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>22 项回测</b>（PRD §11.2，除叫停的信号交叉 2 项）</td><td>2026-09-14</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>v1.4 六项变更</b>：③深档→观察 / ⑤用ATR60 / ⑥去below_sup / ④深度≤5% / ④涨幅上界 / ④动作→观察</td><td>2026-09-14</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>v1.4 复测：④ 均值 −0.58%→<b>+0.30%</b>，胜率 40%→43%</td><td>2026-09-14</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>v1.5 闸门重建</b>：距高点 120→60日，删涨幅与 RPS 两条件</td><td>2026-09-14</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>v1.5 ⑥ 方向分档</b>：six_dir（破位后·反弹/续跌）</td><td>2026-09-14</td></tr>
+          <tr><td><span class="pg-dot dot-todo"></span>单元测试（引擎零自动化测试，最高优先级）</td><td>待开发</td></tr>
+          <tr><td><span class="pg-dot dot-todo"></span>前端二期（invalidated 三态 / 观察池过滤 / collapse_states 接线）</td><td>待开发</td></tr>
         </table>
       </div>
 
@@ -573,6 +579,14 @@
 <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">118. 脚本缺参数文档 = 使用者看不懂</div><div class="ld">交付了一个新参数 --caliber（含义是「口径」），但脚本 docstring 里没写任何说明。使用者面对一个既没有用法示例、也没有耗时预期的参数，只能猜。根因是当时两次改 docstring 的编辑都失败了，我就跳过去先做别的，事后没有回头补。教训：改动工具的「接口」（参数名、默认值、耗时量级、失败表现）必须与改动一起交付；编辑失败不是跳过的理由，换个方式（比如用脚本按行替换）也要补上。</div></div>
 <div class="lesson-card" style="border-left-color:#C62828"><div class="ln" style="color:#C62828">119. 聚合分布会掩盖大额对冲变化</div><div class="ld">验证价格口径迁移对 CPA 阶段判定的影响时，我先比了各阶段的**计数分布**：改前 146,137 → 改后 148,830，只看这一列会觉得「几乎没变，说明口径变更无影响」。但逐行核对（按股票+日期配对比较）发现，**共有日期里有 31,573 行（3.44%）的阶段变了**，只是各种迁移方向（①a→⑥c、⑥c→①a、②→③……）数量相当，在总数上互相抵消，把真实规模完全藏住了。教训：判断「变更有没有影响」，必须做**逐行配对比较**，不能只看聚合分布；聚合量是净额，不是总量。</div></div>
 </div>
+
+<div class="lesson-card"><div class="ln">120. 改函数签名后必须 grep 全部调用点</div><div class="ld">find_box 去掉一个形参，3 个调用点只改了 2 个。语法检查查不出，运行时才 TypeError——而带着它跑的 30 分钟重算会「不报错但产出错结果」（worker 反复抛错被吞掉，日志只有一行标题）。</div></div>
+<div class="lesson-card"><div class="ln">121. CFG 参数置 None 后必须全仓搜引用</div><div class="ld">引擎里把 r_strong_gain 置 None（废弃），回测脚本里 `gain >= None` 直接 TypeError。参数作废不是删个键就完事，要把所有消费方一起找出来。</div></div>
+<div class="lesson-card"><div class="ln">122. 改码 → 复核 → 重算，顺序不能反</div><div class="ld">两次复核（v1.4 的签名漏改、v1.5 的废弃参数引用）都在重算之前抓到了崩溃。grep + 单股冒烟 + 人工逐条审计的成本是几分钟，重算是 30 分钟，而带错重算的代价是「结果看起来正常但全错」。</div></div>
+<div class="lesson-card"><div class="ln">123. 分组分析必须先控住混杂变量</div><div class="ld">#14 原结论「前置涨幅越高越差」——实际上高涨幅与深箱体高度相关，测出来的是「深箱体差」。把箱体深度收紧到 5% 后，均值上的关系直接反转。两个自变量相关时，单变量分组的结论是假象。</div></div>
+<div class="lesson-card"><div class="ln">124. 均值与中位打架时以中位为准</div><div class="ld">同一批数据，均值说「高涨幅更好」（右尾拉高），中位说「高涨幅更差」（与两次回测一致）。均值被少数大赢家驱动，中位反映概率结构。项目此前「中位数由负转正」就是这么论证的。</div></div>
+<div class="lesson-card"><div class="ln">125. 表名里带「signals」不代表它存的是信号</div><div class="ld">pattern_scan_signals 的 date 是扫描日不是信号日，signals_json 是累积快照（截至该扫描日已知的全部信号）。加上卖出引擎的预筛选，导致 96% 的行都含 bearish ——它实际在测「这只股近期是否强势」，完全不能当信号用。建信号表前必须读写入端代码。</div></div>
+<div class="lesson-card"><div class="ln">126. 子代理不是万能的</div><div class="ld">本项目 CPA 类 review 子代理连续多次「启动即失败」（1 秒内），而 chanlun 类的能成功。不再重试，改为自执行逐条审计——反而挖出了两个 Blocker。工具失败时，换成自己能控制的方式继续，比反复重试有效。</div></div>
 
 </div>
 <script>
