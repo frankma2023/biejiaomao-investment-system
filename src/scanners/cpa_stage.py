@@ -52,9 +52,10 @@ CFG = {
     'r_nd20_min': 3.0,         # N_D20 ≥3（ATR 归一口径）
     'r_d20_max_pct': -0.12,    # D20 ≤-12%（辅助口径）
     'r_panic_vr': 1.8,         # 恐慌量 VR ≥1.8
-    'r_strong_gain': 0.40,     # 前置：250 日内最大涨幅 ≥40%
-    'r_high_recency': 120,     # 前置：距 250 日高点 ≤120 交易日
-    'r_h_rps250': 70,          # 前置：高点时 RPS250 ≥70
+    # 前置闸门（2026-09-14 v1.5 重建，PRD §13.2 #4）：只剩「距高点 ≤60 日」一条。
+    'r_high_recency': 60,      # 前置：距 250 日高点 ≤60 交易日（原 120；实测单调，60 日 +2.24pp）
+    'r_strong_gain': None,     # 已废弃（v1.5）：单独作闸门 −0.02pp，现只在 detail 里记录
+    'r_h_rps250': None,        # 已废弃（v1.5）：单独作闸门 −0.04pp，现只在 detail 里记录
     'r_lower_shadow_ratio': 2.0,   # 长下影：下影 ≥ 实体×2
     'r_lower_shadow_atr': 0.5,     # 且 下影 ≥ ATR20×0.5
 
@@ -489,17 +490,20 @@ def judge_reversal(ind, kl, i, tops, rps_map=None):
     dd, hi_idx = drawdown_from_high(kl, i, CFG['pctile_win'])
     if dd is None or hi_idx is None:
         return {'a': False, 'b': False, 'detail': {}}
-    # 前置闸门：强势股（PRD §3：a 必要；b/c 至少一条）
-    gate_gain = max_gain_in(kl, max(0, hi_idx - 250), hi_idx)
+    # 前置闸门（2026-09-14 v1.5 重建，PRD §13.2 #4）：只剩「距高点 ≤0 日」一条。
+    # 实测（600 只 / ①A 候选日 3,529 个，scripts/bt_cpa_04_gate_sweep.py）：
+    #   仅 涨幅≥40%      −0.02pp（阈值 20~100% 全在 ±0.25pp 内）
+    #   仅 RPS250≥70     −0.04pp（越严越差）
+    #   仅 距高点≤120日  +1.18pp；≤60 日 +2.24pp（单调）
+    # 原「gain 为必要条件 + (rec or rps)」两段式：gain 与 rps 均无价值，
+    # 且 rps 支路在 a_ok 里被 gate_recent 重新锁死，本来就是死代码。
     gate_recent = (i - hi_idx) <= CFG['r_high_recency']
-    gate_a = (gate_gain is not None and gate_gain >= CFG['r_strong_gain'])
-    if not gate_a:
-        return {'a': False, 'b': False, 'detail': {'gate': 'strong_gain_fail', 'gain': gate_gain}}
-    # c：高点时 RPS250 ≥ 70（rps_map 由状态机预加载并传入；b/c 至少一条）
+    if not gate_recent:
+        return {'a': False, 'b': False,
+                'detail': {'gate': 'recency_fail', 'days_since_high': i - hi_idx}}
+    # 以下两项不再作门槛，仅记录（供观察与事后回测）
+    gate_gain = max_gain_in(kl, max(0, hi_idx - 250), hi_idx)
     rps_high = (rps_map or {}).get(kl[hi_idx]['date'])
-    gate_c = (rps_high is not None and rps_high >= CFG['r_h_rps250'])
-    if not (gate_recent or gate_c):
-        return {'a': False, 'b': False, 'detail': {'gate': 'b_and_c_fail', 'days_since_high': i - hi_idx}}
     # ①a：深度回撤 + EMA 下方极值（ATR 归一为主，固定百分比为辅）
     nd20 = ind['nd20'][i]
     d20 = (c / ind['ema20'][i] - 1) if ind['ema20'][i] else None
@@ -513,7 +517,7 @@ def judge_reversal(ind, kl, i, tops, rps_map=None):
         if vj and cj and cj_prev and cj < cj_prev and vj >= CFG['r_panic_vr']:
             panic = True
             break
-    a_ok = bool(deep and ext and panic and gate_recent)
+    a_ok = bool(deep and ext and panic)   # gate_recent 已在函数开头作为前置闸门返回（v1.5）
     # ①b 衰竭迹象（任一）：长下影 / 反转日 / 两日确认（Spec W2 补全）
     b_ok = False
     b_detail = {}
@@ -545,6 +549,7 @@ def judge_reversal(ind, kl, i, tops, rps_map=None):
     return {'a': a_ok, 'b': b_ok,
             'detail': {'drawdown': round(dd, 3), 'nd20': round(nd20, 2) if nd20 else None,
                        'panic': panic, 'gate_gain': round(gate_gain, 3) if gate_gain else None,
+                       'gate_rps250': rps_high, 'days_since_high': i - hi_idx,
                        **b_detail}}
 
 
@@ -1143,6 +1148,18 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
         if ctx.get('init_flag'):
             metrics['init_flag'] = True
             ctx.pop('init_flag', None)
+        # ⑥ 方向分档（2026-09-14 v1.5，PRD §13.2 #31）：近 5 日涨跌。
+        # 实测方向胜率差 6pp / 中位差 1.55pp，而回撤分档不单调（<-50% 组反而最好）。
+        # 故 ⑥ 的展示层按方向分（破位后·反弹 / 破位后·续跌），回撤降为次要标注。
+        if stage.startswith('⑥'):
+            _j5 = i - 5
+            if _j5 >= 0 and ind['closes'][_j5] and c:
+                _d5 = c / ind['closes'][_j5] - 1
+                metrics['six_dir'] = 'rebound' if _d5 > 0 else 'decline'
+                metrics['six_dir_pct'] = round(_d5, 4)
+            _dd6, _ = drawdown_from_high(kl, i, CFG['pctile_win'])
+            if _dd6 is not None:
+                metrics['six_dd'] = round(_dd6, 4)
         if detail:
             metrics['detail'] = detail
 

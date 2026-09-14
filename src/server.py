@@ -2473,7 +2473,7 @@ def api_market_shareholder_low():
     rows = db.execute("""SELECT * FROM shareholder_low_scan WHERE scan_date=? ORDER BY streak DESC, ratio ASC""", (date,)).fetchall()
     items = []
     for r in rows:
-        k = db.execute("""SELECT date, close FROM daily_kline WHERE stock_code=?
+        k = db.execute("""SELECT date, close FROM daily_kline_adj WHERE stock_code=?
             AND date<=? ORDER BY date DESC LIMIT 61""", (r['stock_code'], date)).fetchall()
         k = list(reversed(k))
         chg20 = chg60 = None
@@ -3175,7 +3175,7 @@ def api_pocket_pivot():
     period = data.get('period', 'day')  # day/week/month
 
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if mode == 'index' else ''
     # 月线需要更长历史
     extra = '-600 days' if period == 'month' else '-300 days'
@@ -3293,7 +3293,7 @@ def api_flat_base():
     params = data.get('params', {})
     db = get_db()
     extra = '-900 days' if period == 'month' else '-400 days'
-    rows = db.execute(f"""SELECT date, open, high, low, close, volume, amount FROM daily_kline
+    rows = db.execute(f"""SELECT date, open, high, low, close, volume, amount FROM daily_kline_adj
         WHERE stock_code=? AND date>=date(?,?) AND date<=? ORDER BY date""",
         (stock_code, start, extra, end)).fetchall()
     if not rows: return jsonify({'klines':[],'signals':[]})
@@ -3324,7 +3324,7 @@ def api_double_bottom():
     mode = data.get('mode', 'stock')
     params = data.get('params', {})
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if mode == 'index' else ''
     extra = '-600 days' if period == 'month' else '-400 days'
     rows = db.execute(f"""SELECT date, open, high, low, close, volume, amount FROM {table}
@@ -3422,7 +3422,7 @@ def api_saucer_base():
         
         klines = db.execute("""
             SELECT date, open, high, low, close, volume
-            FROM daily_kline
+            FROM daily_kline_adj
             WHERE stock_code = ? AND date <= ? AND date >= date(?, '-400 days')
             ORDER BY date
         """, (code, date_str, date_str)).fetchall()
@@ -3485,7 +3485,7 @@ def api_cup_handle():
         start = (datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=600)).strftime('%Y-%m-%d')
     
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if mode == 'index' else ''
     code_col = 'stock_code'
     extra_days = 400  # 给形态切割 + 前置上涨回溯留足够空间
@@ -3524,7 +3524,7 @@ def api_cup_handle_diag():
     mode = request.args.get('mode', 'stock')
     
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if mode == 'index' else ''
     code_col = 'stock_code'
     
@@ -3679,7 +3679,7 @@ def api_base_breakout():
         start = (datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=730)).strftime('%Y-%m-%d')
     
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if mode == 'index' else ''
     code_col = 'stock_code'
     
@@ -3726,7 +3726,7 @@ def api_base_breakout_diag():
     mode = request.args.get('mode', 'stock')
     
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if mode == 'index' else ''
     code_col = 'stock_code'
     
@@ -3835,7 +3835,7 @@ def api_breakout_failure():
         start = (datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=730)).strftime('%Y-%m-%d')
 
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if mode == 'index' else ''
     code_col = 'stock_code'
 
@@ -3944,7 +3944,7 @@ def api_breakout_failure_diag():
         return jsonify({'error': '缺少 breakout_date 参数'})
 
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if mode == 'index' else ''
     code_col = 'stock_code'
 
@@ -3986,7 +3986,7 @@ def api_climax_top():
     start = request.args.get('start', None)
     
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if mode == 'index' else ''
     code_col = 'stock_code'
     
@@ -4021,7 +4021,7 @@ def api_climax_top_diag():
     mode = request.args.get('mode', 'stock')
     
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if mode == 'index' else ''
     code_col = 'stock_code'
     
@@ -4108,7 +4108,7 @@ def api_railroad_tracks():
     if not start:
         start = (datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=730)).strftime('%Y-%m-%d')
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if mode == 'index' else ''
     code_col = 'stock_code'
     lb_date = start
@@ -4136,7 +4136,7 @@ def api_railroad_tracks_diag():
     date_str = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
     mode = request.args.get('mode', 'stock')
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if mode == 'index' else ''
     klines = db.execute(f"""SELECT date, open, high, low, close, volume FROM {table}
         WHERE stock_code=? {kf} AND date<=? AND date>=date(?,'-600 days') ORDER BY date""",
@@ -4163,7 +4163,7 @@ def api_top_pattern():
     if not start:
         start = (datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=730)).strftime('%Y-%m-%d')
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     code_col = 'stock_code'
     klines = db.execute(f"""SELECT date, open, high, low, close, volume FROM {table}
         WHERE {code_col}=? AND date<=? AND date>=?
@@ -4187,7 +4187,7 @@ def api_top_pattern_diag():
     if not start:
         start = (datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=730)).strftime('%Y-%m-%d')
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     code_col = 'stock_code'
     klines = db.execute(f"""SELECT date, open, high, low, close, volume FROM {table}
         WHERE {code_col}=? AND date<=? AND date>=?
@@ -4214,7 +4214,7 @@ def api_volume_divergence():
     if not start:
         start = (datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=730)).strftime('%Y-%m-%d')
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     code_col = 'stock_code'
     klines = db.execute(f"""SELECT date, open, high, low, close, volume FROM {table}
         WHERE {code_col}=? AND date<=? AND date>=?
@@ -4237,7 +4237,7 @@ def api_volume_divergence_diag():
     if not start:
         start = (datetime.strptime(date_str, '%Y-%m-%d') - timedelta(days=730)).strftime('%Y-%m-%d')
     db = get_db()
-    table = 'index_daily_kline' if mode == 'index' else 'daily_kline'
+    table = 'index_daily_kline' if mode == 'index' else 'daily_kline_adj'
     code_col = 'stock_code'
     klines = db.execute(f"""SELECT date, open, high, low, close, volume FROM {table}
         WHERE {code_col}=? AND date<=? AND date>=?
@@ -5227,11 +5227,11 @@ def api_index_constituents():
         (SELECT icw.weighting FROM index_constituent_weightings icw
          WHERE icw.index_code = ic.index_code AND icw.stock_code = ic.stock_code
          ORDER BY icw.date DESC LIMIT 1) as weighting,
-        (SELECT close FROM daily_kline WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1) as close,
-        (SELECT close FROM daily_kline WHERE stock_code=ic.stock_code AND date<=(SELECT date FROM daily_kline WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1 OFFSET 1) ORDER BY date DESC LIMIT 1) as prev_close,
-        (SELECT close FROM daily_kline WHERE stock_code=ic.stock_code AND date<=(SELECT date FROM daily_kline WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1 OFFSET 4) ORDER BY date DESC LIMIT 1) as close_5d_ago,
-        (SELECT close FROM daily_kline WHERE stock_code=ic.stock_code AND date<=(SELECT date FROM daily_kline WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1 OFFSET 9) ORDER BY date DESC LIMIT 1) as close_10d_ago,
-        (SELECT close FROM daily_kline WHERE stock_code=ic.stock_code AND date<=(SELECT date FROM daily_kline WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1 OFFSET 19) ORDER BY date DESC LIMIT 1) as close_20d_ago
+        (SELECT close FROM daily_kline_adj WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1) as close,
+        (SELECT close FROM daily_kline_adj WHERE stock_code=ic.stock_code AND date<=(SELECT date FROM daily_kline_adj WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1 OFFSET 1) ORDER BY date DESC LIMIT 1) as prev_close,
+        (SELECT close FROM daily_kline_adj WHERE stock_code=ic.stock_code AND date<=(SELECT date FROM daily_kline_adj WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1 OFFSET 4) ORDER BY date DESC LIMIT 1) as close_5d_ago,
+        (SELECT close FROM daily_kline_adj WHERE stock_code=ic.stock_code AND date<=(SELECT date FROM daily_kline_adj WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1 OFFSET 9) ORDER BY date DESC LIMIT 1) as close_10d_ago,
+        (SELECT close FROM daily_kline_adj WHERE stock_code=ic.stock_code AND date<=(SELECT date FROM daily_kline_adj WHERE stock_code=ic.stock_code AND date<=? ORDER BY date DESC LIMIT 1 OFFSET 19) ORDER BY date DESC LIMIT 1) as close_20d_ago
         FROM index_constituents ic
         LEFT JOIN stock_basic sb ON ic.stock_code = sb.stock_code
         WHERE ic.index_code = ? AND ic.date = ?
@@ -5711,16 +5711,13 @@ def api_pattern_scan():
             code.startswith('sh') or code.startswith('sz') or
             code.startswith('cs') or code.startswith('cy')
         ))
-    table = 'index_daily_kline' if is_index else 'daily_kline'
+    table = 'index_daily_kline' if is_index else 'daily_kline_adj'
     kf = "AND kline_type='normal'" if is_index else ''
 
     # 获取足够的历史K线（至少2年）
-    # 个股优先用前复权价（adj_*），NULL 时退回不复权
+    # 个股走 daily_kline_adj 视图：open/high/low/close 已是理杏仁前复权价
     chg_col = 'change' if is_index else 'change_pct'
-    if is_index:
-        ohlc = "open, high, low, close"
-    else:
-        ohlc = "COALESCE(adj_open, open) as open, COALESCE(adj_high, high) as high, COALESCE(adj_low, low) as low, COALESCE(adj_close, close) as close"
+    ohlc = "open, high, low, close"
     if start:
         rows = db.execute(f"""SELECT date, {ohlc}, volume, amount, {chg_col} as change_pct
             FROM {table} WHERE stock_code=? {kf}
@@ -5737,9 +5734,7 @@ def api_pattern_scan():
 
     klines_full = [dict(r) for r in rows]
 
-    # ── 前复权：用 change_pct 逆向推算（adj_*/complex_factor 大量缺失后的兜底方案）──
-    if not is_index:
-        _ensure_adj_prices(klines_full)
+    # 价格口径：个股走 daily_kline_adj 视图，已是理杏仁前复权价，无需再兜底
 
     # 获取股票名称
     name = code
@@ -7508,7 +7503,10 @@ def api_cpa_stages():
     try:
         stage = request.args.get('stage', '')
         action = request.args.get('action', '')
-        limit = min(int(request.args.get('limit', 300)), 2000)
+        # 注意：上限曾为 2000，而最新交易日有 ~5,969 只股票，且排序是“阶段+持续天数”，
+        # 与股票代码无关 → 用户搜 600309 这类代码会搜不到（被随机截掉）。
+        # 现改为覆盖全市场，并把 stock_code 加入排序键保证截断是确定性的。
+        limit = min(int(request.args.get('limit', 300)), 8000)
         date = request.args.get('date') or db.execute("SELECT MAX(date) FROM cpa_stage_daily").fetchone()[0]
         q = """SELECT d.stock_code, b.name, d.stage, d.prior_stage, d.stage_start_date,
                       d.days_in_stage, d.structure_support, d.invalid_level, d.action, d.close, d.metrics_json
@@ -7522,7 +7520,7 @@ def api_cpa_stages():
         if action:
             q += " AND d.action=?"
             args.append(action)
-        q += " ORDER BY d.stage, d.days_in_stage DESC LIMIT ?"
+        q += " ORDER BY d.stage, d.days_in_stage DESC, d.stock_code LIMIT ?"
         args.append(limit)
         rows = db.execute(q, args).fetchall()
         out = []
@@ -7551,11 +7549,48 @@ def api_cpa_stock():
     if not code:
         return jsonify({'error': 'code 必填'}), 400
     try:
-        rows = db.execute("""SELECT date, stage, days_in_stage, structure_support, invalid_level, action, close
-            FROM cpa_stage_daily WHERE stock_code=? AND date>=? ORDER BY date""", (code, start)).fetchall()
+        # 带上复权 OHLC（视图 daily_kline_adj 的 open/high/low/close 就是前复权价），
+        # 供前端画 K 线——只看收盘线看不出形态，而阶段判定本身就是形态判定。
+        # warn_from：⑥w 是「输出层标签」，不改内部状态机（cpa_stage.py:1092）。
+        #   它的底层阶段存在 metrics_json 里，前端画色带必须用它才能连成一段，
+        #   否则 ③ 中间夹一天 ⑥w 会断成两段色带（用户实测 002648 就是这个现象）。
+        rows = db.execute("""SELECT d.date, d.stage, d.days_in_stage, d.stage_start_date,
+                                   d.structure_support, d.invalid_level, d.action,
+                                   json_extract(d.metrics_json,'$.warn_from') AS warn_from,
+                                   json_extract(d.metrics_json,'$.transition_zone') AS in_tz,
+                                   json_extract(d.metrics_json,'$.entry_path') AS entry_path,
+                                   json_extract(d.metrics_json,'$.vr') AS vr,
+                                   json_extract(d.metrics_json,'$.six_dir') AS six_dir,
+                                   json_extract(d.metrics_json,'$.six_dir_pct') AS six_dir_pct,
+                                   json_extract(d.metrics_json,'$.six_dd') AS six_dd,
+                                   k.volume,
+                                   k.open, k.high, k.low, k.close
+            FROM cpa_stage_daily d
+            LEFT JOIN daily_kline_adj k ON k.stock_code=d.stock_code AND k.date=d.date
+            WHERE d.stock_code=? AND d.date>=? ORDER BY d.date""", (code, start)).fetchall()
         trans = db.execute("""SELECT transition_date, from_stage, to_stage, trigger_detail_json, invalidated, invalidated_date
             FROM cpa_stage_transitions WHERE stock_code=? AND transition_date>=? ORDER BY transition_date""", (code, start)).fetchall()
-        return jsonify({'code': code, 'daily': [dict(r) for r in rows],
+        # ③「回踩确认」回踩的就是 EMA10（标准档）/ EMA20（深档），前端必须画这两条线，
+        # 否则「回踩确认」四个字没有视觉对应物。ATR20 一并返回，用于标注「低点距均线多少 ATR」。
+        # 指标现算（~6000 根，毫秒级）不落库；从 2014 起算保证 EMA 预热充分，只合并请求区间。
+        ema = {}
+        try:
+            import scanners.cpa_stage as _cpa
+            _kl = _cpa.load_klines(db, code, '2014-01-01')
+            _ind = _cpa.compute_indicators(_kl)
+            for _j, _k in enumerate(_kl):
+                ema[_k['date']] = (_ind['ema10'][_j], _ind['ema20'][_j], _ind['atr20'][_j])
+        except Exception:
+            ema = {}
+        out = []
+        for r in rows:
+            d = dict(r)
+            e = ema.get(d['date'])
+            d['ema10'] = round(e[0], 3) if e and e[0] else None
+            d['ema20'] = round(e[1], 3) if e and e[1] else None
+            d['atr20'] = round(e[2], 3) if e and e[2] else None
+            out.append(d)
+        return jsonify({'code': code, 'daily': out,
                         'transitions': [dict(r) for r in trans]})
     except Exception as e:
         return jsonify({'error': str(e)}), 500

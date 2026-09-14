@@ -31,13 +31,31 @@
   .code:hover{text-decoration:underline}
   .stg{display:inline-block;padding:1px 7px;border-radius:8px;font-size:0.58rem;font-weight:700}
   .act{font-size:0.6rem;padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.05)}
-  .chart{width:100%;height:300px}
+  .chart{width:100%;height:600px}
+    /* 图例框（图表下方，解释图上各类图元） */
+    .clegend{display:flex;flex-wrap:wrap;gap:5px 18px;margin:4px 0 2px;padding:9px 12px;
+      border:1px solid var(--divider);border-radius:10px;background:var(--card);
+      font-size:0.62rem;color:var(--muted);line-height:1.6}
+    .clegend span{display:inline-flex;align-items:center;gap:6px}
+    .clegend b{flex:0 0 auto;display:inline-block}
+    .cl-line{width:20px;height:0;border-top:2px solid}
+    .cl-dash{border-top-style:dashed}
+    .cl-tri{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid #f59e0b}
+    .cl-band{width:20px;height:11px;border-radius:2px}
+    .cl-updn{display:inline-flex;gap:2px}
+    .cl-updn i{width:8px;height:11px;border-radius:1.5px}
+    /* 阶段一览表 */
+    .stg-tbl{width:100%;margin:7px 0 9px;font-size:0.62rem;border-collapse:collapse}
+    .stg-tbl td{padding:3px 7px;border-bottom:1px solid var(--divider);vertical-align:top;line-height:1.55}
+    .stg-tbl tr:first-child td{color:var(--muted);font-weight:600}
+    .stg-tbl td:first-child{white-space:nowrap;font-weight:600;color:var(--text-primary)}
+    .stg-tbl td:nth-child(2){white-space:nowrap}
   .scroll{max-height:520px;overflow-y:auto}
   .tlist{font-size:0.62rem;color:var(--text-secondary);max-height:220px;overflow-y:auto}
   .tlist div{padding:3px 0;border-bottom:1px solid var(--divider)}
   .inv{color:#9ca3af;text-decoration:line-through}
   .note{font-size:0.56rem;color:var(--muted);line-height:1.7;margin-top:6px}
-  @media(max-width:700px){.layout{padding:0 8px 20px}th,td{padding:4px 5px;font-size:0.62rem}.chart{height:240px}}
+  @media(max-width:700px){.layout{padding:0 8px 20px}th,td{padding:4px 5px;font-size:0.62rem}.chart{height:460px}}
 </style>
 </head>
 <body>
@@ -81,11 +99,43 @@
       <div class="hdr" style="margin-bottom:6px"><h1 id="d-title" style="font-size:0.85rem"></h1>
         <span class="sub" id="d-sub"></span></div>
       <div class="chart" id="d-chart"></div>
+      <div class="clegend">
+        <span><b class="cl-line" style="border-top-color:#f59e0b"></b>EMA10（③ 标准档回踩对象）</span>
+        <span><b class="cl-line" style="border-top-color:#38bdf8"></b>EMA20（③ 深档回踩对象）</span>
+        <span><b class="cl-line cl-dash" style="border-top-color:#10b981"></b>失效位（跌破则本阶段结束；分段显示，只标当前值）</span>
+        <span><b class="cl-tri"></b>橙三角 = 当日带 ⑥w 预警 / 过渡态标签（底层阶段不变）</span>
+        <span><b class="cl-band" style="background:#ef444433"></b>阶段色带（同一阶段 ≥3 日才画；不足 3 日标“趋势待明”灰底）</span>
+        <span><b class="cl-updn"><i style="background:#ef4444"></i><i style="background:#10b981"></i></b>K 线 / 成交量柱：红涨绿跌</span>
+        <span><b class="cl-line cl-dash" style="border-top-color:#9ca3af"></b>20 日均量（成交量柱低于它 = 缩量）</span>
+        <span><b style="font-size:0.62rem">鼠标划过任一根 K 线</b> = 当日判定依据（阶段/标签/均线/失效位/量比）</span>
+      </div>
       <div class="tlist" id="d-trans"></div>
     </div>
     <div class="note">
-      <b>阶段说明</b>：①a 跌到位 / ①b 衰竭迹象（观察）｜② Wedge Pop（入场）｜③ EMA Crossback（入场）｜④ Base 'n Break（加仓）｜⑤ Exhaustion（保护利润）｜⑥a/b/c Wedge Drop 三子段（清仓→观望）。
-      <b>T 后缀 = 过渡态</b>（EMA20 ±0.3~0.5×ATR 模糊带，判据无答案地带，回测已证为低收益"垃圾时间"）。
+      <b>13 个阶段一览</b>
+      <table class="stg-tbl">
+        <tr><td>代码</td><td>显示名</td><td>含义（含 Kell 原文与对应动作）</td></tr>
+        <tr><td>①a</td><td>超跌（未反转）</td><td><b>Reversal Extension</b>（反转延伸）——自 250 日高点回撤 ≥30% + 恐慌放量（VR≥1.8），但尚未出现反转迹象。<b>动作：观察</b></td></tr>
+        <tr><td>①b</td><td>超跌+反转迹象</td><td>同上，但出现长下影 / 反转日（低点破前低且收盘突破前高）/ 两日确认之一。<b>动作：观察</b></td></tr>
+        <tr><td>②</td><td>突破后运行</td><td><b>Wedge Pop</b>（楔形弹跳）——自停顿区/基部<b>放量突破</b>后仍在推进，尚未经历回踩确认。可延续数月（实测最长 34 个交易日）。<b>动作：入场</b></td></tr>
+        <tr><td>②T</td><td>② 过渡态</td><td>价格落在“进 / 出”两道门槛之间的模糊带（当前 [-0.3, 0]×ATR）。判据本来就没答案的地带，回测已证为低收益“垃圾时间”。</td></tr>
+        <tr><td>③</td><td>回踩后运行</td><td><b>EMA Crossback</b>（EMA 回踩）——② 后 5~15 日内<b>缩量回踩 EMA10（标准档）/ EMA20（深档）</b>、收盘守住、EMA10 斜率转正、回踩低点不破停顿区高点，确认成立后的运行区间。<b>动作：入场</b></td></tr>
+        <tr><td>④</td><td>基部突破</td><td><b>Base 'n Break</b>——箱体/基部整理后<b>向上突破</b>；收盘跌回箱内则本段结束。<b>动作：加仓</b></td></tr>
+        <tr><td>⑤</td><td>衰竭延长</td><td><b>Exhaustion Extension</b>（衰竭延伸）——末端加速拉升后<b>跌破 10EMA</b>，衰竭迹象。<b>动作：保护利润</b></td></tr>
+        <tr><td>⑥a</td><td>破位初现</td><td><b>Wedge Drop</b>（楔形下坠）——<b>跌破 EMA20 并确认</b>，牛市情景整体失效的第一天。<b>动作：清仓</b></td></tr>
+        <tr><td>⑥b</td><td>破位后下行</td><td>破位后继续走低，但自高点回撤 <b>&lt;30%</b>。常表现为“跌一大段 → 反弹 → 再跌”。<b>动作：观察</b></td></tr>
+        <tr><td>⑥bT</td><td>⑥b 过渡态</td><td>同 ②T（⑥b 期间的模糊带）。</td></tr>
+        <tr><td>⑥c</td><td>破位后深跌</td><td>自高点回撤 <b>≥30%</b>。此时跌势已确认，距底部可能很近了。<b>动作：观察</b></td></tr>
+        <tr><td>⑥cT</td><td>⑥c 过渡态</td><td>同 ②T（⑥c 期间的模糊带）。</td></tr>
+        <tr><td>⑥w</td><td>预警（将转 ⑥b/⑥c）</td><td>出现在 ②/③/④/⑤ 中：<b>笔顶不抬高 + EMA10 斜率不向上</b>。这是<b>当日标签，不改底层阶段</b>（色带不断）。<b>动作：减仓</b></td></tr>
+      </table>
+      <b>⚠ 标签 ≠ 状态</b>：<code>⑥w</code> 与 <code>T</code> 后缀是<b>当日输出层标签</b>，不进入内部状态机，所以色带不会被它们切断（例：③ 期间夹一天 ⑥w，仍是一条 ③）。这类日子在 K 线上方用<span style="color:#f59e0b">橙色三角</span>标出。
+      <b>⚠ 阶段 = 区间，不是瞬点</b>：名字里的“突破”“回踩”“破位”都是<b>瞬间动作</b>（回踩可能就一天，甚至当天收回），阶段描述的是那之后的运行区间——所以 ②/③ 叫“×后运行”。
+      <b>⚠ ②→③ 不是趋势变了</b>，是确认等级升了一级：两段在 K 线上连续，因为趋势本来就没断过；分界点由参数（回踩窗口下界 5 日）决定，不是价格事件。
+      <b>⚠ 不足 3 日标「趋势待明」</b>：只持续 1~2 天的判定不作为阶段（中性灰底）。回测带后视镜可以说“那天是 X 阶段”，<b>实盘当时并不知道</b>。
+      <b>⚠ ⑥ 族破位</b>：鼠标划过 K 线会给出<b>破的是哪个位、什么时候破的</b>（如“跌破 EMA20 24.04（2026-07-08）”）与当时的结构支撑。
+      <b>术语来源</b>：上文六个英文原文是 <b>Oliver Kell</b>（2020 年美国投资锦标赛冠军）的自创术语，<b>中文圈无正式译名</b>；表中显示名与中文表述为本系统自拟。
+      同理，<b>所有数值阈值（0.3/0.5×ATR、5~15 日窗口、30% 回撤分界等）均为本系统设计，非 Kell 原文</b>，全部待回测校准。
       <b>入口</b>：pause = 停顿区慢速通道；ftd_4_7 / ftd_8_15 = FTD 快速通道（欧奈尔追盘日特征）。
       仅供研究参考，非交易建议。
     </div>
@@ -98,6 +148,33 @@ var ALL = [], DATE = '', FILTER_STAGE = '', charts = {}, sortKey = '', sortDir =
 var STAGE_COLOR = {'①a':'#6b7280','①b':'#9ca3af','②':'#ef4444','③':'#f97316','④':'#dc2626','⑤':'#a855f7',
                    '⑥a':'#065f46','⑥b':'#10b981','⑥c':'#34d399'};
 function stgColor(s){ var base = (s||'').replace('T',''); var c = STAGE_COLOR[base] || '#888'; return (s||'').indexOf('T')>=0 ? c+'99' : c; }
+// 阶段中文名（代号单独看不知道什么意思，全站统一用这一套）
+var STAGE_NAME = {'①a':'超跌（未反转）','①b':'超跌+反转迹象','②':'突破后运行','②T':'② 过渡态',
+                  '③':'回踩后运行','④':'基部突破','⑤':'衰竭延长',
+                  '⑥a':'破位初现','⑥b':'破位后下行','⑥bT':'⑥b 过渡态',
+                  '⑥c':'破位后深跌','⑥cT':'⑥c 过渡态','⑥w':'预警（将转 ⑥b/⑥c）'};
+function stgName(s){ return STAGE_NAME[s] || ''; }
+// ⑥ 方向分档（2026-09-14 v1.5，PRD §13.2 #31）：
+// 实测方向胜率差 6pp / 中位差 1.55pp，而回撤分档不单调（<-50% 组反而最好）。
+// 故 ⑥ 的标签改为**方向优先**（破位后·反弹 / 破位后·续跌），回撤幅度降为次要标注。
+// 回撤 30% 的结构标记保留在下面的说明表里，只是不再驱动展示分档。
+function stgName6(s, r){
+  var base = String(s||'').replace(/T$/,'');
+  if (base !== '⑥b' && base !== '⑥c') return stgName(s);
+  var d = r && r.six_dir;
+  if (d === 'rebound') return '破位后·反弹';
+  if (d === 'decline') return '破位后·续跌';
+  return stgName(s);       // 无 six_dir（旧数据/指标不足）时回退
+}
+function stgFull(s, r){ var n = stgName6(s, r); return s + (n ? ' ' + n : ''); }
+// 底层状态 vs 输出层标签（cpa_stage.py:1092：⑥w / XT 不改内部状态机，只是当日标签）
+// 色带必须按底层状态画：否则「③ 中夹一天 ⑥w」会断成两段（002648 实测现象）
+function baseStage(r){
+  if (!r) return '';
+  if (r.warn_from) return r.warn_from;                  // ⑥w → 还原底层（如 ③）
+  return String(r.stage || '').replace(/T$/, '');        // ②T → ②
+}
+function isOverlay(r){ return !!(r.warn_from || /T$/.test(String((r && r.stage) || ''))); }
 // 主题色变量（hanako-glass 深浅适配）
 function themeVars(){
   var light = document.documentElement.dataset.theme === 'light';
@@ -128,10 +205,10 @@ async function load(){
   var total = (j.stages||[]).reduce(function(a,b){return a+b.count;},0);
   var html = '<span class="sc'+(FILTER_STAGE===''?' on':'')+'" onclick="setStage(\'\')">全部<b>'+total+'</b></span>';
   (j.stages||[]).forEach(function(s){
-    html += '<span class="sc'+(FILTER_STAGE===s.stage?' on':'')+'" onclick="setStage(\''+s.stage+'\')" style="'+(FILTER_STAGE===s.stage?'border-color:'+stgColor(s.stage)+';color:'+stgColor(s.stage):'')+'">'+s.stage+'<b>'+s.count+'</b></span>';
+    html += '<span class="sc'+(FILTER_STAGE===s.stage?' on':'')+'" onclick="setStage(\''+s.stage+'\')" style="'+(FILTER_STAGE===s.stage?'border-color:'+stgColor(s.stage)+';color:'+stgColor(s.stage):'')+'">'+stgFull(s.stage)+'<b>'+s.count+'</b></span>';
   });
   document.getElementById('stage-cards').innerHTML = html;
-  var q = await (await fetch('/api/cpa/stages?limit=2000'+(FILTER_STAGE?'&stage='+encodeURIComponent(FILTER_STAGE):''))).json();
+  var q = await (await fetch('/api/cpa/stages?limit=8000'+(FILTER_STAGE?'&stage='+encodeURIComponent(FILTER_STAGE):''))).json();
   ALL = q.rows || [];
   renderTable();
   }catch(e){
@@ -154,7 +231,7 @@ function renderTable(){
   document.getElementById('count').textContent = rows.length + ' / ' + ALL.length + ' 只';
   document.querySelector('#main-table tbody').innerHTML = rows.slice(0,1500).map(function(r){
     return '<tr><td class="code" onclick="showStock(\''+r.code+'\')">'+r.code+'</td><td>'+(r.name||'')+'</td>'+
-      '<td><span class="stg" style="background:'+stgColor(r.stage)+'22;color:'+stgColor(r.stage)+'">'+r.stage+'</span></td>'+
+      '<td><span class="stg" style="background:'+stgColor(r.stage)+'22;color:'+stgColor(r.stage)+'" title="'+stgFull(r.stage, r)+'">'+stgFull(r.stage, r)+'</span></td>'+
       '<td>'+r.days+'</td><td>'+(r.support==null?'—':r.support)+'</td><td>'+(r.invalid==null?'—':r.invalid)+'</td>'+
       '<td><span class="act">'+r.action+'</span></td><td style="font-size:0.55rem;color:var(--muted)">'+(r.entry_path||'')+'</td></tr>';
   }).join('');
@@ -164,35 +241,147 @@ function sortBy(k){ if (sortKey===k) sortDir=-sortDir; else { sortKey=k; sortDir
 async function showStock(code){
   var panel = document.getElementById('detail-panel');
   panel.style.display = 'block';
-  document.getElementById('d-title').textContent = '📈 ' + code + ' 阶段轨迹';
   var j = await (await fetch('/api/cpa/stock?code='+code)).json();
+  var last = (j.daily||[]).length ? j.daily[j.daily.length-1] : null;
+  document.getElementById('d-title').textContent =
+    '📈 ' + code + (last ? ' · 当前 ' + stgFull(last.stage) + '（已持续 ' + last.days_in_stage + ' 日）' : '');
   var V = themeVars();
-  var ds = [], ps = [], areas = [];
-  (j.daily||[]).forEach(function(r){ ds.push(r.date); ps.push(r.close); });
-  // 阶段色带（连续同阶段合并；展示层：连续 >=3 日才着色）
-  var cur = null, seg = [];
+  var ds = [], ps = [], e10 = [], e20 = [], areas = [], ov = [], vols = [], vavg = [], invs = [];
   (j.daily||[]).forEach(function(r, i){
-    if (!cur || r.stage !== cur) {
-      if (cur && seg.length >= 3) areas.push([{xAxis: seg[0]},{xAxis: seg[seg.length-1],itemStyle:{color: stgColor(cur)+'33'}}]);
-      cur = r.stage; seg = [i];
-    } else seg.push(i);
+    ds.push(r.date);
+    // ECharts candlestick 数据顺序：[开, 收, 低, 高]（复权价）
+    ps.push([r.open, r.close, r.low, r.high]);
+    e10.push(r.ema10 == null ? '-' : r.ema10);   // ③ 回踩对象（标准档）
+    e20.push(r.ema20 == null ? '-' : r.ema20);   // ③ 回踩对象（深档）
+    if (isOverlay(r)) ov.push([i, r.high]);      // ⑥w / XT 标签日：K 线上方打三角
+    // 成交量副图：柱色红涨绿跌（铁律：硬编码，禁用 var(--rise/--fall)）
+    vols.push({value: r.volume == null ? '-' : r.volume,
+               itemStyle: {color: (r.close >= r.open) ? '#ef4444' : '#10b981'}});
+    // 20 日均量（肉眼判断“缩量”用）：由 量比 = 当日量/20日均量 反推
+    vavg.push((r.volume && r.vr) ? Math.round(r.volume / r.vr) : '-');
+    // 失效位是「逐日」的：每个阶段有各自的失效位（①a/①b 为空）
+    invs.push(r.invalid_level == null ? '-' : r.invalid_level);
   });
-  if (cur && seg.length >= 3) areas.push([{xAxis: seg[0]},{xAxis: seg[seg.length-1],itemStyle:{color: stgColor(cur)+'33'}}]);
+  // 每段起点的迁移原因与明细（来自 transitions），tooltip 用来展示判定依据
+  var why = {};
+  (j.transitions||[]).forEach(function(t){
+    var o = {};
+    try { o = JSON.parse(t.trigger_detail_json||'{}'); } catch(e) { o = {}; }
+    if (o.reason) why[t.transition_date] = o;
+  });
+  // 阶段色带：先按「底层状态」切段（⑥w / XT 是输出层标签，不改内部状态机，否则
+  // 「③ 里夹一天 ⑥w」会断成两段），再用段长决定画什么。
+  // 不足 3 日的片段**不当作一个阶段**，显式标“趋势待明”（中性灰底）——
+  // 用户原则：只有 2 天谈何阶段；回测带后视镜，实盘不知道就是不知道。
+  var segs = [], segOf = [], SHORT_N = 3;
+  (j.daily||[]).forEach(function(r, i){
+    var b = baseStage(r);
+    if (!segs.length || segs[segs.length-1].stage !== b) segs.push({stage:b, a:i, b:i});
+    else segs[segs.length-1].b = i;
+  });
+  segs.forEach(function(s){
+    s.len = s.b - s.a + 1;
+    s.short = s.len < SHORT_N;
+    for (var k = s.a; k <= s.b; k++) segOf[k] = s;
+    // 注意：markArea 的 xAxis 是轴坐标（类目中心），不是格子。
+    // 若直接写 [a, b]，相邻两段之间会空出一个类目宽度的缝隙——看上去就是一道道黑条。
+    // 所以两边各向外撑半格，接缝才会闭上。（这是用户看到的“黑色”的真因）
+    if (s.short) {
+      areas.push([{xAxis:s.a - 0.5, name:'趋势待明'}, {xAxis:s.b + 0.5, itemStyle:{color:'#9ca3af40'}}]);
+    } else {
+      areas.push([{xAxis:s.a - 0.5, name:stgFull(s.stage)},
+                  {xAxis:s.b + 0.5, itemStyle:{color:stgColor(s.stage)+'33'}}]);
+    }
+  });
   var ch = charts['d'] = charts['d'] || echarts.init(document.getElementById('d-chart'));
   ch.setOption({
     backgroundColor:'transparent', animation:false,
-    grid:{left:8,right:10,top:14,bottom:40,containLabel:true},
-    tooltip:{trigger:'axis',backgroundColor:V.tipBg,borderColor:V.tipBd,textStyle:{color:V.tipTx,fontSize:11}},
-    xAxis:{type:'category',data:ds,boundaryGap:false,axisLabel:{color:V.tx,fontSize:9,interval:Math.floor(ds.length/10)}},
-    yAxis:{type:'value',scale:true,axisLabel:{color:V.tx,fontSize:9},splitLine:{lineStyle:{color:V.sp}}},
-    dataZoom:[{type:'inside',start:60,end:100}],
-    series:[{type:'line',data:ps,symbol:'none',lineStyle:{width:1.4,color:'#ef4444'},
-      markArea:{silent:true,data:areas}}]
+    grid:[{left:8,right:10,top:14,height:'64%',containLabel:true},
+          {left:8,right:10,top:'80%',height:'14%',containLabel:true}],
+    // 多 grid 联动铁律（缺一不可）：① tooltip 内 link 用数字数组；② 顶层 axisPointer.link；
+    // ③ dataZoom 显式 xAxisIndex。否则十字线不联动 / 缩放后两图日期错位。
+    axisPointer:{link:[{xAxisIndex:[0,1]}]},
+    tooltip:{trigger:'axis',backgroundColor:V.tipBg,borderColor:V.tipBd,textStyle:{color:V.tipTx,fontSize:11},
+      axisPointer:{type:'cross',link:[{xAxisIndex:[0,1]}]},
+      formatter:function(ps){
+        var i = ps[0].dataIndex, r = (j.daily||[])[i] || {}, sg = segOf[i];
+        var short = !!(sg && sg.short);
+        var head = short ? '趋势待明' : stgFull(baseStage(r));
+        var s = (r.date||'')+'　<b>'+head+'</b>';
+        if (short) s += '<span style="font-size:9px;opacity:.65">（引擎暂标 '+r.stage+'，仅 '+sg.len+' 日，未成阶段）</span>';
+        if (isOverlay(r)) s += '<br/>⚠ 当日标签：<b>' + stgFull(r.stage) + '</b>（底层仍为 ' + stgFull(baseStage(r)) + '）';
+        s += '<br/>开 '+r.open+'　高 '+r.high+'<br/>低 '+r.low+'　收 '+r.close;
+        // ③ 的判据关键量：低点是否触及 EMA10/EMA20，距多少 ATR
+        if (r.ema10 != null) {
+          var d10 = r.low - r.ema10;
+          s += '<br/>EMA10 '+r.ema10+'　低点距它 '+(d10>=0?'+':'')+d10.toFixed(2)
+             + (r.atr20 ? '（'+(d10/r.atr20>=0?'+':'')+(d10/r.atr20).toFixed(2)+'×ATR）' : '');
+        }
+        if (r.ema20 != null) s += '<br/>EMA20 '+r.ema20;
+        // 判定依据：本段从哪天开始、为什么、靠什么撑着、跌破什么就结束
+        if (r.stage_start_date) {
+          var wd = why[r.stage_start_date];
+          s += '<br/>本段起点 '+r.stage_start_date+(wd && wd.reason ? '：'+wd.reason : '');
+          // ⑥ 族：用户要求标明“破的是哪个位、什么时候破的”
+          if (String(baseStage(r)).indexOf('⑥') === 0 && wd) {
+            var lvl = (wd.ema20 != null) ? ('EMA20 ' + wd.ema20) : '结构位';
+            s += '<br/><b>破位</b>：跌破 ' + lvl + '（' + r.stage_start_date + '）'
+               + (wd.close != null ? '　当日收 ' + wd.close : '');
+            if (wd.support != null) s += '<br/>当时结构支撑 ' + wd.support;
+            if (r.days_in_stage != null) s += '　已下行 ' + r.days_in_stage + ' 日';
+          }
+        }
+        s += '<br/>结构支撑 '+(r.structure_support==null?'—':r.structure_support)
+           + '　失效位 '+(r.invalid_level==null?'—':r.invalid_level)
+           + (r.entry_path ? '　入口 '+r.entry_path : '');
+        // 成交量与量比（判断 ③ “缩量”条件用）
+        if (r.volume != null) {
+          s += '<br/>量 ' + Math.round(r.volume / 10000).toLocaleString() + ' 万手'
+             + (r.vr != null ? '　量比 ' + r.vr + (r.vr <= 0.9 ? ' <b style="color:#10b981">✓ 缩量</b>' : '') : '');
+        }
+        return s;
+      }},
+    xAxis:[{type:'category',data:ds,gridIndex:0,boundaryGap:false,
+            axisLabel:{color:V.tx,fontSize:9,interval:Math.floor(ds.length/10)}},
+           {type:'category',data:ds,gridIndex:1,boundaryGap:false,axisLabel:{show:false}}],
+    yAxis:[{type:'value',scale:true,gridIndex:0,axisLabel:{color:V.tx,fontSize:9},splitLine:{lineStyle:{color:V.sp}}},
+           {type:'value',gridIndex:1,name:'量',nameTextStyle:{color:V.tx,fontSize:9},
+            axisLabel:{show:false},splitLine:{show:false}}],
+    dataZoom:[{type:'inside',xAxisIndex:[0,1],start:60,end:100}],
+    series:[{type:'candlestick',data:ps,xAxisIndex:0,yAxisIndex:0,
+      itemStyle:{color:'#ef4444',color0:'#10b981',borderColor:'#ef4444',borderColor0:'#10b981'},
+      markArea:{silent:true,data:areas,
+        label:{show:true,position:'insideTop',color:V.tx,fontSize:9,formatter:function(p){return p.name||''}}}},
+      // 失效位不再用 markLine（那会横穿整张图、看着像全程有效），改用独立 series 画阶梯线
+      {type:'line',data:e20,name:'EMA20（深档回踩）',symbol:'none',silent:true,xAxisIndex:0,yAxisIndex:0,
+       lineStyle:{width:1,color:'#38bdf8',opacity:.8}},
+      {type:'line',data:e10,name:'EMA10（标准档回踩）',symbol:'none',silent:true,xAxisIndex:0,yAxisIndex:0,
+       lineStyle:{width:1,color:'#f59e0b',opacity:.9}},
+      {type:'scatter',data:ov,symbol:'triangle',symbolSize:7,z:6,itemStyle:{color:'#f59e0b'},silent:true,
+       xAxisIndex:0,yAxisIndex:0},
+      // 失效位：随阶段变化的阶梯虚线（'-' 断开不连）
+      // 标签只标**最后一个有值的点**（= 当前生效的失效位）。历史上的段不标，避免糊片。
+      {type:'line',data:invs,xAxisIndex:0,yAxisIndex:0,symbol:'none',silent:true,
+       step:'end',connectNulls:false,name:'失效位',
+       lineStyle:{width:1,color:'#10b981',type:'dashed',opacity:.85},
+       label:{show:true,position:'right',color:'#10b981',fontSize:9.5,fontWeight:500,
+         formatter:function(p){
+           var i = p.dataIndex, v = invs[i];
+           if (v === '-' || v == null) return '';
+           for (var k = i + 1; k < invs.length; k++) {
+             if (invs[k] !== '-' && invs[k] != null) return '';   // 后面还有值 → 不是最后一个
+           }
+           return v;                                              // 当前生效
+         }}},
+      // 成交量副图：柱 + 20 日均量虚线（低于虚线 = 缩量）
+      {type:'bar',data:vols,xAxisIndex:1,yAxisIndex:1,barWidth:'60%'},
+      {type:'line',data:vavg,xAxisIndex:1,yAxisIndex:1,symbol:'none',silent:true,
+       lineStyle:{width:1,color:'#9ca3af',opacity:.7,type:'dashed'}}]
   }, true);
   document.getElementById('d-sub').textContent = (j.transitions||[]).length + ' 次迁移';
   document.getElementById('d-trans').innerHTML = (j.transitions||[]).slice(-40).reverse().map(function(t){
     var cls = t.invalidated ? 'inv' : '';
-    return '<div class="'+cls+'">'+t.transition_date+' '+t.from_stage+'→'+t.to_stage+
+    return '<div class="'+cls+'">'+t.transition_date+' '+stgFull(t.from_stage)+' → '+stgFull(t.to_stage)+
       (t.invalidated ? ' <span style="font-size:0.55rem">(已失效 '+t.invalidated_date+')</span>' : '')+
       ' <span style="font-size:0.55rem;color:var(--muted)">'+((t.trigger_detail_json||'').slice(0,60))+'</span></div>';
   }).join('');

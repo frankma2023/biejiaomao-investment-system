@@ -70,11 +70,12 @@ def scan_group(ind, kl, i, rps_map):
         l = kl[i].get('low_adj')
         if pl and ph and l and l < pl and c > ph:
             out.add('C')
-    # D：强势闸门
-    gain = cpa.max_gain_in(kl, max(0, hi_idx - 250), hi_idx)
-    recent = (i - hi_idx) <= cpa.CFG['r_high_recency']
-    rps_h = rps_map.get(kl[hi_idx]['date'])
-    if gain is not None and gain >= cpa.CFG['r_strong_gain'] and (recent or (rps_h is not None and rps_h >= cpa.CFG['r_h_rps250'])):
+    # D：强势闸门（2026-09-14 v1.5 与引擎同步）
+    # 原实现是 `gain≥40% ∧ (recent ∨ rps≥70)`，但引擎 L520 的 a_ok 又强制要求 recent，
+    # 且 #4 扫参证明 gain 与 rps 均无价值（−0.02pp / −0.04pp）、recent 单调（≤60 日 +2.24pp）。
+    # 现与引擎同结构：只剩「距高点 ≤ r_high_recency」一条。
+    # ⚠ CFG['r_strong_gain'] / CFG['r_h_rps250'] 已在 v1.5 置为 None，不再引用。
+    if (i - hi_idx) <= cpa.CFG['r_high_recency']:
         out.add('D')
     return out
 
