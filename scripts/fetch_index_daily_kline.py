@@ -193,6 +193,13 @@ def main():
 
     default_end = datetime.now().strftime("%Y-%m-%d")
     total_saved = 0
+    # ⚠ 2026-09-14 加固：原实现只报“共保存 N 条”，拿不到数据也是退出 0
+    #   → 上游（daily_update）看到的是 ✅，而实际可能整批为空。
+    #   实测：2026-09-14 在 16:18 跑（数据源当日 EOD 尚未发布），410 个指数全返回 0 条，
+    #   静默成功，库里只有 21 行 ETF（来自另一个步骤）→ 下游行业分组全为 null。
+    #   现改为：逐指数记录“应当拿到、却拿到 0 条”的落空项，大面积落空即报错并非零退出。
+    expect_date = user_end or default_end
+    missed = []
 
     for idx_code, idx_name in indices.items():
         # 查询该指数已存的最新日期
@@ -216,10 +223,21 @@ def main():
             n = save_klines(conn, idx_code, klines)
             total_saved += n
             log.info(f"  {idx_code} {idx_name}: +{n} 条 {start_date}~{end_date}")
+            if n == 0 and start_date <= expect_date:
+                missed.append(idx_code)
         except Exception as e:
             log.error(f"  {idx_code} {idx_name}: ❌ {e}")
 
     log.info(f"🏁 完成: 共保存 {total_saved} 条指数K线")
+    if missed:
+        ratio = len(missed) / max(1, len(indices))
+        log.error(f"⚠️ {len(missed)}/{len(indices)} ({ratio:.0%}) 个指数在 {expect_date} 前未取到数据，"
+                  f"例: {missed[:5]}")
+        if ratio >= 0.2:
+            log.error("❌ 超过 20% 的指数落空，判定为取数失败"
+                      "（常见原因：数据源当日 EOD 尚未发布；建议稍后重跑）")
+            conn.close()
+            sys.exit(1)
     conn.close()
 
 

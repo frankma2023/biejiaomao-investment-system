@@ -142,10 +142,24 @@ def run_task(label, cmd, timeout=3600, stream=False):
         stderr = r.stderr.strip()
         if r.returncode == 0:
             # 打印最后几行输出
-            lines = stdout.split("\n")
+            lines = [l for l in stdout.split("\n") if l.strip()]
             for line in lines[-8:]:
-                if line.strip():
-                    log(f"    {line.strip()}")
+                log(f"    {line.strip()}")
+            # ⚠ 2026-09-14 加固：退出码 0 不代表内部没有告警/错误。
+            #   实测：取数脚本拿到 0 条数据时也退出 0，其内部的 ❌ / WARNING 行
+            #   只要不在最后 8 行内就被丢弃 → 整批落空却上报 ✅。
+            #   （行业分组健康分显示 null 就是这条链路的末端表现）
+            #   现将所有含告警/错误关键词的行额外透传（去重，不与上面重复）。
+            shown = {l.strip() for l in lines[-8:]}
+            hl = [l.strip() for l in lines
+                  if l.strip() not in shown
+                  and any(k in l for k in ("❌", "⚠", "WARNING", "ERROR", "失败", "错误"))]
+            if hl:
+                log(f"    ⚠ 该步骤退出码为 0，但输出含 {len(hl)} 条告警/错误：")
+                for line in hl[:10]:
+                    log(f"      {line}")
+                if len(hl) > 10:
+                    log(f"      ...（另有 {len(hl) - 10} 条）")
             log(f"  ✅ {label} 完成 ({elapsed:.0f}s)")
             return (label, True, elapsed, stdout)
         else:
