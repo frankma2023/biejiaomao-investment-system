@@ -706,6 +706,28 @@ tests:
     pending: "✅ 重算与复测均完成。剩余：前端另有 4 处 stgFull 调用点未传 r（回退旧标签，不影响功能）；
               回测 2（② 三组）未随闸门改动重跑（② 不经过①的闸门，无影响）"
 
+  frontend_phase2:
+    status: partial
+    date: '2026-09-14'
+    item_1_invalidated_three_state:
+      status: done
+      spec: 'PRD §9.5：已失效（灰/删除线）｜ 待验证（黄，仍在 N 窗口内）｜ 有效（绿）'
+      api: "server.py /api/cpa/stock 的 transitions 新增 inv_state / inv_n / inv_window_days / days_since。
+            N 取 CFG['inv_n'] 的分类值（→⑥ 类回退 12），窗口口径与 mark_invalidated 一致：N × 1.4 日历日"
+      front: "cpa-stages.html 迁移列表按 inv_state 上色；新增 .pend / .ok 两个 CSS 类；标题加图例"
+      verify: "600309（2024-01-01 起）48 条迁移 → 37 有效 / 9 已失效 / 2 待验证"
+      caveat: |
+        ⚠️ “→⑥ 类”的 invalidated 在本 PRD #22 已判定为**退化标记**（离开 ⑥ 就算回退，失败率 97~100%），
+        所以该类的“待验证”语义弱于其它类。待 #22 的处置（从标记中排除→⑥类）落地后同步调整。
+    item_2_watchlist_filter:
+      status: todo
+      spec: 'PRD §9.14 一期补项：前端主表按观察池/自选池过滤（当前为全市场）'
+    item_3_collapse_states:
+      status: not_frontend
+      spec: 'PRD §9.13：collapse_states 接入消费链'
+      note: "审查 PRD 原文后确认：该项注明“回测阶段接”，属回测侧而非前端，不计入前端二期。
+             23 项回测已全部完成，回测脚本各自自备口径，故不改。"
+
   cpa_unit_tests:
     status: done
     date: '2026-09-14'

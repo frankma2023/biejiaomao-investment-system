@@ -7570,6 +7570,46 @@ def api_cpa_stock():
             WHERE d.stock_code=? AND d.date>=? ORDER BY d.date""", (code, start)).fetchall()
         trans = db.execute("""SELECT transition_date, from_stage, to_stage, trigger_detail_json, invalidated, invalidated_date
             FROM cpa_stage_transitions WHERE stock_code=? AND transition_date>=? ORDER BY transition_date""", (code, start)).fetchall()
+        # invalidated 三态（PRD §9.5；§9.14 二期补项）：
+        #   已失效（灰/删除线）= invalidated=1
+        #   待验证（黄）      = 未失效，但距迁移日仍在 N 窗口内（结论未成）
+        #   有效（绿）        = 未失效且已超出 N 窗口
+        # N 按迁移类型分设（CFG['inv_n']），窗口口径与 mark_invalidated 一致：N × 1.4 日历日。
+        trans_out = []
+        try:
+            import scanners.cpa_stage as _cpa2
+            _inv_n = dict(_cpa2.CFG.get('inv_n') or {})
+        except Exception:
+            _inv_n = {}
+        _latest = db.execute("SELECT MAX(date) FROM cpa_stage_daily").fetchone()[0]
+
+        def _n2d(s):
+            from datetime import date as _dt
+            return _dt(int(s[:4]), int(s[5:7]), int(s[8:10])).toordinal()
+
+        for _r in trans:
+            _d = dict(_r)
+            _key = '%s→%s' % (_d.get('from_stage') or '', _d.get('to_stage') or '')
+            _n = _inv_n.get(_key)
+            if _n is None:
+                _n = _inv_n.get('→%s' % (_d.get('to_stage') or ''), 12)
+            _win = _n * 1.4                       # 日历日窗（与 mark_invalidated 同口径）
+            _span = None
+            try:
+                if _latest and _d.get('transition_date'):
+                    _span = _n2d(_latest) - _n2d(_d['transition_date'])
+            except Exception:
+                _span = None
+            _d['inv_n'] = _n
+            _d['inv_window_days'] = round(_win, 1)
+            _d['days_since'] = _span
+            if _d.get('invalidated'):
+                _d['inv_state'] = 'invalidated'
+            elif _span is not None and _span < _win:
+                _d['inv_state'] = 'pending'
+            else:
+                _d['inv_state'] = 'valid'
+            trans_out.append(_d)
         # ③「回踩确认」回踩的就是 EMA10（标准档）/ EMA20（深档），前端必须画这两条线，
         # 否则「回踩确认」四个字没有视觉对应物。ATR20 一并返回，用于标注「低点距均线多少 ATR」。
         # 指标现算（~6000 根，毫秒级）不落库；从 2014 起算保证 EMA 预热充分，只合并请求区间。
@@ -7590,8 +7630,7 @@ def api_cpa_stock():
             d['ema20'] = round(e[1], 3) if e and e[1] else None
             d['atr20'] = round(e[2], 3) if e and e[2] else None
             out.append(d)
-        return jsonify({'code': code, 'daily': out,
-                        'transitions': [dict(r) for r in trans]})
+        return jsonify({'code': code, 'daily': out, 'transitions': trans_out})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
