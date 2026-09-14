@@ -7503,6 +7503,7 @@ def api_cpa_stages():
     try:
         stage = request.args.get('stage', '')
         action = request.args.get('action', '')
+        pool = request.args.get('pool', '')   # pool=watch → 只看观察池（PRD §9.14 一期补项）
         # 注意：上限曾为 2000，而最新交易日有 ~5,969 只股票，且排序是“阶段+持续天数”，
         # 与股票代码无关 → 用户搜 600309 这类代码会搜不到（被随机截掉）。
         # 现改为覆盖全市场，并把 stock_code 加入排序键保证截断是确定性的。
@@ -7513,6 +7514,13 @@ def api_cpa_stages():
                FROM cpa_stage_daily d LEFT JOIN stock_basic b ON b.stock_code=d.stock_code
                WHERE d.date=?"""
         args = [date]
+        if pool == 'watch':
+            # 观察池过滤（PRD §9.14 一期补项：主表原为全市场）。
+            # 池子是按日快照（每日约 480 只 vs 全市场 ~5,969），取「不超过查询日的
+            # 最近一个有池子的日期」，避免查历史日期时池子为空导致结果全空。
+            q += (" AND d.stock_code IN (SELECT stock_code FROM discipline_observation_pool "
+                  "WHERE date=(SELECT MAX(date) FROM discipline_observation_pool WHERE date<=?))")
+            args.append(date)
         if stage:
             stages = [s for s in stage.split(',') if s]
             q += " AND d.stage IN (%s)" % ','.join('?' * len(stages))
@@ -7535,7 +7543,7 @@ def api_cpa_stages():
                         'days': r['days_in_stage'], 'support': r['structure_support'],
                         'invalid': r['invalid_level'], 'action': r['action'], 'close': r['close'],
                         'entry_path': m.get('entry_path'), 'transition_zone': m.get('transition_zone', False)})
-        return jsonify({'date': date, 'rows': out, 'count': len(out)})
+        return jsonify({'date': date, 'rows': out, 'count': len(out), 'pool': pool or 'all'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

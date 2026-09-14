@@ -146,7 +146,7 @@
 <script src="../shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:"🎯",brandText:"CPA 阶段",currentPage:"cpa-stages"})</script>
 <script>
-var ALL = [], DATE = '', FILTER_STAGE = '', charts = {}, sortKey = '', sortDir = 1;
+var ALL = [], DATE = '', FILTER_STAGE = '', FILTER_POOL = false, charts = {}, sortKey = '', sortDir = 1;
 var STAGE_COLOR = {'①a':'#6b7280','①b':'#9ca3af','②':'#ef4444','③':'#f97316','④':'#dc2626','⑤':'#a855f7',
                    '⑥a':'#065f46','⑥b':'#10b981','⑥c':'#34d399'};
 function stgColor(s){ var base = (s||'').replace('T',''); var c = STAGE_COLOR[base] || '#888'; return (s||'').indexOf('T')>=0 ? c+'99' : c; }
@@ -205,12 +205,13 @@ async function load(){
     ALL = []; renderTable(); return;
   }
   var total = (j.stages||[]).reduce(function(a,b){return a+b.count;},0);
-  var html = '<span class="sc'+(FILTER_STAGE===''?' on':'')+'" onclick="setStage(\'\')">全部<b>'+total+'</b></span>';
+  var html = '<span class="sc'+(FILTER_POOL?' on':'')+'" onclick="setPool()" title="只看观察池（每日约 480 只）">🎯 观察池</span>'
+     + '<span class="sc'+(FILTER_STAGE===''?' on':'')+'" onclick="setStage(\'\')">全部<b>'+total+'</b></span>';
   (j.stages||[]).forEach(function(s){
     html += '<span class="sc'+(FILTER_STAGE===s.stage?' on':'')+'" onclick="setStage(\''+s.stage+'\')" style="'+(FILTER_STAGE===s.stage?'border-color:'+stgColor(s.stage)+';color:'+stgColor(s.stage):'')+'">'+stgFull(s.stage)+'<b>'+s.count+'</b></span>';
   });
   document.getElementById('stage-cards').innerHTML = html;
-  var q = await (await fetch('/api/cpa/stages?limit=8000'+(FILTER_STAGE?'&stage='+encodeURIComponent(FILTER_STAGE):''))).json();
+  var q = await (await fetch('/api/cpa/stages?limit=8000'+(FILTER_STAGE?'&stage='+encodeURIComponent(FILTER_STAGE):'')+(FILTER_POOL?'&pool=watch':''))).json();
   ALL = q.rows || [];
   renderTable();
   }catch(e){
@@ -218,6 +219,7 @@ async function load(){
   }
 }
 function setStage(s){ FILTER_STAGE = s; load(); }
+ function setPool(){ FILTER_POOL = !FILTER_POOL; load(); }   // 观察池过滤（PRD §9.14 一期补项）
 function renderTable(){
   var q = (document.getElementById('q').value||'').trim();
   var fa = document.getElementById('faction').value;

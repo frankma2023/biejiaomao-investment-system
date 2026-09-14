@@ -707,7 +707,7 @@ tests:
               回测 2（② 三组）未随闸门改动重跑（② 不经过①的闸门，无影响）"
 
   frontend_phase2:
-    status: partial
+    status: done
     date: '2026-09-14'
     item_1_invalidated_three_state:
       status: done
@@ -720,8 +720,14 @@ tests:
         ⚠️ “→⑥ 类”的 invalidated 在本 PRD #22 已判定为**退化标记**（离开 ⑥ 就算回退，失败率 97~100%），
         所以该类的“待验证”语义弱于其它类。待 #22 的处置（从标记中排除→⑥类）落地后同步调整。
     item_2_watchlist_filter:
-      status: todo
-      spec: 'PRD §9.14 一期补项：前端主表按观察池/自选池过滤（当前为全市场）'
+      status: done
+      spec: 'PRD §9.14 一期补项：前端主表按观察池过滤（原为全市场）'
+      api: "server.py /api/cpa/stages 新增 pool 参数；pool=watch 时用
+            `stock_code IN (SELECT ... WHERE date=(SELECT MAX(date) ... WHERE date<=?))`，
+            取不超过查询日的最近一个有池子的日期，避免查历史时池子为空"
+      front: "cpa-stages.html 新增 FILTER_POOL 状态 + setPool() + '🎯 观察池' 切换 chip"
+      verify: "全市场 5,439 行 → 观察池 478 行（池内 480 只，2 只无 CPA 数据）"
+      note: "观察池表：discipline_observation_pool，按日快照，最新日 2026-09-14 共 480 只"
     item_3_collapse_states:
       status: not_frontend
       spec: 'PRD §9.13：collapse_states 接入消费链'
