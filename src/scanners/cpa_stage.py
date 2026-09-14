@@ -1106,7 +1106,9 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
                 if r1['a']:   # ①a 全条件满足
                     stage = '①b' if r1['b'] else '①a'
                     ctx['stage_start_idx'] = i; ctx['w_pause'] = None; ctx['w_date_idx'] = None
-                    detail = {'reason': '①a全条件满足（跌够且衰竭）'}
+                    detail = {'reason': '①a全条件满足（跌够且衰竭）',
+                              **(r1.get('detail') or {})}   # 2026-09-14：原写法丢掉了判据的 detail，
+                                                            # 导致闸门/回撤/恐慌量字段不入库、无法事后核验
                 elif dd is not None and dd >= CFG['r_drawdown_min']:
                     if stage != '⑥c':
                         stage = '⑥c'; detail = {'reason': '回撤≥30%但衰竭未现'}
