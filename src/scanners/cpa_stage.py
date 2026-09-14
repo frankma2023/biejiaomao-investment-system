@@ -685,8 +685,11 @@ def judge_crossback(ind, kl, i, ctx):
                        'phase': phase}}   # 2026-09-14：档位写入 detail，供动作层判定（PRD §12.2 #7）
 
 
-def find_box(ind, kl, i, prior_gain_start_idx):
+def find_box(ind, kl, i):
     """阶段④ 箱体识别（无参数边界 + 四项硬门槛）
+
+    2026-09-14：去掉 prior_gain_start_idx 形参——深度门槛改绝对上限后（PRD §12.2 #13），
+    箱体筛选不再依赖前置涨幅；前置涨幅的判定搬到了 judge_base_break（上界，PRD §12.2 #14）。
     返回 dict(high, low, start_idx, win_len, depth, touch_top, touch_bot) 或 None
     """
     best = None
@@ -714,14 +717,9 @@ def find_box(ind, kl, i, prior_gain_start_idx):
         if not (v1 and v2):
             continue
         vol_ok = (sum(v2) / len(v2)) < (sum(v1) / len(v1))
-        # 深度门槛
-        prior_gain = None
-        if prior_gain_start_idx is not None and prior_gain_start_idx < s:
-            base_close = kl[prior_gain_start_idx].get('adj_close')   # 复权口径统一（PRD §2）
-            if base_close and base_close > 0:
-                prior_gain = zh / base_close - 1
         # 深度门槛（2026-09-14，PRD §12.2 #13）：改绝对上限。
         # 原「≤前段涨幅×50% 或 ≤15%」的相对口径随 #14 取消前置涨幅下界而失去基准。
+        # 前置涨幅的判定改在 judge_base_break 里做（上界），此处不再需要 prior_gain_start_idx。
         depth_ok = depth <= CFG['b_depth_max']
         if not (vol_ok and depth_ok):
             continue
@@ -730,7 +728,7 @@ def find_box(ind, kl, i, prior_gain_start_idx):
         touch_top = sum(1 for x in seg_c if x >= zh * (1 - band))
         touch_bot = sum(1 for x in seg_c if x <= zl * (1 + band))
         cand = {'high': zh, 'low': zl, 'start_idx': s, 'win_len': w, 'depth': depth,
-                'touch_top': touch_top, 'touch_bot': touch_bot, 'prior_gain': prior_gain}
+                'touch_top': touch_top, 'touch_bot': touch_bot}
         if best is None or w > best['win_len']:
             best = cand
     return best
@@ -742,7 +740,7 @@ def judge_base_break(ind, kl, i, ctx):
     if c is None or v is None:
         return {'hit': False, 'box': None}
     start_idx = ctx.get('entry_idx')
-    box = find_box(ind, kl, i, start_idx)
+    box = find_box(ind, kl, i)
     if not box:
         return {'hit': False, 'box': None}
     # 前置：自最后有效入场点涨幅（2026-09-14 由「≥20% 下界」反向为「≤30% 上界」，PRD §12.2 #14）
@@ -854,13 +852,16 @@ def init_stage(ind, kl, i):
     if c is None or e20 is None:
         return '①a', {}
     dd, _ = drawdown_from_high(kl, i, CFG['pctile_win'])
-    nd10 = ind['nd10'][i]
+    # 2026-09-14：⑤ 的判据已换 ATR60 口径（PRD §12.2 #16），初值推断必须同口径，
+    # 否则同一只股票在初值路径与主路径上会得到不同的 ⑤ 判定。
+    nd10_slow = ind['nd10_slow'][i]
     above = c > e20
     if above:
-        pctl = pctile_of(ind['nd10'], i, CFG['pctile_win'], nd10) if nd10 is not None else None
-        if pctl is not None and pctl >= CFG['e_pctile_min'] and nd10 and nd10 >= CFG['e_nd10_min']:
+        pctl = (pctile_of(ind['nd10_slow'], i, CFG['pctile_win'], nd10_slow)
+                if nd10_slow is not None else None)
+        if pctl is not None and pctl >= CFG['e_pctile_min'] and nd10_slow and nd10_slow >= CFG['e_nd10_min']:
             return '⑤', {}
-        if find_box(ind, kl, i, max(0, i - 120)):
+        if find_box(ind, kl, i):
             return '④', {'init_box': True}
         return '②', {'init_flag': True}      # 初值推断（标记）
     if dd is not None and dd >= CFG['r_drawdown_min']:
@@ -1061,8 +1062,18 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
                     stage = '⑤'; ctx['exh_start_idx'] = i; ctx['stage_start_idx'] = i; detail = r5['detail']
                 else:
                     # 新箱体（连续加仓）
-                    nb = find_box(ind, kl, i, ctx.get('entry_idx'))
-                    if nb and c > nb['high'] * CFG['b_breakout_buf'] and (ind['vr'][i] or 0) >= CFG['b_breakout_vr']:
+                    nb = find_box(ind, kl, i)
+                    # 2026-09-14：与 judge_base_break 一致施加前置涨幅上界（PRD §12.2 #14）。
+                    # 此路径原本没有前置涨幅门槛（旧版只在 find_box 的深度相对口径里间接用到），
+                    # 属遗留不一致，借本次统一。
+                    _ok_gain = True
+                    _ei = ctx.get('entry_idx')
+                    if nb and _ei is not None:
+                        _bc = kl[_ei].get('adj_close')
+                        if _bc and _bc > 0:
+                            _ok_gain = (nb['high'] / _bc - 1) <= CFG['b_prior_gain_max']
+                    if (nb and _ok_gain and c > nb['high'] * CFG['b_breakout_buf']
+                            and (ind['vr'][i] or 0) >= CFG['b_breakout_vr']):
                         ctx['box'] = nb; ctx['entry_idx'] = i; ctx['stage_start_idx'] = i
                         detail = {'reason': '连续箱体突破', 'box_high': round(nb['high'], 2)}
 
@@ -1113,7 +1124,10 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
         elif stage.startswith('⑥'):
             invalid = e20
 
+        # nd10 = ATR20 口径（①③ 用）；nd10_slow = ATR60 口径（⑤ 用）。
+        # 2026-09-14：⑤ 改 ATR60 后两者必须都记录，否则页面显示的口径与判据不一致。
         metrics = {'nd10': round(ind['nd10'][i], 2) if ind['nd10'][i] is not None else None,
+                   'nd10_slow': round(ind['nd10_slow'][i], 2) if ind['nd10_slow'][i] is not None else None,
                    'nd20': round(ind['nd20'][i], 2) if ind['nd20'][i] is not None else None,
                    'vr': round(ind['vr'][i], 2) if ind['vr'][i] else None,
                    'ema10': round(e10, 2), 'ema20': round(e20, 2)}
