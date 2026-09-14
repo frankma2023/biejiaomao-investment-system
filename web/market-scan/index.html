@@ -377,7 +377,7 @@
           html+='<div class="sc-title">'+g.group_label+'</div>';
           html+='<div style="display:flex;align-items:baseline;gap:6px;margin:4px 0">';
           html+='<span style="font-family:var(--font-display);font-size:1.8rem;font-weight:400;color:'+gColor+'">'+(g.total_score||'--')+'</span>';
-          html+='<span style="font-size:13px;font-weight:600;color:'+gColor+'">'+g.rating+'</span>';
+          html+='<span style="font-size:13px;font-weight:600;color:'+gColor+'">'+(g.rating||'—')+'</span>';
           html+='</div>';
           if(g.indices_count||g.stocks_count){
             html+='<div style="font-size:10px;color:var(--muted)">'+(g.indices_count||0)+'指数 · '+(g.stocks_count||0)+'只</div>';
@@ -388,7 +388,11 @@
           }
           if(g.tech){
             var t=g.tech;
-            html+='<div style="font-size:9px;color:var(--muted);margin-top:3px">MA50↑'+t.above_ma50+'/'+g.indices_count+' · RS_20均'+t.avg_rs_20+'</div>';
+            var _seen=t.indices_seen||g.indices_count||0;
+            html+='<div style="font-size:9px;color:var(--muted);margin-top:3px">MA50↑'+t.above_ma50+'/'+_seen+' · RS_20均'+t.avg_rs_20+'</div>';
+            if(!g.indices_count&&!_seen){
+              html+='<div style="font-size:9px;color:var(--muted);margin-top:2px">本期该组无成员指数</div>';
+            }
           }
           // 资金流向标签
           if(h.capital_flow&&h.capital_flow.groups&&h.capital_flow.groups[g.group_name]){

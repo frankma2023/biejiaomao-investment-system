@@ -588,6 +588,9 @@ def api_market_health():
         """, (row['date'], *codes)).fetchall()
         
         tech = {
+            # indices_seen：本次按 RS 条件实际命中的指数数。
+            # 与存储字段 indices_count 可能不同（后者是写入时的口径），两者不一致说明存储表陈旧。
+            'indices_seen': len(idx_rows),
             'above_ma50': sum(1 for r in idx_rows if r['ma50'] and r['close'] > r['ma50']),
             'above_ma200': sum(1 for r in idx_rows if r['ma200'] and r['close'] > r['ma200']),
             'avg_rs_20': round(sum(r['rs_20'] for r in idx_rows) / len(idx_rows), 1) if idx_rows else 0,

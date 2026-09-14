@@ -969,12 +969,17 @@ def compute_sector_health_groups(target_date):
     
     # 分池：sector_l2 和 thematic
     # 从 index_rs_daily 查所有指数的 RS
+    # ⚠ 2026-09-14 修复：原句是 `JOIN index_daily_kline ON ... AND i.date = r.date`，
+    #   是个隐蔽的致命依赖——只要指数 K 线当天不完整（实测 2026-09-14 只加载了 21/430 行），
+    #   整张 RS 表就被 JOIN 筛空 → rs_map 为空 → 所有指数被归入弱势组 → mid/strong 写 NULL。
+    #   而读取侧（server.py /api/market-health）只查 index_rs_daily，两侧口径不同 → 界面矛盾。
+    #   原 SELECT 的 i.close 从未被使用（rs_map 只用 rs_20），故直接去掉 JOIN。
+    #   若将来需要"当天有交易"的守门，应改用与读取侧一致的判据，并显式记录排除项。
     all_index_rs = conn.execute(f"""
-        SELECT r.stock_code, r.rs_20, i.close
+        SELECT r.stock_code, r.rs_20
         FROM index_rs_daily r
-        JOIN index_daily_kline i ON r.stock_code = i.stock_code AND r.date = i.date
-        WHERE r.date = ? AND i.date = ?
-    """, (target_date, target_date)).fetchall()
+        WHERE r.date = ?
+    """, (target_date,)).fetchall()
     
     # 从 index_style.yaml 获取分类
     # 使用 Python 解析 yaml 获取分类
@@ -1001,9 +1006,17 @@ def compute_sector_health_groups(target_date):
     
     for pool_key, pool_label, pool_codes in pools:
         # 按 RS 分组
-        strong_codes = [c for c in pool_codes if rs_map.get(c, 0) >= 75]
-        mid_codes = [c for c in pool_codes if 30 <= rs_map.get(c, 0) < 75]
-        weak_codes = [c for c in pool_codes if rs_map.get(c, 0) < 30]
+        # ⚠ 2026-09-14 修复：原用 `rs_map.get(c, 0)`——缺 RS 数据的指数会被默认值 0
+        # 静默归入弱势组。实测后果：rs_map 来自 index_rs_daily JOIN index_daily_kline，
+        # 凡当天在 index_daily_kline 里没有 K 线的指数全部被吞，导致 45 个 L2 几乎全进弱势，
+        # l2_mid / l2_strong 的 codes 为空 → 写入 NULL，与读取侧（直接查 index_rs_daily）矛盾。
+        # 现改为：缺 RS 数据的指数不参与分组，并计数上报（不再静默）。
+        missing_rs = [c for c in pool_codes if rs_map.get(c) is None]
+        strong_codes = [c for c in pool_codes if c not in missing_rs and rs_map[c] >= 75]
+        mid_codes = [c for c in pool_codes if c not in missing_rs and 30 <= rs_map[c] < 75]
+        weak_codes = [c for c in pool_codes if c not in missing_rs and rs_map[c] < 30]
+        if missing_rs:
+            logger.warning(f"[{pool_label}] {len(missing_rs)}/{len(pool_codes)} 个指数缺 RS 数据，已排除出分组：{missing_rs[:6]}")
         
         for suffix, label_suffix, codes in [
             ('strong', '强势组', strong_codes),
