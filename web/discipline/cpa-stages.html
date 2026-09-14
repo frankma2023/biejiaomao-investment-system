@@ -244,7 +244,7 @@ async function showStock(code){
   var j = await (await fetch('/api/cpa/stock?code='+code)).json();
   var last = (j.daily||[]).length ? j.daily[j.daily.length-1] : null;
   document.getElementById('d-title').textContent =
-    '📈 ' + code + (last ? ' · 当前 ' + stgFull(last.stage) + '（已持续 ' + last.days_in_stage + ' 日）' : '');
+    '📈 ' + code + (last ? ' · 当前 ' + stgFull(last.stage, last) + '（已持续 ' + last.days_in_stage + ' 日）' : '');
   var V = themeVars();
   var ds = [], ps = [], e10 = [], e20 = [], areas = [], ov = [], vols = [], vavg = [], invs = [];
   (j.daily||[]).forEach(function(r, i){
@@ -306,10 +306,10 @@ async function showStock(code){
       formatter:function(ps){
         var i = ps[0].dataIndex, r = (j.daily||[])[i] || {}, sg = segOf[i];
         var short = !!(sg && sg.short);
-        var head = short ? '趋势待明' : stgFull(baseStage(r));
+        var head = short ? '趋势待明' : stgFull(baseStage(r), r);
         var s = (r.date||'')+'　<b>'+head+'</b>';
         if (short) s += '<span style="font-size:9px;opacity:.65">（引擎暂标 '+r.stage+'，仅 '+sg.len+' 日，未成阶段）</span>';
-        if (isOverlay(r)) s += '<br/>⚠ 当日标签：<b>' + stgFull(r.stage) + '</b>（底层仍为 ' + stgFull(baseStage(r)) + '）';
+        if (isOverlay(r)) s += '<br/>⚠ 当日标签：<b>' + stgFull(r.stage, r) + '</b>（底层仍为 ' + stgFull(baseStage(r), r) + '）';
         s += '<br/>开 '+r.open+'　高 '+r.high+'<br/>低 '+r.low+'　收 '+r.close;
         // ③ 的判据关键量：低点是否触及 EMA10/EMA20，距多少 ATR
         if (r.ema10 != null) {
