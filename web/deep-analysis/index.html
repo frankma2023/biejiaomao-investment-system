@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>深度分析</title>
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<style>
+.app-container{max-width:900px;margin:0 auto;padding:16px 24px 80px}
+.search-bar{display:flex;gap:8px;margin-bottom:16px}
+.search-bar input{flex:1;padding:10px 14px;border-radius:10px;border:1px solid var(--divider);background:var(--card-bg);color:var(--text-primary);font-size:1rem;font-family:var(--font-display)}
+.search-bar input:focus{outline:none;border-color:var(--accent)}
+.search-bar button{padding:10px 24px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+.search-bar button:disabled{opacity:.5;cursor:not-allowed}
+.analysis-btn-wrap{text-align:center;margin:20px 0}
+.analysis-btn{padding:14px 48px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:1.05rem;font-weight:600;cursor:pointer;position:relative}
+.analysis-btn:disabled{opacity:.5;cursor:not-allowed}
+.analysis-btn .spinner{display:none;width:20px;height:20px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;margin:0 auto}
+.analysis-btn.loading .spinner{display:block}.analysis-btn.loading .txt{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress{text-align:center;font-size:0.85rem;color:var(--muted);margin-top:6px;display:none}
+.progress.show{display:block}
+#result{display:none;background:var(--card-bg);border:1px solid var(--divider);border-radius:14px;padding:24px;margin-top:16px;font-size:0.9rem;line-height:1.7;overflow-x:auto}
+#result.show{display:block}
+#result h1,#result h2,#result h3{font-family:var(--font-display);color:var(--text-primary);margin:16px 0 8px}
+#result h1{font-size:1.2rem}#result h2{font-size:1.05rem}#result h3{font-size:0.95rem}
+#result table{border-collapse:collapse;width:100%;margin:8px 0;font-size:0.82rem}
+#result th,#result td{padding:5px 8px;border:1px solid var(--divider);text-align:left}
+#result th{background:rgba(128,128,128,.05)}
+#result hr{border:none;border-top:1px solid var(--divider);margin:16px 0}
+.error-card{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:12px;padding:14px;margin-top:12px;font-size:0.85rem;color:#ef4444;display:none}
+.error-card.show{display:block}
+</style>
+</head>
+<body>
+<div class="app-container">
+  <nav id="top-nav"></nav>
+  <header class="panel-header" style="margin-top:0">
+    <h1>🔬 深度分析</h1>
+    <p style="font-size:0.75rem;color:var(--muted)">输入 A 股代码 → 异步调用 LLM 按 stock-health-report 框架生成完整深度分析报告</p>
+  </header>
+
+  <div class="search-bar">
+    <input id="code" type="text" placeholder="输入 6 位股票代码，如 600309" maxlength="6" onkeydown="if(event.key==='Enter')go()">
+    <button id="goBtn" onclick="go()">分析</button>
+  </div>
+
+  <div class="analysis-btn-wrap">
+    <button class="analysis-btn" id="analyzeBtn" onclick="start()">
+      <span class="txt">🤖 生成深度分析</span>
+      <span class="spinner"></span>
+    </button>
+    <div class="progress" id="progress"></div>
+  </div>
+
+  <div class="error-card" id="error"></div>
+  <div id="result"></div>
+</div>
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'🦊',brandText:'Hana',currentPage:'deep-analysis'});</script>
+<script>
+var API = location.port==='8772'?'http://127.0.0.1:8788':'';
+var CODE='';
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function md2html(md){
+  return (md||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.*$)/gm,'<h3>$1</h3>')
+    .replace(/^## (.*$)/gm,'<h2>$1</h2>')
+    .replace(/^# (.*$)/gm,'<h1>$1</h1>')
+    .replace(/^---$/gm,'<hr>')
+    .replace(/^\|(.+)\|$/gm,function(m){var c=m.split('|').filter(Boolean).map(function(x){return x.trim()});return c.length?'<tr><td>'+c.join('</td><td>')+'</td></tr>':''})
+    .replace(/<tr><td>[-]+/g,'')
+    .replace(/\n\n/g,'</p><p>')
+    .replace(/\n/g,'<br>');
+}
+
+function go(){
+  var c=document.getElementById('code').value.trim();
+  if(c.length!==6||!/^\d+$/.test(c)){alert('6位数字');return}
+  CODE=c; document.getElementById('result').className='result-card'; document.getElementById('error').className='error-card';
+}
+
+async function start(){
+  if(!CODE){alert('先输入股票代码');return}
+  var btn=document.getElementById('analyzeBtn'),prog=document.getElementById('progress'),err=document.getElementById('error'),res=document.getElementById('result');
+  btn.className='analysis-btn loading';btn.disabled=true;
+  prog.className='progress show';prog.textContent='启动中...';
+  err.className='error-card';res.className='result-card';res.innerHTML='';
+  try{
+    var r=await fetch(API+'/api/deep-analysis/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:CODE})});
+    var j=await r.json();
+    if(j.error)throw new Error(j.error);
+    if(j.reused){prog.textContent='复用今日已有结果';}
+    await poll(j.job_id,btn,prog,res,err);
+  }catch(e){btn.className='analysis-btn';btn.disabled=false;err.className='error-card show';err.textContent='失败: '+e.message}
+}
+
+async function poll(jid,btn,prog,res,err){
+  while(true){
+    var r=await fetch(API+'/api/deep-analysis/status?job_id='+jid);var j=await r.json();
+    if(j.error)throw new Error(j.error);
+    if(j.state==='done'){
+      btn.className='analysis-btn';btn.disabled=false;prog.className='progress';
+      res.style.display='block';res.innerHTML=md2html(j.result_md);
+      // 加载七票表
+      if(j.votes){
+        var tb='<h3>七大师投票明细</h3><table><tr><th>大师</th><th>票</th><th>理由</th></tr>';
+        j.votes.forEach(function(v){tb+='<tr><td>'+esc(v.master)+'</td><td><b>'+esc(v.vote)+'</b></td><td>'+esc(v.reason)+'</td></tr>'});
+        res.innerHTML+=tb+'</table>';
+      }
+      return;
+    }
+    if(j.state==='error'){btn.className='analysis-btn';btn.disabled=false;err.className='error-card show';err.textContent=j.error||'分析出错';return}
+    prog.textContent=(j.stage||'分析中')+' · '+Math.round(j.elapsed_sec||0)+'s';
+    await new Promise(function(r){setTimeout(r,3000)});
+  }
+}
+</script>
+</body>
+</html>

@@ -7487,6 +7487,42 @@ def api_microcap_components():
     return jsonify({'type': typ, 'eff_date': date, 'rows': [dict(r) for r in rows], 'count': len(rows)})
 
 
+# ═══════════════════════════════════════════════
+# API: 深度分析（服务端 job + 轮询）
+# ═══════════════════════════════════════════════
+# 为何异步：分析要跑 9 次 LLM 调用（1 次整合 + 7 大师并行 + 1 主持人），墙钟分钟级。
+# Flask 是单线程，同步等待会占住唯一 worker 并阻塞其他请求。
+# 故 POST /start 立即返回 job_id，后台线程跑，前端轮询 /status。
+
+@app.route('/api/deep-analysis/start', methods=['POST'])
+def api_deep_analysis_start():
+    from scanners import deep_analysis as _da
+    body = request.get_json(silent=True) or {}
+    code = (body.get('code') or request.args.get('code') or '').strip()
+    if not code or len(code) != 6 or not code.isdigit():
+        return jsonify({'error': '需要 6 位数字股票代码'}), 400
+    try:
+        res = _da.start_job(code, force=bool(body.get('force')))
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': f'{type(e).__name__}: {str(e)[:200]}'}), 500
+
+
+@app.route('/api/deep-analysis/status')
+def api_deep_analysis_status():
+    from scanners import deep_analysis as _da
+    jid = request.args.get('job_id', '').strip()
+    if not jid:
+        return jsonify({'error': '缺少 job_id'}), 400
+    try:
+        j = _da.get_job(jid)
+    except Exception as e:
+        return jsonify({'error': f'{type(e).__name__}: {str(e)[:200]}'}), 500
+    if not j:
+        return jsonify({'error': 'job 不存在'}), 404
+    return jsonify(j)
+
+
 @app.route('/api/cpa/summary', methods=['GET'])
 def api_cpa_summary():
     """CPA 阶段分布汇总（最新交易日）"""
