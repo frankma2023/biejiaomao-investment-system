@@ -4,9 +4,10 @@ CPA 阶段判定引擎 v1.1
 ════════════════════════════════════════════════════════════
 PRD: docs/product/CPA阶段判定引擎_产品需求书.md
 
-六阶段状态机（Oliver Kell Cycle of Price Action）：
+八阶段状态机（Oliver Kell Cycle of Price Action，完整镜像）：
   ① Reversal Extension → ② Wedge Pop → ③ EMA Crossback
-  → ④ Base 'n Break → ⑤ Exhaustion Extension → ⑥ Wedge Drop（⑥a/b/c）→ 循环
+  → ④ Base 'n Break → ⑤ Exhaustion Extension → ⑥ Wedge Drop
+  → ⑦ EMA Crossback Downside → ⑧ Base 'n Break Downside → 循环
 
 核心语义：**阶段 = 由事件触发的区间**（②③④ 是事件，⑤⑥① 是状态/段），
         任何时刻每只股票都属于某个区间，无空档。
@@ -97,7 +98,7 @@ CFG = {
 
     # ── 阶段⑥ Wedge Drop ──
     'd_vr_score': 1.3,                     # VR 评分分档（非门槛）
-    'd_resume_days': 0,                    # ⑥b→②/③ 复活：站上 EMA20 即触发
+    'd_resume_days': 0,                    # ⑥→②/③ 复活：站上 EMA20 即触发
 
     # ── FTD 快速通道（欧奈尔追盘日，个股适配待验）──
     'ftd_min_dd': 0.25,                    # 深回撤 ≥25%
@@ -106,17 +107,17 @@ CFG = {
     'ftd_vr_min': 1.3,                     # 放量
 
     # ── 非对称阈值 + 过渡态（抖动治理，2026-09-10 讨论）──
-    't_in_band': 0.3,      # 进⑥b：close < EMA20 - 0.3×ATR（防守快确认，宁可误报不可漏报）
-    't_in_days': 2,        # 进⑥b 确认天数
-    't_out_band': 0.0,     # 出⑥b 门槛：close > EMA20 + 0×ATR = **纯 EMA20**（2026-09-13 回落）
+    't_in_band': 0.3,      # 进⑥：close < EMA20 - 0.3×ATR（防守快确认，宁可误报不可漏报）
+    't_in_days': 2,        # 进⑥ 确认天数
+    't_out_band': 0.0,     # 出⑥ 门槛：close > EMA20 + 0×ATR = **纯 EMA20**（2026-09-13 回落）
     # ⚠ 原为 0.5×ATR（2026-09-10 拖动治理时自设），因为没有验证基础，且 ATR 口径本身还在待定（#28），
     #   用户决定先退回传统形式“站上 EMA20”。参数保留在这里：将来若要加回 ATR 带，只改这一个数。
     #   副作用：过渡态模糊带的上界就是这个参数，所以改成 0 后过渡带变为 [-0.3, 0]×ATR。
-    # 出⑥b（趋势复活）确认：#30 校准，由 3中2 收紧为 **4中3**（2026-09-13 用户拍定）。
+    # 出⑥（趋势复活）确认：#30 校准，由 3中2 收紧为 **4中3**（2026-09-13 用户拍定）。
     # 理由：下跌趋势逆转不能因两天反弹就确认（“三阳改三观”）；宁愿谨慎。
     # ⚠ 这是自设参数，实测发现不准还要调。
-    't_out_win': 4,        # 出⑥b 观察窗口
-    't_out_need': 3,       # 出⑥b 需窗口内 N 日达标（4中3）
+    't_out_win': 4,        # 出⑥ 观察窗口
+    't_out_need': 3,       # 出⑥ 需窗口内 N 日达标（4中3）
     # 过渡态：[-0.3, +0.5]×ATR 区间 = 判据本来就没答案的地带（独立标签）
 
     # ── invalidated N 值（待校准）──
@@ -129,7 +130,9 @@ ACTIONS = {
     '②': '入场', '②T': '观察',           # ②T = 过渡态（模糊区，不参与）
     '③': '入场', '④': '观察', '持有': '持有',   # ④: 2026-09-14 由「加仓」降级（整体 −0.58%/40% 负期望，PRD §12.2 #11）
     '⑤': '保护利润', '⑥w': '减仓',        # ⑥w = 预警态（衰竭未破位，Spec B6）
-    '⑥a': '清仓', '⑥b': '观察', '⑥bT': '观察', '⑥c': '观察', '⑥cT': '观察',
+    '⑥': '观察', '⑥a': '清仓',
+    '⑦': '观察', '⑦T': '观察',
+    '⑧': '观察', '⑧T': '观察',
 }
 
 
@@ -559,7 +562,7 @@ def judge_ftd(ind, kl, i):
     返回 {'hit':bool, 'low_idx':int, 'low':float, 'detail':{...}}
 
     设计理由（与用户讨论）：FTD 只标记"一个值得跟踪的起点"（证据负担轻）——
-    不需要停顿区/多日确认；而普通复苏（出⑥b）需证明"下降趋势已终结"（证据负担重）——
+    不需要停顿区/多日确认；而普通复苏（出⑥）需证明"下降趋势已终结"（证据负担重）——
     两个判据服务于两种证据负担，冲突自然消解。
     注：欧奈尔原意 FTD 是指数级信号，个股适用性待验（用户保留态度）。
     """
@@ -870,8 +873,8 @@ def init_stage(ind, kl, i):
             return '④', {'init_box': True}
         return '②', {'init_flag': True}      # 初值推断（标记）
     if dd is not None and dd >= CFG['r_drawdown_min']:
-        return '⑥c', {'init_flag': True}
-    return '⑥b', {'init_flag': True}
+        return '⑥', {'init_flag': True}
+    return '⑥', {'init_flag': True}
 
 
 def max_gain_since(kl, i0, i1):
@@ -895,7 +898,7 @@ def below_ma_confirmed(ind, i, n=2, band_atr=0.3):
 def above_ma_confirmed(ind, i, n=4, band_atr=0.0, need=3):
     """n 日窗口内 need 日收盘 > EMA20 + band*ATR20
 
-    非对称：出⑥b 用 **4中3**（#30 校准，原为 3中2）——进攻慢确认，
+    非对称：出⑥ 用 **4中3**（#30 校准，原为 3中2）——进攻慢确认，
     不接受单日/两日脉冲（“三阳改三观”）。
     band_atr 默认 0.0 = 纯 EMA20（2026-09-13 回落，原 0.5×ATR）；默认值与 CFG 一致。
     """
@@ -908,11 +911,11 @@ def above_ma_confirmed(ind, i, n=4, band_atr=0.0, need=3):
 
 
 def in_transition_zone(ind, i, stage):
-    """过渡态判定：处于 ②/⑥b/⑥c 且价格在模糊带 [-t_in_band, +t_out_band]×ATR 内
+    """过渡态判定：处于 ②/⑥/⑦/⑧ 且价格在模糊带 [-t_in_band, +t_out_band]×ATR 内
     （即“进”与“出”两道门槛之间的地带 = 判据本来就没答案的地带）
     → 回测已证：低收益垃圾时间区。当前 t_out_band=0，模糊带是 [-0.3, 0]×ATR。
     """
-    if stage not in ('②', '⑥b', '⑥c'):
+    if stage not in ('②', '⑥', '⑦', '⑧'):
         return False
     c, e, a = ind['closes'][i], ind['ema20'][i], ind['atr20'][i]
     if None in (c, e, a) or not a:
@@ -920,6 +923,52 @@ def in_transition_zone(ind, i, stage):
     lo = e - CFG['t_in_band'] * a
     hi = e + CFG['t_out_band'] * a
     return lo <= c <= hi
+
+
+def _check_crossback_downside(ind, i):
+    """判据：下行周期内，价格从下方靠近 EMA10（⑦ 入口）
+    条件：close >= EMA10 - tol*ATR, close < EMA20, EMA10 斜率转负
+    """
+    c, e10, e20, a20 = ind['closes'][i], ind['ema10'][i], ind['ema20'][i], ind['atr20'][i]
+    if None in (c, e10, e20, a20) or not a20:
+        return False
+    # 从下方靠近 EMA10，但仍低于 EMA20
+    if c < e10 - CFG['cb_tol_atr'] * a20:
+        return False
+    if c >= e20:
+        return False
+    # EMA10 斜率转负 = 均线仍然向下（阻力有效）
+    if i < CFG['slope_lag']:
+        return False
+    slp = slope_up(ind['ema10'], i, CFG['slope_lag'])
+    if slp is not False:
+        return False
+    return True
+
+
+def _check_base_break_downside(ind, kl, i):
+    """判据：下行周期内，均线下方窄幅整理（⑧ 入口）
+    条件：近 15 日振幅 ≤ 8%，全部价格在 EMA20 以下
+    （量能干涸是加分项但不作门槛——实测中发现下行缩量不统一）
+    """
+    c = ind['closes'][i]
+    e20 = ind['ema20'][i]
+    if c is None or e20 is None:
+        return False
+    if c >= e20:
+        return False  # 必须在 EMA20 以下
+    win = min(15, i + 1)
+    prices = [ind['closes'][j] for j in range(max(0, i - win + 1), i + 1) if ind['closes'][j] is not None]
+    if len(prices) < 8:
+        return False
+    # 近期振幅 ≤ 8%（窄幅整理）
+    amp = (max(prices) - min(prices)) / ((max(prices) + min(prices)) / 2) if prices else 1
+    if amp > 0.08:
+        return False
+    # 全部价格在 EMA20 以下
+    if any(p >= e20 for p in prices):
+        return False
+    return True
 
 
 def run_state_machine(conn, code, kl, ind, tops, warmup=260):
@@ -1007,7 +1056,7 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
             if below_ma_confirmed(ind, i, CFG['t_in_days'], CFG['t_in_band']):
                 # n 日跌破 EMA20-band：底部反转区间结束 → ⑥ 判定
                 r6 = judge_wedge_drop(ind, kl, i, ctx, structure_support, tops)
-                stage = '⑥a' if r6['confirm'] else '⑥b'
+                stage = '⑥a' if r6['confirm'] else '⑥'
                 ctx.update({'stage_start_idx': i, 'w_pause': None, 'w_date_idx': None})
                 detail = {'reason': '②区间跌破EMA20(n日确认)', **r6['detail']}
             elif fail_low and c < fail_low:
@@ -1035,7 +1084,7 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
             if below_ma_confirmed(ind, i, CFG['t_in_days'], CFG['t_in_band']):
                 # n 日跌破 EMA20 → 进 ⑥ 判定（confirm→⑥a；否则⑥b）
                 r6 = judge_wedge_drop(ind, kl, i, ctx, structure_support, tops)
-                stage = '⑥a' if r6['confirm'] else '⑥b'
+                stage = '⑥a' if r6['confirm'] else '⑥'
                 ctx.update({'stage_start_idx': i, 'cb_low': None})
                 detail = {'reason': '③区间跌破EMA20(2日确认)', **r6['detail']}
             else:
@@ -1057,7 +1106,7 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
                 # ④ 失效（收盘回到箱内）
                 if c < e20:
                     r6 = judge_wedge_drop(ind, kl, i, ctx, structure_support, tops)
-                    stage = '⑥a' if r6['confirm'] else '⑥b'
+                    stage = '⑥a' if r6['confirm'] else '⑥'
                     ctx['stage_start_idx'] = i; detail = {'reason': '④失效+趋势破坏', **r6['detail']}
                 else:
                     stage = '③'; ctx['stage_start_idx'] = i; detail = {'reason': '④失效（回箱内，趋势未破）→回③'}
@@ -1085,37 +1134,45 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
         elif stage == '⑤':
             if c < e10:
                 r6 = judge_wedge_drop(ind, kl, i, ctx, structure_support, tops)
-                stage = '⑥a' if r6['confirm'] else '⑥b'
+                stage = '⑥a' if r6['confirm'] else '⑥'
                 ctx['stage_start_idx'] = i; detail = {'reason': '⑤结束（跌破EMA10）', **r6['detail']}
 
-        elif stage in ('⑥a', '⑥b', '⑥c'):
+        elif stage in ('⑥', '⑥a', '⑦', '⑧'):
             dd, _ = drawdown_from_high(kl, i, CFG['pctile_win'])
-            # 趋势复活：窗口 t_out_win 内 t_out_need 日站上 EMA20+t_out_band×ATR → 回 ② 区间
-            if above_ma_confirmed(ind, i, CFG['t_out_win'], CFG['t_out_band'], CFG['t_out_need']) and stage in ('⑥a', '⑥b', '⑥c'):
+            # 1) 趋势复活：站上 EMA20 → 回 ② 区间（优先于所有下行内部判定）
+            if above_ma_confirmed(ind, i, CFG['t_out_win'], CFG['t_out_band'], CFG['t_out_need']):
                 stage = '②'
                 ctx.update({'stage_start_idx': i, 'w_date_idx': i, 'w_pause': None, 'cb_low': None,
-                            'entry_low': None, 'entry_path': 'revive'})   # 清理旧入口上下文（Spec W13）
+                            'entry_low': None, 'entry_path': 'revive'})
                 detail = {'reason': '趋势复活（站上EMA20）→回②区间'}
-            else:
-                # ⑥b/⑥c 升级确认（Spec W12）：三条件齐 → ⑥a（清仓）
-                if stage in ('⑥b', '⑥c'):
-                    r6 = judge_wedge_drop(ind, kl, i, ctx, structure_support, tops)
-                    if r6['confirm']:
-                        stage = '⑥a'; detail = {'reason': '⑥b/c 升级确认（三条件齐）', **r6['detail']}
+            # 2) 反转：①a 全条件满足 → 循环底部
+            elif judge_reversal(ind, kl, i, tops, rps_map=rps_map)['a']:
                 r1 = judge_reversal(ind, kl, i, tops, rps_map=rps_map)
-                if r1['a']:   # ①a 全条件满足
-                    stage = '①b' if r1['b'] else '①a'
-                    ctx['stage_start_idx'] = i; ctx['w_pause'] = None; ctx['w_date_idx'] = None
-                    detail = {'reason': '①a全条件满足（跌够且衰竭）',
-                              **(r1.get('detail') or {})}   # 2026-09-14：原写法丢掉了判据的 detail，
-                                                            # 导致闸门/回撤/恐慌量字段不入库、无法事后核验
-                elif dd is not None and dd >= CFG['r_drawdown_min']:
-                    if stage != '⑥c':
-                        stage = '⑥c'; detail = {'reason': '回撤≥30%但衰竭未现'}
+                stage = '①b' if r1['b'] else '①a'
+                ctx['stage_start_idx'] = i; ctx['w_pause'] = None; ctx['w_date_idx'] = None
+                detail = {'reason': '①a全条件满足（跌够且衰竭）', **(r1.get('detail') or {})}
+            # 3) 下行EMA回踩 ⑦：价格从下方靠近 EMA10（死猫反弹）
+            elif _check_crossback_downside(ind, i):
+                stage = '⑦'
+                ctx['stage_start_idx'] = i
+                _lows = [x for x in ind['lows'][max(0,i-2):i+1] if x]
+                ctx['cb_low'] = min(_lows) if _lows else ind['closes'][i]
+                detail = {'reason': '下行EMA回踩（价格靠近EMA10/EMA20）',
+                          'ema10': round(ind['ema10'][i],2) if ind['ema10'][i] else None}
+            # 4) 下行平台破位 ⑧：窄幅整理/量能干涸
+            elif _check_base_break_downside(ind, kl, i):
+                stage = '⑧'
+                ctx['stage_start_idx'] = i
+                detail = {'reason': '下行平台（窄幅整理/量能干涸）',
+                          'amp': round((max(ind['closes'][max(0,i-39):i+1])-min(ind['closes'][max(0,i-39):i+1]))/max(ind['closes'][max(0,i-39):i+1])*100,1) if ind['closes'][i] else None}
+            # 5) 默认 → ⑥ 破位延续
+            else:
+                if stage != '⑥':
+                    stage = '⑥'; detail = {'reason': '破位延续'}
                 else:
-                    if stage == '⑥a':
-                        stage = '⑥b'; detail = {'reason': '跌破后延续（回撤<30%）'}
+                    pass  # 已在 ⑥：不产生迁移
 
+        # ═══ 失效位 ═══
         # ═══ 失效位 ═══
         invalid = None
         if stage in ('①a', '①b'):
@@ -1167,7 +1224,7 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
 
         # 预警态（PRD §8.4）：衰竭迹象（高点不抬高 + EMA10 斜率转负）出现但未破位 → 减仓
         warn_now = False
-        if stage in ('②', '③', '④', '⑤'):
+        if stage in ('②', '③', '④', '⑤', '⑥', '⑦', '⑧'):
             _tp = [t for t in tops if t['date'] <= kl[i]['date']][-3:]
             _hl = len(_tp) >= 2 and all(_tp[j + 1]['price'] <= _tp[j]['price'] * 1.01 for j in range(len(_tp) - 1))
             _sl = slope_up(ind['ema10'], i, CFG['slope_lag'])
@@ -1178,8 +1235,8 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
             stage_out = '⑥w'
             metrics['warn_from'] = stage
         elif in_transition_zone(ind, i, stage):
-            stage_out = stage + 'T'
-            metrics['transition_zone'] = True
+            stage_out = stage + "T"
+            metrics["transition_zone"] = True
 
         daily.append((code, d, stage_out, prev_stage if prev_stage != stage else None,
                       kl[ctx['stage_start_idx']]['date'], i - ctx['stage_start_idx'],

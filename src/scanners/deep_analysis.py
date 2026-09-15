@@ -177,13 +177,52 @@ def build_snapshot(conn, code, data_date):
     snap['fin_annual'] = _rows(conn, """SELECT * FROM stock_financials_annual
         WHERE stock_code=? ORDER BY report_date DESC LIMIT 10""", (code,))
 
-    # 估值：无专用表。用观察池自带的 PE/PB 分位（仅池内股票有；池外则未获取）
+    # 估值：从 fundamental_indicator（EAV 模型 metric_code+value）取 PE/PB/PS/股息率/市值
+    # 计算历史分位，逻辑与 /api/stock-valuation 一致
     snap['valuation'] = []
-    ov_peek = _one(conn, """SELECT date, pe_ttm, pb, pe_percentile, market_cap
-        FROM discipline_observation_pool WHERE stock_code=? AND date<=?
-        ORDER BY date DESC LIMIT 1""", (code, data_date))
-    if ov_peek:
-        snap['valuation'] = [ov_peek]
+    FI_METRICS = ('pe_ttm', 'pb', 'ps_ttm', 'dyr', 'mc')
+    fi_rows = conn.execute('''
+        SELECT date, metric_code, value FROM fundamental_indicator
+        WHERE stock_code=? AND date<=? AND metric_code IN (?,?,?,?,?)
+        ORDER BY date, metric_code
+    ''', (code, data_date, *FI_METRICS)).fetchall()
+    by_date = {}
+    for r in fi_rows:
+        d = r['date']
+        if d not in by_date:
+            by_date[d] = {}
+        by_date[d][r['metric_code']] = r['value']
+    if by_date:
+        sorted_dates = sorted(by_date.keys())
+        latest = by_date[sorted_dates[-1]]
+        # 收集全历史用于分位计算
+        hist = {m: [] for m in FI_METRICS}
+        for d in sorted_dates:
+            for m in FI_METRICS:
+                v = by_date[d].get(m)
+                if v is not None:
+                    hist[m].append(v)
+        # 计算最新分位（PE/PB/PS 越小越便宜 ascending=True；股息率越高越好 ascending=False）
+        def _pct(vals, cv, ascending):
+            if len(vals) < 2 or cv is None:
+                return None
+            sv = sorted(vals, reverse=not ascending)
+            try:
+                rank = sv.index(cv)
+                return round(rank / (len(sv) - 1), 4)
+            except ValueError:
+                return None
+        entry = {'date': sorted_dates[-1]}
+        entry['pe_ttm'] = latest.get('pe_ttm')
+        entry['pb'] = latest.get('pb')
+        entry['ps_ttm'] = latest.get('ps_ttm')
+        entry['dyr'] = latest.get('dyr')
+        entry['mc'] = latest.get('mc')
+        entry['pe_pct'] = _pct(hist['pe_ttm'], latest.get('pe_ttm'), True)
+        entry['pb_pct'] = _pct(hist['pb'], latest.get('pb'), True)
+        entry['ps_pct'] = _pct(hist['ps_ttm'], latest.get('ps_ttm'), True)
+        entry['dyr_pct'] = _pct(hist['dyr'], latest.get('dyr'), False)
+        snap['valuation'] = [entry]
 
     # RS
     snap['rs'] = _one(conn, """SELECT * FROM stock_rs_daily WHERE stock_code=? AND date<=?
@@ -286,13 +325,16 @@ def snapshot_to_text(snap):
             keep = {k: v for k, v in f.items() if v is not None}
             L.append("  " + json.dumps({k: keep[k] for k in list(keep)[:14]}, ensure_ascii=False))
 
-    if snap.get('valuation'):
+    if snap.get('valuation') and snap['valuation'][0].get('pe_ttm') is not None:
         L.append("\n## 估值")
         for v in snap['valuation']:
-            L.append(f"  {v.get('date')} PE_TTM={v.get('pe_ttm')} PB={v.get('pb')} "
-                     f"PE分位={v.get('pe_percentile')} 市值={v.get('market_cap')}")
+            L.append(f"  {v.get('date')} PE_TTM={v.get('pe_ttm')} PE分位={v.get('pe_pct')} "
+                     f"PB={v.get('pb')} PB分位={v.get('pb_pct')} "
+                     f"PS={v.get('ps_ttm')} PS分位={v.get('ps_pct')} "
+                     f"股息率={v.get('dyr')} DY分位={v.get('dyr_pct')} "
+                     f"市值={v.get('mc')}")
     else:
-        L.append("\n## 估值\n未获取（本系统仅有观察池内股票的 PE/PB 分位）")
+        L.append("\n## 估值\n未获取（fundamental_indicator 无此股票数据）")
 
     o = snap.get('observation')
     if o:
@@ -325,6 +367,7 @@ MASTERS = [
     ('巴菲特', '护城河宽窄、估值是否有安全边际、资本配置是否理性'),
     ('芒格', '最大的风险是什么、我可能错在哪里、有无致命缺陷（逆向思考）'),
     ('索罗斯', '趋势自我强化处于早期/中段/后段、共识叙事是否已被价格透支、反身性转向风险'),
+    ('Oliver Kell', 'CPA 价格行为循环位置判定（反转/楔形突破/EMA回踩/基部突破/衰竭/破位）+ EMA10/EMA20 多周期关系 + 量价验证 + 风险收益比评估'),
 ]
 
 MASTER_SYS = """你是一位资深 A 股分析师，本轮只负责以「{name}」的视角独立判断。
@@ -469,20 +512,12 @@ def _run_job(job_id, code):
 # ═══════════════════════════════════════════════
 # 对外接口
 # ═══════════════════════════════════════════════
-def start_job(code, force=False):
-    """建 job + 起后台线程。若同日已有完成的结果且 force=False，直接复用。"""
+def start_job(code):
+    """建 job + 起后台线程。每次都重新生成，不缓存复用。"""
     conn = sqlite3.connect(DB_PATH, timeout=60)
     conn.row_factory = sqlite3.Row
     ensure_table(conn)
     data_date = conn.execute("SELECT MAX(date) FROM daily_kline_adj").fetchone()[0]
-
-    if not force:
-        r = conn.execute("""SELECT job_id, result_md, elapsed_sec FROM deep_analysis_jobs
-            WHERE code=? AND data_date=? AND state='done' ORDER BY finished_at DESC LIMIT 1""",
-                         (code, data_date)).fetchone()
-        if r and r['result_md']:
-            conn.close()
-            return {'job_id': r['job_id'], 'reused': True}
 
     job_id = uuid.uuid4().hex[:16]
     conn.execute("""INSERT INTO deep_analysis_jobs
@@ -493,7 +528,7 @@ def start_job(code, force=False):
 
     th = threading.Thread(target=_run_job, args=(job_id, code), daemon=True)
     th.start()
-    return {'job_id': job_id, 'reused': False}
+    return {'job_id': job_id}
 
 
 def get_job(job_id):

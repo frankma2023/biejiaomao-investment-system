@@ -7502,7 +7502,7 @@ def api_deep_analysis_start():
     if not code or len(code) != 6 or not code.isdigit():
         return jsonify({'error': '需要 6 位数字股票代码'}), 400
     try:
-        res = _da.start_job(code, force=bool(body.get('force')))
+        res = _da.start_job(code)
         return jsonify(res)
     except Exception as e:
         return jsonify({'error': f'{type(e).__name__}: {str(e)[:200]}'}), 500

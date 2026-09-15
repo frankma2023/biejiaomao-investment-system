@@ -5,7 +5,7 @@
 <link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
 <meta name="theme-color" content="#0d0d12">
-<title>CPA 阶段判定 · 六阶段状态机</title>
+<title>CPA 阶段判定 · 八阶段状态机</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/css/hanako-glass.css">
 <script src="../shared/js/echarts.min.js"></script>
@@ -67,7 +67,7 @@
   <nav id="top-nav"></nav>
   <div class="layout">
     <div class="hdr">
-      <h1>🎯 CPA 阶段判定 <span style="font-size:0.55rem;color:var(--muted);font-weight:400">Oliver Kell 六阶段状态机 · 事件触发区间</span></h1>
+      <h1>🎯 CPA 阶段判定 <span style="font-size:0.55rem;color:var(--muted);font-weight:400">Oliver Kell 八阶段状态机 · 事件触发区间</span></h1>
       <span class="sub" id="date-label">加载中…</span>
     </div>
     <div class="stages" id="stage-cards"></div>
@@ -125,17 +125,18 @@
         <tr><td>④</td><td>基部突破</td><td><b>Base 'n Break</b>——箱体/基部整理后<b>向上突破</b>；收盘跌回箱内则本段结束。<b>动作：加仓</b></td></tr>
         <tr><td>⑤</td><td>衰竭延长</td><td><b>Exhaustion Extension</b>（衰竭延伸）——末端加速拉升后<b>跌破 10EMA</b>，衰竭迹象。<b>动作：保护利润</b></td></tr>
         <tr><td>⑥a</td><td>破位初现</td><td><b>Wedge Drop</b>（楔形下坠）——<b>跌破 EMA20 并确认</b>，牛市情景整体失效的第一天。<b>动作：清仓</b></td></tr>
-        <tr><td>⑥b</td><td>破位后下行</td><td>破位后继续走低，但自高点回撤 <b>&lt;30%</b>。常表现为“跌一大段 → 反弹 → 再跌”。<b>动作：观察</b></td></tr>
-        <tr><td>⑥bT</td><td>⑥b 过渡态</td><td>同 ②T（⑥b 期间的模糊带）。</td></tr>
-        <tr><td>⑥c</td><td>破位后深跌</td><td>自高点回撤 <b>≥30%</b>。此时跌势已确认，距底部可能很近了。<b>动作：观察</b></td></tr>
-        <tr><td>⑥cT</td><td>⑥c 过渡态</td><td>同 ②T（⑥c 期间的模糊带）。</td></tr>
-        <tr><td>⑥w</td><td>预警（将转 ⑥b/⑥c）</td><td>出现在 ②/③/④/⑤ 中：<b>笔顶不抬高 + EMA10 斜率不向上</b>。这是<b>当日标签，不改底层阶段</b>（色带不断）。<b>动作：减仓</b></td></tr>
+        <tr><td>⑦</td><td>破位下行</td><td>破位确认后的延续阶段。价格在 EMA20 下方运行，均线斜率向下。<b>动作：观察</b></td></tr>
+        <tr><td>⑧</td><td>下行 EMA 回踩</td><td><b>EMA Crossback Downside</b>（③ 的下行镜像）——破位后价格<b>反弹至下行的 EMA10/EMA20 附近</b>，均线转为阻力。<b>动作：观察</b></td></tr>
+        <tr><td>⑧T</td><td>⑧ 过渡态</td><td>⑧ 期间的模糊带。判据无确定答案。</td></tr>
+        <tr><td>⑨</td><td>下行平台</td><td><b>Base 'n Break Downside</b>（④ 的下行镜像）——均线下方<b>窄幅整理</b>后继续破位下行。<b>动作：观察</b></td></tr>
+        <tr><td>⑨T</td><td>⑨ 过渡态</td><td>⑨ 期间的模糊带。</td></tr>
+        <tr><td>⑥w</td><td>预警（破位前兆）</td><td>出现在 ②/③/④/⑤ 中：<b>笔顶不抬高 + EMA10 斜率不向上</b>。这是<b>当日标签，不改底层阶段</b>（色带不断）。<b>动作：减仓</b></td></tr>
       </table>
       <b>⚠ 标签 ≠ 状态</b>：<code>⑥w</code> 与 <code>T</code> 后缀是<b>当日输出层标签</b>，不进入内部状态机，所以色带不会被它们切断（例：③ 期间夹一天 ⑥w，仍是一条 ③）。这类日子在 K 线上方用<span style="color:#f59e0b">橙色三角</span>标出。
       <b>⚠ 阶段 = 区间，不是瞬点</b>：名字里的“突破”“回踩”“破位”都是<b>瞬间动作</b>（回踩可能就一天，甚至当天收回），阶段描述的是那之后的运行区间——所以 ②/③ 叫“×后运行”。
       <b>⚠ ②→③ 不是趋势变了</b>，是确认等级升了一级：两段在 K 线上连续，因为趋势本来就没断过；分界点由参数（回踩窗口下界 5 日）决定，不是价格事件。
       <b>⚠ 不足 3 日标「趋势待明」</b>：只持续 1~2 天的判定不作为阶段（中性灰底）。回测带后视镜可以说“那天是 X 阶段”，<b>实盘当时并不知道</b>。
-      <b>⚠ ⑥ 族破位</b>：鼠标划过 K 线会给出<b>破的是哪个位、什么时候破的</b>（如“跌破 EMA20 24.04（2026-07-08）”）与当时的结构支撑。
+      <b>⚠ 破位族（⑥⑦⑧）</b>：鼠标划过 K 线会给出<b>破的是哪个位、什么时候破的</b>（如“跌破 EMA20 24.04（2026-07-08）”）与当时的结构支撑。
       <b>术语来源</b>：上文六个英文原文是 <b>Oliver Kell</b>（2020 年美国投资锦标赛冠军）的自创术语，<b>中文圈无正式译名</b>；表中显示名与中文表述为本系统自拟。
       同理，<b>所有数值阈值（0.3/0.5×ATR、5~15 日窗口、30% 回撤分界等）均为本系统设计，非 Kell 原文</b>，全部待回测校准。
       <b>入口</b>：pause = 停顿区慢速通道；ftd_4_7 / ftd_8_15 = FTD 快速通道（欧奈尔追盘日特征）。
@@ -148,21 +149,21 @@
 <script>
 var ALL = [], DATE = '', FILTER_STAGE = '', FILTER_POOL = false, charts = {}, sortKey = '', sortDir = 1;
 var STAGE_COLOR = {'①a':'#6b7280','①b':'#9ca3af','②':'#ef4444','③':'#f97316','④':'#dc2626','⑤':'#a855f7',
-                   '⑥a':'#065f46','⑥b':'#10b981','⑥c':'#34d399'};
+                   '⑥a':'#065f46','⑥':'#10b981','⑦':'#0ea5e9','⑧':'#6366f1'};
 function stgColor(s){ var base = (s||'').replace('T',''); var c = STAGE_COLOR[base] || '#888'; return (s||'').indexOf('T')>=0 ? c+'99' : c; }
 // 阶段中文名（代号单独看不知道什么意思，全站统一用这一套）
 var STAGE_NAME = {'①a':'超跌（未反转）','①b':'超跌+反转迹象','②':'突破后运行','②T':'② 过渡态',
                   '③':'回踩后运行','④':'基部突破','⑤':'衰竭延长',
-                  '⑥a':'破位初现','⑥b':'破位后下行','⑥bT':'⑥b 过渡态',
-                  '⑥c':'破位后深跌','⑥cT':'⑥c 过渡态','⑥w':'预警（将转 ⑥b/⑥c）'};
+                  '⑥a':'破位初现','⑥':'破位下行','⑥w':'预警（破位前兆）',
+                  '⑦':'下行回踩','⑦T':'⑦ 过渡态','⑧':'下行平台','⑧T':'⑧ 过渡态'};
 function stgName(s){ return STAGE_NAME[s] || ''; }
 // ⑥ 方向分档（2026-09-14 v1.5，PRD §13.2 #31）：
 // 实测方向胜率差 6pp / 中位差 1.55pp，而回撤分档不单调（<-50% 组反而最好）。
-// 故 ⑥ 的标签改为**方向优先**（破位后·反弹 / 破位后·续跌），回撤幅度降为次要标注。
+// 故 ⑥⑦⑧ 的标签改为**方向优先**（破位后·反弹 / 破位后·续跌），回撤幅度降为次要标注。
 // 回撤 30% 的结构标记保留在下面的说明表里，只是不再驱动展示分档。
 function stgName6(s, r){
   var base = String(s||'').replace(/T$/,'');
-  if (base !== '⑥b' && base !== '⑥c') return stgName(s);
+  if (!/^[⑥⑦⑧]/.test(base)) return stgName(s);
   var d = r && r.six_dir;
   if (d === 'rebound') return '破位后·反弹';
   if (d === 'decline') return '破位后·续跌';
@@ -199,7 +200,7 @@ function toggleTheme(){
 async function load(){
   try{
   var j = await (await fetch('/api/cpa/summary')).json();
-  DATE = j.date; document.getElementById('date-label').textContent = (DATE||'—') + ' · 六阶段状态机';
+  DATE = j.date; document.getElementById('date-label').textContent = (DATE||'—') + ' · 八阶段状态机';
   if (!j.date || !(j.stages||[]).length) {
     document.getElementById('stage-cards').innerHTML = '<span style="font-size:0.68rem;color:var(--muted)">📡 暂无 CPA 数据（请先跑 python src/scanners/cpa_stage.py --incremental）</span>';
     ALL = []; renderTable(); return;
@@ -327,7 +328,7 @@ async function showStock(code){
           var wd = why[r.stage_start_date];
           s += '<br/>本段起点 '+r.stage_start_date+(wd && wd.reason ? '：'+wd.reason : '');
           // ⑥ 族：用户要求标明“破的是哪个位、什么时候破的”
-          if (String(baseStage(r)).indexOf('⑥') === 0 && wd) {
+          if (/^[⑥⑦⑧]/.test(String(baseStage(r))) && wd) {
             var lvl = (wd.ema20 != null) ? ('EMA20 ' + wd.ema20) : '结构位';
             s += '<br/><b>破位</b>：跌破 ' + lvl + '（' + r.stage_start_date + '）'
                + (wd.close != null ? '　当日收 ' + wd.close : '');

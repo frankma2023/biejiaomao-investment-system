@@ -1,119 +1,346 @@
 <!DOCTYPE html>
 <html lang="zh-CN" class="dark">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>深度分析</title>
+<meta charset="UTF-8">
+<link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="theme-color" content="#0d0d12">
+<title>深度分析 · 七大师裁决</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/css/hanako-glass.css">
 <style>
-.app-container{max-width:900px;margin:0 auto;padding:16px 24px 80px}
-.search-bar{display:flex;gap:8px;margin-bottom:16px}
-.search-bar input{flex:1;padding:10px 14px;border-radius:10px;border:1px solid var(--divider);background:var(--card-bg);color:var(--text-primary);font-size:1rem;font-family:var(--font-display)}
-.search-bar input:focus{outline:none;border-color:var(--accent)}
-.search-bar button{padding:10px 24px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
-.search-bar button:disabled{opacity:.5;cursor:not-allowed}
-.analysis-btn-wrap{text-align:center;margin:20px 0}
-.analysis-btn{padding:14px 48px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:1.05rem;font-weight:600;cursor:pointer;position:relative}
-.analysis-btn:disabled{opacity:.5;cursor:not-allowed}
-.analysis-btn .spinner{display:none;width:20px;height:20px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;margin:0 auto}
-.analysis-btn.loading .spinner{display:block}.analysis-btn.loading .txt{display:none}
+/* ─── 布局 ─── */
+.layout{max-width:820px;margin:0 auto;padding:16px 24px 80px}
+
+/* ─── 搜索行 ─── */
+.search-row{display:flex;gap:8px;margin:16px 0 10px}
+.search-row input{flex:1;padding:9px 14px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text-primary);font-size:0.82rem;font-family:var(--font-body);outline:none;transition:border-color .2s,box-shadow .2s;backdrop-filter:blur(10px)}
+.search-row input::placeholder{color:var(--text-tertiary)}
+.search-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,158,11,.1)}
+.search-row button{padding:9px 28px;border-radius:10px;border:1px solid var(--accent-border);background:var(--accent-subtle);color:var(--accent);font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .2s;font-family:var(--font-body)}
+.search-row button:hover{background:rgba(245,158,11,.18)}
+.search-row button:disabled{opacity:.4;cursor:not-allowed}
+
+/* ─── 加载进度 ─── */
+.progress-wrap{display:none;align-items:center;gap:10px;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:14px;backdrop-filter:blur(10px)}
+.progress-wrap.show{display:flex}
+.progress-spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
-.progress{text-align:center;font-size:0.85rem;color:var(--muted);margin-top:6px;display:none}
-.progress.show{display:block}
-#result{display:none;background:var(--card-bg);border:1px solid var(--divider);border-radius:14px;padding:24px;margin-top:16px;font-size:0.9rem;line-height:1.7;overflow-x:auto}
+.progress-text{font-size:0.72rem;color:var(--text-secondary)}
+.progress-stage{font-size:0.65rem;color:var(--text-tertiary);margin-left:auto}
+
+/* ─── 报告卡片 ─── */
+#result{display:none}
 #result.show{display:block}
-#result h1,#result h2,#result h3{font-family:var(--font-display);color:var(--text-primary);margin:16px 0 8px}
-#result h1{font-size:1.2rem}#result h2{font-size:1.05rem}#result h3{font-size:0.95rem}
-#result table{border-collapse:collapse;width:100%;margin:8px 0;font-size:0.82rem}
-#result th,#result td{padding:5px 8px;border:1px solid var(--divider);text-align:left}
-#result th{background:rgba(128,128,128,.05)}
-#result hr{border:none;border-top:1px solid var(--divider);margin:16px 0}
-.error-card{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:12px;padding:14px;margin-top:12px;font-size:0.85rem;color:#ef4444;display:none}
-.error-card.show{display:block}
+.report-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px 36px;margin-top:4px;font-size:0.82rem;line-height:1.8;overflow-wrap:break-word;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:var(--shadow-card)}
+/* 标题体系 */
+.report-card h1{font-family:var(--font-display);font-size:1.25rem;font-weight:400;color:var(--text-primary);margin:24px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--divider);letter-spacing:.01em}
+.report-card h2{font-family:var(--font-display);font-size:1.05rem;font-weight:400;color:var(--text-primary);margin:20px 0 8px;letter-spacing:.01em}
+.report-card h3{font-family:var(--font-display);font-size:0.92rem;font-weight:400;color:var(--text-primary);margin:16px 0 6px}
+.report-card h4{font-family:var(--font-body);font-size:0.82rem;font-weight:600;color:var(--text-primary);margin:12px 0 4px}
+.report-card p{margin:8px 0;color:var(--text-secondary);line-height:1.8}
+.report-card hr{border:none;border-top:1px solid var(--divider);margin:20px 0}
+/* 表格 */
+.report-card table{border-collapse:collapse;width:100%;margin:12px 0;font-size:0.72rem;border-radius:10px;overflow:hidden}
+.report-card th{text-align:left;padding:8px 12px;background:rgba(255,255,255,.03);color:var(--muted);font-weight:600;font-size:0.65rem;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--divider)}
+.report-card td{padding:7px 12px;border-bottom:1px solid var(--divider);color:var(--text-secondary);vertical-align:top}
+.report-card tr:hover td{background:rgba(255,255,255,.02)}
+.report-card tr:last-child td{border-bottom:none}
+.report-card strong{color:var(--text-primary);font-weight:600}
+.report-card em{color:var(--text-secondary);font-style:italic}
+/* 代码 */
+.report-card code{background:rgba(255,255,255,.05);border-radius:4px;padding:1px 5px;font-size:0.8em;font-family:var(--font-mono);color:var(--accent)}
+.report-card pre{background:rgba(255,255,255,.02);border:1px solid var(--divider);border-radius:10px;padding:14px 18px;overflow-x:auto;font-size:0.75rem;line-height:1.6;margin:12px 0}
+.report-card pre code{background:none;padding:0;border-radius:0;color:var(--text-secondary)}
+/* 引用 */
+.report-card blockquote{border-left:3px solid var(--accent);padding:8px 16px;margin:12px 0;color:var(--text-secondary);background:rgba(245,158,11,.03);border-radius:0 8px 8px 0;font-size:0.8rem}
+/* 列表 */
+.report-card ul,.report-card ol{padding-left:22px;margin:8px 0;color:var(--text-secondary)}
+.report-card li{margin:4px 0;line-height:1.7}
+.report-card a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent;transition:border-color .15s}
+.report-card a:hover{border-bottom-color:var(--accent)}
+
+/* ─── 操作栏 ─── */
+.action-bar{display:none;align-items:center;gap:8px;margin-top:10px;padding:10px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px;backdrop-filter:blur(10px)}
+.action-bar.show{display:flex}
+.action-bar .label{font-size:0.68rem;color:var(--text-tertiary);flex:1}
+.action-bar button{padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:0.72rem;cursor:pointer;transition:all .15s;font-family:var(--font-body)}
+.action-bar button:hover{border-color:var(--border-hover);color:var(--text-primary)}
+.action-bar .btn-download{background:var(--accent-subtle);color:var(--accent);border-color:var(--accent-border)}
+.action-bar .btn-download:hover{background:rgba(245,158,11,.18)}
+
+/* ─── 错误 ─── */
+.error-card{display:none;align-items:flex-start;gap:10px;padding:12px 16px;border-radius:12px;margin:10px 0;font-size:0.78rem;line-height:1.6;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);color:var(--fall)}
+.error-card.show{display:flex}
+.error-card .err-icon{font-size:1rem;flex-shrink:0;margin-top:1px}
+
+/* ─── 首屏引导 ─── */
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-tertiary)}
+.empty-state .icon{font-size:2.2rem;margin-bottom:14px;opacity:.5}
+.empty-state .hint{font-size:0.78rem;line-height:1.7}
+.empty-state .hint code{background:rgba(255,255,255,.05);border-radius:4px;padding:1px 6px;font-family:var(--font-mono);font-size:0.75rem}
+
+/* ─── 移动端 ─── */
+@media(max-width:600px){
+  .layout{padding:12px 14px 80px}
+  .report-card{padding:18px 16px}
+  .action-bar{flex-wrap:wrap;gap:6px}
+}
+
+/* ─── 浅色模式 ─── */
+html[data-theme="light"] .search-row input{background:rgba(255,255,255,.7);border-color:var(--divider)}
+html[data-theme="light"] .report-card{background:rgba(255,255,255,.75)}
+html[data-theme="light"] .progress-wrap{background:rgba(255,255,255,.7)}
+html[data-theme="light"] .action-bar{background:rgba(255,255,255,.7)}
 </style>
 </head>
 <body>
-<div class="app-container">
+<div class="layout">
   <nav id="top-nav"></nav>
+
   <header class="panel-header" style="margin-top:0">
     <h1>🔬 深度分析</h1>
-    <p style="font-size:0.75rem;color:var(--muted)">输入 A 股代码 → 异步调用 LLM 按 stock-health-report 框架生成完整深度分析报告</p>
+    <p style="font-size:0.7rem;color:var(--text-tertiary);margin-top:2px">输入 A 股代码 → stock-health-report 框架 · 十步工作流 + 七大师奇数投票 + 主持人裁决</p>
   </header>
 
-  <div class="search-bar">
-    <input id="code" type="text" placeholder="输入 6 位股票代码，如 600309" maxlength="6" onkeydown="if(event.key==='Enter')go()">
-    <button id="goBtn" onclick="go()">分析</button>
+  <!-- 输入行 -->
+  <div class="search-row">
+    <input id="code" type="text" placeholder="输入 6 位股票代码，如 600309" maxlength="6" autocomplete="off">
+    <button id="genBtn">生成深度分析</button>
   </div>
 
-  <div class="analysis-btn-wrap">
-    <button class="analysis-btn" id="analyzeBtn" onclick="start()">
-      <span class="txt">🤖 生成深度分析</span>
-      <span class="spinner"></span>
-    </button>
-    <div class="progress" id="progress"></div>
+  <!-- 进度 -->
+  <div class="progress-wrap" id="progress">
+    <div class="progress-spinner"></div>
+    <span class="progress-text" id="progText">分析中…</span>
+    <span class="progress-stage" id="progStage"></span>
   </div>
 
-  <div class="error-card" id="error"></div>
-  <div id="result"></div>
+  <!-- 错误 -->
+  <div class="error-card" id="error">
+    <span class="err-icon">✕</span>
+    <span id="errMsg"></span>
+  </div>
+
+  <!-- 结果 -->
+  <div id="result">
+    <div class="report-card" id="reportBody"></div>
+    <div class="action-bar" id="actionBar">
+      <span class="label">分析完成</span>
+      <button onclick="restart()">重新生成</button>
+      <button class="btn-download" onclick="downloadReport()">下载 HTML 报告</button>
+    </div>
+  </div>
+
+  <!-- 首屏 -->
+  <div class="empty-state" id="emptyState">
+    <div class="icon">📋</div>
+    <div class="hint">输入股票代码，点击「生成深度分析」<br>系统将调用 LLM 按 ten-step 框架完成：<br>否决筛查 → 认识它 → 行业位置 → 财务验证 → 定价 → 择时 → 情景前瞻<br>→ 七大师独立投票 → 主持人终裁<br><br><code>每次生成约 25~35 秒</code></div>
+  </div>
 </div>
+
 <script src="../shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:'🦊',brandText:'Hana',currentPage:'deep-analysis'});</script>
 <script>
 var API = location.port==='8772'?'http://127.0.0.1:8788':'';
-var CODE='';
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function md2html(md){
-  return (md||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/^### (.*$)/gm,'<h3>$1</h3>')
-    .replace(/^## (.*$)/gm,'<h2>$1</h2>')
-    .replace(/^# (.*$)/gm,'<h1>$1</h1>')
-    .replace(/^---$/gm,'<hr>')
-    .replace(/^\|(.+)\|$/gm,function(m){var c=m.split('|').filter(Boolean).map(function(x){return x.trim()});return c.length?'<tr><td>'+c.join('</td><td>')+'</td></tr>':''})
-    .replace(/<tr><td>[-]+/g,'')
-    .replace(/\n\n/g,'</p><p>')
-    .replace(/\n/g,'<br>');
-}
+var CODE = '';
+var LAST_MD = '';
+var POLLING = false;
 
-function go(){
-  var c=document.getElementById('code').value.trim();
-  if(c.length!==6||!/^\d+$/.test(c)){alert('6位数字');return}
-  CODE=c; document.getElementById('result').className='result-card'; document.getElementById('error').className='error-card';
-}
-
-async function start(){
-  if(!CODE){alert('先输入股票代码');return}
-  var btn=document.getElementById('analyzeBtn'),prog=document.getElementById('progress'),err=document.getElementById('error'),res=document.getElementById('result');
-  btn.className='analysis-btn loading';btn.disabled=true;
-  prog.className='progress show';prog.textContent='启动中...';
-  err.className='error-card';res.className='result-card';res.innerHTML='';
-  try{
-    var r=await fetch(API+'/api/deep-analysis/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:CODE})});
-    var j=await r.json();
-    if(j.error)throw new Error(j.error);
-    if(j.reused){prog.textContent='复用今日已有结果';}
-    await poll(j.job_id,btn,prog,res,err);
-  }catch(e){btn.className='analysis-btn';btn.disabled=false;err.className='error-card show';err.textContent='失败: '+e.message}
-}
-
-async function poll(jid,btn,prog,res,err){
-  while(true){
-    var r=await fetch(API+'/api/deep-analysis/status?job_id='+jid);var j=await r.json();
-    if(j.error)throw new Error(j.error);
-    if(j.state==='done'){
-      btn.className='analysis-btn';btn.disabled=false;prog.className='progress';
-      res.style.display='block';res.innerHTML=md2html(j.result_md);
-      // 加载七票表
-      if(j.votes){
-        var tb='<h3>七大师投票明细</h3><table><tr><th>大师</th><th>票</th><th>理由</th></tr>';
-        j.votes.forEach(function(v){tb+='<tr><td>'+esc(v.master)+'</td><td><b>'+esc(v.vote)+'</b></td><td>'+esc(v.reason)+'</td></tr>'});
-        res.innerHTML+=tb+'</table>';
+/* ─── Markdown → HTML ─── */
+function md2html(md) {
+  if (!md) return '';
+  var h = md;
+  // 1) 保护代码块
+  var fences = [];
+  h = h.replace(/(```|~~~)(\w*)\n([\s\S]*?)\n\1/g, function(m,_,lang,code){
+    var idx = fences.length;
+    fences.push('<pre><code'+(lang?' class="lang-'+lang+'"':'')+'>'+esc(code)+'</code></pre>');
+    return '\x00F'+idx+'\x00';
+  });
+  // 2) 转义 HTML
+  h = esc(h);
+  // 3) 还原代码块
+  h = h.replace(/\x00F(\d+)\x00/g, function(_,n){ return fences[+n]||''; });
+  // 4) 横线
+  h = h.replace(/^---$/gm, '<hr>');
+  // 5) 标题
+  h = h.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  h = h.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  h = h.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  h = h.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // 6) 引用
+  h = h.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+  // 7) 表格块
+  h = h.replace(/(^\|.+\n(?:\|.+\n?)*)/gm, function(tbl){
+    var rows = tbl.trim().split('\n'), out = '<table>';
+    for (var i = 0; i < rows.length; i++) {
+      var cells = rows[i].split('|').filter(Boolean);
+      if (cells.length && cells.every(function(c){ return /^[\s\-:]+$/.test(c.trim()); })) continue;
+      var tag = i === 0 ? 'th' : 'td';
+      out += '<tr>';
+      for (var j = 0; j < cells.length; j++) {
+        out += '<'+tag+'>'+inline(cells[j].trim())+'</'+tag+'>';
       }
+      out += '</tr>';
+    }
+    return out + '</table>';
+  });
+  // 8) 无序列表
+  h = h.replace(/^(\s*)[-*] (.+)$/gm, function(m,indent,item){
+    return indent+'<li>'+inline(item)+'</li>';
+  });
+  // 9) 段落
+  var parts = h.split(/\n\n+/), out = [];
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i].trim();
+    if (!p) continue;
+    if (/^<(h[1-4r]|table|blockquote|pre|ul|ol|li)/.test(p)) { out.push(p); continue; }
+    if (/^<(li)/.test(p)) { out.push('<ul>'+p+'</ul>'); continue; }
+    // 纯文本段落去除非块级标签的换行
+    p = p.replace(/\n/g, '<br>');
+    out.push('<p>'+inline(p)+'</p>');
+  }
+  return out.join('\n');
+}
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function inline(s){
+  return s
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`(.+?)`/g,'<code>$1</code>')
+    .replace(/\[(.+?)\]\((.+?)\)/g,'<a href="$2" target="_blank">$1</a>');
+}
+
+/* ─── 启动 ─── */
+function generate() {
+  var code = document.getElementById('code').value.trim();
+  if (!code || code.length!==6 || !/^\d+$/.test(code)) {
+    showError('请输入 6 位数字股票代码');
+    return;
+  }
+  if (POLLING) return;
+  CODE = code;
+  hideAll();
+  showProgress('启动中…');
+  document.getElementById('genBtn').disabled = true;
+  POLLING = true;
+
+  fetch(API+'/api/deep-analysis/start', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code:CODE})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(j){
+    if (j.error) throw new Error(j.error);
+    poll(j.job_id);
+  })
+  .catch(function(e){
+    POLLING = false;
+    document.getElementById('genBtn').disabled = false;
+    showError('启动失败: ' + e.message);
+  });
+}
+
+function poll(jid) {
+  fetch(API+'/api/deep-analysis/status?job_id='+jid)
+  .then(function(r){ return r.json(); })
+  .then(function(j){
+    if (j.error) throw new Error(j.error);
+    if (j.state === 'done') {
+      POLLING = false;
+      document.getElementById('genBtn').disabled = false;
+      hideProgress();
+      showResult(j.result_md);
       return;
     }
-    if(j.state==='error'){btn.className='analysis-btn';btn.disabled=false;err.className='error-card show';err.textContent=j.error||'分析出错';return}
-    prog.textContent=(j.stage||'分析中')+' · '+Math.round(j.elapsed_sec||0)+'s';
-    await new Promise(function(r){setTimeout(r,3000)});
-  }
+    if (j.state === 'error') {
+      POLLING = false;
+      document.getElementById('genBtn').disabled = false;
+      hideProgress();
+      showError(j.error || '分析出错');
+      return;
+    }
+    setProgress((j.stage||'分析中')+' · '+(j.elapsed_sec?Math.round(j.elapsed_sec)+'s':''), '');
+    setTimeout(function(){ poll(jid); }, 2000);
+  })
+  .catch(function(e){
+    POLLING = false;
+    document.getElementById('genBtn').disabled = false;
+    showError('轮询失败: ' + e.message);
+  });
 }
+
+function showResult(md) {
+  LAST_MD = md;
+  document.getElementById('result').className = 'show';
+  document.getElementById('actionBar').className = 'action-bar show';
+  document.getElementById('reportBody').innerHTML = md2html(md);
+  document.getElementById('emptyState').style.display = 'none';
+}
+
+function restart() {
+  if (POLLING) return;
+  document.getElementById('result').className = '';
+  document.getElementById('actionBar').className = 'action-bar';
+  generate();
+}
+
+function downloadReport() {
+  if (!LAST_MD) return;
+  var code = CODE;
+  var name = '';
+  var m = LAST_MD.match(/^#\s*(.+?)（(\d+)）深度分析/m) || LAST_MD.match(/^#\s*(.+?)\((\d+)\)/m);
+  if (m) { name = m[1]; code = m[2]; }
+  var date = new Date().toISOString().slice(0,10);
+  var title = name ? name+'（'+code+'）深度分析' : code+' 深度分析';
+  var cssUrl = window.location.origin+'/shared/css/hanako-glass.css';
+  var html = '<!DOCTYPE html><html lang="zh-CN" class="dark"><head><meta charset="UTF-8">'+
+    '<meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">'+
+    '<link rel="stylesheet" href="'+cssUrl+'">'+
+    '<style>.report-wrap{max-width:820px;margin:0 auto;padding:40px 24px;}.report-wrap table{width:100%;border-collapse:collapse;font-size:0.72rem;margin:12px 0;}.report-wrap th{padding:8px 12px;background:rgba(255,255,255,.03);color:var(--muted);font-weight:600;font-size:0.65rem;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--divider);text-align:left;}.report-wrap td{padding:7px 12px;border-bottom:1px solid var(--divider);color:var(--text-secondary);}.report-wrap h1{font-family:var(--font-display);font-size:1.25rem;color:var(--text-primary);margin:24px 0 12px;border-bottom:1px solid var(--divider);padding-bottom:8px;}.report-wrap h2{font-family:var(--font-display);font-size:1.05rem;color:var(--text-primary);margin:20px 0 8px;}.report-wrap h3{font-family:var(--font-display);font-size:0.92rem;color:var(--text-primary);margin:16px 0 6px;}.report-wrap p{color:var(--text-secondary);line-height:1.8;margin:8px 0;}.report-wrap hr{border:none;border-top:1px solid var(--divider);margin:20px 0;}.report-wrap code{background:rgba(255,255,255,.05);border-radius:4px;padding:1px 5px;font-family:var(--font-mono);font-size:0.8em;color:var(--accent);}.report-wrap pre{background:rgba(255,255,255,.02);border:1px solid var(--divider);border-radius:10px;padding:14px 18px;overflow-x:auto;font-size:0.75rem;margin:12px 0;}.report-wrap blockquote{border-left:3px solid var(--accent);padding:8px 16px;margin:12px 0;color:var(--text-secondary);background:rgba(245,158,11,.03);border-radius:0 8px 8px 0;}.report-wrap strong{color:var(--text-primary)}.report-wrap ul,.report-wrap ol{padding-left:22px;color:var(--text-secondary)}</style></head><body>'+
+    '<div class="report-wrap">'+md2html(LAST_MD)+
+    '<hr><p style="font-size:0.7rem;color:var(--text-tertiary);text-align:center;margin-top:32px">'+
+    '生成于 '+date+' · Hanako 投资系统 · 不构成投资建议</p></div></body></html>';
+
+  var blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (name||code)+'_深度分析_'+date+'.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ─── UI 辅助 ─── */
+function hideAll() {
+  document.getElementById('result').className = '';
+  document.getElementById('error').className = 'error-card';
+  document.getElementById('emptyState').style.display = 'none';
+}
+function showProgress(t) {
+  document.getElementById('progress').className = 'progress-wrap show';
+  document.getElementById('progText').textContent = t;
+  document.getElementById('progStage').textContent = '';
+}
+function setProgress(t, s) {
+  document.getElementById('progText').textContent = t;
+  document.getElementById('progStage').textContent = s || '';
+}
+function hideProgress() {
+  document.getElementById('progress').className = 'progress-wrap';
+}
+function showError(msg) {
+  var el = document.getElementById('error');
+  el.className = 'error-card show';
+  document.getElementById('errMsg').textContent = msg;
+}
+
+/* ─── 事件 ─── */
+document.getElementById('code').addEventListener('keydown', function(e){
+  if (e.key === 'Enter') generate();
+});
+document.getElementById('genBtn').addEventListener('click', generate);
 </script>
 </body>
 </html>
