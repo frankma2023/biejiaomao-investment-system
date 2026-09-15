@@ -52,6 +52,18 @@
     return '<div class="chan-line">🧬 <span style="color:' + col + '">' + esc(c.text) + '</span><span class="dim">(' + esc(c.date) + ')</span></div>';
   }
 
+  // CPA 阶段（Oliver Kell 六阶段）——只展示，不进评分（见 watchlist_report._cpa_note）
+  // 颜色按动作语义，遵循红涨绿跌：看多=红 / 防守=绿 / 观察=灰
+  function cpaLine(card) {
+    const c = card.cpa;
+    if (!c) return '';
+    let col = '#8b8b90';
+    if (c.action === '入场') col = '#ef4444';
+    else if (c.action === '保护利润' || c.action === '清仓' || c.action === '减仓') col = '#10b981';
+    return '<div class="chan-line">🎯 <span style="color:' + col + '">CPA ' + esc(c.text) + '</span>'
+         + '<span class="dim">(' + esc(c.date) + ')</span></div>';
+  }
+
   function missBlock(card, lastView) {
     const m = card.missed || [];
     if (!m.length || !lastView) return '';
@@ -103,7 +115,7 @@
       (card.metrics && card.metrics.dd_250 != null ? '<span class="dim">回撤 ' + card.metrics.dd_250 + '%</span>' : '') +
       (card.metrics && card.metrics.pe_pct != null ? '<span class="dim">PE分位 ' + card.metrics.pe_pct + '%</span>' : '') +
       '</div>' +
-      holdingBlock(card) + chanLine(card) + missBlock(card, lastView) +
+      holdingBlock(card) + chanLine(card) + cpaLine(card) + missBlock(card, lastView) +
       (ev.reasons && ev.reasons.length ? '<div class="r-reasons">' + ev.reasons.map(r => '<div>' + esc(r) + '</div>').join('') + '</div>' : '') +
       sigLine(card) + callbackBlock(card) +
       (ev.tips && ev.tips.length ? '<div class="r-tips">' + ev.tips.map(t => '<div>⚠️ ' + esc(t) + '</div>').join('') + '</div>' : '') +

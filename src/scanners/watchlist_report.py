@@ -165,6 +165,75 @@ def _chanlun_note(code, db, scan_date):
     return {'text': ' · '.join(parts), 'side': r['latest_trade_side'], 'date': r['scan_date']}, sigs
 
 
+# CPA 阶段中文名（与前端 cpa-stages.html 的 STAGE_NAME 保持一致）
+_CPA_STAGE_CN = {
+    '①a': '超跌（未反转）', '①b': '超跌+反转迹象', '②': '突破后运行', '③': '回踩后运行',
+    '④': '基部突破', '⑤': '衰竭延长', '⑥a': '破位初现', '⑥b': '破位后下行',
+    '⑥c': '破位后深跌', '⑥w': '预警（衰竭未破位）',
+}
+
+# 阶段 → 动作的中文表达（动作本身取自引擎，此处只做说法转换）
+_CPA_ACTION_CN = {
+    '观察': '观察', '入场': '入场（买入候选）', '加仓': '加仓', '持有': '持有',
+    '减仓': '减仓', '保护利润': '卖出·保留利润', '清仓': '清仓',
+}
+
+
+def _cpa_note(code, db, scan_date):
+    """CPA 阶段标注（Oliver Kell 六阶段）
+
+    ■ 只作展示，**不进评分**。原因：回测显示多个阶段是负期望——
+      ④ 整体 H20 −0.58% / 胜率 40%（校准后 +0.30%/43%）、③ 深档 −0.72%/41%、
+      ⑤ 各桶超额中位 −5%~−8.5%。阶段的语义是「处境描述 + 该处境的处置建议」，
+      不是择时信号。自动加分会让报告看起来更有依据，实际是过早的定量化。
+
+    ■ 输出层标签与底层状态分开表达：⑥w（预警）是输出层覆盖，底层可能仍是 ②③④⑤；
+      过渡态（XT）同理。若直接展示 stage 字段，会把「预警」演成「已经进 ⑥」。
+    """
+    r = db.execute("""SELECT date, stage, action, days_in_stage,
+                             structure_support, invalid_level, metrics_json
+        FROM cpa_stage_daily WHERE stock_code=? AND date<=?
+        ORDER BY date DESC LIMIT 1""", (code, scan_date)).fetchone()
+    if not r:
+        return None
+    import json as _json
+    try:
+        m = _json.loads(r['metrics_json'] or '{}')
+    except Exception:
+        m = {}
+
+    st = r['stage'] or ''
+    base = m.get('warn_from') or st          # ⑥w / XT 还原底层
+    base_clean = base.replace('T', '')
+    act = r['action'] or '观察'
+
+    out = {
+        'stage': base_clean,
+        'stage_raw': st,
+        'stage_cn': _CPA_STAGE_CN.get(base_clean, base_clean),
+        'action': act,
+        'action_cn': _CPA_ACTION_CN.get(act, act),
+        'days': r['days_in_stage'],
+        'date': r['date'],
+    }
+    seg = [f"{base_clean} {out['stage_cn']}", f"动作「{out['action_cn']}」"]
+    if r['days_in_stage']:
+        seg.append(f"已 {r['days_in_stage']} 交易日")
+    # ⑥ 的方向分档（v1.5）：方向胜率差 6pp，比回撤幅度更有信息量
+    if m.get('six_dir'):
+        seg.append('反弹' if m['six_dir'] == 'rebound' else '续跌')
+    if m.get('warn_from'):
+        seg.append(f"预警中（底层 {m['warn_from']}）")
+    elif m.get('transition_zone'):
+        seg.append('过渡态')
+    out['text'] = ' · '.join(seg)
+    if r['invalid_level']:
+        out['invalid_level'] = r['invalid_level']
+    if r['structure_support']:
+        out['structure_support'] = r['structure_support']
+    return out
+
+
 def scan_stock(code, name, db, scan_date, weights=None, holdings=None, last_view=None):
     """股票轨：引擎扫描 + 规则引擎 → 卡片"""
     klines = _load_klines(db, code, scan_date)
@@ -212,6 +281,9 @@ def scan_stock(code, name, db, scan_date, weights=None, holdings=None, last_view
     # 缠论标注
     chan = _chanlun_note(code, db, scan_date)
 
+    # CPA 阶段标注（只展示，不进评分——见 _cpa_note docstring）
+    cpa = _cpa_note(code, db, scan_date)
+
     # 规则引擎（norm 已含 mw_signals 并去重）
     res = evaluate(norm, ctx, weights=weights, scan_date=scan_date)
     # 错过检测：last_view 锚点 + 信号日价回填
@@ -223,6 +295,7 @@ def scan_stock(code, name, db, scan_date, weights=None, holdings=None, last_view
         'ctx': {k: ctx[k] for k in ('pos_250', 'ma50', 'ma50_slope', 'gain_from_low', 'fib_levels', 'low_250', 'high_250')},
         'rps': ctx.get('rps', {}),
         'chanlun': chan,
+        'cpa': cpa,
         'signals': res['signals_used'],
         'eval': {k: res[k] for k in ('level', 'level_cn', 'net', 'buy_score', 'sell_score', 'reasons', 'tips', 'callback', 'resonance')},
         'missed': missed,
