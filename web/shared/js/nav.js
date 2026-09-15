@@ -46,7 +46,14 @@
     { href: '../pattern-scan/',         label: '形态识别',         page: 'pattern-scan' },
     { href: '../daily-pattern-scan/',   label: '形态扫描',         page: 'daily-pattern-scan' },
     { href: '../mw-signals/',           label: 'MW信号',           page: 'mw-signals' },
-    { href: '../prompt-generator/',    label: 'Prompt 生成',     page: 'prompt-generator' },
+  ];
+
+  // 个股扫描（2026-09-15 改造）：由单项链接改为下拉栏目
+  // 原 "个股扫描" 直接指向 stock-valuation/?，现改为栏目，内含基本面/大师分析/深度分析三项
+  var STOCK_ITEMS = [
+    { href: '../stock-valuation/',   label: '个股基本面', page: 'stock-valuation' },
+    { href: '../prompt-generator/',  label: '大师分析',   page: 'prompt-generator' },
+    { href: '../deep-analysis/',     label: '深度分析',   page: 'deep-analysis' },
   ];
 
   var DISCIPLINE_ITEMS = [
@@ -77,7 +84,6 @@
   ];
 
   var MAIN_ITEMS = [
-    { href: '../stock-valuation/',      label: '个股扫描',         page: 'stock-valuation' },
     { href: '../market-scan/',          label: '大盘扫描',         page: 'market-scan' },
     { href: '../canslim-scores/',       label: 'CAN SLIM',          page: 'canslim-scores' },
     { href: '../cockpit/',             label: '驾驶舱',           page: 'cockpit' },
@@ -142,6 +148,15 @@
     for (var ix = 0; ix < INDEX_ITEMS.length; ix++) {
       var xi = INDEX_ITEMS[ix];
       html += '<a href="' + H(xi.href) + '" class="' + (xi.page === cp ? 'active' : '') + '">' + xi.label + '</a>';
+    }
+    html += '</div></div>';
+
+    // 个股扫描 dropdown（个股基本面/大师分析/深度分析）
+    var isStock = STOCK_ITEMS.some(function (s) { return s.page === cp; });
+    html += '<div class="nav-dropdown"><a href="javascript:void(0)" class="nav-item' + (isStock ? ' active' : '') + '">个股扫描</a><div class="nav-dropdown-menu">';
+    for (var si = 0; si < STOCK_ITEMS.length; si++) {
+      var st = STOCK_ITEMS[si];
+      html += '<a href="' + H(st.href) + '" class="' + (st.page === cp ? 'active' : '') + '">' + st.label + '</a>';
     }
     html += '</div></div>';
 
