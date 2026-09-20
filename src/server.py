@@ -7790,14 +7790,21 @@ def api_cpa_stock_weekly():
             d['open'] = w.get('open')
             d['high'] = w.get('high')
             d['low'] = w.get('low')
-            d['close'] = w.get('close') or d['close']
+            # close 取自周K现算（wkl_map）；miss 时置 None 而非报错——
+            # SELECT 不含 close 列，dict(r) 无该键，w.get 缺省才能避免 KeyError 500（Spec W-1）
+            d['close'] = w.get('close')
             d['volume'] = w.get('volume')
             d['ema10'] = w.get('ema10')
             d['ema20'] = w.get('ema20')
             d['atr20'] = w.get('atr20')
             d['vr'] = round(d['vr'], 2) if d['vr'] else None
             out.append(d)
-        return jsonify({'code': code, 'weekly': out, 'transitions': trans_out})
+        # PRD §7.1 warmup_note（行为要求）：无数据时说明原因而非裸空数组
+        resp = {'code': code, 'weekly': out, 'transitions': trans_out}
+        if not out:
+            resp['warmup_note'] = ('该股周线CPA无数据：上市不足 warmup(26周)+分位窗(52周)=78 周，'
+                                   '或不在流动性池（CPA与数据层同源池，无周线笔快照的股票不写库，防半残数据）')
+        return jsonify(resp)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
