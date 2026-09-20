@@ -43,6 +43,7 @@
 
   var PATTERN_ITEMS = [
     { href: '../discipline/cpa-stages.html', label: 'CPA阶段', page: 'cpa-stages' },
+    { href: '../discipline/cpa-stock-weekly.html', label: 'CPA周K详情', page: 'cpa-stock-weekly' },
     { href: '../pattern-structure/',    label: 'MW分析',           page: 'pattern-structure' },
     { href: '../pattern-scan/',         label: '形态识别',         page: 'pattern-scan' },
     { href: '../daily-pattern-scan/',   label: '形态扫描',         page: 'daily-pattern-scan' },

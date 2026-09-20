@@ -591,6 +591,10 @@
 <div class="lesson-card"><div class="ln">124. 均值与中位打架时以中位为准</div><div class="ld">同一批数据，均值说「高涨幅更好」（右尾拉高），中位说「高涨幅更差」（与两次回测一致）。均值被少数大赢家驱动，中位反映概率结构。项目此前「中位数由负转正」就是这么论证的。</div></div>
 <div class="lesson-card"><div class="ln">125. 表名里带「signals」不代表它存的是信号</div><div class="ld">pattern_scan_signals 的 date 是扫描日不是信号日，signals_json 是累积快照（截至该扫描日已知的全部信号）。加上卖出引擎的预筛选，导致 96% 的行都含 bearish ——它实际在测「这只股近期是否强势」，完全不能当信号用。建信号表前必须读写入端代码。</div></div>
 <div class="lesson-card"><div class="ln">126. 子代理不是万能的</div><div class="ld">本项目 CPA 类 review 子代理连续多次「启动即失败」（1 秒内），而 chanlun 类的能成功。不再重试，改为自执行逐条审计——反而挖出了两个 Blocker。工具失败时，换成自己能控制的方式继续，比反复重试有效。</div></div>
+<div class="lesson-card"><div class="ln">127. 覆盖率预检的分母必须与数据生产方同池</div><div class="ld">周线 CPA 全量的预检先拿日线引擎大池（5971 只，有 320+ 日K就算）当分母，被自己拦住：数据层只给流动性池（4110 只）回填快照，对大池覆盖率永远只有 67%。分母换回 POOL_SQL 后 100%。更深一层：CPA 跑大池会给 1800+ 只无快照股写出半残数据——**池口径不统一不只是预检误报，是真的会产出脏数据**。</div></div>
+<div class="lesson-card"><div class="ln">128. 快照领先才重算，是增量的正确幂等语义</div><div class="ld">周线 CPA 增量第一版判据是「快照周落后于市场周」，有漏洞：CPA 行为空的股票永远不会被补上。改成「快照 max(scan_date) > CPA max(date) 才重算」后与数据层产出严格衔接，实测二次运行 0 行重写。增量判据要比较「上游产出 vs 下游落库」，不能只看上游与日历的关系。</div></div>
+<div class="lesson-card"><div class="ln">129. 参数化验收必须配回归基线，而不是靠自信</div><div class="ld">T2 把 21 个硬编码窗口改读 CFG，宣称「日线行为零变化」的证据是：改前先拍 5507 行基线，改后复跑逐字节一致。中途还抓到交接文档漏掉的 atr_series/ema_series 写死窗口（周线 atr_win=8 不参数化就是哑巴覆盖）。改造类任务的验收标准是可机检的（快照比对），不是「我确认没改行为」。</div></div>
+<div class="lesson-card"><div class="ln">130. 无上游证据的下游产物是定时炸弹</div><div class="ld">笔顶快照只回了 2 只时就跑了全市场 CPA，写出 238 万行 ⑥w/收敛判据恒 False 的半残数据，还混着旧引擎 dow==0 口径残留（日期键不同，REPLACE 覆盖不掉）。上游没就绪时跑下游，能跑通≠有效——下游管道要么前置预检（覆盖率<90% 拒跑），要么明标「半残、待 purge 重算」。</div></div>
 
 </div>
 <script>
@@ -599,6 +603,21 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 </script>
 <script src="shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
+
+<div class="pg-section">
+<div class="section-title">📌 2026-09-18 收尾 · 周K线 CPA 判定引擎全链路上线</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-done"></span></td><td>T2 日线引擎参数化：21 个硬编码窗口改读 CFG（含文档漏检的 atr/ema 写死窗口），回归基线逐字节一致（5507 行 / 955 迁移）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>T1 周线引擎 v2 重写：三死罪全修（ISO 聚合 / 逐周快照防未来 / CFG 幂等 update），A4 十项修订值全生效</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>T3 单股验证：①~⑧ 全可达、防未来 6853 笔顶 0 泄露、2024-09-30 单日周四价=日线</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>数据层全量回填：4109 只 / 173.9 万周快照（week_is_complete 自动跳过进行中周）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>T4 全量重算：182.7 万行 / 4000 只 / 迁移 52 万 / 失效标记 16.7 万 / 241s；A3 分布无退化；预检池口径修正（流动性池同源）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>T5 API 重建 /api/cpa/stock-weekly：ISO 周K + EMA/ATR 现算 + invalidated 三态（周单位）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>T6 前端 cpa-stock-weekly.html 重写：色带/失效位/迁移三态/折叠 original 提示/双页互跳；日K页仅加互跳（A9）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>T7 daily_update 接入：步骤 35a+36，增量判据 v3（快照领先才重算），幂等实测 0 行重写</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td>待办：⑥w 占比 26.5% 偏敏校准（EMA10 连续 2 周转负才 warn / 恢复 3 顶，可回测验证）；8788 重启后浏览器验收 A5~A7</td></tr>
+</table>
+</div>
 
 <div class="pg-section">
 <div class="section-title">📌 2026-09-07 收尾 · CANSLIM 重构 + 个股体检 Skill</div>
