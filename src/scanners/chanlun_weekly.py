@@ -30,9 +30,12 @@ import json
 import sqlite3
 from datetime import datetime, timedelta
 
+import os
+
 import pandas as pd
 
-DB_PATH = r"D:\hanako\investment-system\data\lixinger.db"
+PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(PROJECT, 'data', 'lixinger.db')
 WEEKLY_ALGO_VERSION = 'czsc101_w'
 
 # 周线窗口上限（周K根数）。回填 2016-2026 约 550 周 + warmup 26 周，

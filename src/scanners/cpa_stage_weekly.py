@@ -205,6 +205,23 @@ def load_weekly_bi_tops_by_date(conn, code, dates):
 
 
 # ═══════════════════ tops 与状态机 ═══════════════════
+def compute_weekly_indicators(wkl):
+    """周线指标现算（CFG 安全版）：apply WEEKLY_CFG → compute_indicators → restore。
+
+    为什么需要：compute_indicators 读模块级 daily.CFG（atr_win/vr_win/pctile_win 等），
+    长驻进程（server）里 daily.CFG 是日线默认值——直接调会让展示层的 ATR/VR
+    与判据层的窗口分家（Standards review B1）。
+    save/restore 模式镜像 mark_invalidated_weekly；日K端点共用同一 CFG，
+    不恢复会把日K也污染。
+    """
+    cfg_saved = {k: daily.CFG[k] for k in WEEKLY_CFG}
+    daily.CFG.update(WEEKLY_CFG)
+    try:
+        return daily.compute_indicators(wkl)
+    finally:
+        daily.CFG.update(cfg_saved)
+
+
 def run_weekly(code, conn=None, min_date='2014-01-01'):
     """单股周线 CPA：ISO 周K → 日线状态机（WEEKLY_CFG）→ collapse → (daily_rows, trans_rows)
 
@@ -223,7 +240,7 @@ def run_weekly(code, conn=None, min_date='2014-01-01'):
         wkl = load_weekly_klines(conn, code, min_date)
         if len(wkl) < MIN_WEEKS:
             return [], [], len(wkl)
-        ind = daily.compute_indicators(wkl)
+        ind = compute_weekly_indicators(wkl)
         tops = load_weekly_bi_tops_by_date(conn, code, [k['date'] for k in wkl])
         d_rows, t_rows = daily.run_state_machine(conn, code, wkl, ind, tops, warmup=WARMUP_WEEKS)
         # 数据层折叠（min_days=2 周），折叠返回 [(date, stage, orig_stage)]
@@ -251,8 +268,9 @@ def run_weekly(code, conn=None, min_date='2014-01-01'):
 def _ensure_cfg():
     """CFG 污染防护：幂等 update（值相同则无副作用）。
 
-    单进程内先周线后日线会污染日线 CFG（交接文档 D4 ⚠），
-    全量回算走多进程天然隔离；此函数保证 run_weekly 重复调用幂等。
+    ⚠ 仅适用于短生命周期的 worker 进程（多进程回算天然隔离）。
+    长驻进程（server）禁止用本函数——update 后不恢复会污染同进程的日K端点，
+    必须用 compute_weekly_indicators / mark_invalidated_weekly 的 save/restore 模式。
     """
     daily.CFG.update(WEEKLY_CFG)
 

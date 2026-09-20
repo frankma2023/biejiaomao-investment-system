@@ -29,7 +29,7 @@
 .tlist .inv{color:var(--muted);text-decoration:line-through;padding:3px 0;border-bottom:1px solid var(--divider)}
 .tlist .pend{color:var(--accent);padding:3px 0;border-bottom:1px solid var(--divider)}
 .load{padding:80px 0;text-align:center;color:var(--muted);font-size:0.78rem}
-.err{padding:60px;text-align:center;color:var(--fall);font-size:0.75rem}
+.err{padding:60px;text-align:center;color:#ef4444;font-size:0.75rem}
 </style>
 </head>
 <body>
@@ -57,6 +57,10 @@
 <div class="tlist" id="dTrans"></div>
 </div>
 </div>
+<script>
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);try{if(window.__wkChart){window.__wkChart.dispose();location.reload()}}catch(e){location.reload()}}
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s;document.documentElement.className=s})();
+</script>
 <script src="../shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:'📊',brandText:'CPA周K',currentPage:'cpa-stock-weekly'})</script>
 <script>
@@ -101,6 +105,7 @@ else{
       else areas.push([{xAxis:s.a-0.5,name:stgFull(s.stage)},{xAxis:s.b+0.5,itemStyle:{color:stgC(s.stage)+'33'}}]);
     });
     var ch=echarts.init(document.getElementById('dChart'));
+    window.__wkChart=ch;
     ch.setOption({
       backgroundColor:'transparent',animation:false,
       grid:[{left:8,right:10,top:14,height:'64%',containLabel:true},{left:8,right:10,top:'80%',height:'14%',containLabel:true}],

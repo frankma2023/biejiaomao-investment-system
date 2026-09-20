@@ -518,7 +518,7 @@ def judge_reversal(ind, kl, i, tops, rps_map=None):
     dd, hi_idx = drawdown_from_high(kl, i, CFG['pctile_win'])
     if dd is None or hi_idx is None:
         return {'a': False, 'b': False, 'detail': {}}
-    # 前置闸门（2026-09-14 v1.5 重建，PRD §13.2 #4）：只剩「距高点 ≤0 日」一条。
+    # 前置闸门（2026-09-14 v1.5 重建，PRD §13.2 #4）：只剩「距高点 ≤60 日」一条。
     # 实测（600 只 / ①A 候选日 3,529 个，scripts/bt_cpa_04_gate_sweep.py）：
     #   仅 涨幅≥40%      −0.02pp（阈值 20~100% 全在 ±0.25pp 内）
     #   仅 RPS250≥70     −0.04pp（越严越差）
@@ -694,7 +694,7 @@ def judge_crossback(ind, kl, i, ctx):
     v_win = [x for x in ind['vols'][max(0, i - 2):i + 1] if x]
     v_avg = (sum(v_win) / len(v_win)) if v_win else None
     v_w = ctx.get('w_vol')
-    vol_ok = (v <= CFG['cb_vol_max']) or (v_avg is not None and v_w and v_avg < v_w * 0.7)
+    vol_ok = (v <= CFG['cb_vol_max']) or (v_avg is not None and v_w and v_avg < v_w * CFG['w_vol_dry'])
     if not vol_ok:
         return {'hit': False, 'phase': phase, 'detail': {'vol_fail': round(v, 2)}}
     # 持续守住：回踩期 ≥2 日 close 在该均线上方（含当日与之前几日）

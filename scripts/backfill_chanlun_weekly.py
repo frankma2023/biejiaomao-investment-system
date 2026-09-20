@@ -2,7 +2,7 @@
 """周K线缠论笔全量回填（ISO 真周K + CZSC Freq.W 真周线笔）
 
 产出表：
-- chanlun_weekly_bi_json(stock_code, scan_date, bi_json, algo_version)：
+- chanlun_weekly_bi_json(stock_code, scan_date, bi_json, WEEKLY_ALGO_VERSION)：
   每周一行「当时可见」的周线笔快照（scan_date=周代表日=该周最后交易日）。
   PK(stock_code, scan_date)，写库为 DELETE+INSERT 覆盖写，幂等可断点续跑。
   algo_version='czsc101_w'：增量续跑只跳过已完成的周（镜像日线 chanlun_scan_daily 做法）。
@@ -27,14 +27,18 @@ import argparse
 import os
 import sqlite3
 import sys
+import os
 import time
 from datetime import datetime
 
-sys.path.insert(0, r"D:\hanako\investment-system\src")
+PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(PROJECT, 'src'))
+sys.path.insert(0, PROJECT)
 
-DB = r"D:\hanako\investment-system\data\lixinger.db"
-ALGO_VERSION = 'czsc101_w'
-LOG_DIR = r"D:\hanako\investment-system\logs"
+from scanners.chanlun_weekly import WEEKLY_ALGO_VERSION
+
+DB = os.path.join(PROJECT, 'data', 'lixinger.db')
+LOG_DIR = os.path.join(PROJECT, 'logs')
 
 # 股票池：与日线缠论扫描一致的流动性过滤（全市场正常上市、非ST、近20日日均成交额≥5000万）
 POOL_SQL = """
@@ -103,8 +107,8 @@ def save_stock_results(db_path, code, dates_all, results, max_retry=8):
                         continue
                     db.execute(
                         "INSERT OR REPLACE INTO chanlun_weekly_bi_json "
-                        "(stock_code, scan_date, bi_json, algo_version) VALUES (?,?,?,?)",
-                        (code, d, s['bi_json'], ALGO_VERSION))
+                        "(stock_code, scan_date, bi_json, WEEKLY_ALGO_VERSION) VALUES (?,?,?,?)",
+                        (code, d, s['bi_json'], WEEKLY_ALGO_VERSION))
                 db.commit()
                 return len([s for _, s in results if s])
             finally:
@@ -130,7 +134,7 @@ def scan_stock_weekly_worker(args):
             db = sqlite3.connect(DB, timeout=30)
             rows = db.execute(
                 "SELECT scan_date FROM chanlun_weekly_bi_json "
-                "WHERE stock_code=? AND algo_version=?", (code, ALGO_VERSION)).fetchall()
+                "WHERE stock_code=? AND algo_version=?", (code, WEEKLY_ALGO_VERSION)).fetchall()
             db.close()
             done = {r[0] for r in rows}
             dates = [d for d in dates if d not in done]

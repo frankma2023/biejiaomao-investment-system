@@ -7765,13 +7765,15 @@ def api_cpa_stock_weekly():
                 _d['inv_state'] = 'valid'
             trans_out.append(_d)
         # 周K + 指标现算（ISO 聚合，代表日与 CPA 行同源）；从 2014 起算保证 EMA 预热
+        # ⚠ 必须用 compute_weekly_indicators（内部 apply/restore WEEKLY_CFG），
+        # 直接调 daily.compute_indicators 会用日线 CFG（atr_win=20/vr_win=20），
+        # 展示口径与周线判据口径（8 周）分家 —— Standards review B1
         wkl_map = {}
         try:
-            import scanners.cpa_stage as _cpa
             import scanners.cpa_stage_weekly as _cpaw
             _wkl = _cpaw.load_weekly_klines(db, code, '2014-01-01')
             if _wkl:
-                _ind = _cpa.compute_indicators(_wkl)
+                _ind = _cpaw.compute_weekly_indicators(_wkl)
                 for _j, _k in enumerate(_wkl):
                     wkl_map[_k['date']] = {
                         'open': _k['open_adj'], 'high': _k['high_adj'],
