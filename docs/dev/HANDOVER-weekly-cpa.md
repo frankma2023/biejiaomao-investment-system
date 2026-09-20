@@ -52,6 +52,19 @@ python scripts/backfill_cpa_weekly.py --workers 8
 - 增量跑两次：第一次 2385335 行/665053 迁移/5637 只；第二次行数完全一致
 - v3 判据下二次运行：0 行重写，0s 退出 ✓（A10）
 
+### 0.5 O-5 双路径抽查结论（Spec review 2026-09-20）
+
+Spec review O-5 质疑 chanlun_weekly.load_daily_df（直接读复权列）与 cpa_stage_weekly._load_daily_df_adj（raw×当日因子）两条日线读取路径不等价。实测（600309/688432/000001 三只全历史 1345 周）：
+
+| 差异类型 | 数量 | 量级 | 结论 |
+|---|---|---|---|
+| 浮点舍入 | 1607 条 | 中位 5.8e-07 | _apply_adj_factor 的 round(6) 累积舍入，无意义 |
+| 实质差异 | 2 条（open/low） | 2~3.6% | 全部在 2015-03-20 一周 = load_daily_df 的 max_weeks×7 窗口把首周拦腰切断（残周聚合失真） |
+
+**CPA 主路径（load_weekly_klines）从 2014 全量读取无窗口，不受影响**；已落库 182.7 万行完好。
+数据层回填调用链 end_date 均为邻近日期，切断发生在尾部，尾部有 week_is_complete 防护。
+**遗留警示**：若未来有人用 load_daily_df 做 end_date 距今 >窗口起点 的历史分析，首周会失真——使用时注意窗口语义，或改用 load_weekly_klines 同源读取。
+
 ---
 
 ## 1. 任务全景与当前进度
