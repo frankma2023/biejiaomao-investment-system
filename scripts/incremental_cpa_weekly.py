@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
-"""周线 CPA 增量模式（T7 幂等要求，v2）：
-仅重算「日线最新完整周 > 周线快照最新周」的股票；其余跳过。
+"""周线 CPA 增量模式（T7 幂等要求，v3 判据）：
 
-判定路径（避开 19M 行逐组 MAX 的随机 IO）：
-  1. 市场最新完整周（周内周五已过 = 上周）：取 idx_daily_kline_date 范围内的
-     最后一个完整周 Monday，SELECT DISTINCT stock_code WHERE date>=monday
-     （日期索引范围扫，~5000 行）。
-  2. 快照最新周：chanlun_weekly_bi_json 仅 6000+ 行，全表扫。
-  3. 快照周 < 市场完整周 且 本周有交易 → 需重算。
-首次全量回算仍用 scripts/backfill_cpa_weekly.py（purge）。
+判据：数据层周线笔快照领先于 CPA 落库行（快照 max(scan_date) > CPA max(date)，含 CPA 无行）→ 重算该股。
+快照缺失（数据层未回填到该股）→ 跳过，等 35a 回填后下一天自然补上。
+与 daily_update 步骤 35a 的产出严格衔接，天然幂等：重算后两者对齐，下次跳过。
+
+⚠ 首次运行或表里有旧引擎/无快照时期的脏数据时，必须先跑全量 purge：
+  python scripts/backfill_cpa_weekly.py --workers 8
+（v1 判据时期曾写过 238 万行无笔顶证据的半残数据 + 旧引擎 dow==0 口径残留，
+  日期键不同 REPLACE 覆盖不掉，只有 purge 能清。）
+
+上游：步骤 35a（backfill_chanlun_weekly.py --incremental）
 """
 import sys, os
-from datetime import datetime, timedelta
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(PROJECT, 'src'))
@@ -19,38 +20,10 @@ sys.path.insert(0, os.path.join(PROJECT, 'src'))
 import sqlite3
 
 import scanners.cpa_stage_weekly as wk
-from scanners.chanlun_weekly import iso_week_key, iso_aggregate
-import pandas as pd
-
-
-def market_last_complete_monday(conn):
-    """市场（000001 指数日历）最后一个完整周的 Monday。
-
-    用上证指数日历（index_daily_kline）判断周完整性：该周代表日之后，
-    日历周五已过（今天 > 本周五）→ 上一个周即为最后完整周。
-    """
-    row = conn.execute("SELECT MAX(date) FROM index_daily_kline WHERE stock_code='000001' AND kline_type='normal'").fetchone()
-    data_max = row[0] if row else None
-    if not data_max:
-        return None
-    dt = datetime.strptime(data_max, '%Y-%m-%d')
-    # 本周 Monday
-    monday = dt - timedelta(days=dt.weekday())
-    friday = monday + timedelta(days=4)
-    # 本周周五已过 → 本周完整；否则最后一个完整周是上周
-    if datetime.now().date() > friday.date():
-        return monday.strftime('%Y-%m-%d')
-    return (monday - timedelta(days=7)).strftime('%Y-%m-%d')
 
 
 def stocks_needing_update(conn):
-    """返回 (需要重算的股票列表, 总池大小)。
-
-    判据（v3）：数据层快照领先于 CPA 落库行 → 重算。
-      快照 max(scan_date) > CPA max(date)（含 CPA 无行的股票）→ 需重算；
-      快照缺失（数据层未回填到该股）→ 跳过（等 35a 回填后下一天自然补上）。
-    这样与步骤 35a 的产出严格衔接，且天然幂等：重算后两者对齐，下次跳过。
-    """
+    """返回 (需要重算的股票列表, 总池大小)。"""
     # 快照最新周（周线笔表仅数千行）
     snap = {}
     for code, wmax in conn.execute(
@@ -73,7 +46,7 @@ def stocks_needing_update(conn):
 
 
 def incremental(workers=8):
-    """增量入口：只把有新完整周的股票列表交给 backfill 的 worker 管道。"""
+    """增量入口：把 stocks_needing_update 选出的股票交给 worker 管道。"""
     from concurrent.futures import ProcessPoolExecutor, as_completed
     import time as _t
     t0 = _t.time()
