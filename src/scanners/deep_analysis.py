@@ -3,25 +3,25 @@
 深度分析引擎 —— stock-health-report Skill 的服务端实现（页面化）
 
 ■ 来源
-  .agents/skills/stock-health-report/SKILL.md（十步工作流 + 七大师奇数投票 + 主持人裁决）
+  .agents/skills/stock-health-report/SKILL.md（十步工作流 + 八大师奇数投票 + 主持人裁决）
   本模块是它的**服务端流水线实现**：数据确定性取自本地库，判断层由 LLM 完成。
 
 ■ 与 Skill 的对应
   Skill 步骤 0  市场闸门      → _market_gate()
   Skill 步骤 1  数据拉取      → build_snapshot()
   Skill 步骤 2~8 否决/认识/行业/评估/定价/择时/情景 → 第 1 次 LLM 调用（整合分析）
-  Skill 步骤 9  七大师投票    → 7 次并行 LLM 调用（每人一副眼镜）
+  Skill 步骤 9  八大师投票    → 7 次并行 LLM 调用（每人一副眼镜）
   Skill 步骤 10 主持人裁决    → 第 9 次 LLM 调用（拿机器分 + 七票 + 证据）
 
 ■ 铁律（与 Skill 一致，写进 prompt）
   1. 裁决协议是输出结构：五档评级 + 动作清单
-  2. 七大师每人必须投「买/等/回避」单向票 + 一句基于数据的理由
+  2. 八大师每人必须投「买/等/回避」单向票 + 一句基于数据的理由
   3. 数据不可编造：缺的明说「未获取」，不伪装
   4. 红涨绿跌（前端负责）
   5. 禁止目标价、禁止收益预测
 
 ■ 为什么是 9 次调用而不是 1 次
-  七大师的价值来自**彼此独立的视角**。一次调用让模型扮演七个角色，它会自我一致化
+  八大师的价值来自**彼此独立的视角**。一次调用让模型扮演七个角色，它会自我一致化
   （先给出结论，再让七个角色为这个结论找理由），失去"分歧"这个最有用的信号。
   实测代价可接受：7 次并行，墙钟时间约等于 1 次。
 
@@ -57,6 +57,17 @@ DEEPSEEK_KEY = os.environ.get('DEEPSEEK_KEY', '')
 DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1')
 LLM_MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
 
+# MoYu 平台备用模型
+MOYU_KEY = os.environ.get('MOYU_KEY', '')
+MOYU_BASE_URL = os.environ.get('MOYU_BASE_URL', 'https://www.moyu.info/v1')
+MOYU_MODEL = os.environ.get('MOYU_MODEL', 'deepseek-chat')
+
+PROVIDERS = {
+    'deepseek': {'key': DEEPSEEK_KEY, 'base_url': DEEPSEEK_BASE_URL, 'model': LLM_MODEL},
+    'moyu':    {'key': MOYU_KEY,      'base_url': MOYU_BASE_URL,      'model': MOYU_MODEL},
+}
+DEFAULT_PROVIDER = 'deepseek'
+
 
 # ═══════════════════════════════════════════════
 # 表
@@ -88,12 +99,14 @@ def ensure_table(conn):
 # ═══════════════════════════════════════════════
 # LLM（OpenAI 兼容）
 # ═══════════════════════════════════════════════
-def _llm(system, user, temperature=0.3, timeout=900, retries=2):
-    """单次调用。失败重试 retries 次；仍失败抛异常（由调用方决定是否降级）"""
-    if not DEEPSEEK_KEY:
-        raise RuntimeError('DEEPSEEK_KEY 未配置（检查 D:\\hanako\\.env）')
+def _llm(system, user, temperature=0.3, timeout=900, retries=2, provider=None):
+    """单次调用。provider = 'deepseek' | 'moyu'，默认使用 DEFAULT_PROVIDER。"""
+    prov = provider or DEFAULT_PROVIDER
+    cfg = PROVIDERS.get(prov)
+    if not cfg or not cfg['key']:
+        raise RuntimeError(f'{prov} 未配置（检查 .env 中的 {prov.upper()}_KEY）')
     payload = json.dumps({
-        'model': LLM_MODEL,
+        'model': cfg['model'],
         'messages': [{'role': 'system', 'content': system},
                      {'role': 'user', 'content': user}],
         'temperature': temperature,
@@ -103,10 +116,10 @@ def _llm(system, user, temperature=0.3, timeout=900, retries=2):
     for attempt in range(retries + 1):
         try:
             req = urllib.request.Request(
-                DEEPSEEK_BASE_URL.rstrip('/') + '/chat/completions',
+                cfg['base_url'].rstrip('/') + '/chat/completions',
                 data=payload,
                 headers={'Content-Type': 'application/json',
-                         'Authorization': f'Bearer {DEEPSEEK_KEY}'})
+                         'Authorization': f'Bearer {cfg["key"]}'})
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 d = json.loads(r.read().decode('utf-8'))
             return d['choices'][0]['message']['content']
@@ -114,7 +127,7 @@ def _llm(system, user, temperature=0.3, timeout=900, retries=2):
             last = e
             if attempt < retries:
                 time.sleep(3 * (attempt + 1))
-    raise RuntimeError(f'LLM 调用失败: {type(last).__name__}: {str(last)[:200]}')
+    raise RuntimeError(f'LLM 调用失败 ({prov}): {type(last).__name__}: {str(last)[:200]}')
 
 
 # ═══════════════════════════════════════════════
@@ -357,7 +370,7 @@ def snapshot_to_text(snap):
 
 
 # ═══════════════════════════════════════════════
-# 七大师
+# 八大师
 # ═══════════════════════════════════════════════
 MASTERS = [
     ('欧奈尔', '看买点质量、相对强度(RPS)、量价配合、机构行为(CANSLIM)'),
@@ -419,7 +432,7 @@ HOST_SYS = """你是投资决策的主持人。你拿到：客观机器数据、
 """
 
 
-def _run_job(job_id, code):
+def _run_job(job_id, code, provider=None):
     conn = sqlite3.connect(DB_PATH, timeout=60)
     conn.row_factory = sqlite3.Row
     t0 = time.time()
@@ -443,9 +456,9 @@ def _run_job(job_id, code):
         conn.commit()
 
         _stage('整合分析（步骤 2-8）')
-        analysis = _llm(ANALYST_SYS, ctx, temperature=0.3, timeout=900)
+        analysis = _llm(ANALYST_SYS, ctx, temperature=0.3, timeout=900, provider=provider)
 
-        _stage('七大师独立投票')
+        _stage('八大师独立投票')
         votes = []
         with ThreadPoolExecutor(max_workers=7) as pool:
             futs = {}
@@ -481,10 +494,10 @@ def _run_job(job_id, code):
         md = []
         md.append(f"# {name or ''}（{code}）深度分析")
         md.append(f"\n> 数据日期 {data_date} · 生成于 {time.strftime('%Y-%m-%d %H:%M')} · "
-                  f"框架：stock-health-report（十步工作流 + 七大师奇数投票 + 主持人裁决）")
+                  f"框架：stock-health-report（十步工作流 + 八大师奇数投票 + 主持人裁决）")
         md.append("\n---\n")
         md.append(verdict)
-        md.append("\n---\n## 七大师投票明细\n")
+        md.append("\n---\n## 八大师投票明细\n")
         md.append("| 大师 | 票 | 理由 |\n|---|---|---|")
         for v in votes:
             md.append(f"| {v['master']} | **{v['vote']}** | {v['reason']} |")

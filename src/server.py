@@ -7682,6 +7682,126 @@ def api_cpa_stock():
         return jsonify({'error': str(e)}), 500
 
 
+def _ema(values, n):
+    """指数移动平均"""
+    a = 2.0 / (n + 1)
+    result, prev = [], None
+    for v in values:
+        if v is None:
+            result.append(None)
+            continue
+        prev = v if prev is None else v * a + prev * (1 - a)
+        result.append(round(prev, 2))
+    return result
+
+
+@app.route('/api/cpa/stock-weekly', methods=['GET'])
+def api_cpa_stock_weekly():
+    """个股周线 CPA 阶段轨迹（v2：镜像日K版结构，交接文档 §7 T5 / 验收 A5）
+
+    与旧版差异：
+    - 周K 用 chanlun_weekly.iso_aggregate（ISO 口径，代表日=该周最后交易日），
+      与数据层/CPA 落库行同源（D2 快照归属三处同源）；旧版周五→周一转换作废。
+    - EMA/ATR 从周K现算（cpa_stage_weekly.load_weekly_klines + compute_indicators），
+      不再用日线 _ema() 对周五收盘现算；atr20 返回真值。
+    - metrics 展开 entry_path/six_dir 等（与日K版同字段）；invalidated 三态同口径
+      （周线窗=inv_n 周×7 天，与 mark_invalidated_weekly 一致）。
+    """
+    db = get_db()
+    code = request.args.get('code', '')
+    start = request.args.get('start', '2016-01-01')
+    if not code:
+        return jsonify({'error': 'code 必填'}), 400
+    try:
+        rows = db.execute("""SELECT d.date, d.stage, d.days_in_stage, d.stage_start_date,
+                                   d.structure_support, d.invalid_level, d.action,
+                                   json_extract(d.metrics_json,'$.warn_from') AS warn_from,
+                                   json_extract(d.metrics_json,'$.transition_zone') AS in_tz,
+                                   json_extract(d.metrics_json,'$.entry_path') AS entry_path,
+                                   json_extract(d.metrics_json,'$.vr') AS vr,
+                                   json_extract(d.metrics_json,'$.six_dir') AS six_dir,
+                                   json_extract(d.metrics_json,'$.six_dir_pct') AS six_dir_pct,
+                                   json_extract(d.metrics_json,'$.six_dd') AS six_dd,
+                                   json_extract(d.metrics_json,'$.original') AS orig_stage
+            FROM cpa_stage_stock_weekly d
+            WHERE d.stock_code=? AND d.date>=? ORDER BY d.date""", (code, start)).fetchall()
+        trans = db.execute("""SELECT transition_date, from_stage, to_stage, trigger_detail_json, invalidated, invalidated_date
+            FROM cpa_stage_stock_weekly_transitions WHERE stock_code=? AND transition_date>=?
+            ORDER BY transition_date""", (code, start)).fetchall()
+        # invalidated 三态（镜像日K版；周线窗=N 周×7 日历天，与 mark_invalidated_weekly 同口径）
+        trans_out = []
+        try:
+            import scanners.cpa_stage_weekly as _cpaw
+            _inv_n = dict(_cpaw.WEEKLY_CFG.get('inv_n') or {})
+        except Exception:
+            _inv_n = {}
+        _latest = db.execute("SELECT MAX(date) FROM cpa_stage_stock_weekly").fetchone()[0]
+
+        def _n2d(s):
+            from datetime import date as _dt
+            return _dt(int(s[:4]), int(s[5:7]), int(s[8:10])).toordinal()
+
+        for _r in trans:
+            _d = dict(_r)
+            _key = '%s→%s' % (_d.get('from_stage') or '', _d.get('to_stage') or '')
+            _n = _inv_n.get(_key)
+            if _n is None:
+                _n = _inv_n.get('→%s' % (_d.get('to_stage') or ''), 3)
+            _win = _n * 7.0                       # 周线：N 周 × 7 日历天
+            _span = None
+            try:
+                if _latest and _d.get('transition_date'):
+                    _span = _n2d(_latest) - _n2d(_d['transition_date'])
+            except Exception:
+                _span = None
+            _d['inv_n'] = _n
+            _d['inv_window_days'] = round(_win, 1)
+            _d['days_since'] = _span
+            if _d.get('invalidated'):
+                _d['inv_state'] = 'invalidated'
+            elif _span is not None and _span < _win:
+                _d['inv_state'] = 'pending'
+            else:
+                _d['inv_state'] = 'valid'
+            trans_out.append(_d)
+        # 周K + 指标现算（ISO 聚合，代表日与 CPA 行同源）；从 2014 起算保证 EMA 预热
+        wkl_map = {}
+        try:
+            import scanners.cpa_stage as _cpa
+            import scanners.cpa_stage_weekly as _cpaw
+            _wkl = _cpaw.load_weekly_klines(db, code, '2014-01-01')
+            if _wkl:
+                _ind = _cpa.compute_indicators(_wkl)
+                for _j, _k in enumerate(_wkl):
+                    wkl_map[_k['date']] = {
+                        'open': _k['open_adj'], 'high': _k['high_adj'],
+                        'low': _k['low_adj'], 'close': _k['close'],
+                        'volume': _k['volume'],
+                        'ema10': round(_ind['ema10'][_j], 3) if _ind['ema10'][_j] else None,
+                        'ema20': round(_ind['ema20'][_j], 3) if _ind['ema20'][_j] else None,
+                        'atr20': round(_ind['atr20'][_j], 3) if _ind['atr20'][_j] else None,
+                    }
+        except Exception:
+            wkl_map = {}
+        out = []
+        for r in rows:
+            d = dict(r)
+            w = wkl_map.get(d['date'], {})
+            d['open'] = w.get('open')
+            d['high'] = w.get('high')
+            d['low'] = w.get('low')
+            d['close'] = w.get('close') or d['close']
+            d['volume'] = w.get('volume')
+            d['ema10'] = w.get('ema10')
+            d['ema20'] = w.get('ema20')
+            d['atr20'] = w.get('atr20')
+            d['vr'] = round(d['vr'], 2) if d['vr'] else None
+            out.append(d)
+        return jsonify({'code': code, 'weekly': out, 'transitions': trans_out})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/microcap/watertemp', methods=['GET'])
 def api_microcap_watertemp():
     """微盘水温卡：400/100 最新点位/回撤/平均市值 + 与 932000 对比（供 market-scan 卡片）"""

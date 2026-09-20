@@ -198,11 +198,7 @@ TASKS = [
     ("🔁 5b.四口径增量(lxr_fc)",
      [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py", "--caliber", "--types", "lxr_fc"],
      {"timeout": 3600, "stream": True}),
-    # 5c. fc/bc 是留档口径（无任何代码读取，仅备查），非周一跳过
-    #     不做的话这两列会从 2026-09-11 起永久为空，与文档宣称的「四口径」不符
-    *([("🗄 5c.留档口径(fc/bc)",
-        [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py", "--caliber", "--types", "fc,bc"],
-        {"timeout": 9000, "stream": True})] if date.today().weekday() == 0 else []),
+    # 5c.【已取消 2026-09-15】ex_rights/fc_rights/bc_rights 不再拉取，lxr_fc 已满足全站复权需求
     # 5.5 指数全收益（理杏仁 total_return，8 指数 2016 起，回撤买点基准；替代旧 H00922 单指数脚本）
     ("🧧 5.5全收益指数",     [PYTHON_EXE, "scripts/fetch_index_full_return.py"]),
     # 5.6 国债收益率（红利温度计股债息差用）
@@ -323,6 +319,13 @@ TASKS.append(("🔬 33.微盘股指数", [PYTHON_EXE, "scripts/build_microcap_in
 
 # 步骤 34：CPA 阶段判定（依赖 K线+笔数据——六阶段状态机全量重跑，~3min，幂等）
 TASKS.append(("🎯 34.CPA阶段判定", [PYTHON_EXE, "src/scanners/cpa_stage.py", "--incremental"]))
+
+# 步骤 35：周K线缠论笔快照（依赖日线K线就位；ISO 真周线口径，周末/周五盘后才有新周，
+# week_is_complete 保证周五盘中跑自动跳过本周；幂等：已有快照的周不重写）
+TASKS.append(("🎋 35a.周线缠论笔", [PYTHON_EXE, "scripts/backfill_chanlun_weekly.py", "--start", "2016-01-01", "--incremental"]))
+
+# 步骤 36：周线 CPA 阶段判定（依赖 35a 周线笔 + K线；增量式：仅重算有新完整周的股票，幂等可重复）
+TASKS.append(("🎯 36.周线CPA判定", [PYTHON_EXE, "scripts/incremental_cpa_weekly.py"]))
 
 for item in TASKS:
     label, cmd = item[0], item[1]

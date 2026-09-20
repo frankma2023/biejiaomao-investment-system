@@ -646,5 +646,41 @@
     "run_date": "2026-09-14",
     "market_phase": null,
     "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-09-15",
+    "pool_size": 479,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-09-15",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-09-16",
+    "pool_size": 585,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-09-16",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-09-17",
+    "pool_size": 595,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-09-17",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-09-18",
+    "pool_size": 643,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-09-19",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
   }
 ]

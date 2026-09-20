@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8"><link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="theme-color" content="#0d0d12">
+<title>CPA · 个股详情</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared/css/hanako-glass.css">
+<script src="../shared/js/echarts.min.js"></script>
+<style>
+.layout{max-width:1100px;margin:0 auto;padding:16px 24px 60px}
+.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.hdr h1{font-family:var(--font-display);font-size:1.15rem;font-weight:800;color:var(--text-primary)}
+.hdr .sub{font-size:0.6rem;color:var(--muted)}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-bottom:8px;backdrop-filter:blur(10px)}
+.chart{width:100%;height:600px}
+.clegend{display:flex;flex-wrap:wrap;gap:5px 18px;margin:4px 0 2px;padding:9px 12px;border:1px solid var(--divider);border-radius:10px;background:var(--card);font-size:0.62rem;color:var(--muted);line-height:1.6;backdrop-filter:blur(10px)}
+.clegend span{display:inline-flex;align-items:center;gap:6px}
+.cline{display:inline-block;width:18px;height:0;border-top-width:2px;border-top-style:solid}
+.cldash{border-top-style:dashed}
+.cltri{display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid #f59e0b}
+.clband{display:inline-block;width:16px;height:10px;border-radius:2px}
+.clupdn i{display:inline-block;width:7px;height:10px;margin:0 1px;border-radius:1px}
+.tlist{font-size:0.65rem;line-height:1.7}
+.tlist .ok{color:var(--text-secondary);padding:3px 0;border-bottom:1px solid var(--divider)}
+.tlist .inv{color:var(--muted);text-decoration:line-through;padding:3px 0;border-bottom:1px solid var(--divider)}
+.tlist .pend{color:var(--accent);padding:3px 0;border-bottom:1px solid var(--divider)}
+.load{padding:80px 0;text-align:center;color:var(--muted);font-size:0.78rem}
+.err{padding:60px;text-align:center;color:var(--fall);font-size:0.75rem}
+.hop{font-size:0.62rem;color:var(--accent);text-decoration:none;border:1px solid var(--divider);border-radius:8px;padding:4px 10px;transition:background .15s}
+.hop:hover{background:var(--color-accent-subtle)}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav id="top-nav"></nav>
+<div class="hdr">
+<h1 style="font-size:0.85rem" id="dTitle">📊 个股CPA</h1>
+<span class="sub" id="dSub"></span>
+<a class="hop" id="hopWeekly" href="cpa-stock-weekly.html" style="display:none">↔ 周K详情</a>
+</div>
+<div class="panel">
+<div class="chart" id="dChart"><div class="load">加载中…</div></div>
+<div class="clegend">
+<span><span class="cline" style="border-top-color:#f59e0b"></span>EMA10（③ 标准档回踩对象）</span>
+<span><span class="cline" style="border-top-color:#38bdf8"></span>EMA20（③ 深档回踩对象）</span>
+<span><span class="cline cldash" style="border-top-color:#10b981"></span>失效位（跌破则本阶段结束；分段显示，只标当前值）</span>
+<span><span class="cltri"></span>橙三角 = 当日带 ⑥w 预警 / 过渡态标签（底层阶段不变）</span>
+<span><span class="clband" style="background:#ef444433"></span>阶段色带（同一阶段 ≥3 日才画；不足 3 日标"趋势待明"灰底）</span>
+<span><span class="clupdn"><i style="background:#ef4444"></i><i style="background:#10b981"></i></span>K 线 / 成交量柱：红涨绿跌</span>
+<span><span class="cline cldash" style="border-top-color:#9ca3af"></span>20 日均量（成交量柱低于它 = 缩量）</span>
+<span style="font-size:0.62rem">鼠标划过任一根 K 线 = 当日判定依据</span>
+</div>
+</div>
+<div class="panel" id="migPanel">
+<div class="tlist" id="dTrans"></div>
+</div>
+</div>
+<script src="../shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'📊',brandText:'CPA详情',currentPage:'cpa-stock-detail'})</script>
+<script>
+var A='http://127.0.0.1:8788';
+var SC={'①a':'#6b7280','①b':'#9ca3af','②':'#ef4444','③':'#f97316','④':'#dc2626','⑤':'#a855f7','⑥a':'#065f46','⑥':'#10b981','⑦':'#0ea5e9','⑧':'#6366f1'};
+var SN={'①a':'超跌（未反转）','①b':'超跌+反转迹象','②':'突破后运行','③':'回踩后运行','④':'基部突破','⑤':'衰竭延伸','⑥a':'破位初现','⑥':'破位下行','⑥w':'预警','⑦':'下行回踩','⑧':'下行平台破位'};
+function stgC(s){return SC[(s||'').replace('T','').replace('⑥w','⑥')]||'#888';}
+function baseS(r){if(!r)return'';if(r.warn_from)return r.warn_from;return String(r.stage||'').replace(/T$/,'');}
+function stgFull(s){return s+(SN[baseS({stage:s})]?' '+SN[baseS({stage:s})]:'');}
+function isOv(r){return!!(r.warn_from||/T$/.test(String((r&&r.stage)||'')));}
+function tv(){var l=document.documentElement.dataset.theme==='light';return{tx:l?'#52525b':'#888',sp:l?'rgba(0,0,0,.06)':'rgba(255,255,255,.05)',tipBg:l?'rgba(255,255,255,.96)':'rgba(20,20,26,.92)',tipBd:l?'rgba(0,0,0,.10)':'rgba(255,255,255,.08)',tipTx:l?'#27272a':'#ddd'};}
+
+var CODE=(location.search.match(/code=(\d{6})/)||[])[1]||'';
+if(!CODE){document.getElementById('dChart').innerHTML='<div class="err">?code=XXXXXX</div>';}
+else{
+  document.getElementById('dTitle').textContent='📊 '+CODE;
+  document.getElementById('hopWeekly').href='cpa-stock-weekly.html?code='+CODE;
+  document.getElementById('hopWeekly').style.display='';
+  fetch(A+'/api/cpa/stock?code='+CODE).then(function(r){return r.json();}).then(function(j){
+    var last=(j.daily||[]).length?j.daily[j.daily.length-1]:null;
+    document.getElementById('dTitle').textContent='📊 '+CODE+(last?' · 当前 '+stgFull(last.stage)+'（已持续 '+last.days_in_stage+' 日）':'');
+    document.getElementById('dSub').textContent=(j.transitions||[]).length+' 次迁移（灰=已失效 橙=待验证 常规=有效）';
+    var V=tv(),ds=[],ps=[],e10=[],e20=[],areas=[],ov=[],vols=[],vavg=[],invs=[];
+    (j.daily||[]).forEach(function(r,i){
+      ds.push(r.date);ps.push([r.open,r.close,r.low,r.high]);
+      e10.push(r.ema10==null?'-':r.ema10);e20.push(r.ema20==null?'-':r.ema20);
+      if(isOv(r))ov.push([i,r.high]);
+      vols.push({value:r.volume==null?'-':r.volume,itemStyle:{color:(r.close>=r.open)?'#ef4444':'#10b981'}});
+      vavg.push((r.volume&&r.vr)?Math.round(r.volume/r.vr):'-');
+      invs.push(r.invalid_level==null?'-':r.invalid_level);
+    });
+    var why={};
+    (j.transitions||[]).forEach(function(t){try{var o=JSON.parse(t.trigger_detail_json||'{}');if(o.reason)why[t.transition_date]=o;}catch(e){}});
+    var segs=[],segOf=[],SHORT_N=3;
+    (j.daily||[]).forEach(function(r,i){var b=baseS(r);if(!segs.length||segs[segs.length-1].stage!==b)segs.push({stage:b,a:i,b:i});else segs[segs.length-1].b=i;});
+    segs.forEach(function(s){
+      s.len=s.b-s.a+1;s.short=s.len<SHORT_N;
+      for(var k=s.a;k<=s.b;k++)segOf[k]=s;
+      if(s.short)areas.push([{xAxis:s.a-0.5,name:'趋势待明'},{xAxis:s.b+0.5,itemStyle:{color:'#9ca3af40'}}]);
+      else areas.push([{xAxis:s.a-0.5,name:stgFull(s.stage)},{xAxis:s.b+0.5,itemStyle:{color:stgC(s.stage)+'33'}}]);
+    });
+    var ch=echarts.init(document.getElementById('dChart'));
+    ch.setOption({
+      backgroundColor:'transparent',animation:false,
+      grid:[{left:8,right:10,top:14,height:'64%',containLabel:true},{left:8,right:10,top:'80%',height:'14%',containLabel:true}],
+      axisPointer:{link:[{xAxisIndex:[0,1]}]},
+      tooltip:{trigger:'axis',backgroundColor:V.tipBg,borderColor:V.tipBd,textStyle:{color:V.tipTx,fontSize:11},
+        axisPointer:{type:'cross',link:[{xAxisIndex:[0,1]}]},
+        formatter:function(ps){
+          var i=ps[0].dataIndex,r=(j.daily||[])[i]||{},sg=segOf[i],short=!!(sg&&sg.short);
+          var head=short?'趋势待明':stgFull(baseS(r));
+          var s=(r.date||'')+'　<b>'+head+'</b>';
+          if(short)s+='<span style="font-size:9px;opacity:.65">（引擎暂标 '+r.stage+'，仅 '+sg.len+' 日，未成阶段）</span>';
+          if(isOv(r))s+='<br/>⚠ 当日标签：<b>'+stgFull(r.stage)+'</b>（底层仍为 '+stgFull(baseS(r))+'）';
+          s+='<br/>开 '+r.open+'　高 '+r.high+'<br/>低 '+r.low+'　收 '+r.close;
+          if(r.ema10!=null){var d10=r.low-r.ema10;s+='<br/>EMA10 '+r.ema10+'　低点距它 '+(d10>=0?'+':'')+d10.toFixed(2)+(r.atr20?'（'+(d10/r.atr20>=0?'+':'')+(d10/r.atr20).toFixed(2)+'×ATR）':'');}
+          if(r.ema20!=null)s+='<br/>EMA20 '+r.ema20;
+          if(r.stage_start_date){var wd=why[r.stage_start_date];s+='<br/>本段起点 '+r.stage_start_date+(wd&&wd.reason?'：'+wd.reason:'');if(/^[⑥⑦⑧]/.test(String(baseS(r)))&&wd){var lvl=(wd.ema20!=null)?'EMA20 '+wd.ema20:'结构位';s+='<br/><b>破位</b>：跌破 '+lvl+'（'+r.stage_start_date+'）'+(wd.close!=null?'　当日收 '+wd.close:'');if(wd.support!=null)s+='<br/>当时结构支撑 '+wd.support;if(r.days_in_stage!=null)s+='　已下行 '+r.days_in_stage+' 日';}}
+          s+='<br/>结构支撑 '+(r.structure_support==null?'—':r.structure_support)+'　失效位 '+(r.invalid_level==null?'—':r.invalid_level)+(r.entry_path?'　入口 '+r.entry_path:'');
+          if(r.volume!=null)s+='<br/>量 '+Math.round(r.volume/10000).toLocaleString()+' 万手'+(r.vr!=null?'　量比 '+r.vr+(r.vr<=0.9?' <b style="color:#10b981">✓ 缩量</b>':''):'');
+          return s;
+        }},
+      xAxis:[{type:'category',data:ds,gridIndex:0,boundaryGap:false,axisLabel:{color:V.tx,fontSize:9,interval:Math.floor(ds.length/10)}},{type:'category',data:ds,gridIndex:1,boundaryGap:false,axisLabel:{show:false}}],
+      yAxis:[{type:'value',scale:true,gridIndex:0,axisLabel:{color:V.tx,fontSize:9},splitLine:{lineStyle:{color:V.sp}}},{type:'value',gridIndex:1,name:'量',nameTextStyle:{color:V.tx,fontSize:9},axisLabel:{show:false},splitLine:{show:false}}],
+      dataZoom:[{type:'inside',xAxisIndex:[0,1],start:60,end:100}],
+      series:[
+        {type:'candlestick',data:ps,xAxisIndex:0,yAxisIndex:0,itemStyle:{color:'#ef4444',color0:'#10b981',borderColor:'#ef4444',borderColor0:'#10b981'},markArea:{silent:true,data:areas,label:{show:true,position:'insideTop',color:V.tx,fontSize:9,formatter:function(p){return p.name||'';}}}},
+        {type:'line',data:e20,name:'EMA20（深档回踩）',symbol:'none',silent:true,xAxisIndex:0,yAxisIndex:0,lineStyle:{width:1,color:'#38bdf8',opacity:.8}},
+        {type:'line',data:e10,name:'EMA10（标准档回踩）',symbol:'none',silent:true,xAxisIndex:0,yAxisIndex:0,lineStyle:{width:1,color:'#f59e0b',opacity:.9}},
+        {type:'scatter',data:ov,symbol:'triangle',symbolSize:7,z:6,itemStyle:{color:'#f59e0b'},silent:true,xAxisIndex:0,yAxisIndex:0},
+        {type:'line',data:invs,xAxisIndex:0,yAxisIndex:0,symbol:'none',silent:true,step:'end',connectNulls:false,name:'失效位',lineStyle:{width:1,color:'#10b981',type:'dashed',opacity:.85},label:{show:true,position:'right',color:'#10b981',fontSize:9.5,fontWeight:500,formatter:function(p){var i=p.dataIndex,v=invs[i];if(v==='-'||v==null)return'';for(var k=i+1;k<invs.length;k++){if(invs[k]!=='-'&&invs[k]!=null)return'';}return v;}}},
+        {type:'bar',data:vols,xAxisIndex:1,yAxisIndex:1,barWidth:'60%'},
+        {type:'line',data:vavg,xAxisIndex:1,yAxisIndex:1,symbol:'none',silent:true,lineStyle:{width:1,color:'#9ca3af',opacity:.7,type:'dashed'}}
+      ]
+    },true);
+    document.getElementById('dTrans').innerHTML=(j.transitions||[]).slice(-40).reverse().map(function(t){
+      var _st=t.inv_state||(t.invalidated?'invalidated':'valid');
+      var cls=_st==='invalidated'?'inv':(_st==='pending'?'pend':'ok');
+      return '<div class="'+cls+'">'+t.transition_date+' '+stgFull(t.from_stage)+' → '+stgFull(t.to_stage)+
+        (t.invalidated?' <span style="font-size:0.55rem">(已失效 '+t.invalidated_date+')</span>'
+          :_st==='pending'?' <span style="font-size:0.55rem">(待验证·N='+(t.inv_n||'-')+' 还差 '+Math.max(0,Math.round((t.inv_window_days||0)-(t.days_since||0)))+' 日见分晓)</span>'
+          :'')+
+        ' <span style="font-size:0.55rem;color:var(--muted)">'+((t.trigger_detail_json||'').slice(0,60))+'</span></div>';
+    }).join('')||'<div style="padding:8px;text-align:center;color:var(--muted)">无迁移事件</div>';
+    window.addEventListener('resize',function(){try{ch.resize()}catch(e){}});
+  }).catch(function(e){document.getElementById('dChart').innerHTML='<div class="err">加载失败</div>';});
+}
+</script>
+</body>
+</html>

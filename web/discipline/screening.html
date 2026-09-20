@@ -300,6 +300,8 @@ function renderTable(){
 
     h+=`<th onclick="tc('rps_250')">RPS250${sa('rps_250')}</th>`;
 
+    h+=`<th onclick="tc('rps_20')">RPS20${sa('rps_20')}</th>`;
+
     h+=`<th onclick="tc('canslim_total')">CANSLIM${sa('canslim_total')}</th>`;
 
     h+=`<th onclick="tc('signal_count')">信号${sa('signal_count')}</th>`;
@@ -354,6 +356,8 @@ function renderTable(){
       h+=`<td>${cats}</td>`;
 
       h+=`<td>${(it.rps_250||0).toFixed(0)}</td>`;
+
+      h+=`<td>${(it.rps_20||0).toFixed(0)}</td>`;
 
       h+=`<td>${it.canslim_total!=null?it.canslim_total.toFixed(0):'-'}</td>`;
 

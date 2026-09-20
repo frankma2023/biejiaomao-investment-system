@@ -123,12 +123,12 @@
         <tr><td>②T</td><td>② 过渡态</td><td>价格落在“进 / 出”两道门槛之间的模糊带（当前 [-0.3, 0]×ATR）。判据本来就没答案的地带，回测已证为低收益“垃圾时间”。</td></tr>
         <tr><td>③</td><td>回踩后运行</td><td><b>EMA Crossback</b>（EMA 回踩）——② 后 5~15 日内<b>缩量回踩 EMA10（标准档）/ EMA20（深档）</b>、收盘守住、EMA10 斜率转正、回踩低点不破停顿区高点，确认成立后的运行区间。<b>动作：入场</b></td></tr>
         <tr><td>④</td><td>基部突破</td><td><b>Base 'n Break</b>——箱体/基部整理后<b>向上突破</b>；收盘跌回箱内则本段结束。<b>动作：加仓</b></td></tr>
-        <tr><td>⑤</td><td>衰竭延长</td><td><b>Exhaustion Extension</b>（衰竭延伸）——末端加速拉升后<b>跌破 10EMA</b>，衰竭迹象。<b>动作：保护利润</b></td></tr>
+        <tr><td>⑤</td><td>衰竭延伸</td><td><b>Exhaustion Extension</b>（衰竭延伸）——末端加速拉升后<b>跌破 10EMA</b>，衰竭迹象。<b>动作：保护利润</b></td></tr>
         <tr><td>⑥a</td><td>破位初现</td><td><b>Wedge Drop</b>（楔形下坠）——<b>跌破 EMA20 并确认</b>，牛市情景整体失效的第一天。<b>动作：清仓</b></td></tr>
         <tr><td>⑦</td><td>破位下行</td><td>破位确认后的延续阶段。价格在 EMA20 下方运行，均线斜率向下。<b>动作：观察</b></td></tr>
         <tr><td>⑧</td><td>下行 EMA 回踩</td><td><b>EMA Crossback Downside</b>（③ 的下行镜像）——破位后价格<b>反弹至下行的 EMA10/EMA20 附近</b>，均线转为阻力。<b>动作：观察</b></td></tr>
         <tr><td>⑧T</td><td>⑧ 过渡态</td><td>⑧ 期间的模糊带。判据无确定答案。</td></tr>
-        <tr><td>⑨</td><td>下行平台</td><td><b>Base 'n Break Downside</b>（④ 的下行镜像）——均线下方<b>窄幅整理</b>后继续破位下行。<b>动作：观察</b></td></tr>
+        <tr><td>⑨</td><td>下行平台破位</td><td><b>Base 'n Break Downside</b>（④ 的下行镜像）——均线下方<b>窄幅整理</b>后继续破位下行。<b>动作：观察</b></td></tr>
         <tr><td>⑨T</td><td>⑨ 过渡态</td><td>⑨ 期间的模糊带。</td></tr>
         <tr><td>⑥w</td><td>预警（破位前兆）</td><td>出现在 ②/③/④/⑤ 中：<b>笔顶不抬高 + EMA10 斜率不向上</b>。这是<b>当日标签，不改底层阶段</b>（色带不断）。<b>动作：减仓</b></td></tr>
       </table>
@@ -153,9 +153,9 @@ var STAGE_COLOR = {'①a':'#6b7280','①b':'#9ca3af','②':'#ef4444','③':'#f97
 function stgColor(s){ var base = (s||'').replace('T',''); var c = STAGE_COLOR[base] || '#888'; return (s||'').indexOf('T')>=0 ? c+'99' : c; }
 // 阶段中文名（代号单独看不知道什么意思，全站统一用这一套）
 var STAGE_NAME = {'①a':'超跌（未反转）','①b':'超跌+反转迹象','②':'突破后运行','②T':'② 过渡态',
-                  '③':'回踩后运行','④':'基部突破','⑤':'衰竭延长',
+                  '③':'回踩后运行','④':'基部突破','⑤':'衰竭延伸',
                   '⑥a':'破位初现','⑥':'破位下行','⑥w':'预警（破位前兆）',
-                  '⑦':'下行回踩','⑦T':'⑦ 过渡态','⑧':'下行平台','⑧T':'⑧ 过渡态'};
+                  '⑦':'下行回踩','⑦T':'⑦ 过渡态','⑧':'下行平台破位','⑧T':'⑧ 过渡态'};
 function stgName(s){ return STAGE_NAME[s] || ''; }
 // ⑥ 方向分档（2026-09-14 v1.5，PRD §13.2 #31）：
 // 实测方向胜率差 6pp / 中位差 1.55pp，而回撤分档不单调（<-50% 组反而最好）。
@@ -208,7 +208,9 @@ async function load(){
   var total = (j.stages||[]).reduce(function(a,b){return a+b.count;},0);
   var html = '<span class="sc'+(FILTER_POOL?' on':'')+'" onclick="setPool()" title="只看观察池（每日约 480 只）">🎯 观察池</span>'
      + '<span class="sc'+(FILTER_STAGE===''?' on':'')+'" onclick="setStage(\'\')">全部<b>'+total+'</b></span>';
-  (j.stages||[]).forEach(function(s){
+  // 阶段排序：按 ①a ①b ② ②T ③ ④ ⑤ ⑥ ⑥a ⑥w ⑦ ⑦T ⑧ ⑧T 顺序
+  var STAGE_ORDER = {'①a':1,'①b':2,'②':3,'②T':4,'③':5,'④':6,'⑤':7,'⑥':8,'⑥a':9,'⑥w':10,'⑦':11,'⑦T':12,'⑧':13,'⑧T':14};
+  (j.stages||[]).sort(function(a,b){ return (STAGE_ORDER[a.stage]||99) - (STAGE_ORDER[b.stage]||99); }).forEach(function(s){
     html += '<span class="sc'+(FILTER_STAGE===s.stage?' on':'')+'" onclick="setStage(\''+s.stage+'\')" style="'+(FILTER_STAGE===s.stage?'border-color:'+stgColor(s.stage)+';color:'+stgColor(s.stage):'')+'">'+stgFull(s.stage)+'<b>'+s.count+'</b></span>';
   });
   document.getElementById('stage-cards').innerHTML = html;
@@ -235,7 +237,7 @@ function renderTable(){
     if (x==null) return 1; if (y==null) return -1; return (x>y?1:-1)*sortDir; });
   document.getElementById('count').textContent = rows.length + ' / ' + ALL.length + ' 只';
   document.querySelector('#main-table tbody').innerHTML = rows.slice(0,1500).map(function(r){
-    return '<tr><td class="code" onclick="showStock(\''+r.code+'\')">'+r.code+'</td><td>'+(r.name||'')+'</td>'+
+    return '<tr><td class="code"><a href="cpa-stock-detail.html?code='+r.code+'" target="_blank" style="color:inherit;text-decoration:none">'+r.code+'</a></td><td>'+(r.name||'')+'</td>'+
       '<td><span class="stg" style="background:'+stgColor(r.stage)+'22;color:'+stgColor(r.stage)+'" title="'+stgFull(r.stage, r)+'">'+stgFull(r.stage, r)+'</span></td>'+
       '<td>'+r.days+'</td><td>'+(r.support==null?'—':r.support)+'</td><td>'+(r.invalid==null?'—':r.invalid)+'</td>'+
       '<td><span class="act">'+r.action+'</span></td><td style="font-size:0.55rem;color:var(--muted)">'+(r.entry_path||'')+'</td></tr>';

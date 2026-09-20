@@ -122,6 +122,30 @@ CFG = {
 
     # ── invalidated N 值（待校准）──
     'inv_n': {'②→③': 15, '②→④': 40, '③→④': 40, '④→⑤': 30, '⑤→⑥': 30, '→⑥': 12},
+
+    # ── 窗口硬编码参数化（2026-09-18 T2，周线引擎 WEEKLY_CFG 覆盖用）──
+    # 原则：默认值 = 改造前的硬编码值，日线行为零变化（验收：scripts/_t2_regression.py）。
+    # 周线覆盖值见 cpa_stage_weekly.py（PRD §4 周线参数表）。
+    'r_panic_lookback': 20,        # judge_reversal 恐慌量回看窗（原 range(max(0, i-20), i+1)）
+    'ftd_min_history': 260,        # judge_ftd 最低历史长度（原 if L < 260）
+    'ftd_low_lookback': 120,       # judge_ftd 低点回看窗（原 L + 1 - 120）
+    'pause_recent_win': 5,         # 停顿区量能/振幅「近期」窗（原 vols[i-5:i]）
+    'pause_prior_win': 20,         # 停顿区「更早」窗长（原 vols[i-25:i-5]，起点=i-recent-prior）
+    'pause_prior_gap': 5,          # prior 窗右端点距 i 的距离（日线=recent_win，两窗相接）
+    'pause_vol_min_recent': 3,     # 量能干涸 recent 最小样本（原 len(v_recent) >= 3）
+    'pause_vol_min_prior': 10,     # 量能干涸 prior 最小样本（原 len(v_prior) >= 10）
+    'pause_shrink_min_recent': 3,  # 振幅收缩 recent 最小样本（原 len(a_recent) >= 3）
+    'pause_shrink_min_prior': 8,   # 振幅收缩 prior 最小样本（原 len(a_prior) >= 8）
+    'pause_mid_min_seg': 8,        # 中枢差异检查的最小样本（原 len(seg_c) >= 8）
+    'win_floor': 20,               # 停顿区/箱体窗口起点下限（原 if s < 20）
+    'b_floor_atr': 0.3,            # 箱底距 EMA20 的 ATR 下限（原 zl < e20 - 0.3*a20）
+    'bd_win': 15,                  # 下行平台破位观察窗（原 win = min(15, i+1)）
+    'bd_amp_max': 0.08,            # 下行平台振幅上限（原 amp > 0.08）
+    'bd_min_points': 8,            # 下行平台最小样本（原 len(prices) < 8）
+    'support_lookback': 40,        # 结构支撑兜底回看窗（原 closes[i-40:i+1]）
+    'six_dir_lookback': 5,         # ⑥ 方向分档回看（原 _j5 = i - 5）
+    'crossback_low_win': 2,        # ②→③ / ⑥→⑦ 回踩低点窗（原 lows[max(0, i-2):i+1]）
+    'warn_tops_count': 3,          # 笔顶收敛判定取最近 N 个笔顶（原 [-3:]，4 处）
 }
 
 # 动作方向固定枚举
@@ -386,15 +410,15 @@ def compute_indicators(kl):
     highs = [k['high_adj'] for k in kl]
     lows = [k['low_adj'] for k in kl]
     vols = [k['volume'] for k in kl]
-    ema10 = ema_series(closes, 10)
-    ema20 = ema_series(closes, 20)
-    atr20 = atr_series(highs, lows, 20)
+    ema10 = ema_series(closes, CFG['ema_fast'])
+    ema20 = ema_series(closes, CFG['ema_slow'])
+    atr20 = atr_series(highs, lows, CFG['atr_win'])   # 2026-09-18 T2 参数化：原写死 20（周线引擎需 8 周窗口）
     atr60 = atr_series(highs, lows, CFG['atr_win_slow'])   # ⑤ 专用慢口径（PRD §12.2 #16）
     return {
         'closes': closes, 'highs': highs, 'lows': lows, 'vols': vols,
         'ema10': ema10, 'ema20': ema20, 'atr20': atr20,
         'atr60': atr60,
-        'vr': vr_series(vols, 20),
+        'vr': vr_series(vols, CFG['vr_win']),   # 2026-09-18 T2 参数化：原写死 20（旧周线引擎的 VR 实际吃了 20 窗口而非 8）
         'nd10': [(c - e) / a if (e and a and a > 0) else None
                  for c, e, a in zip(closes, ema10, atr20)],
         # ⑤ 用慢口径（2026-09-14）：ATR20 会被延伸行情自己的大阳线抬高 → 分母虚大 → 漏报
@@ -421,7 +445,7 @@ def find_pause_zone(ind, i, win_min, win_max, amp_tol, vol_dry, tops=None, kl=No
     best = None
     for w in range(win_max, win_min - 1, -1):   # 从长到短找（优先长窗口）
         s = i - w
-        if s < 20:
+        if s < CFG['win_floor']:
             continue
         seg_high = [x for x in ind['highs'][s:i] if x is not None]
         seg_low = [x for x in ind['lows'][s:i] if x is not None]
@@ -433,7 +457,7 @@ def find_pause_zone(ind, i, win_min, win_max, amp_tol, vol_dry, tops=None, kl=No
             continue
         amp = (zh - zl) / zl
         # ── 结构合理性（必要）：前后半段价格中枢差异 ≤10%（无单边方向）──
-        if len(seg_c) >= 8:
+        if len(seg_c) >= CFG['pause_mid_min_seg']:
             mid = len(seg_c) // 2
             avg1 = sum(seg_c[:mid]) / mid
             avg2 = sum(seg_c[mid:]) / (len(seg_c) - mid)
@@ -442,30 +466,31 @@ def find_pause_zone(ind, i, win_min, win_max, amp_tol, vol_dry, tops=None, kl=No
         # ── 振幅上限（必要，防单边/大涨区间误判）──
         if amp > CFG['pause_amp_max']:
             continue
-        # 量能干涸：突破前 3-5 日均量 vs 之前 20 日均量
-        v_recent = [x for x in ind['vols'][max(0, i - 5):i] if x]
-        v_prior = [x for x in ind['vols'][max(0, i - 25):max(0, i - 5)] if x]
+        # 量能干涸：突破前 recent_win 日均量 vs 之前 prior_win 日均量（2026-09-18 T2 参数化）
+        _pw_r, _pw_g, _pw_p = CFG['pause_recent_win'], CFG['pause_prior_gap'], CFG['pause_prior_win']
+        v_recent = [x for x in ind['vols'][max(0, i - _pw_r):i] if x]
+        v_prior = [x for x in ind['vols'][max(0, i - _pw_g - _pw_p):max(0, i - _pw_g)] if x]
         dry_ok = False
-        if len(v_recent) >= 3 and len(v_prior) >= 10:
+        if len(v_recent) >= CFG['pause_vol_min_recent'] and len(v_prior) >= CFG['pause_vol_min_prior']:
             dry_ok = (sum(v_recent) / len(v_recent)) <= (sum(v_prior) / len(v_prior)) * vol_dry
         # 振幅收缩（短窗口）：突破前 3-5 日均振幅 vs 更早 10-20 日
         a_recent, a_prior = [], []
-        for j in range(max(0, i - 5), i):
+        for j in range(max(0, i - CFG['pause_recent_win']), i):
             h, l = ind['highs'][j], ind['lows'][j]
             if h and l and l > 0:
                 a_recent.append((h - l) / l)
-        for j in range(max(0, i - 25), max(0, i - 5)):
+        for j in range(max(0, i - CFG['pause_prior_gap'] - CFG['pause_prior_win']), max(0, i - CFG['pause_prior_gap'])):
             h, l = ind['highs'][j], ind['lows'][j]
             if h and l and l > 0:
                 a_prior.append((h - l) / l)
         shrink_ok = False
-        if len(a_recent) >= 3 and len(a_prior) >= 8:
+        if len(a_recent) >= CFG['pause_shrink_min_recent'] and len(a_prior) >= CFG['pause_shrink_min_prior']:
             shrink_ok = (sum(a_recent) / len(a_recent)) <= (sum(a_prior) / len(a_prior)) * CFG['w_amp_shrink']
         amp_ok = amp <= amp_tol
         # 笔顶收敛（PRD §4 证据之一，Spec B4）：长窗口且笔可用
         bi_conv = None
         if tops and kl and w >= CFG['w_win_long']:
-            recent = [t for t in tops if kl[s]['date'] <= t['date'] <= kl[i - 1]['date']][-3:]
+            recent = [t for t in tops if kl[s]['date'] <= t['date'] <= kl[i - 1]['date']][-CFG['warn_tops_count']:]
             if len(recent) >= 2:
                 bi_conv = all(recent[j + 1]['price'] <= recent[j]['price'] * 1.01
                               for j in range(len(recent) - 1))
@@ -512,9 +537,9 @@ def judge_reversal(ind, kl, i, tops, rps_map=None):
     d20 = (c / ind['ema20'][i] - 1) if ind['ema20'][i] else None
     deep = dd >= CFG['r_drawdown_min']
     ext = (nd20 is not None and -nd20 >= CFG['r_nd20_min']) or (d20 is not None and d20 <= CFG['r_d20_max_pct'])
-    # 恐慌量：近 20 日出现 VR ≥ 门槛的下跌日
+    # 恐慌量：近 N 日出现 VR ≥ 门槛的下跌日（2026-09-18 T2 参数化，日线 N=20）
     panic = False
-    for j in range(max(0, i - 20), i + 1):
+    for j in range(max(0, i - CFG['r_panic_lookback']), i + 1):
         vj, cj = ind['vr'][j], ind['closes'][j]
         cj_prev = ind['closes'][j - 1] if j > 0 else None
         if vj and cj and cj_prev and cj < cj_prev and vj >= CFG['r_panic_vr']:
@@ -576,9 +601,9 @@ def judge_ftd(ind, kl, i):
         return {'hit': False}
     # 低点：i 前 ftd_win_min~ftd_win_max 日内存在"近 120 日最低收盘"的低点 L，且自 250 日高点回撤 ≥25%
     for L in range(i - CFG['ftd_win_max'], i - CFG['ftd_win_min'] + 1):
-        if L < 260:
+        if L < CFG['ftd_min_history']:
             continue
-        s = max(0, L + 1 - 120)
+        s = max(0, L + 1 - CFG['ftd_low_lookback'])
         seg = [kl[j]['adj_close'] for j in range(s, L + 1) if kl[j]['adj_close']]
         if not seg or kl[L]['adj_close'] != min(seg):
             continue
@@ -630,10 +655,10 @@ def judge_wedge_pop(ind, kl, i, tops):
                 'detail': {'break': False, 'vr': round(v, 2)}}
     bio_conv = None
     if pause['win_len'] >= CFG['w_win_long'] and tops:
-        # 上界不能省：只写下界会让 [-3:] 取到全序列最后 3 个笔顶（即未来数据）。
+        # 上界不能省：只写下界会取到全序列最后 N 个笔顶（即未来数据）。
         # 修正前 tops 是「最新快照」，这个缺陷让阶段② 的收缩判据一直在看未来。
         recent = [t for t in tops
-                  if kl[pause['start_idx']]['date'] <= t['date'] <= kl[i]['date']][-3:]
+                  if kl[pause['start_idx']]['date'] <= t['date'] <= kl[i]['date']][-CFG['warn_tops_count']:]
         if len(recent) >= 2:
             bio_conv = all(recent[j + 1]['price'] <= recent[j]['price'] * 1.01 for j in range(len(recent) - 1))
     return {'hit': True, 'path': 'pause', 'pause': pause, 'low': pause['low'],
@@ -703,20 +728,20 @@ def find_box(ind, kl, i):
     best = None
     for w in range(CFG['b_win_max'], CFG['b_win_min'] - 1, -1):
         s = i - w
-        if s < 20:
+        if s < CFG['win_floor']:
             continue
         # 箱体边界：收盘价极值（PRD §6：无参数）
         seg_c = [x for x in ind['closes'][s:i] if x is not None]
-        if len(seg_c) < w * 0.8:
+        if len(seg_c) < w * CFG['data_min_ratio']:
             continue
         zh, zl = max(seg_c), min(seg_c)
         if zl <= 0:
             continue
         depth = (zh - zl) / zl
-        # 均线位置：箱底 ≥ EMA20 - 0.3*ATR20
+        # 均线位置：箱底 ≥ EMA20 - 0.3*ATR20（2026-09-18 T2 参数化 b_floor_atr）
         e20 = ind['ema20'][i - 1]
         a20 = ind['atr20'][i - 1]
-        if e20 is None or a20 is None or zl < e20 - 0.3 * a20:
+        if e20 is None or a20 is None or zl < e20 - CFG['b_floor_atr'] * a20:
             continue
         # 量能收缩：后段均量 < 前段均量
         half = w // 2
@@ -828,7 +853,7 @@ def judge_wedge_drop(ind, kl, i, ctx, structure_support, tops):
     # ① 高点不抬高（笔顶序列）
     hl = None
     if tops:
-        recent = [t for t in tops if t['date'] <= kl[i]['date']][-3:]
+        recent = [t for t in tops if t['date'] <= kl[i]['date']][-CFG['warn_tops_count']:]
         if len(recent) >= 2:
             hl = all(recent[j + 1]['price'] <= recent[j]['price'] * 1.01 for j in range(len(recent) - 1))
     # ② EMA10 斜率转负
@@ -957,13 +982,13 @@ def _check_base_break_downside(ind, kl, i):
         return False
     if c >= e20:
         return False  # 必须在 EMA20 以下
-    win = min(15, i + 1)
+    win = min(CFG['bd_win'], i + 1)
     prices = [ind['closes'][j] for j in range(max(0, i - win + 1), i + 1) if ind['closes'][j] is not None]
-    if len(prices) < 8:
+    if len(prices) < CFG['bd_min_points']:
         return False
-    # 近期振幅 ≤ 8%（窄幅整理）
+    # 近期振幅 ≤ bd_amp_max（窄幅整理，2026-09-18 T2 参数化）
     amp = (max(prices) - min(prices)) / ((max(prices) + min(prices)) / 2) if prices else 1
-    if amp > 0.08:
+    if amp > CFG['bd_amp_max']:
         return False
     # 全部价格在 EMA20 以下
     if any(p >= e20 for p in prices):
@@ -1031,7 +1056,7 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
         elif ctx.get('w_pause'):
             structure_support = ctx['w_pause']['low']
         else:
-            seg = [x for x in ind['closes'][max(0, i - 40):i + 1] if x]
+            seg = [x for x in ind['closes'][max(0, i - CFG['support_lookback']):i + 1] if x]
             structure_support = min(seg) if seg else None
 
         # ═══ 迁移判定（按状态分支）═══
@@ -1047,6 +1072,13 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
                             'entry_low': w['low'], 'entry_path': w['path'],
                             'stage_start_idx': i, 'cb_low': None, 'box': None})
                 detail = w['detail']
+            # 出口兜底：闸门关闭（距250日高点>60日）+ 价格已站上EMA20 → 视为趋势恢复
+            elif (r1.get('detail') or {}).get('gate') == 'recency_fail' and c is not None and e20 is not None and c > e20:
+                stage = '②'
+                ctx.update({'w_date_idx': i, 'w_pause': None, 'entry_idx': i,
+                            'entry_low': None, 'entry_path': 'recovery_hatch',
+                            'stage_start_idx': i, 'cb_low': None, 'box': None})
+                detail = {'reason': '①a出口兜底（价格站上EMA20）→回②区间'}
 
         elif stage == '②':
             # ②失效判据：跌破【入口结构低点】（FTD前低点/停顿区低点）/ 结构支撑 / 连续2日破EMA20
@@ -1075,7 +1107,7 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
                     stage = '④'; ctx['box'] = r4['box']; ctx['entry_idx'] = i; ctx['stage_start_idx'] = i; detail = r4['detail']
                 elif r3['hit']:
                     stage = '③'
-                    _lows = [x for x in ind['lows'][max(0, i - 2):i + 1] if x]
+                    _lows = [x for x in ind['lows'][max(0, i - CFG['crossback_low_win']):i + 1] if x]
                     ctx['cb_low'] = min(_lows) if _lows else l   # 回踩低点用 low（Spec W5）
                     ctx['w_vol'] = ind['vols'][ctx['w_date_idx']] if ctx.get('w_date_idx') is not None else None
                     ctx['entry_idx'] = i; ctx['stage_start_idx'] = i; detail = r3['detail']
@@ -1155,7 +1187,7 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
             elif _check_crossback_downside(ind, i):
                 stage = '⑦'
                 ctx['stage_start_idx'] = i
-                _lows = [x for x in ind['lows'][max(0,i-2):i+1] if x]
+                _lows = [x for x in ind['lows'][max(0,i-CFG['crossback_low_win']):i+1] if x]
                 ctx['cb_low'] = min(_lows) if _lows else ind['closes'][i]
                 detail = {'reason': '下行EMA回踩（价格靠近EMA10/EMA20）',
                           'ema10': round(ind['ema10'][i],2) if ind['ema10'][i] else None}
@@ -1211,7 +1243,7 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
         # 实测方向胜率差 6pp / 中位差 1.55pp，而回撤分档不单调（<-50% 组反而最好）。
         # 故 ⑥ 的展示层按方向分（破位后·反弹 / 破位后·续跌），回撤降为次要标注。
         if stage.startswith('⑥'):
-            _j5 = i - 5
+            _j5 = i - CFG['six_dir_lookback']
             if _j5 >= 0 and ind['closes'][_j5] and c:
                 _d5 = c / ind['closes'][_j5] - 1
                 metrics['six_dir'] = 'rebound' if _d5 > 0 else 'decline'
@@ -1225,7 +1257,7 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
         # 预警态（PRD §8.4）：衰竭迹象（高点不抬高 + EMA10 斜率转负）出现但未破位 → 减仓
         warn_now = False
         if stage in ('②', '③', '④', '⑤', '⑥', '⑦', '⑧'):
-            _tp = [t for t in tops if t['date'] <= kl[i]['date']][-3:]
+            _tp = [t for t in tops if t['date'] <= kl[i]['date']][-CFG['warn_tops_count']:]
             _hl = len(_tp) >= 2 and all(_tp[j + 1]['price'] <= _tp[j]['price'] * 1.01 for j in range(len(_tp) - 1))
             _sl = slope_up(ind['ema10'], i, CFG['slope_lag'])
             warn_now = bool(_hl and _sl is False)
