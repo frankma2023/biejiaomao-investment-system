@@ -1,0 +1,9 @@
+# 每日盘后更新调度配置
+# 文件: config/daily_update.yaml
+
+# 流水线使用的 Python 解释器（scripts/daily_update.py）。
+#   留空或删除该键 → 使用启动 daily_update.py 的那个解释器
+#   命令行 --python-exe <path> → 优先级最高，用于临时覆盖
+# 指定绝对路径的原因：conda 等环境下常缺 TA-Lib，需固定到装好依赖的解释器。
+# 配置的路径不存在时脚本会告警并回退到当前解释器，不会静默换解释器。
+python_exe: "C:\\Program Files\\Python312\\python.exe"

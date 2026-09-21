@@ -6,6 +6,9 @@
     python scripts/daily_update.py              # 全量执行
     python scripts/daily_update.py --skip-rs    # 跳过RS计算
     python scripts/daily_update.py --date 2026-05-10  # 指定日期
+    python scripts/daily_update.py --python-exe "C:\\path\\to\\python.exe"  # 临时指定解释器
+
+解释器解析优先级：--python-exe > config/daily_update.yaml 的 python_exe > 当前解释器。
 
 执行顺序（按依赖关系分层排列）：
   数据拉取层：
@@ -64,17 +67,59 @@ from datetime import datetime, date, timedelta
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(PROJECT_DIR)
 
-# 固定 Python 解释器（避免 conda 环境下 talib 缺失）
-PYTHON_EXE = r"C:\Program Files\Python312\python.exe"
-if not os.path.exists(PYTHON_EXE):
-    PYTHON_EXE = sys.executable  # 回退
+SCHEDULER_CONFIG = os.path.join(PROJECT_DIR, "config", "daily_update.yaml")
+
+
+def load_scheduler_config(path):
+    """
+    读取调度器配置。
+
+    Args:
+        path: 配置文件路径。
+
+    Returns:
+        dict；文件不存在时返回空 dict。
+    """
+    if not os.path.exists(path):
+        return {}
+    import yaml
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
+def resolve_python_exe(configured, cli_override, current):
+    """
+    决定本流水线使用的解释器：--python-exe > 配置文件 > 当前解释器。
+
+    解析集中在这一步完成，不在调用点散落回退。配置了但文件不存在时返回告警文本，
+    由调用方打印——静默换解释器会改变 TA-Lib 等二进制依赖是否可用。
+
+    Args:
+        configured: config/daily_update.yaml 的 python_exe，可为 None。
+        cli_override: 命令行 --python-exe，可为 None。
+        current: 当前解释器路径，作为最终回退。
+
+    Returns:
+        (解释器路径, 告警文本或 None)
+    """
+    chosen = cli_override or configured
+    if not chosen:
+        return current, None
+    if not os.path.exists(chosen):
+        return current, (f"python_exe={chosen} 不存在，已回退到当前解释器 {current}；"
+                         f"TA-Lib 等依赖可能因此缺失")
+    return chosen, None
+
 
 # ── 解析参数 ──
 SKIP_RS = "--skip-rs" in sys.argv
 TARGET_DATE = None
+CLI_PYTHON_EXE = None
 for i, arg in enumerate(sys.argv):
     if arg == "--date" and i + 1 < len(sys.argv):
         TARGET_DATE = sys.argv[i + 1]
+    if arg == "--python-exe" and i + 1 < len(sys.argv):
+        CLI_PYTHON_EXE = sys.argv[i + 1]
 
 if TARGET_DATE:
     today_str = TARGET_DATE
@@ -82,6 +127,13 @@ else:
     today_str = date.today().strftime("%Y-%m-%d")
 # W5(review)：周一判定用目标日期（回填 --date 时按目标日而非今天）
 WEEKDAY = date.fromisoformat(today_str).weekday()
+
+# 解释器属于部署差异项，走 config/daily_update.yaml（避免 conda 环境下 talib 缺失）
+PYTHON_EXE, PYTHON_EXE_WARNING = resolve_python_exe(
+    load_scheduler_config(SCHEDULER_CONFIG).get('python_exe'),
+    CLI_PYTHON_EXE,
+    sys.executable,
+)
 
 # ── 日志 ──
 LOG_FILE = os.path.join(PROJECT_DIR, "data", "daily_update.log")
@@ -176,6 +228,11 @@ def run_task(label, cmd, timeout=3600, stream=False):
 # ═══════════════════════════════════════════════
 # 任务列表（步骤编号 + 目的 + 依赖）
 # ═══════════════════════════════════════════════
+
+# 解释器一旦不是预期的那一个，后续失败会难以归因，因此开跑前先说明用的是哪个
+if PYTHON_EXE_WARNING:
+    log(f"⚠️  {PYTHON_EXE_WARNING}")
+log(f"🐍 解释器: {PYTHON_EXE}")
 
 log(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 log(f"🐺 每日盘后更新开始 — {today_str}")

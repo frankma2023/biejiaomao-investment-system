@@ -1,8 +1,10 @@
 # Data files
-data/*.db
-data/*.db-shm
-data/*.db-wal
-data/*.sqlite
+# 数据库一律不入库：主库 data/lixinger.db 已远超 GitHub 限制，
+# 且 SQLite 的 -wal/-shm 会产生几十 MB 的临时 blob（历史中已误入一个 72MB 的 db-wal）
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
 data/*.csv
 data/*.json
 
@@ -69,6 +71,10 @@ web/*/fix_*.py
 web/*/insert_*.py
 web/*/add_*.py
 
+# npm 依赖与构建产物（web/.gitignore 已有，此处兜底 web 之外的 node_modules）
+node_modules/
+dist-vue/
+
 # Handoff documents (session-only, not for repo)
 HANDOFF-*.md
 SESSION_HANDOFF_*.md
@@ -81,15 +87,20 @@ data/cockpit/
 data/analysis/
 data/reports/
 
-# Shell quoting artifacts
-[0-9]*
+# Shell quoting artifacts（PowerShell 误重定向产生的根目录垃圾文件；仅根目录生效）
+/[0-9]*
 '*'
 
-# 大文件（>100MB，GitHub限制）
+# 大文件：GitHub 单文件限制与仓库体积（本地保留，不入库）
+config/strategy/mw_backtest_wide.json
 analysis/volume_reversal_stats.json
 
-# 每日扫描产物（自动生成，不入库）
+# 生成产物（脚本每日/每次重写，不入库）
+#   scripts/daily_pattern_scan.py → web/daily-pattern-scan/{data.json,index.html}
+#   src/scanners/chanlun_scan.py  → web/chanlun-scan/index.html
 web/daily-pattern-scan/data.json
+web/daily-pattern-scan/index.html
+web/chanlun-scan/index.html
 
 # 备份文件（历史误提交，已清理）
 *.bak
@@ -98,7 +109,25 @@ data/backup/
 
 *.err
 
-# 临时/备份大文件（2026-09-14 收尾）：analysis/ 下划线开头的 CSV 产物
+# 分析产物：analysis/ 下的 json/csv/txt/html 均为可重新生成的结果，
+# 只保留 *.py 分析脚本入库
+analysis/*.json
+analysis/*.csv
+analysis/*.txt
+analysis/*.html
 
-# 临时/备份大文件（2026-09-14 收尾）：analysis/ 下划线开头的 CSV 产物
-analysis/_*.csv
+# 临时脚本与素材（下划线前缀为本仓库的临时文件约定）
+/_*.py
+scripts/_*.py
+analysis/_*.py
+.scratch/
+
+# 一次性归档与源码自动备份（不参与构建，仅本地留存）
+scripts/_archive/
+analysis/_code_migration_backup/
+
+# 运行时生成的报告正文（每日重写；已入库的历史文件保持跟踪，新增文件不再入库）
+web/backtest/daily/
+web/discipline/reports/
+web/stock-health/reports/
+web/chanlun-backtest-compare/data/
