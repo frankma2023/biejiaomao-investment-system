@@ -117,7 +117,7 @@ analysis/*.txt
 analysis/*.html
 
 # 临时脚本与素材（下划线前缀为本仓库的临时文件约定）
-/_*.py
+/_*
 scripts/_*.py
 analysis/_*.py
 .scratch/
