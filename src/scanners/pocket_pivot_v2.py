@@ -382,7 +382,7 @@ def scan_date(scan_date):
     
     db.close()
     elapsed = time.time() - t0
-    print(f"\n✓ PP V2: {len(signals)} | {elapsed:.1f}s")
+    print(f"\nPP V2: {len(signals)} | {elapsed:.1f}s")
     print(f"  漏斗: {dict(skipped)}")
     print(f"  缠论结构: {chanlun_ok}/{len(stock_list)} 只有效")
     

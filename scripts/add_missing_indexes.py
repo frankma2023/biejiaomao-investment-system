@@ -42,7 +42,7 @@ for idx_name, table, columns, reason in indexes:
         (idx_name,)
     ).fetchone()
     if exists:
-        print(f"  ⏭  {idx_name:30s} → 已存在，跳过")
+        print(f"   {idx_name:30s} → 已存在，跳过")
         skipped += 1
         continue
 
@@ -51,11 +51,11 @@ for idx_name, table, columns, reason in indexes:
         db.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table}({columns})")
         db.commit()
         elapsed = time.time() - t0
-        print(f"  ✅ {idx_name:30s} → {table}({columns})  ({elapsed:.1f}s)")
+        print(f"  [OK] {idx_name:30s} → {table}({columns})  ({elapsed:.1f}s)")
         print(f"     原因: {reason}")
         added += 1
     except Exception as e:
-        print(f"  ❌ {idx_name:30s} → 失败: {e}")
+        print(f"  [FAIL] {idx_name:30s} → 失败: {e}")
 
 print(f"\n完成: 新增 {added} 个, 跳过 {skipped} 个")
 

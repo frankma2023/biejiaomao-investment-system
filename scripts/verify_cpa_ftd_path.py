@@ -116,7 +116,7 @@ def main():
     ft = by_path.get('ftd_4_7', []) + by_path.get('ftd_8_15', [])
     if pa and ft:
         d = (statistics.mean(ft) - statistics.mean(pa)) * 100
-        print('  ★ FTD入口 vs 慢速入口 均值差: %+.2fpp %s' % (
+        print('  FTD入口 vs 慢速入口 均值差: %+.2fpp %s' % (
             d, '→ 差异大，entry_path 分层必需' if abs(d) > 1.0 else '→ 差异小，语义统一的假设成立'))
 
     print('\n【验3】FTD 延迟 sanity check')

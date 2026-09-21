@@ -295,7 +295,7 @@ html += '''
 
 with open(OUT_HTML, 'w', encoding='utf-8') as f:
     f.write(html)
-print(f'\n✅ 报告已生成: {OUT_HTML}')
+print(f'\n[OK] 报告已生成: {OUT_HTML}')
 print(f'  分析信号: {total_b1:,}')
 print(f'  B2确认率: {b2_rate}%')
 print(f'  RP5极差: {analyses["rp5"][-1][3]-analyses["rp5"][0][3]:.1f}pp')

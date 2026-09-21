@@ -12,7 +12,7 @@ for line in open(ENV_PATH, encoding='utf-8'):
         token = line.strip().split('=')[1]
         break
 if not token:
-    print('❌ 未找到 LIXINGER_TOKEN')
+    print('[FAIL] 未找到 LIXINGER_TOKEN')
     sys.exit(1)
 
 def fetch_cabb(code, start='2016-01-01', end=None):
@@ -66,10 +66,10 @@ def update_db(code, records):
 if __name__ == '__main__':
     codes = sys.argv[1:] if len(sys.argv) > 1 else ['002648']
     for code in codes:
-        print(f'🔄 拉取 {code}...')
+        print(f'拉取 {code}...')
         records = fetch_cabb(code)
         if not records:
-            print(f'  ⚠️ 无数据')
+            print(f'  [WARN] 无数据')
             continue
         print(f'  获取到 {len(records)} 条记录')
         updated = update_db(code, records)

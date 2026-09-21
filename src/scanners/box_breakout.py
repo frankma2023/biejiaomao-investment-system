@@ -473,7 +473,7 @@ if __name__ == '__main__':
     daily = [dict(r) for r in rows]
     sigs = detect(daily)
 
-    print(f"🔍 {args.stock} @ {args.date} — 箱体突破信号: {len(sigs)} 个")
+    print(f"{args.stock} @ {args.date} — 箱体突破信号: {len(sigs)} 个")
     for s in sigs:
         print(f"   {s['signal_date']} [{s['signal_level']}] 箱体 {s['band_top']}/{s['band_bottom']} "
               f"尝试#{s['attempt_no']}(失败{s['prior_failures']}) 量比{s['vol_ratio']}x 时长{s['box_days']}天")

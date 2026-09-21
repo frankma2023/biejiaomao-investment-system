@@ -61,7 +61,7 @@ def load_yaml_config(signal_type):
 
 def compute(target_date):
     conn = get_db()
-    logger.info(f"🐺 大盘扫描快照计算 — {target_date}")
+    logger.info(f"大盘扫描快照计算 — {target_date}")
 
     snapshot = {'date': target_date}
 
@@ -137,7 +137,7 @@ def compute(target_date):
     ))
     conn.commit()
     conn.close()
-    logger.info(f"  ✅ 快照已保存")
+    logger.info(f"  [OK] 快照已保存")
 
 
 def _compute_distribution(conn, target_date):

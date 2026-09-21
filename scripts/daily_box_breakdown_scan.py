@@ -74,13 +74,13 @@ def main():
         conn = sqlite3.connect(DB_PATH, timeout=30)
         end_date = conn.execute("SELECT MAX(date) FROM daily_kline").fetchone()[0]
         conn.close()
-    print(f'📅 数据截止: {end_date}')
+    print(f'数据截止: {end_date}')
 
     if args.code:
         # 单股调试
         sigs = scan_stock(args.code, end_date)
         name = get_name(args.code)
-        print(f'\n🔍 {args.code} {name}: {len(sigs)} 个活跃跌破信号')
+        print(f'\n{args.code} {name}: {len(sigs)} 个活跃跌破信号')
         for s in sigs:
             print(f"   {s['signal_date']} [{s['signal_level']}] 下沿{s['band_bottom']} 收盘{s['close']:.2f} "
                   f"跌破{s.get('drop_pct')}% 最大{s.get('max_drop_pct')}%")
@@ -88,7 +88,7 @@ def main():
 
     # 全 A 扫描
     codes = get_all_a_shares()
-    print(f'🔎 扫描 {len(codes)} 只 A 股 ...')
+    print(f'扫描 {len(codes)} 只 A 股 ...')
     t0 = time.time()
     all_signals = []
     for i, code in enumerate(codes):
@@ -109,7 +109,7 @@ def main():
     recent = all_signals[:args.top]
 
     print(f'\n{"="*95}')
-    print(f'📉 最近 {args.top} 个跌破箱体信号（共检出 {len(all_signals)} 个活跃信号 / {len(codes)} 只）')
+    print(f'最近 {args.top} 个跌破箱体信号（共检出 {len(all_signals)} 个活跃信号 / {len(codes)} 只）')
     print(f'{"="*95}')
     print(f'{"代码":<8}{"名称":<10}{"触发日":<12}{"级别":<14}{"下沿":>8}{"收盘":>8}{"最大跌幅":>9}  箱体起点')
     for s in recent:
@@ -120,7 +120,7 @@ def main():
     out_path = os.path.join(PROJECT_DIR, "analysis", "box_breakdown_daily.json")
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump({'date': end_date, 'total': len(all_signals), 'recent': recent}, f, ensure_ascii=False, indent=2)
-    print(f'\n✅ 已保存 {out_path}（耗时 {time.time()-t0:.0f}s）')
+    print(f'\n[OK] 已保存 {out_path}（耗时 {time.time()-t0:.0f}s）')
 
 
 if __name__ == '__main__':

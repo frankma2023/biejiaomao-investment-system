@@ -129,12 +129,12 @@ def main():
     print('\n═══ 结果 ═══')
     print('扫描: %d 只 | 违反失效机制的重复跌破: %d 个' % (len(stocks), len(violations)))
     if violations:
-        print('⚠️ 发现违规案例（前 10 个）:')
+        print('[WARN] 发现违规案例（前 10 个）:')
         for v in violations[:10]:
             print('  %s %s(%.2f) → %s(%.2f) 间隔%d天' % (
                 v['code'], v['first'], v['first_bottom'], v['repeat'], v['repeat_bottom'], v['gap_days']))
     else:
-        print('✅ 无违规：所有 strong_sell 后 250 天内同价位再次跌破均被拦截')
+        print('[OK] 无违规：所有 strong_sell 后 250 天内同价位再次跌破均被拦截')
         print('   （跨年/超期/不同箱体正常放行，属于新箱体）')
     print('\n完整结果: %s' % OUT_JSON)
 

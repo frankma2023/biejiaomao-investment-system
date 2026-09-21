@@ -51,14 +51,14 @@ def fetch_one(token, code, start, end):
             if d.get('code') == 1 and d.get('data'):
                 return d['data']
             if d.get('code') == 2:  # 积分不足/无权限
-                print(f'  ⚠️ {code}: 理杏仁积分不足/无权限，静默切换 akshare')
+                print(f'  [WARN] {code}: 理杏仁积分不足/无权限，静默切换 akshare')
                 return None
             if d.get('message'):
-                print(f'  ⚠️ {code}: {str(d.get("message"))[:60]}')
+                print(f'  [WARN] {code}: {str(d.get("message"))[:60]}')
                 return None
         except Exception as e:
             if attempt == 2:
-                print(f'  ❌ {code}: {str(e)[:60]}')
+                print(f'  [FAIL] {code}: {str(e)[:60]}')
                 return None
             time.sleep(2 * (attempt + 1))
     return None
@@ -141,7 +141,7 @@ def fetch_akshare(code):
             rows.append({'date': d, 'total': total, 'change_rate': chg, 'price_change': None})
         return rows
     except Exception as e:
-        print(f'  ⚠️ akshare {code}: {str(e)[:60]}')
+        print(f'  [WARN] akshare {code}: {str(e)[:60]}')
         return None
 
 
@@ -200,7 +200,7 @@ def main():
             codes = codes[:args.limit]
         else:
             # O9：全市场无上限约 80 分钟+，强制确认
-            print(f'⚠️ --all 全市场 {len(codes)} 只，预计 {(len(codes) * args.sleep) / 60:.0f} 分钟。建议 --limit 分批。继续？Ctrl+C 取消，5 秒后开始...')
+            print(f'[WARN] --all 全市场 {len(codes)} 只，预计 {(len(codes) * args.sleep) / 60:.0f} 分钟。建议 --limit 分批。继续？Ctrl+C 取消，5 秒后开始...')
             time.sleep(5)
     if not codes:
         print('无标的。用法见文件头')

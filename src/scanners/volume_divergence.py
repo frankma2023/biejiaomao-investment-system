@@ -420,7 +420,7 @@ if __name__ == '__main__':
     daily = [dict(r) for r in klines]
     result = detect_all(daily, stock_code=args.stock)
 
-    print(f"🔍 {args.stock} @ {args.date}")
+    print(f"{args.stock} @ {args.date}")
     for s in result['signals']:
         print(f"   {s['label']} | {s['signal_date']} | {s['details']}")
     if not result['signals']:

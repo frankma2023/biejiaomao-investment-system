@@ -302,7 +302,7 @@ if __name__ == '__main__':
     result = detect(daily)
     total_dist = sum(1 for d in result['daily'] if d['dist_type'])
     total_w = sum(d['dist_weight'] for d in result['daily'])
-    print(f"🔍 {args.index} @ {args.date}")
+    print(f"{args.index} @ {args.date}")
     print(f"   抛盘日: {total_dist} 天 | 加权: {total_w} | 信号: {len(result['signals'])}")
     for s in result['signals'][-10:]:
         print(f"   {s['label']} @ {s['signal_date']} (计数={s['count']})")

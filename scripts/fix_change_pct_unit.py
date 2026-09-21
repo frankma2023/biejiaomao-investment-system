@@ -136,7 +136,7 @@ with open(BACKUP, 'w', newline='', encoding='utf-8') as f:
                            "AND change_pct IS NOT NULL ORDER BY date", (code, s0, s1)):
             w.writerow([code, r['date'], r['change_pct']])
             n_backup += 1
-print(f'📦 已备份 {n_backup:,} 行原值 → {BACKUP}')
+print(f'已备份 {n_backup:,} 行原值 → {BACKUP}')
 
 # ── 执行 ──
 total = 0
@@ -173,7 +173,7 @@ for code, mode, s0, s1, d_in in plan:
                             f"WHERE rowid IN ({ph})", chunk)
             total += cur.rowcount
 c.commit()
-print(f'✅ 已修改 {total:,} 行')
+print(f'[OK] 已修改 {total:,} 行')
 
 # ── 复核：重跑分类，确认不再有百分数行 ──
 left = 0

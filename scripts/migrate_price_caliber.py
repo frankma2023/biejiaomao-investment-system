@@ -425,7 +425,7 @@ def step0(apply):
     if apply:
         conn.executescript(f'DROP VIEW IF EXISTS {VIEW};' + VIEW_SQL)
         conn.commit()
-        print(f'  ✅ 已重建视图 {VIEW}')
+        print(f'  [OK] 已重建视图 {VIEW}')
     else:
         print('  （干跑，加 --apply 执行）')
     if exists or apply:
@@ -436,8 +436,8 @@ def step0(apply):
             v = conn.execute(f"SELECT {col} FROM {VIEW} WHERE stock_code='600309' "
                              f"ORDER BY date DESC LIMIT 1").fetchone()
             print(f'  校验 600309 最新 {col} = {v[0] if v else None}')
-        print(f'  视图行数 {n:,} / 表行数 {tot:,}  {"✓" if n == tot else "✗ 不一致"}')
-        print(f'  close 为空的行 {nnull:,}  {"✓ 全覆盖" if nnull == 0 else "⚠ 仍有空值"}')
+        print(f'  视图行数 {n:,} / 表行数 {tot:,}  {"" if n == tot else "不一致"}')
+        print(f'  close 为空的行 {nnull:,}  {"全覆盖" if nnull == 0 else "[WARN] 仍有空值"}')
     conn.close()
     return 0
 
@@ -449,7 +449,7 @@ def load_rules(step):
 def apply_step(step, apply, show_diff=True):
     rules = load_rules(step)
     if not rules:
-        print(f'  ⚠ Step {step} 尚未录入规则。用 --scan 查看候选点，或等规则补齐。')
+        print(f'  [WARN] Step {step} 尚未录入规则。用 --scan 查看候选点，或等规则补齐。')
         print(f'     步骤说明：{STEPS.get(step, "?")}')
         return 2
 
@@ -466,7 +466,7 @@ def apply_step(step, apply, show_diff=True):
     for f, rs in by_file.items():
         path = os.path.join(ROOT, f)
         if not os.path.exists(path):
-            print(f'  ✗ {f}  文件不存在')
+            print(f'  {f}  文件不存在')
             total_abort += len(rs)
             continue
         text = open(path, encoding='utf-8').read()
@@ -491,13 +491,13 @@ def apply_step(step, apply, show_diff=True):
                     text = guarded.replace(r['find'], r['repl']).replace(ph, r['repl'])
                 else:
                     text = text.replace(r['find'], r['repl'])
-                print(f'  ✓ {f}  命中 {n_eff}/{r["expect"]}  {r["note"]}')
+                print(f'  {f}  命中 {n_eff}/{r["expect"]}  {r["note"]}')
                 total_ok += 1
             elif n_eff == 0 and n_done >= 1:
                 print(f'  · {f}  已迁移，跳过  {r["note"]}')
                 total_skip += 1
             else:
-                print(f'  ✗ {f}  待迁移 {n_eff} 处（原始 {n_find} / 已迁移 {n_done}），'
+                print(f'  {f}  待迁移 {n_eff} 处（原始 {n_find} / 已迁移 {n_done}），'
                       f'期望 {r["expect"]} 处 → 中止本条  {r["note"]}')
                 total_abort += 1
         if text != orig:
@@ -529,8 +529,8 @@ def apply_step(step, apply, show_diff=True):
         dst = os.path.join(bdir, f.replace('/', '__'))
         shutil.copy2(os.path.join(ROOT, f), dst)
         open(os.path.join(ROOT, f), 'w', encoding='utf-8').write(new)
-        print(f'  💾 {f}  ← 原文件已备份到 {os.path.relpath(dst, ROOT)}')
-    print(f'\n  ✅ Step {step} 已应用 {len(pending)} 个文件，备份目录 {os.path.relpath(bdir, ROOT)}')
+        print(f'  {f}  ← 原文件已备份到 {os.path.relpath(dst, ROOT)}')
+    print(f'\n  [OK] Step {step} 已应用 {len(pending)} 个文件，备份目录 {os.path.relpath(bdir, ROOT)}')
     print('     建议：python -c "import py_compile,glob,sys; [py_compile.compile(p,doraise=True) for p in glob.glob(\'src/**/*.py\',recursive=True)]"')
     return 0
 

@@ -80,7 +80,7 @@ def main():
                     break
                 cur = seg_end + _td(days=1)
             if not rows_all:
-                print(f'⚠️ {code} {name}: 无数据')
+                print(f'[WARN] {code} {name}: 无数据')
                 continue
             rows = [(code, d['date'][:10], d['close'], d.get('change'), None) for d in rows_all]
             conn.executemany(
@@ -88,9 +88,9 @@ def main():
                 rows)
             conn.commit()
             ds = sorted(r[1] for r in rows)
-            print(f'✅ {code} {name}: +{len(rows)} 条 ({ds[0]} ~ {ds[-1]})')
+            print(f'[OK] {code} {name}: +{len(rows)} 条 ({ds[0]} ~ {ds[-1]})')
         except Exception as e:
-            print(f'❌ {code} {name}: {str(e)[:70]}')
+            print(f'[FAIL] {code} {name}: {str(e)[:70]}')
 
     conn.close()
     print('完成')

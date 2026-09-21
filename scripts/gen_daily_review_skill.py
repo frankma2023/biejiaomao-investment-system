@@ -22,7 +22,7 @@ def main():
     if not date:
         date = db.execute('SELECT MAX(date) FROM daily_kline').fetchone()[0]
     t0 = time.time()
-    print(f'📊 生成 {date} 复盘...')
+    print(f'生成 {date} 复盘...')
 
     # ── 1. 指数概览与估值 ──
     idx_rows = []
@@ -205,7 +205,7 @@ def main():
     p = os.path.join(OUT_DIR, f'{date}.md')
     with open(p, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
-    print(f'✅ {p} ({time.time()-t0:.0f}s)')
+    print(f'[OK] {p} ({time.time()-t0:.0f}s)')
 
 if __name__ == '__main__':
     main()

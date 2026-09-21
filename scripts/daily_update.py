@@ -197,32 +197,32 @@ def run_task(label, cmd, timeout=3600, stream=False):
             lines = [l for l in stdout.split("\n") if l.strip()]
             for line in lines[-8:]:
                 log(f"    {line.strip()}")
-            # ⚠ 2026-09-14 加固：退出码 0 不代表内部没有告警/错误。
-            #   实测：取数脚本拿到 0 条数据时也退出 0，其内部的 ❌ / WARNING 行
-            #   只要不在最后 8 行内就被丢弃 → 整批落空却上报 ✅。
+            # 2026-09-14 加固：退出码 0 不代表内部没有告警/错误。
+            #   实测：取数脚本拿到 0 条数据时也退出 0，其内部的告警关键词行
+            #   只要不在最后 8 行内就被丢弃，整批落空却上报成功。
             #   （行业分组健康分显示 null 就是这条链路的末端表现）
             #   现将所有含告警/错误关键词的行额外透传（去重，不与上面重复）。
             shown = {l.strip() for l in lines[-8:]}
             hl = [l.strip() for l in lines
                   if l.strip() not in shown
-                  and any(k in l for k in ("❌", "⚠", "WARNING", "ERROR", "失败", "错误"))]
+                  and any(k in l for k in ("[FAIL]", "[WARN]", "WARNING", "ERROR", "失败", "错误"))]
             if hl:
-                log(f"    ⚠ 该步骤退出码为 0，但输出含 {len(hl)} 条告警/错误：")
+                log(f"    [WARN] 该步骤退出码为 0，但输出含 {len(hl)} 条告警/错误：")
                 for line in hl[:10]:
                     log(f"      {line}")
                 if len(hl) > 10:
                     log(f"      ...（另有 {len(hl) - 10} 条）")
-            log(f"  ✅ {label} 完成 ({elapsed:.0f}s)")
+            log(f"  [OK] {label} 完成 ({elapsed:.0f}s)")
             return (label, True, elapsed, stdout)
         else:
-            log(f"  ❌ {label} 失败 (exit={r.returncode})")
+            log(f"  [FAIL] {label} 失败 (exit={r.returncode})")
             for line in stderr.split("\n")[-5:]:
                 if line.strip():
                     log(f"    {line.strip()}")
             return (label, False, elapsed, stderr)
     except subprocess.TimeoutExpired:
         elapsed = time.time() - t0
-        log(f"  ❌ {label} 超时 ({elapsed:.0f}s)")
+        log(f"  [FAIL] {label} 超时 ({elapsed:.0f}s)")
         return (label, False, elapsed, "timeout")
 
 # ═══════════════════════════════════════════════
@@ -231,110 +231,110 @@ def run_task(label, cmd, timeout=3600, stream=False):
 
 # 解释器一旦不是预期的那一个，后续失败会难以归因，因此开跑前先说明用的是哪个
 if PYTHON_EXE_WARNING:
-    log(f"⚠️  {PYTHON_EXE_WARNING}")
-log(f"🐍 解释器: {PYTHON_EXE}")
+    log(f"[WARN] {PYTHON_EXE_WARNING}")
+log(f"解释器: {PYTHON_EXE}")
 
 log(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-log(f"🐺 每日盘后更新开始 — {today_str}")
+log(f"每日盘后更新开始 — {today_str}")
 log(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 # 步骤 1~4：数据拉取层（无依赖，预先拉齐今天的原始数据）
 TASKS = [
     # 1. 股票基础信息
-    ("📋 1.股票状态",         [PYTHON_EXE, "scripts/fetch_stock_basic.py"]),
+    ("1.股票状态",         [PYTHON_EXE, "scripts/fetch_stock_basic.py"]),
     # 2. 指数日K线 + 估值（理杏仁API）
-    ("📊 2.指数日K线",       [PYTHON_EXE, "scripts/fetch_index_daily_kline.py", "--all", "--end", today_str]),
-    ("💹 3.指数估值PE/PB",    [PYTHON_EXE, "scripts/fetch_index_fundamental.py", "--incremental", "--end", today_str]),
+    ("2.指数日K线",       [PYTHON_EXE, "scripts/fetch_index_daily_kline.py", "--all", "--end", today_str]),
+    ("3.指数估值PE/PB",    [PYTHON_EXE, "scripts/fetch_index_fundamental.py", "--incremental", "--end", today_str]),
     # 4. 通达信补K线（ETF + 个股，本地文件读取）
-    ("📡 4.通达信ETF+K线",   [PYTHON_EXE, "scripts/fetch_tdx_kline.py"]),
-    ("📈 5.个股日K线",       [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py"]),
+    ("4.通达信ETF+K线",   [PYTHON_EXE, "scripts/fetch_tdx_kline.py"]),
+    ("5.个股日K线",       [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py"]),
     # 5b. 四口径增量（每日）：只跑 lxr_fc（唯一被代码读取的口径，约 22 分钟）
     #     ex_* 本地推导（0 调用）；lxr_fc 逐只调 API，窗口 30 天 + 重叠日对齐
     #     调用量 = 股票数 × 口径数，与窗口长度无关；实测 4.8 次/秒
     #     断点续传：进度入 daily_kline_caliber_progress，同日重跑自动跳过
-    ("🔁 5b.四口径增量(lxr_fc)",
+    ("5b.四口径增量(lxr_fc)",
      [PYTHON_EXE, "scripts/fetch_stock_daily_kline.py", "--caliber", "--types", "lxr_fc"],
      {"timeout": 3600, "stream": True}),
     # 5c.【已取消 2026-09-15】ex_rights/fc_rights/bc_rights 不再拉取，lxr_fc 已满足全站复权需求
     # 5.5 指数全收益（理杏仁 total_return，8 指数 2016 起，回撤买点基准；替代旧 H00922 单指数脚本）
-    ("🧧 5.5全收益指数",     [PYTHON_EXE, "scripts/fetch_index_full_return.py"]),
+    ("5.5全收益指数",     [PYTHON_EXE, "scripts/fetch_index_full_return.py"]),
     # 5.6 国债收益率（红利温度计股债息差用）
-    ("🏦 5.6国债收益率",     [PYTHON_EXE, "scripts/fetch_bond_yield.py"]),
+    ("5.6国债收益率",     [PYTHON_EXE, "scripts/fetch_bond_yield.py"]),
     # 5.7 港股红利ETF（每日行情，akshare 新浪源）
-    ("🇭🇰 5.7港股红利ETF",   [PYTHON_EXE, "scripts/fetch_hk_etf.py"]),
+    ("5.7港股红利ETF",   [PYTHON_EXE, "scripts/fetch_hk_etf.py"]),
     # 5.8 分红记录（理杏仁个股+akshare场外+腾讯ETF反推）
-    ("💰 5.8分红记录",       [PYTHON_EXE, "scripts/fetch_dividends.py"]),
+    ("5.8分红记录",       [PYTHON_EXE, "scripts/fetch_dividends.py"]),
 ]
 
 # 步骤 6~8：市场环境层（依赖 K 线数据就位）
 TASKS.extend([
     # 6. 指数拥挤度（追涨/恐慌信号）
-    ("📐 6.指数拥挤度",      [PYTHON_EXE, "src/scanners/index_crowding.py", "--date", today_str]),
+    ("6.指数拥挤度",      [PYTHON_EXE, "src/scanners/index_crowding.py", "--date", today_str]),
     # 7. 融资融券（杠杆资金动向）
-    ("🔄 7.融资融券",        [PYTHON_EXE, "scripts/fetch_margin_daily.py"]),
+    ("7.融资融券",        [PYTHON_EXE, "scripts/fetch_margin_daily.py"]),
     # 8. 龙虎榜+大宗交易+汇总（游资/机构动向）
-    ("📰 8.龙虎榜+大宗",      [PYTHON_EXE, "scripts/daily_review.py", today_str]),
+    ("8.龙虎榜+大宗",      [PYTHON_EXE, "scripts/daily_review.py", today_str]),
     # 9. 大盘健康度（涨跌家数/AD线/NHNL）
-    ("💊 9.大盘健康度",      [PYTHON_EXE, "src/scanners/market_health.py", "--date", today_str]),
+    ("9.大盘健康度",      [PYTHON_EXE, "src/scanners/market_health.py", "--date", today_str]),
 ])
 
 # 步骤 10~14：个股/行业量化层（依赖 K 线 + 大盘数据）
 TASKS.extend([
     # 10. 个股 RS 强度（RPS 计算，约 5min）
-    ("💪 10.个股RS强度",     [PYTHON_EXE, "src/scanners/stock_rs.py", "--date", today_str]),
+    ("10.个股RS强度",     [PYTHON_EXE, "src/scanners/stock_rs.py", "--date", today_str]),
     # 11. 指数 RS 强度（行业强弱排序基础）
-    ("📊 11.指数RS强度",     [PYTHON_EXE, "src/scanners/index_rs.py", "--date", today_str]),
+    ("11.指数RS强度",     [PYTHON_EXE, "src/scanners/index_rs.py", "--date", today_str]),
     # 12. 行业分组健康分 v3.0（L2+主题 × 强/中/弱）
-    ("🔬 12.行业分组健康",   [PYTHON_EXE, "src/scanners/market_health.py", "--date", today_str, "--sector"]),
+    ("12.行业分组健康",   [PYTHON_EXE, "src/scanners/market_health.py", "--date", today_str, "--sector"]),
     # 13. 指数资金活跃度（北向/主力资金）
-    ("💰 13.指数资金流向",   [PYTHON_EXE, "src/scanners/index_capital_flow.py", "--date", today_str]),
+    ("13.指数资金流向",   [PYTHON_EXE, "src/scanners/index_capital_flow.py", "--date", today_str]),
     # 14. 大盘卖出评分（环境恶化预警）
-    ("📉 14.大盘卖出评分",   [PYTHON_EXE, "src/scanners/market_sell_score.py", "--date", today_str]),
+    ("14.大盘卖出评分",   [PYTHON_EXE, "src/scanners/market_sell_score.py", "--date", today_str]),
     # 15. 大盘扫描快照（6 卡片 + 趋势图）
-    ("📸 15.大盘扫描快照",   [PYTHON_EXE, "scripts/compute_market_snapshot.py", "--date", today_str]),
+    ("15.大盘扫描快照",   [PYTHON_EXE, "scripts/compute_market_snapshot.py", "--date", today_str]),
 ])
 
 # 步骤 16~17：形态引擎层（依赖个股 RS 完成，检测买入/卖出信号）
 # 16. 全 A 股形态扫描（MW/基部突破/口袋支点/卖出信号，依赖个股 RS）
-TASKS.append(("🔎 16.全A形态扫描", [PYTHON_EXE, "scripts/daily_pattern_scan.py", "--date", today_str, "--all"]))
+TASKS.append(("16.全A形态扫描", [PYTHON_EXE, "scripts/daily_pattern_scan.py", "--date", today_str, "--all"]))
 # 17. 口袋支点 V2（多周期扫描，依赖 MW 结构的 H/L/C）
-TASKS.append(("🟠 17.口袋支点V2", [PYTHON_EXE, "src/scanners/pocket_pivot_v2.py", "--date", today_str, "--save"]))
+TASKS.append(("17.口袋支点V2", [PYTHON_EXE, "src/scanners/pocket_pivot_v2.py", "--date", today_str, "--save"]))
 
 # 步骤 18~19：基本面层（财务/机构数据，周一全量，每日增量）
 # 18. 个股基本面增量（季度财报数据）
-TASKS.append(("💰 18.个股基本面", [PYTHON_EXE, "scripts/fetch_fundamental_nonfinancial.py", "--incremental", "--workers", "4"]))
+TASKS.append(("18.个股基本面", [PYTHON_EXE, "scripts/fetch_fundamental_nonfinancial.py", "--incremental", "--workers", "4"]))
 # 18b. 季度财报明细（披露窗口内每天覆盖拉取：早披露早入库，晚披露自动补；
 #      fetch_stock_financials.py --recent 只拉披露窗口内的报告期，覆盖写幂等）
-TASKS.append(("💰 18b.季度财报", [PYTHON_EXE, "scripts/fetch_stock_financials.py", "--quarters-only", "--recent"]))
+TASKS.append(("18b.季度财报", [PYTHON_EXE, "scripts/fetch_stock_financials.py", "--quarters-only", "--recent"]))
 if WEEKDAY == 0:
     # 19. 机构持股（每季更新，周一拉取）
-    TASKS.append(("🏦 19.机构持股", [PYTHON_EXE, "scripts/fetch_institutional_holdings.py"]))
+    TASKS.append(("19.机构持股", [PYTHON_EXE, "scripts/fetch_institutional_holdings.py"]))
 else:
-    log(f"⏭️  跳过机构持股（非周一，weekday={date.today().weekday()}）")
+    log(f" 跳过机构持股（非周一，weekday={date.today().weekday()}）")
 
 # 步骤 19b：申万一级行业指数日线增量（industry_rs 申万 RS 基准）
-TASKS.append(("🏭 19b.申万行业指数", [PYTHON_EXE, "scripts/fetch_sw_index.py"]))
+TASKS.append(("19b.申万行业指数", [PYTHON_EXE, "scripts/fetch_sw_index.py"]))
 # 步骤 20：新浪研报覆盖（CANSLIM I 因子唯一源——数量/机构数，不下载研报本身；东财备源已退役 2026-09）
 # 每日：自选池+观察池+TOP200 重点池新鲜；周一：新浪全市场（研报低频，90 天窗口周更足够）
-TASKS.append(("📝 20a.新浪研报覆盖", [PYTHON_EXE, "scripts/fetch_sina_report_coverage.py", "--watchlist", "--threads", "8"]))
-TASKS.append(("📝 20b.新浪研报TOP200", [PYTHON_EXE, "scripts/fetch_sina_report_coverage.py", "--top", "200", "--threads", "8"]))
+TASKS.append(("20a.新浪研报覆盖", [PYTHON_EXE, "scripts/fetch_sina_report_coverage.py", "--watchlist", "--threads", "8"]))
+TASKS.append(("20b.新浪研报TOP200", [PYTHON_EXE, "scripts/fetch_sina_report_coverage.py", "--top", "200", "--threads", "8"]))
 if WEEKDAY == 0:
-    TASKS.append(("📝 20c.新浪研报全市场", [PYTHON_EXE, "scripts/fetch_sina_report_coverage.py", "--all", "--threads", "8"]))
-    TASKS.append(("🔄 21.回购数据", [PYTHON_EXE, "scripts/fetch_buyback.py"]))
+    TASKS.append(("20c.新浪研报全市场", [PYTHON_EXE, "scripts/fetch_sina_report_coverage.py", "--all", "--threads", "8"]))
+    TASKS.append(("21.回购数据", [PYTHON_EXE, "scripts/fetch_buyback.py"]))
 else:
-    log(f"⏭️  跳过新浪全市场/回购（非周一）")
+    log(f" 跳过新浪全市场/回购（非周一）")
 
 # 步骤 22~24：选股评分层（依赖 RS + 基本面 + 形态信号全部就位）
 # 22. CAN SLIM 全量评分
-TASKS.append(("🎯 22.CANSLIM评分", [PYTHON_EXE, "scripts/batch_canslim_score.py"]))
+TASKS.append(("22.CANSLIM评分", [PYTHON_EXE, "scripts/batch_canslim_score.py"]))
 # 23. 观察池日更（依赖 RS + CAN SLIM，筛选候选标的）
-TASKS.append(("🔍 23.观察池日更", [PYTHON_EXE, "src/discipline/observation.py", "--date", today_str]))
+TASKS.append(("23.观察池日更", [PYTHON_EXE, "src/discipline/observation.py", "--date", today_str]))
 # 24. 持仓监控扫描（依赖观察池 + 形态信号 + 大盘环境）
-TASKS.append(("📡 24.持仓监控扫描", [PYTHON_EXE, "src/discipline/monitoring.py"]))
+TASKS.append(("24.持仓监控扫描", [PYTHON_EXE, "src/discipline/monitoring.py"]))
 # 25. 欧奈尔每日精选·股票
-TASKS.append(("📋 25.精选·股票", [PYTHON_EXE, "src/discipline/screener.py", "--date", today_str]))
+TASKS.append(("25.精选·股票", [PYTHON_EXE, "src/discipline/screener.py", "--date", today_str]))
 # 26. 欧奈尔每日精选·指数（依赖指数 K 线 + 指数 RS）
-TASKS.append(("📊 26.精选·指数", [PYTHON_EXE, "src/discipline/index_screener.py", "--date", today_str]))
+TASKS.append(("26.精选·指数", [PYTHON_EXE, "src/discipline/index_screener.py", "--date", today_str]))
 
 # 步骤 27：缠论层（依赖 K 线数据，为 MW 信号扫描提供笔数据）
 # 27a. 自动补填昨日缺失的 bi 数据（防止漏跑一天造成缺口）
@@ -345,44 +345,44 @@ if _yesterday:
     _has_bi = _db.execute("SELECT COUNT(*) FROM chanlun_bi_json WHERE scan_date=?", (_yesterday,)).fetchone()[0] > 0
     _db.close()
     if _has_kline and not _has_bi:
-        TASKS.append(("🎋 27a.补昨日缠论bi", [PYTHON_EXE, "src/scanners/chanlun_scan.py", "--date", _yesterday, "--all"]))
-        log(f"  ⚠️ 昨日 {_yesterday} 缠论bi缺失，自动补齐")
+        TASKS.append(("27a.补昨日缠论bi", [PYTHON_EXE, "src/scanners/chanlun_scan.py", "--date", _yesterday, "--all"]))
+        log(f"  [WARN] 昨日 {_yesterday} 缠论bi缺失，自动补齐")
 # 27b. 缠论分钟数据预下载（TDX 通达信本地文件 → 15/60 分钟 K 线）
 # 优化后一次登录批量拉取，取代之前的逐只登录登出
-TASKS.append(("⏱️ 27b.缠论分钟数据", [PYTHON_EXE, "scripts/fetch_tdx_minute.py"]))
+TASKS.append(("27b.缠论分钟数据", [PYTHON_EXE, "scripts/fetch_tdx_minute.py"]))
 # 27c. 缠论批量扫描（全市场过滤 ST+低量后缓存 bi 数据，供 MW/BO 等下游使用）
 # 必须跑在 MW 信号扫描之前，否则 MW 引擎 0% 兜底下会跳过全部股票
-TASKS.append(("🎋 27c.缠论批量扫描", [PYTHON_EXE, "src/scanners/chanlun_scan.py", "--date", today_str, "--all"]))
+TASKS.append(("27c.缠论批量扫描", [PYTHON_EXE, "src/scanners/chanlun_scan.py", "--date", today_str, "--all"]))
 
 # 步骤 28~29：MW 信号 + 回测（依赖缠论 bi + 个股 RS 就位）
 # 28. 缠论 vs 欧奈尔回测对比
-TASKS.append(("⚖️ 28.缠论vs欧奈尔回测", [PYTHON_EXE, "src/scanners/chanlun_backtest_compare.py", "--date", today_str, "--filter"]))
+TASKS.append(("28.缠论vs欧奈尔回测", [PYTHON_EXE, "src/scanners/chanlun_backtest_compare.py", "--date", today_str, "--filter"]))
 # 29. MW 信号扫描（用 backfill_mw.py 替代 mw_signal.py）
 # backfill_mw.py 优势：并行 bi 预加载(3线程+重试) + 哨兵防 run_scan 二次预加载卡死 + 进度输出
 # 默认 0% 兜底等同实盘，单日约 15~30 秒
-TASKS.append(("🔥 29.MW信号扫描", [PYTHON_EXE, "scripts/backfill_mw.py", "--start", today_str, "--end", today_str]))
+TASKS.append(("29.MW信号扫描", [PYTHON_EXE, "scripts/backfill_mw.py", "--start", today_str, "--end", today_str]))
 
 # 步骤 30~31：投资决策驾驶舱（依赖前序全部步骤，最终产出）
 # 30. 市值快照（pysnowball，为管道市值过滤提供数据）
-TASKS.append(("💎 30.市值快照", [PYTHON_EXE, "src/cockpit/market_cap_snapshot.py"]))
+TASKS.append(("30.市值快照", [PYTHON_EXE, "src/cockpit/market_cap_snapshot.py"]))
 # 31. 驾驶舱管道（五级硬过滤 → 简报卡 → 五关检查单 → 仓位/止损建议）
-TASKS.append(("🚀 31.投资决策驾驶舱", [PYTHON_EXE, "src/cockpit/pipeline.py", "--date", today_str, "--save"]))
+TASKS.append(("31.投资决策驾驶舱", [PYTHON_EXE, "src/cockpit/pipeline.py", "--date", today_str, "--save"]))
 
 # 步骤 32：自选池日报（依赖前序全部步骤：K线/RS/形态/缠论/MW 就位后，扫描自选池生成每日技术面日报）
-TASKS.append(("📋 32.自选池日报", [PYTHON_EXE, "scripts/gen_watchlist_report.py"]))
+TASKS.append(("32.自选池日报", [PYTHON_EXE, "scripts/gen_watchlist_report.py"]))
 
 # 步骤 33：微盘股指数（依赖 K线就位——月末定池/月初生效/日频点位，幂等可重复）
-TASKS.append(("🔬 33.微盘股指数", [PYTHON_EXE, "scripts/build_microcap_index.py", "--incremental"]))
+TASKS.append(("33.微盘股指数", [PYTHON_EXE, "scripts/build_microcap_index.py", "--incremental"]))
 
 # 步骤 34：CPA 阶段判定（依赖 K线+笔数据——六阶段状态机全量重跑，~3min，幂等）
-TASKS.append(("🎯 34.CPA阶段判定", [PYTHON_EXE, "src/scanners/cpa_stage.py", "--incremental"]))
+TASKS.append(("34.CPA阶段判定", [PYTHON_EXE, "src/scanners/cpa_stage.py", "--incremental"]))
 
 # 步骤 35：周K线缠论笔快照（依赖日线K线就位；ISO 真周线口径，周末/周五盘后才有新周，
 # week_is_complete 保证周五盘中跑自动跳过本周；幂等：已有快照的周不重写）
-TASKS.append(("🎋 35a.周线缠论笔", [PYTHON_EXE, "scripts/backfill_chanlun_weekly.py", "--start", "2016-01-01", "--incremental"]))
+TASKS.append(("35a.周线缠论笔", [PYTHON_EXE, "scripts/backfill_chanlun_weekly.py", "--start", "2016-01-01", "--incremental"]))
 
 # 步骤 36：周线 CPA 阶段判定（依赖 35a 周线笔 + K线；增量式：仅重算有新完整周的股票，幂等可重复）
-TASKS.append(("🎯 36.周线CPA判定", [PYTHON_EXE, "scripts/incremental_cpa_weekly.py"]))
+TASKS.append(("36.周线CPA判定", [PYTHON_EXE, "scripts/incremental_cpa_weekly.py"]))
 
 for item in TASKS:
     label, cmd = item[0], item[1]
@@ -393,7 +393,7 @@ for item in TASKS:
     tasks.append((lbl, ok, elapsed))
     if not ok:
         failed.append(lbl)
-        log(f"⚠️  {lbl} 失败，继续执行后续任务")
+        log(f"[WARN] {lbl} 失败，继续执行后续任务")
         # 继续执行，不终止
 
 # ═══════════════════════════════════════════════
@@ -403,18 +403,18 @@ for item in TASKS:
 total_elapsed = time.time() - start_time
 
 log(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-log(f"🐺 每日盘后更新结束")
+log(f"每日盘后更新结束")
 log(f"   耗时: {total_elapsed:.0f}s ({total_elapsed/60:.1f}min)")
 
 passed = [t for t in tasks if t[1]]
 for lbl, ok, elapsed in tasks:
-    status = "✅" if ok else "❌"
+    status = "[OK]" if ok else "[FAIL]"
     log(f"   {status}  {lbl} ({elapsed:.0f}s)")
 
 if failed:
-    log(f"⚠️  失败任务: {', '.join(failed)}")
+    log(f"[WARN] 失败任务: {', '.join(failed)}")
 else:
-    log(f"🎉 全部完成")
+    log(f"全部完成")
 
 log(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 

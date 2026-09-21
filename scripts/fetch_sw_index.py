@@ -30,9 +30,9 @@ def main():
         _chk = conn.execute("SELECT COUNT(DISTINCT stock_code) n, MAX(date) d FROM sw_index_kline").fetchone()
         _mem = conn.execute("SELECT COUNT(*) n FROM sw2021_members").fetchone()
         if _chk and (_chk[0] < 31 or _chk[1] is None):
-            print(f'⚠️ sw_index_kline 数据不足({_chk[0]}行业/最新{_chk[1]})——先跑 --full 否则 industry_rs 全市场归零')
+            print(f'[WARN] sw_index_kline 数据不足({_chk[0]}行业/最新{_chk[1]})——先跑 --full 否则 industry_rs 全市场归零')
         if _mem and _mem[0] < 3000:
-            print(f'⚠️ sw2021_members 仅 {_mem[0]} 条——先跑 --members 否则个股行业归属缺失')
+            print(f'[WARN] sw2021_members 仅 {_mem[0]} 条——先跑 --members 否则个股行业归属缺失')
     except Exception:
         pass
     conn.execute("""CREATE TABLE IF NOT EXISTS sw_index_kline (
@@ -60,7 +60,7 @@ def main():
                 tot += len(rows)
                 print(f'  {code} {name}: {len(rows)} 成分')
             except Exception as e:
-                print(f'  {code} {name}: ❌ {str(e)[:70]}')
+                print(f'  {code} {name}: [FAIL] {str(e)[:70]}')
             time.sleep(0.3)
         print(f'成分映射完成: 共 {tot} 条')
         # 抽样验证
@@ -91,7 +91,7 @@ def main():
             conn.commit()
             ok += 1
         except Exception as e:
-            print(f'  {code} {name}: ❌ {str(e)[:80]}')
+            print(f'  {code} {name}: [FAIL] {str(e)[:80]}')
         time.sleep(0.3)
     print(f'完成: {ok}/{len(sws)} 入库')
     r = conn.execute("SELECT COUNT(DISTINCT stock_code), MAX(date) FROM sw_index_kline").fetchone()

@@ -35,4 +35,4 @@ if '| 25 |' not in t:
     n += 2
 
 io.open(P, 'w', encoding='utf-8').write(t)
-print(f'✅ 更新 {n} 处')
+print(f'[OK] 更新 {n} 处')

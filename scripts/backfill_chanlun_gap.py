@@ -144,10 +144,10 @@ if __name__ == '__main__':
         total_filled += saved
         total_bi += day_bi
 
-        print(f"✓ 补{saved}只, {day_bi}笔 ({elapsed:.1f}s) {eta_str}")
+        print(f"补{saved}只, {day_bi}笔 ({elapsed:.1f}s) {eta_str}")
         if day_errs:
             err_samples = [r[1] for r in results if r[1]][:3]
-            print(f"  ⚠ {day_errs}错: {'; '.join(err_samples)}")
+            print(f"  [WARN] {day_errs}错: {'; '.join(err_samples)}")
 
     total_elapsed = time.time() - t_start
     print(f"\n=== 完成 ===")

@@ -124,12 +124,12 @@ if __name__ == '__main__':
             compute(date)
             elapsed = time.time() - t0
             completed += 1
-            print(f"✓ ({elapsed:.1f}s) {eta_str}")
+            print(f"({elapsed:.1f}s) {eta_str}")
 
         except Exception as e:
             elapsed = time.time() - t0
             errors.append((date, str(e)[:200]))
-            print(f"[{completed}/{len(dates)}] {date}  ✗ ({elapsed:.1f}s) {e}")
+            print(f"[{completed}/{len(dates)}] {date}  ({elapsed:.1f}s) {e}")
 
     # 汇总
     total_elapsed = time.time() - t_start

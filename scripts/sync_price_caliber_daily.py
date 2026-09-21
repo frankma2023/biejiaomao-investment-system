@@ -86,7 +86,7 @@ def main():
             conn.execute("""UPDATE daily_kline
                             SET ex_open=open, ex_high=high, ex_low=low, ex_close=close
                             WHERE ex_close IS NULL AND close IS NOT NULL""")
-        print(f'  ✅ ex_* 已回填 {n1:,} 行')
+        print(f'  [OK] ex_* 已回填 {n1:,} 行')
     elif not n1:
         print('  无需处理')
 
@@ -147,7 +147,7 @@ def main():
                                 SET lxr_fc_open=?, lxr_fc_high=?, lxr_fc_low=?, lxr_fc_close=?
                                 WHERE stock_code=? AND date=?""", payload)
             total += len(payload)
-    print(f'\n  ✅ lxr_fc_* 已递推写入 {total:,} 行'
+    print(f'\n  [OK] lxr_fc_* 已递推写入 {total:,} 行'
           f'{f"，跳过异常 {errs:,} 行" if errs else ""}')
 
     print()

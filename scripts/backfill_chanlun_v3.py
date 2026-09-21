@@ -159,7 +159,7 @@ if __name__ == '__main__':
                 days_completed += 1
                 elapsed = time.time() - t_start
                 eta = elapsed / days_completed * (len(dates) - days_completed)
-                print(f"[{days_completed}/{len(dates)}] {scan_date} ✓ {saved}只 {bi_cnt}笔 ETA {eta/3600:.1f}h")
+                print(f"[{days_completed}/{len(dates)}] {scan_date} {saved}只 {bi_cnt}笔 ETA {eta/3600:.1f}h")
                 del day_results[scan_date]  # 释放内存
 
     total_elapsed = time.time() - t_start

@@ -160,8 +160,8 @@ if __name__ == '__main__':
                 total_stocks += n_stocks
                 total_bi += bi_cnt
                 eta = (time.time() - t_start) / completed * (len(dates) - completed)
-                print(f"[{completed}/{len(dates)}] {date} ✓ {saved}/{n_stocks}只 {bi_cnt}笔 ({elapsed:.0f}s) ETA {eta/3600:.1f}h")
-                if errs: print(f"  ⚠ {errs}个错误")
+                print(f"[{completed}/{len(dates)}] {date} {saved}/{n_stocks}只 {bi_cnt}笔 ({elapsed:.0f}s) ETA {eta/3600:.1f}h")
+                if errs: print(f"  [WARN] {errs}个错误")
 
     total_elapsed = time.time() - t_start
     print(f"\n=== 完成: {completed}天 {total_stocks}只次 {total_bi}笔 {total_elapsed/3600:.1f}h ===")

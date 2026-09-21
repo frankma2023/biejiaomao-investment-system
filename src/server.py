@@ -7843,7 +7843,7 @@ if __name__ == '__main__':
     import sys, io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
     init_schema()
-    print("🦊 O'Neil Backtest API Server starting on http://localhost:8788")
+    print("O'Neil Backtest API Server starting on http://localhost:8788")
     print(f"   Config dir: {CONFIG_DIR}")
     print(f"   Detectors: distribution_day, follow_through_day, accumulation, index_rs")
     app.run(host='0.0.0.0', port=8788, debug=False)

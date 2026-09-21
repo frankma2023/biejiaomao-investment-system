@@ -40,20 +40,20 @@ def dump(key):
     conn.row_factory = sqlite3.Row
     rows = conn.execute(sql).fetchall()
     if not rows:
-        print(f'  ⚠ {key}: 无数据，跳过')
+        print(f'  [WARN] {key}: 无数据，跳过')
         return
     with open(path, 'w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
         w.writerow(rows[0].keys())
         w.writerows([tuple(r) for r in rows])
-    print(f'  ✅ {key}: 基线 {len(rows):,} 行 → {path}')
+    print(f'  [OK] {key}: 基线 {len(rows):,} 行 → {path}')
     conn.close()
 
 
 def compare(key):
     path, sql = SPEC[key]
     if not os.path.exists(path):
-        print(f'  ⚠ {key}: 找不到基线 {path}，先跑一次不带 --compare 的')
+        print(f'  [WARN] {key}: 找不到基线 {path}，先跑一次不带 --compare 的')
         return
     old = {}
     with open(path, encoding='utf-8') as f:

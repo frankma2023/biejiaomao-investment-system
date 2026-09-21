@@ -70,7 +70,7 @@ elif health_score < 65 or sell_score >= 60: pos_pct = 50
 elif regime == '熊市': pos_pct = 50
 elif regime == '震荡市': pos_pct = 80
 print(f'  建议仓位上限: {pos_pct}%')
-print(f'  MW信号回测覆盖: {regime}环境 {"样本极少(6%)，结论可靠度低 ⚠" if regime=="熊市" else ("最优环境 ✅" if regime=="震荡市" else "一般")}')
+print(f'  MW信号回测覆盖: {regime}环境 {"样本极少(6%)，结论可靠度低 [WARN]" if regime=="熊市" else ("最优环境 [OK]" if regime=="震荡市" else "一般")}')
 
 # ═══════════════════ 步骤二：行业选择 ═══════════════════
 print(f'\n{"─" * 85}')
@@ -122,7 +122,7 @@ for s in strong_sectors:
 print(f'  RS强势组: {len(strong_sectors)} 个')
 print(f'  资金三线确认: {len(confirmed_sectors)} 个')
 for s in confirmed_sectors:
-    print(f'    ⭐ {s["name"]:<15s} 评级{s["rating"]} | 资金10d={s["flow10"]:.0f} 65d={s["flow65"]:.0f} 250d={s["flow250"]:.0f}')
+    print(f'    {s["name"]:<15s} 评级{s["rating"]} | 资金10d={s["flow10"]:.0f} 65d={s["flow65"]:.0f} 250d={s["flow250"]:.0f}')
 
 # 收集强势板块的所有成分股
 strong_indices = set()
@@ -137,7 +137,7 @@ if not strong_indices:
         if s['codes']:
             for code in s['codes'].split(','):
                 strong_indices.add(code.strip())
-    print(f'  ⚠ 无资金确认板块，回退到所有RS强势组 ({len(strong_indices)} 个指数)')
+    print(f'  [WARN] 无资金确认板块，回退到所有RS强势组 ({len(strong_indices)} 个指数)')
 
 # 获取成分股
 all_stocks_in_sectors = set()
@@ -277,19 +277,19 @@ cat3.sort(key=lambda x: x['rps250'], reverse=True)
 cat4.sort(key=lambda x: x['b1_only'], reverse=True)
 
 # ── 输出 ──
-print(f'\n🔴 类型1: 管道通过 + MW B1≥40 + B2确认 = 立即买入 ({len(cat1)}只)')
+print(f'\n类型1: 管道通过 + MW B1≥40 + B2确认 = 立即买入 ({len(cat1)}只)')
 if cat1:
     print(f'  {"代码":<8s} {"名称":<8s} {"B1分":>5s} {"置信":<4s} {"PLUS":<5s} {"PPV1":<5s} {"RPS":>5s} {"行业RS":>6s} {"成交(万)":>9s}')
     for e in cat1:
-        print(f'  {e["code"]:<8s} {e["name"]:<8s} {e["b1_only"]:>5d} {e["conf"]:<4s} {"✦" if e["is_plus"] else "":<5s} {"✅" if e["ppv1"] else "—":<5s} {e["rps250"]:>5d} {e["ind_rs"] or "—":>6s} {e["amt_m"]:>8.0f}')
+        print(f'  {e["code"]:<8s} {e["name"]:<8s} {e["b1_only"]:>5d} {e["conf"]:<4s} {"" if e["is_plus"] else "":<5s} {"[OK]" if e["ppv1"] else "—":<5s} {e["rps250"]:>5d} {e["ind_rs"] or "—":>6s} {e["amt_m"]:>8.0f}')
 
-print(f'\n🟡 类型2: 管道通过 + MW B1≥40 + B2未出 = 等待确认 ({len(cat2)}只)')
+print(f'\n类型2: 管道通过 + MW B1≥40 + B2未出 = 等待确认 ({len(cat2)}只)')
 if cat2:
     print(f'  {"代码":<8s} {"名称":<8s} {"B1分":>5s} {"置信":<4s} {"PPV1":<5s} {"RPS":>5s} {"行业":<12s}')
     for e in cat2[:10]:
-        print(f'  {e["code"]:<8s} {e["name"]:<8s} {e["b1_only"]:>5d} {e["conf"]:<4s} {"✅" if e["ppv1"] else "—":<5s} {e["rps250"]:>5d} {(e["ind_name"] or "")[:12]:<12s}')
+        print(f'  {e["code"]:<8s} {e["name"]:<8s} {e["b1_only"]:>5d} {e["conf"]:<4s} {"[OK]" if e["ppv1"] else "—":<5s} {e["rps250"]:>5d} {(e["ind_name"] or "")[:12]:<12s}')
 
-print(f'\n🟢 类型3: 管道通过但无MW高分信号 = 仅管道候选 ({len(cat3)}只, 展示Top10)')
+print(f'\n类型3: 管道通过但无MW高分信号 = 仅管道候选 ({len(cat3)}只, 展示Top10)')
 if cat3:
     print(f'  {"代码":<8s} {"名称":<8s} {"RPS250":>7s} {"成交(万)":>9s} {"MW":>5s} {"PP":>5s}')
     for e in cat3[:10]:
@@ -301,7 +301,7 @@ if cat3:
         if sr: name = sr['name']
         print(f'  {e["code"]:<8s} {name:<8s} {e["rps250"]:>7d} {e["amt_m"]:>8.0f} {has_mw:>5s} {has_pp:>5s}')
 
-print(f'\n🟣 类型4: MW B1高分但管道未通过 = 行业弱 ({len(cat4)}只)')
+print(f'\n类型4: MW B1高分但管道未通过 = 行业弱 ({len(cat4)}只)')
 if cat4:
     print(f'  {"代码":<8s} {"名称":<8s} {"B1分":>5s} {"RPS":>5s} {"问题":<20s}')
     for e in cat4:
@@ -328,22 +328,22 @@ print(f'''
 └─ 建议 ──────────────────────────────────────''')
 
 if cat1:
-    print(f'  🏆 首选: {cat1[0]["code"]} {cat1[0]["name"]}')
+    print(f'  首选: {cat1[0]["code"]} {cat1[0]["name"]}')
     print(f'     管道通过 + MW高置信 + B2确认')
     print(f'     仓位: {pos_pct}% × 凯利72% = {pos_pct*0.72:.0f}%')
 elif cat2:
     top = cat2[0]
-    print(f'  📋 观察池首位: {top["code"]} {top["name"]}')
+    print(f'  观察池首位: {top["code"]} {top["name"]}')
     print(f'     B1={top["b1_only"]}分/{top["conf"]}置信, RPS={top["rps250"]}')
     print(f'     等待B2确认后买入, 仓位: {pos_pct}% × 凯利72% = {pos_pct*0.72:.0f}%')
     if regime == '熊市':
-        print(f'     ⚠ 熊市环境，MW回测样本极少，建议轻仓或等待市场转震荡/牛市')
+        print(f'     [WARN] 熊市环境，MW回测样本极少，建议轻仓或等待市场转震荡/牛市')
 else:
     print(f'  今日无符合条件的MW买入信号')
     print(f'  建议: 等待市场环境改善 + B2确认出现')
 
 if cat4:
-    print(f'\n  ⚠ 行业过滤剔除 {len(cat4)} 只MW高分信号（不在强势板块），避免了潜在假信号')
+    print(f'\n  [WARN] 行业过滤剔除 {len(cat4)} 只MW高分信号（不在强势板块），避免了潜在假信号')
 
 print(f'\n管道+MW整合规则:')
 print(f'  ① 管道定仓位（{pos_pct}%） + MW定选股（B1≥40+等B2）')

@@ -30,12 +30,12 @@ if __name__ == '__main__':
     done = get_already_done()
     todo = [d for d in dates if d not in done]
     
-    print(f'📅 {start} ~ {end}: {len(dates)}个交易日, {len(done)}个已有数据, {len(todo)}个待补跑')
+    print(f'{start} ~ {end}: {len(dates)}个交易日, {len(done)}个已有数据, {len(todo)}个待补跑')
     
     for i, d in enumerate(todo):
         print(f'  [{i+1}/{len(todo)}] {d}...', end=' ', flush=True)
         ret = subprocess.run(['python', SCRIPT, d], capture_output=True, text=True, timeout=120)
         if ret.returncode == 0:
-            print('✅')
+            print('[OK]')
         else:
-            print(f'❌ {ret.stderr[:100]}')
+            print(f'[FAIL] {ret.stderr[:100]}')

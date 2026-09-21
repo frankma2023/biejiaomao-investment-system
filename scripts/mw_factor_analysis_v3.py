@@ -97,7 +97,7 @@ for idx, s in enumerate(signals):
         print(f'  [{idx+1}/{len(signals)}] {elapsed:.0f}s ({elapsed/(idx+1)*len(signals)/60:.0f}min est)')
 
 elapsed = time.time() - t0
-print(f'✅ 计算完成: {len(results)} 条, 耗时 {elapsed:.0f}s')
+print(f'[OK] 计算完成: {len(results)} 条, 耗时 {elapsed:.0f}s')
 
 # 3. 统计分析
 def bucket(data, key, bins, labels):
@@ -199,5 +199,5 @@ html += '''<h2>结论</h2>
 
 with open(OUT, 'w', encoding='utf-8') as f:
     f.write(html)
-print(f'✅ 报告已保存: {OUT}')
+print(f'[OK] 报告已保存: {OUT}')
 db.close()

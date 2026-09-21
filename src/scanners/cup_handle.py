@@ -616,10 +616,10 @@ if __name__ == '__main__':
     params = load_params()
     sigs = detect(daily, params)
     
-    print(f"🔍 {args.stock} @ {args.date}")
+    print(f"{args.stock} @ {args.date}")
     print(f"   杯柄形态突破信号: {len(sigs)}")
     for s in sigs:
-        print(f"   📅 {s['signal_date']} {s['pattern_type']} 买点={s['buy_point']}")
+        print(f"   {s['signal_date']} {s['pattern_type']} 买点={s['buy_point']}")
         print(f"      前高={s['prior_high_price']}({s['prior_high_date']}) 杯底={s['bottom_price']}({s['bottom_date']})")
         print(f"      回调={s['drawdown_pct']}% 下行={s['descent_days']}d 回升={s['ascent_days']}d")
         if s['handle_high_price']:

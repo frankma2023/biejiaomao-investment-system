@@ -574,7 +574,7 @@ def score_fear_greed(val): return _tier6(val, [80, 60, 40, 20], [10, 8, 6, 4, 0]
 def compute_all(target_date):
     conn = get_db()
     logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    logger.info(f"🐺 大盘健康度计算 — {target_date}")
+    logger.info(f"大盘健康度计算 — {target_date}")
     logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
     # 1
@@ -945,16 +945,16 @@ def compute_sector_health_groups(target_date):
     if not has_rs:
         fallback = conn.execute("SELECT MAX(date) FROM index_rs_daily").fetchone()[0]
         if fallback:
-            logger.warning(f"  ⚠️ {target_date} 无RS数据，回退到 {fallback}")
+            logger.warning(f"  [WARN] {target_date} 无RS数据，回退到 {fallback}")
             target_date = fallback
     
-    logger.info(f"📊 行业分组健康分 — {target_date}")
+    logger.info(f"行业分组健康分 — {target_date}")
     
     # 先算全市场的共享值（融资余额、板块轮动、恐慌指数）
     # 复用 compute_all 已算的结果
     row = conn.execute("SELECT * FROM market_health_daily WHERE date=?", (target_date,)).fetchone()
     if not row:
-        logger.warning(f"  ⚠️ 全市场健康分未计算，先执行 compute_all({target_date})")
+        logger.warning(f"  [WARN] 全市场健康分未计算，先执行 compute_all({target_date})")
         conn.close()
         return
     
@@ -1109,7 +1109,7 @@ def compute_sector_health_groups(target_date):
     
     conn.commit()
     conn.close()
-    logger.info(f"📊 行业分组健康分完成: {len(all_groups)} 组")
+    logger.info(f"行业分组健康分完成: {len(all_groups)} 组")
 
 
 if __name__ == "__main__":

@@ -80,7 +80,7 @@ def main():
     has_bi_text = '仍存在' if has_bi else '已移除'
     print(f'  chanlun_scan_daily: {main_rows:,} 行 (bi_json 列: {has_bi_text})')
     print(f'  chanlun_bi_json:   {bi_rows:,} 行')
-    print(f'  ✅' if not has_bi and main_rows > 0 and bi_rows > 0 else '  ❌ 验证失败')
+    print(f'  [OK]' if not has_bi and main_rows > 0 and bi_rows > 0 else '  [FAIL] 验证失败')
 
 if __name__ == '__main__':
     main()

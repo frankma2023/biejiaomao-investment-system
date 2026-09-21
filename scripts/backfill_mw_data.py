@@ -94,25 +94,25 @@ def run_cmd_live(label, cmd, timeout=3600):
             proc.kill()
             proc.wait()
             elapsed = time.time() - t0
-            log(f"  ❌ {label}: 超时 ({elapsed:.0f}s)")
+            log(f"  [FAIL] {label}: 超时 ({elapsed:.0f}s)")
             return False
 
         elapsed = time.time() - t0
 
         if returncode == 0:
             summary = last_lines[-1][:80] if last_lines else "(无输出)"
-            log(f"  ✅ {label} ({elapsed:.0f}s) ─ {summary}")
+            log(f"  [OK] {label} ({elapsed:.0f}s) ─ {summary}")
             return True
         else:
             err = last_lines[-1][:100] if last_lines else f"exit={returncode}"
-            log(f"  ❌ {label} ({elapsed:.0f}s): {err}")
+            log(f"  [FAIL] {label} ({elapsed:.0f}s): {err}")
             return False
 
     except FileNotFoundError:
-        log(f"  ❌ {label}: 找不到命令 {cmd[0]}")
+        log(f"  [FAIL] {label}: 找不到命令 {cmd[0]}")
         return False
     except Exception as e:
-        log(f"  ❌ {label}: {e}")
+        log(f"  [FAIL] {label}: {e}")
         return False
 
 
@@ -165,7 +165,7 @@ STEPS = [
 dates = trading_dates(START_DATE, TODAY)
 log(f"交易日列表: {len(dates)} 天 ({START_DATE} → {TODAY})")
 log("=" * 60)
-log(f"🐺 MW数据回填 — {len(dates)} 个交易日")
+log(f"MW数据回填 — {len(dates)} 个交易日")
 log(f"   过滤: ST·*ST排除 | 市值≥50亿 | 成交额≥5000万")
 log("=" * 60)
 
@@ -179,7 +179,7 @@ for di, ds in enumerate(dates):
         continue
 
     # 每天开始时打印一条进度线
-    log(f"📅 {ds}  ({di+1}/{len(dates)})")
+    log(f"{ds}  ({di+1}/{len(dates)})")
     day_t0 = time.time()
     day_ok = 0
 
@@ -191,7 +191,7 @@ for di, ds in enumerate(dates):
             total_skip += 1
             # 跳过也打一行，让进度完全透明
             if step["id"] == 1:
-                log(f"  ⏭ 步骤{step['id']} {step['name']}: 已有数据，跳过")
+                log(f"  步骤{step['id']} {step['name']}: 已有数据，跳过")
                 # 不逐个打印跳过，减少噪音
             continue
 
@@ -203,18 +203,18 @@ for di, ds in enumerate(dates):
         else:
             total_fail += 1
             if step["id"] == 2:  # 个股RS失败则后续无法跑
-                log(f"  ⚠ {ds} 个股RS失败，跳过该日后续步骤")
+                log(f"  [WARN] {ds} 个股RS失败，跳过该日后续步骤")
                 break
 
     day_elapsed = time.time() - day_t0
     if day_elapsed > 5:
-        log(f"  ⏱ {ds} 当日耗时 {day_elapsed:.0f}s")
+        log(f"  {ds} 当日耗时 {day_elapsed:.0f}s")
 
     # 每 5 天打印汇总
     if (di + 1) % 5 == 0:
         elapsed = time.time() - total_start
         eta = elapsed / (di + 1) * (len(dates) - di - 1) if di + 1 < len(dates) else 0
-        log(f"  📊 [{di+1}/{len(dates)}] 总耗时{elapsed/60:.0f}min | 执行{total_ok} 跳过{total_skip} 失败{total_fail} | 预计剩余{eta/60:.0f}min")
+        log(f"  [{di+1}/{len(dates)}] 总耗时{elapsed/60:.0f}min | 执行{total_ok} 跳过{total_skip} 失败{total_fail} | 预计剩余{eta/60:.0f}min")
 
 # ═══════════════════════════════════════════════
 # 步骤6：缠论全量缓存（只需今天跑一次）
@@ -222,7 +222,7 @@ for di, ds in enumerate(dates):
 
 if SINGLE_STEP == 0 or SINGLE_STEP == 6:
     log(f"\n{'─' * 50}")
-    log("步骤6: 🎋 缠论全量缓存（给 MW 引擎 H/L 检测加速）")
+    log("步骤6: 缠论全量缓存（给 MW 引擎 H/L 检测加速）")
     cmd = [PYTHON_EXE, "src/scanners/chanlun_scan.py", "--date", TODAY, "--all"]
     if not SINGLE_DATE:
         ok = run_cmd_live("缠论全量缓存", cmd, timeout=43200)
@@ -231,5 +231,5 @@ if SINGLE_STEP == 0 or SINGLE_STEP == 6:
 
 total_elapsed = time.time() - total_start
 log(f"\n{'=' * 60}")
-log(f"🐺 回填完成: {total_elapsed/60:.0f}min | 执行{total_ok} 跳过{total_skip} 失败{total_fail}")
+log(f"回填完成: {total_elapsed/60:.0f}min | 执行{total_ok} 跳过{total_skip} 失败{total_fail}")
 log(f"{'=' * 60}")

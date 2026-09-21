@@ -396,7 +396,7 @@ if __name__ == '__main__':
     daily = [dict(r) for r in klines]
     result = detect_all(daily, stock_code=args.stock)
 
-    print(f"🔍 {args.stock}")
+    print(f"{args.stock}")
     print(f"   周线铁轨线(S): {len(result['signals_weekly'])}")
     print(f"   日线双根(A):   {len(result['signals_daily_double'])}")
     print(f"   日线单根(B):   {len(result['signals_daily_single'])}")

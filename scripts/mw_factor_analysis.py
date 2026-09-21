@@ -337,7 +337,7 @@ tr:hover td{{background:rgba(255,255,255,.02)}}
     
     with open(OUT_HTML, 'w', encoding='utf-8') as f:
         f.write(html)
-    print(f'✅ 报告已生成: {OUT_HTML}')
+    print(f'[OK] 报告已生成: {OUT_HTML}')
     print(f'  分析信号: {len(results)}')
     print(f'  B2确认率: {round(sum(1 for r in results if r["has_b2"])/len(results)*100,1)}%')
 

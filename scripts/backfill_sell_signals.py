@@ -208,7 +208,7 @@ if __name__ == '__main__':
         completed += 1; total_signals += day_sigs
 
         eta = (time.time()-t_start)/completed*(len(dates)-completed) if completed else 0
-        print(f"[{completed}/{len(dates)}] {date} ✓ {day_sigs}个卖出信号 ({elapsed:.1f}s) ETA {eta/3600:.1f}h")
+        print(f"[{completed}/{len(dates)}] {date} {day_sigs}个卖出信号 ({elapsed:.1f}s) ETA {eta/3600:.1f}h")
 
     total_elapsed = time.time() - t_start
     print(f"\n=== 完成 ===")

@@ -30,7 +30,7 @@ for p in sorted(glob.glob('scripts/_*.py')):
             doc = '(无法解析)'
         moved.append((name, doc))
     except Exception as e:
-        print(f'  ⚠ 移动失败 {name}: {e}')
+        print(f'  [WARN] 移动失败 {name}: {e}')
 
 with open(os.path.join(DEST, 'README.md'), 'w', encoding='utf-8') as f:
     f.write(f'# 归档的临时脚本（{datetime.date.today()}）\n\n')
@@ -40,6 +40,6 @@ with open(os.path.join(DEST, 'README.md'), 'w', encoding='utf-8') as f:
     for n, d in moved:
         f.write(f'| `{n}` | {d} |\n')
 
-print(f'✅ 已归档 {len(moved)} 个 → {DEST}')
+print(f'[OK] 已归档 {len(moved)} 个 → {DEST}')
 print(f'   保留 {len(kept)} 个：{", ".join(sorted(kept))}')
 print(f'   索引：{os.path.join(DEST, "README.md")}')

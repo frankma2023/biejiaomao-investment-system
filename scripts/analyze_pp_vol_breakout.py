@@ -113,7 +113,7 @@ def main():
     
     # Report: Volume tiers
     print(f"\n{'='*70}")
-    print(f"📊 量比分层分析 (2024~2026)")
+    print(f"量比分层分析 (2024~2026)")
     print(f"{'='*70}")
     for days in [5, 10, 20, 60]:
         print(f"\n{'─'*50}")
@@ -130,7 +130,7 @@ def main():
     
     # Report: Consecutive
     print(f"\n{'='*70}")
-    print(f"📊 连续信号分析 (2024~2026)")
+    print(f"连续信号分析 (2024~2026)")
     print(f"{'='*70}")
     for days in [5, 10, 20, 60]:
         print(f"\n持有 {days} 日:")

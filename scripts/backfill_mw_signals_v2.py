@@ -190,12 +190,12 @@ if __name__ == '__main__':
             completed += 1
             avg = (time.time() - t_start) / completed
             eta = avg * (len(dates) - i - 1)
-            print(f'  ✓ B1:{cnt[0]} B2:{cnt[1]} 纯B1:{cnt[2]} ({elapsed:.0f}s) ETA {eta/3600:.1f}h')
+            print(f'  B1:{cnt[0]} B2:{cnt[1]} 纯B1:{cnt[2]} ({elapsed:.0f}s) ETA {eta/3600:.1f}h')
 
         except Exception as e:
             elapsed = time.time() - t0
             errors.append((scan_date, str(e)[:200]))
-            print(f'  ✗ ({elapsed:.0f}s) {e}')
+            print(f'  ({elapsed:.0f}s) {e}')
             import traceback
             traceback.print_exc()
 

@@ -100,14 +100,14 @@ def main():
     triggered_2026.sort(key=lambda x: (-(x['max_drop'] or 0), x['code']))
 
     print(f'\n{"="*90}')
-    print(f'📉 当前活跃跌破箱体（{len(active_list)} 只）')
+    print(f'当前活跃跌破箱体（{len(active_list)} 只）')
     print(f'{"="*90}')
     print(f'{"代码":<8}{"名称":<10}{"触发日":<12}{"级别":<14}{"下沿":>8}{"收盘":>8}{"最大跌幅":>9}')
     for s in active_list:
         print(f'{s["code"]:<8}{s["name"]:<10}{s["date"]:<12}{s["level"]:<14}{s["bottom"]:>8.2f}{s["close"]:>8.2f}{s["max_drop"]:>8.2f}%')
 
     print(f'\n{"="*90}')
-    print(f'📋 2026 年触发过跌破（含已清除，共 {len(triggered_2026)} 条）')
+    print(f'2026 年触发过跌破（含已清除，共 {len(triggered_2026)} 条）')
     print(f'{"="*90}')
     print(f'{"代码":<8}{"名称":<10}{"触发日":<12}{"状态":<18}{"下沿":>8}{"收盘":>8}{"最大跌幅":>9}')
     for s in triggered_2026[:60]:
@@ -121,7 +121,7 @@ def main():
     }
     with open(os.path.join(PROJ, 'analysis', 'box_breakdown_2026_scan.json'), 'w', encoding='utf-8') as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    print(f'\n✅ 已保存 analysis/box_breakdown_2026_scan.json')
+    print(f'\n[OK] 已保存 analysis/box_breakdown_2026_scan.json')
 
 if __name__ == '__main__':
     main()

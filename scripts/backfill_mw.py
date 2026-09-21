@@ -271,10 +271,10 @@ def run_staggered(allow_fallback=False):
     
     if not allow_fallback:
         if grand_skipped > 0 or grand_failed > 0:
-            print(f"\n⚡ 跳过 {grand_skipped} 只（预加载未命中）+ {grand_failed} 只（bi加载失败）")
+            print(f"\n跳过 {grand_skipped} 只（预加载未命中）+ {grand_failed} 只（bi加载失败）")
             print(f"   这等同于实盘行为。bi 加载失败多因 DB 锁竞争——重跑可恢复。")
         else:
-            print(f"\n✅ 所有股票笔数据来自预加载缓存，0%兜底，完全等同实盘。")
+            print(f"\n[OK] 所有股票笔数据来自预加载缓存，0%兜底，完全等同实盘。")
 
 
 def run_sequential(dates, allow_fallback=False, skip_existing=False, workers=0):
@@ -285,7 +285,7 @@ def run_sequential(dates, allow_fallback=False, skip_existing=False, workers=0):
         conn.close()
         before = len(dates)
         dates = [d for d in dates if d not in have]
-        print(f'⏭️ 跳过已有 {before - len(dates)} 天（断点续跑），剩余 {len(dates)} 天')
+        print(f'跳过已有 {before - len(dates)} 天（断点续跑），剩余 {len(dates)} 天')
         if not dates:
             print('全部已回填，无需执行')
             return
@@ -317,7 +317,7 @@ def run_sequential(dates, allow_fallback=False, skip_existing=False, workers=0):
             print(f"{d:<12} {pre_t:>4.0f}s {scan_t:>4.0f}s {b1:>6} {b2:>6} {total:>7} {skipped_total:>6}{warn} {grand_total:>10} {eta_str:>8}")
         except Exception as e:
             errors.append((d, str(e)[:100]))
-            print(f"{d:<12} ✗ {e}")
+            print(f"{d:<12} {e}")
     
     n_ok = total_dates - len(errors)
     tt = time.time() - t_total
@@ -328,12 +328,12 @@ def run_sequential(dates, allow_fallback=False, skip_existing=False, workers=0):
     
     if not allow_fallback:
         if grand_skipped > 0 or grand_failed > 0:
-            print(f"\n⚡ 跳过 {grand_skipped} 只（预加载未命中）+ {grand_failed} 只（bi加载失败）")
+            print(f"\n跳过 {grand_skipped} 只（预加载未命中）+ {grand_failed} 只（bi加载失败）")
             print(f"   这等同于实盘行为。bi 加载失败通常是瞬时 DB 锁——重跑该日期通常可恢复。")
         else:
-            print(f"\n✅ 所有股票笔数据来自预加载缓存，0%兜底，完全等同实盘。")
+            print(f"\n[OK] 所有股票笔数据来自预加载缓存，0%兜底，完全等同实盘。")
     else:
-        print(f"\n⚠️ 兜底触发 {grand_skipped} 次，含未来信息偏差。")
+        print(f"\n[WARN] 兜底触发 {grand_skipped} 次，含未来信息偏差。")
     
     if errors:
         print(f"\n失败 {len(errors)} 天:")
@@ -354,10 +354,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     if args.allow_fallback:
-        print('⚠️ 兜底模式已启用：预加载未命中的股票将用 ORDER BY scan_date DESC LIMIT 1 取最新笔数据。')
+        print('[WARN] 兜底模式已启用：预加载未命中的股票将用 ORDER BY scan_date DESC LIMIT 1 取最新笔数据。')
         print('   回填结果可能含有未来信息偏差，实盘(daily_update)中不会触发此路径。\n')
     else:
-        print('🔒 默认 0%% 兜底模式：预加载缓存未命中的股票直接跳过，等同实盘行为。\n')
+        print('默认 0%% 兜底模式：预加载缓存未命中的股票直接跳过，等同实盘行为。\n')
     
     if args.staggered:
         run_staggered(allow_fallback=args.allow_fallback)

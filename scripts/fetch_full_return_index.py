@@ -66,7 +66,7 @@ def main():
         print(f'拉取中... ({start} ~ {TODAY})')
         df = fetch_from_akshare(start, TODAY)
         if df is None or len(df) == 0:
-            print('❌ 无数据返回')
+            print('[FAIL] 无数据返回')
             return
 
         print(f'拉取到 {len(df)} 条 ({df["日期"].min()} ~ {df["日期"].max()})')
@@ -92,7 +92,7 @@ def main():
         latest = conn.execute(
             "SELECT date, close FROM index_full_return_daily WHERE stock_code=? ORDER BY date DESC LIMIT 1",
             (SYMBOL,)).fetchone()
-        print(f'✅ 入库完成：表内共 {total} 条，最新 {latest[0]} 收盘 {latest[1]}')
+        print(f'[OK] 入库完成：表内共 {total} 条，最新 {latest[0]} 收盘 {latest[1]}')
     finally:
         if conn:
             conn.close()

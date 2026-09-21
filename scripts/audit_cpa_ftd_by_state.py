@@ -111,7 +111,7 @@ def main():
         main_ = g.get('⑥c', [])
         if danger and main_:
             d1, d2 = sorted(danger), sorted(main_)
-            print('  ★ 危险批(①b+⑥b) n=%d 均值 %+.2f%% 胜率 %.0f%% | ⑥c n=%d 均值 %+.2f%% 胜率 %.0f%% | 差 %+.2f%%' % (
+            print('  危险批(①b+⑥b) n=%d 均值 %+.2f%% 胜率 %.0f%% | ⑥c n=%d 均值 %+.2f%% 胜率 %.0f%% | 差 %+.2f%%' % (
                 len(d1), statistics.mean(d1) * 100, sum(1 for v in d1 if v > 0) / len(d1) * 100,
                 len(d2), statistics.mean(d2) * 100, sum(1 for v in d2 if v > 0) / len(d2) * 100,
                 (statistics.mean(d1) - statistics.mean(d2)) * 100))

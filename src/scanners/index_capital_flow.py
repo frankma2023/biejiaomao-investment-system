@@ -236,14 +236,14 @@ def compute_all(target_date):
     if not has_data:
         fallback = conn.execute("SELECT MAX(date) FROM index_daily_kline").fetchone()[0]
         if fallback:
-            logger.warning(f"  ⚠️ {target_date} 无K线数据，回退到 {fallback}")
+            logger.warning(f"  [WARN] {target_date} 无K线数据，回退到 {fallback}")
             target_date = fallback
     
     l2_indices, theme_indices = load_index_pool()
     all_indices = {**l2_indices, **theme_indices}
     codes = list(all_indices.keys())
     
-    logger.info(f"📊 指数资金活跃度 — {target_date}")
+    logger.info(f"指数资金活跃度 — {target_date}")
     logger.info(f"   指数总数: {len(codes)} (L2:{len(l2_indices)} 主题:{len(theme_indices)})")
     
     # 获取 K 线数据
@@ -350,7 +350,7 @@ def compute_all(target_date):
         logger.info(f"   TOP 10 ({wl}): {' > '.join(names)}")
     
     conn.close()
-    logger.info(f"📊 指数资金活跃度完成: {len(rows)} 条")
+    logger.info(f"指数资金活跃度完成: {len(rows)} 条")
     return len(rows)
 
 

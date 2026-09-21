@@ -460,7 +460,7 @@ def save_result(result, out_dir=OUT_DIR):
 
     with open(os.path.join(out_dir, fname), 'w', encoding='utf-8') as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    print(f'  📁 {fname}')
+    print(f'  {fname}')
 
 
 def save_manifest(dates, out_dir=OUT_DIR):
@@ -498,7 +498,7 @@ def save_manifest(dates, out_dir=OUT_DIR):
     manifest = sorted(existing.values(), key=lambda x: x['obs_date'])
     with open(MANIFEST_PATH, 'w', encoding='utf-8') as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
-    print(f'  📋 manifest: {len(manifest)} 个交易日')
+    print(f'  manifest: {len(manifest)} 个交易日')
 
 
 # ══════════════════════════════════════════════════════
@@ -559,7 +559,7 @@ if __name__ == '__main__':
                         save_result(fresult)
                 processed.append(obs_date)
         except Exception as e:
-            print(f'  ❌ {obs_date}: {e}')
+            print(f'  [FAIL] {obs_date}: {e}')
             import traceback
             traceback.print_exc()
 

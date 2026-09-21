@@ -488,7 +488,7 @@ class BacktestEngine:
         
         # 自动检查前置步骤
         if not self.kline_idx:
-            print('  ⚠ 未预加载K线，自动执行步骤2...')
+            print('  [WARN] 未预加载K线，自动执行步骤2...')
             self.step2_preload()
         
         db = get_db()
@@ -1066,7 +1066,7 @@ class BacktestEngine:
         print('[6/7] YAML 输出...')
         
         if not hasattr(self, 'stats_df') or self.stats_df is None:
-            print('  ⚠ 无内存统计数据，自动执行步骤4...')
+            print('  [WARN] 无内存统计数据，自动执行步骤4...')
             self.step4_statistics()
         
         os.makedirs(CONFIG_DIR, exist_ok=True)
@@ -1193,7 +1193,7 @@ class BacktestEngine:
         
         # 确保K线已加载
         if not self.kline_idx:
-            print('  ⚠ 未预加载K线，自动执行步骤2...')
+            print('  [WARN] 未预加载K线，自动执行步骤2...')
             self.step2_preload()
         
         db = get_db()

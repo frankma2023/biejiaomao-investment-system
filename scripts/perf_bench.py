@@ -52,7 +52,7 @@ def main():
                 dt = 999
             times.append(dt)
             if dt > 3:
-                log(f'{code}: {dt:.1f}s ⚠️慢')
+                log(f'{code}: {dt:.1f}s [WARN]慢')
             if len(times) % 50 == 0:
                 ts = sorted(times)
                 log(f'  [{len(times)}/{args.n}] 中位{ts[len(ts)//2]:.2f}s 平均{sum(ts)/len(ts):.2f}s 最慢{ts[-1]:.2f}s')

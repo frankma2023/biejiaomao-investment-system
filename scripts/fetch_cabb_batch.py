@@ -13,7 +13,7 @@ for line in open(ENV_PATH, encoding='utf-8'):
         token = line.strip().split('=')[1]
         break
 if not token:
-    print('❌ 未找到 LIXINGER_TOKEN')
+    print('[FAIL] 未找到 LIXINGER_TOKEN')
     sys.exit(1)
 
 def fetch_one(code):
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     db.close()
     
     total = len(codes)
-    print(f'📊 需拉取 {total} 只股票')
+    print(f'需拉取 {total} 只股票')
     
     all_results = []
     done = 0
@@ -95,11 +95,11 @@ if __name__ == '__main__':
                 print(f'  [{done}/{total}] {code}: {len(records)}条 | {rate:.1f}只/秒 预计剩余{eta/60:.0f}分')
     
     # 写入数据库
-    print(f'\n💾 写入数据库...')
+    print(f'\n写入数据库...')
     updated = update_db(all_results)
     elapsed = time.time() - t0
     
-    print(f'\n✅ 完成！')
+    print(f'\n[OK] 完成！')
     print(f'  处理: {total} 只股票')
     print(f'  更新: {updated} 条记录')
     print(f'  耗时: {elapsed/60:.1f} 分钟')

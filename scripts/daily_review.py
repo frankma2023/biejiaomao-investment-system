@@ -53,7 +53,7 @@ def _api_get_with_retry(url, payload, retries=3, timeout=30):
             r = requests.post(url, json=payload, timeout=timeout)
             return r.json()
         except Exception as e:
-            print(f'  ⚠️ {url} 第{attempt}次失败: {e}')
+            print(f'  [WARN] {url} 第{attempt}次失败: {e}')
             if attempt < retries:
                 time.sleep(2 * attempt)
     return None
@@ -72,7 +72,7 @@ def fetch_lhb(db, date):
             # 请求失败（非空数据），回退前一交易日
             prev = _prev_trade_date(db, date)
             if prev:
-                print(f'  ↪️ 龙虎榜 {date} 请求失败，回退 {prev}')
+                print(f'  ↪龙虎榜 {date} 请求失败，回退 {prev}')
                 rows = db.execute('SELECT * FROM daily_review_lhb WHERE date=?', (prev,)).fetchall()
                 if rows: return rows, prev
                 r = _api_get_with_retry('https://open.lixinger.com/api/cn/company/trading-abnormal',
@@ -101,7 +101,7 @@ def fetch_lhb(db, date):
         db.commit()
         return db.execute('SELECT * FROM daily_review_lhb WHERE date=?', (date,)).fetchall(), date
     except Exception as e:
-        print(f'  ⚠️ 龙虎榜 {date} 异常: {e}')
+        print(f'  [WARN] 龙虎榜 {date} 异常: {e}')
         return [], None
 
 
@@ -118,7 +118,7 @@ def fetch_block_trades(db, date):
             # 请求失败或空数据（T+1 未发布），回退前一交易日
             prev = _prev_trade_date(db, date)
             if prev:
-                print(f'  ↪️ 大宗 {date} 无数据/失败，回退 {prev}')
+                print(f'  ↪大宗 {date} 无数据/失败，回退 {prev}')
                 rows = db.execute('SELECT * FROM daily_review_block_trade WHERE date=?', (prev,)).fetchall()
                 if rows: return rows, prev
                 r = _api_get_with_retry('https://open.lixinger.com/api/cn/company/block-deal',
@@ -141,7 +141,7 @@ def fetch_block_trades(db, date):
         db.commit()
         return db.execute('SELECT * FROM daily_review_block_trade WHERE date=?', (date,)).fetchall(), date
     except Exception as e:
-        print(f'  ⚠️ 大宗 {date} 异常: {e}')
+        print(f'  [WARN] 大宗 {date} 异常: {e}')
         return [], None
 
 def fetch_margin(db, date):
@@ -202,7 +202,7 @@ def generate_report(date=None):
     db.row_factory = sqlite3.Row
     init_tables(db)
     if not date: date = get_latest_trade_date(db)
-    print(f'📊 {date}...')
+    print(f'{date}...')
 
     # 1. 指数
     idx_data = {}
@@ -368,16 +368,16 @@ td:first-child{text-align:left;color:#8b8b90}
     os.makedirs(OUT_DIR, exist_ok=True)
     p = os.path.join(OUT_DIR, f'review_{date}.html')
     with open(p, 'w', encoding='utf-8') as f: f.write(html)
-    print(f'✅ {p} ({elapsed:.0f}s)')
+    print(f'[OK] {p} ({elapsed:.0f}s)')
 
     # validate 检查
     issues = validate_report(html, date)
     if issues:
-        print('⚠️ validate 检查发现:')
+        print('[WARN] validate 检查发现:')
         for i in issues:
             print(f'   - {i}')
     else:
-        print('✅ validate 检查通过')
+        print('[OK] validate 检查通过')
     return issues
 
 def validate_report(html, date):

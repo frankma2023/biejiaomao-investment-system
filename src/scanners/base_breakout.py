@@ -276,9 +276,9 @@ if __name__ == '__main__':
     signals = detect(daily, params)
 
     today = [s for s in signals if s['signal_date'] == args.date]
-    print(f"🔍 {args.stock} @ {args.date}")
+    print(f"{args.stock} @ {args.date}")
     print(f"   基部突破: 全部={len(signals)} 当日={len(today)}")
     for s in today[:5]:
-        print(f"   📅 {s['signal_date']} 买点={s['buy_point']}")
+        print(f"   {s['signal_date']} 买点={s['buy_point']}")
         print(f"      前高={s['prior_high_price']}({s['prior_high_date']}) 谷={s['trough_price']}({s['trough_date']})")
         print(f"      回调={s['drawdown_pct']}% 回升={s['recovery_pct']}% 基部={s['base_days']}d 量比={s['breakout_vol_ratio']}")

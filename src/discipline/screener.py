@@ -490,7 +490,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     result = run(target_date=args.date)
     if result.get('market_warning'):
-        print(f"⚠ 市场提醒: {result['market_phase']}（非理想买入环境，以下精选仅供参考）")
+        print(f"[WARN] 市场提醒: {result['market_phase']}（非理想买入环境，以下精选仅供参考）")
     for i, r in enumerate(result['items']):
         print(f"  #{i+1} {r['stock_code']} {r['stock_name']} "
                   f"得分={r['oneil_score']:.0f} 信号={r['signal_summary']} "

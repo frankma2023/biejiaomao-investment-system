@@ -144,7 +144,7 @@ def main():
                     if future.result(timeout=40):  # 单票 40s 超时——慢票/卡票跳过不拖死整批
                         scored += 1
                 except Exception as e:
-                    print(f'⏭️ {futures[future]} 评分失败/超时: {str(e)[:60]}', flush=True)
+                    print(f'{futures[future]} 评分失败/超时: {str(e)[:60]}', flush=True)
                     scored += 1
                 if done % 50 == 0:
                     elapsed = time.time() - t0

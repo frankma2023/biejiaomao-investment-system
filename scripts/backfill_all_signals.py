@@ -369,7 +369,7 @@ if __name__ == '__main__':
         except Exception as e:
             elapsed = time.time() - t0
             errors.append((scan_date, str(e)[:200]))
-            print(f'  ✗ ({elapsed:.0f}s) {e}')
+            print(f'  ({elapsed:.0f}s) {e}')
             import traceback; traceback.print_exc()
 
     total_elapsed = time.time() - t_start

@@ -36,7 +36,7 @@ def precheck(conn, min_ratio=0.9):
     print('预检: 流动性池 %d 只 | 已有周线笔快照 %d 只 | 覆盖率 %.1f%%' % (
         len(codes), len(covered), ratio * 100))
     if ratio < min_ratio:
-        print('✗ 覆盖率不足 %d%%，拒绝执行。先跑数据层回填：' % (min_ratio * 100))
+        print('覆盖率不足 %d%%，拒绝执行。先跑数据层回填：' % (min_ratio * 100))
         print('  python scripts/backfill_chanlun_weekly.py --start 2016-01-01 --workers 8')
         return None
     # 只重算有快照的股票（无快照的写了也是半残数据）

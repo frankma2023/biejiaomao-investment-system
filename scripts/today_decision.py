@@ -151,7 +151,7 @@ watch.sort(key=lambda x: (x['b1_only'], x.get('rps250') or 0), reverse=True)
 
 # ── 输出 ──
 print(f'\n{"─" * 80}')
-print(f'🔴 立即买入（B1≥40 + B2已确认）: {len(buy_now)} 只')
+print(f'立即买入（B1≥40 + B2已确认）: {len(buy_now)} 只')
 print(f'{"─" * 80}')
 if buy_now:
     print(f'  {"代码":<8s} {"名称":<10s} {"B1-only分":>9s} {"置信度":<6s} {"PLUS":<6s} {"PPV1":<6s} {"RPS250":>7s} {"行业RS":>7s} {"成交(万)":>10s}')
@@ -164,7 +164,7 @@ if buy_now:
         print(f'  {e["code"]:<8s} {e["name"]:<10s} {e["b1_only"]:>8d}  {e["b1_conf"]:<6s} {plus:<6s} {ppv1_str:<6s} {rs_str:>7s} {irs_str:>7s} {e["amount_million"]:>9.0f}')
 
 print(f'\n{"─" * 80}')
-print(f'🟡 关注等待B2（B1≥40，B2未出）: {len(watch)} 只')
+print(f'关注等待B2（B1≥40，B2未出）: {len(watch)} 只')
 print(f'{"─" * 80}')
 if watch:
     print(f'  {"代码":<8s} {"名称":<10s} {"B1-only分":>9s} {"置信度":<6s} {"PPV1":<6s} {"RPS250":>7s} {"行业RS":>7s} {"成交(万)":>10s} {"行业":<15s}')
@@ -176,7 +176,7 @@ if watch:
         print(f'  {e["code"]:<8s} {e["name"]:<10s} {e["b1_only"]:>8d}  {e["b1_conf"]:<6s} {ppv1_str:<6s} {rs_str:>7s} {irs_str:>7s} {e["amount_million"]:>9.0f}  {(e.get("ind_name") or "")[:15]:<15s}')
 
 print(f'\n{"─" * 80}')
-print(f'⚫ 放弃（B1<40，胜率太低）: {len(skip)} 只（省略）')
+print(f'放弃（B1<40，胜率太低）: {len(skip)} 只（省略）')
 print(f'{"─" * 80}')
 
 # ── 最终建议 ──
@@ -186,21 +186,21 @@ print(f'=' * 80)
 
 if buy_now:
     top = buy_now[0]
-    print(f'\n🏆 首选: {top["code"]} {top["name"]}')
+    print(f'\n首选: {top["code"]} {top["name"]}')
     print(f'   B1-only分数: {top["b1_only"]}/75 ({top["b1_conf"]}置信)')
     if top['is_plus']:
-        print(f'   ✦ PLUS信号！胜率预期91%，H20收益预期+28%')
+        print(f'   PLUS信号！胜率预期91%，H20收益预期+28%')
     print(f'   PP_V1共现: {"有" if top["ppv1"] else "无"}')
     print(f'   个股RPS250: {top["rps250"]}')
     print(f'   行业RS250: {top["irs250"]}')
     print(f'   建议操作: 明日(T+1)开盘买入，止损-7%，目标H20~H60')
 
 if watch:
-    print(f'\n📋 观察池（等B2确认后买入）:')
+    print(f'\n观察池（等B2确认后买入）:')
     for e in watch[:5]:
         rec = ' ⭐优先' if e['b1_only'] >= 55 else (' 👍推荐' if e['b1_only'] >= 50 else '')
         ppv1_note = ' +PP_V1加持' if e['ppv1'] else ''
         print(f'   {e["code"]} {e["name"]:<8s} B1={e["b1_only"]}分 RPS={e["rps250"]}{rec}{ppv1_note}')
 
-print(f'\n当前环境: {regime}', '(震荡市是MW信号最优环境 ✅)' if regime == '震荡市' else '')
+print(f'\n当前环境: {regime}', '(震荡市是MW信号最优环境 [OK])' if regime == '震荡市' else '')
 print(f'决策规则: B1≥40买入, B2确认持有, 不在B2日追买')

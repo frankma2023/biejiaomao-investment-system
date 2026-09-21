@@ -68,7 +68,7 @@ def fetch_fund_off(code):
             raw = str(r.get('每10份分红') or '')
             m = re.search(r'派现金([0-9.]+)元', raw)
             if not m:
-                print(f'⚠️ {code} 分红格式未匹配: {raw}')
+                print(f'[WARN] {code} 分红格式未匹配: {raw}')
                 continue
             if d:
                 rows.append((code, 'fund_off', d, float(m.group(1)) / 10, None, None, 'implemented', 'akshare'))
@@ -109,7 +109,7 @@ def fetch_fund_etf(code):
                 if 0.0005 < div < r_[d] * 0.30:
                     rows.append((code, 'fund_etf', d, div, None, None, 'implemented', 'tx_reverse'))
                 elif div >= r_[d] * 0.30:
-                    print(f'⚠️ {code} {d}: 疑似送转（跳变 {div:.4f} ≈ raw价 {r_[d]:.4f} 的{div/r_[d]*100:.0f}%），已跳过')
+                    print(f'[WARN] {code} {d}: 疑似送转（跳变 {div:.4f} ≈ raw价 {r_[d]:.4f} 的{div/r_[d]*100:.0f}%），已跳过')
             prev = ratio
             prev_d = d
     return rows
@@ -144,7 +144,7 @@ def main():
             else:
                 rows = fetch_fund_etf(code)
         except Exception as e:
-            print(f'❌ {code} ({kind}): {str(e)[:80]}')
+            print(f'[FAIL] {code} ({kind}): {str(e)[:80]}')
             continue
         # W1: 默认增量（ex_date > MAX），--full 全量
         if not args.full:
@@ -158,7 +158,7 @@ def main():
             (code, kind, ex_date, dividend, payout_ratio, total_amount, status, source)
             VALUES (?,?,?,?,?,?,?,?)""", rows)
         db.commit()
-        print(f'✅ {code} ({kind}): {len(rows)} 条')
+        print(f'[OK] {code} ({kind}): {len(rows)} 条')
 
     cnt = db.execute("SELECT COUNT(*) FROM dividend_records").fetchone()[0]
     print(f'表内共 {cnt} 条')

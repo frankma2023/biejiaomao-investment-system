@@ -463,7 +463,7 @@ class ONeilDeepAnalyzer:
         prompt_text = '\n'.join(parts)
         missing = [k for k, v in checklist.items() if v not in prompt_text]
         if missing:
-            print(f"  [prompt] ⚠️ {stock_code} 遗漏: {', '.join(missing)}")
+            print(f"  [prompt] [WARN] {stock_code} 遗漏: {', '.join(missing)}")
         return prompt_text
     def _text_to_html(self, stock_code, info, text, run_date):
         """将 Markdown 分析文本转为完整 HTML 页面"""

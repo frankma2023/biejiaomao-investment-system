@@ -528,7 +528,7 @@ def score_vol_dry(conn, target_date):
 def compute_all(target_date):
     conn = get_db()
     logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    logger.info(f"📉 大盘卖出评分 — {target_date}")
+    logger.info(f"大盘卖出评分 — {target_date}")
     logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
     # 1. 抛盘日
@@ -617,7 +617,7 @@ def compute_all(target_date):
     logger.info(f"━━━━━━━━━━━━━━━━━━━━━━━━━━")
     logger.info(f"  卖出总分: {total}  仓位建议: {position_advice}")
     if meltdown:
-        logger.info(f"  ⚠️ 熔断触发: {', '.join(cleared_signals)}")
+        logger.info(f"  [WARN] 熔断触发: {', '.join(cleared_signals)}")
     logger.info(f"━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
     # 写入

@@ -201,19 +201,19 @@ cat3.sort(key=lambda x: x['rps250'], reverse=True)
 cat4.sort(key=lambda x: x['b1_only'], reverse=True)
 
 # ── 输出 ──
-print(f'\n🔴 类型1: 管道通过 + MW B1≥40 + B2确认 = 立即买入 ({len(cat1)}只)')
+print(f'\n类型1: 管道通过 + MW B1≥40 + B2确认 = 立即买入 ({len(cat1)}只)')
 if cat1:
     print(f'  {"代码":<8s} {"名称":<8s} {"B1分":>5s} {"置信":<4s} {"PLUS":<5s} {"PPV1":<5s} {"RPS":>5s} {"成交万":>8s}')
     for e in cat1:
-        print(f'  {e["code"]:<8s} {e["name"]:<8s} {e["b1_only"]:>5d} {e["conf"]:<4s} {"✦" if e["is_plus"] else "":<5s} {"✅" if e["ppv1"] else "—":<5s} {e["rps250"]:>5d} {e["amt_m"]:>7.0f}')
+        print(f'  {e["code"]:<8s} {e["name"]:<8s} {e["b1_only"]:>5d} {e["conf"]:<4s} {"" if e["is_plus"] else "":<5s} {"[OK]" if e["ppv1"] else "—":<5s} {e["rps250"]:>5d} {e["amt_m"]:>7.0f}')
 
-print(f'\n🟡 类型2: 管道通过 + MW B1≥40 + B2未出 = 等待确认 ({len(cat2)}只)')
+print(f'\n类型2: 管道通过 + MW B1≥40 + B2未出 = 等待确认 ({len(cat2)}只)')
 if cat2:
     print(f'  {"代码":<8s} {"名称":<8s} {"B1分":>5s} {"置信":<4s} {"PPV1":<5s} {"RPS":>5s} {"行业RS":>6s} {"PP_V2":<6s} {"行业":<12s}')
     for e in cat2:
-        print(f'  {e["code"]:<8s} {e["name"]:<8s} {e["b1_only"]:>5d} {e["conf"]:<4s} {"✅" if e["ppv1"] else "—":<5s} {e["rps250"]:>5d} {str(e["ind_rs"] or "—"):>6s} {"✅" if e["in_ppv2"] else "—":<6s} {(e["ind_name"] or "")[:12]:<12s}')
+        print(f'  {e["code"]:<8s} {e["name"]:<8s} {e["b1_only"]:>5d} {e["conf"]:<4s} {"[OK]" if e["ppv1"] else "—":<5s} {e["rps250"]:>5d} {str(e["ind_rs"] or "—"):>6s} {"[OK]" if e["in_ppv2"] else "—":<6s} {(e["ind_name"] or "")[:12]:<12s}')
 
-print(f'\n🟢 类型3: 管道通过但无MW高分 ({len(cat3)}只, Top15)')
+print(f'\n类型3: 管道通过但无MW高分 ({len(cat3)}只, Top15)')
 if cat3:
     print(f'  {"代码":<8s} {"名称":<8s} {"RPS250":>7s} {"MW":>5s} {"PP_V2":<6s} {"PP_V1":<6s} {"成交万":>8s}')
     for e in cat3[:15]:
@@ -221,9 +221,9 @@ if cat3:
         if not name:
             c.execute("SELECT name FROM stock_basic WHERE stock_code=?", (e['code'],))
             sr = c.fetchone(); name = sr['name'] if sr else ''
-        print(f'  {e["code"]:<8s} {name:<8s} {e["rps250"]:>7d} {"✅" if e["b1_only"]>0 else "—":>5s} {"✅" if e["in_ppv2"] else "—":<6s} {"✅" if e["in_ppv1"] else "—":<6s} {e["amt_m"]:>7.0f}')
+        print(f'  {e["code"]:<8s} {name:<8s} {e["rps250"]:>7d} {"[OK]" if e["b1_only"]>0 else "—":>5s} {"[OK]" if e["in_ppv2"] else "—":<6s} {"[OK]" if e["in_ppv1"] else "—":<6s} {e["amt_m"]:>7.0f}')
 
-print(f'\n🟣 类型4: MW B1高分但管道未通过 = 行业弱 ({len(cat4)}只)')
+print(f'\n类型4: MW B1高分但管道未通过 = 行业弱 ({len(cat4)}只)')
 if cat4:
     for e in cat4:
         issues = []
@@ -248,21 +248,21 @@ print(f'''
 
 if cat1:
     t = cat1[0]
-    print(f'\n  🏆 首选: {t["code"]} {t["name"]}')
+    print(f'\n  首选: {t["code"]} {t["name"]}')
     print(f'     管道通过 + MW高置信 + B2确认')
     print(f'     仓位: {pos}% × 凯利72% ≈ {pos*0.72:.0f}%')
 elif cat2:
     t = cat2[0]
-    print(f'\n  📋 观察池首位: {t["code"]} {t["name"]}')
+    print(f'\n  观察池首位: {t["code"]} {t["name"]}')
     print(f'     B1={t["b1_only"]}分/{t["conf"]}置信 | RPS={t["rps250"]} | PP_V1={"有" if t["ppv1"] else "无"}')
     print(f'     等待B2确认后买入 | 仓位: {pos}% × 凯利72% ≈ {pos*0.72:.0f}%')
     if regime == '熊市':
-        print(f'     ⚠ 熊市MW回测样本极少，建议轻仓或观望')
+        print(f'     [WARN] 熊市MW回测样本极少，建议轻仓或观望')
 else:
     print(f'\n  今日无符合条件的MW买入信号')
 
 if cat4:
-    print(f'\n  ⚠ 行业过滤剔除 {len(cat4)} 只MW高分信号:')
+    print(f'\n  [WARN] 行业过滤剔除 {len(cat4)} 只MW高分信号:')
     for e in cat4[:5]:
         print(f'     {e["code"]} {e["name"]} B1={e["b1_only"]}分 (不在L2强势板块)')
 

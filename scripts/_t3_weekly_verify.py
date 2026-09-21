@@ -29,14 +29,14 @@ def main():
         got = wk.WEEKLY_CFG.get(k)
         got_s = str(got)
         hit = (got_s == expect) if isinstance(expect, str) else (got == expect)
-        print('  %-18s = %s  %s' % (k, got_s, 'OK' if hit else '✗ 期望 ' + str(expect)))
+        print('  %-18s = %s  %s' % (k, got_s, 'OK' if hit else '期望 ' + str(expect)))
         ok4 = ok4 and hit
     # 硬编码覆盖键抽查
     for k, expect in [('ftd_min_history', 52), ('pause_recent_win', 2), ('win_floor', 4),
                       ('warn_tops_count', 2), ('crossback_low_win', 0), ('data_min_ratio', 0.7),
                       ('vr_win', 8), ('atr_win', 8), ('ftd_min_history', 52)]:
         got = wk.WEEKLY_CFG.get(k)
-        print('  %-18s = %s  %s' % (k, got, 'OK' if got == expect else '✗ 期望 ' + str(expect)))
+        print('  %-18s = %s  %s' % (k, got, 'OK' if got == expect else '期望 ' + str(expect)))
         ok4 = ok4 and (got == expect)
     # 日线 CFG 未被污染（模块加载时只 build 了 WEEKLY_CFG，未 update daily.CFG）
     print('  日线 CFG.r_panic_lookback = %s（应为 20，未污染）' % daily.CFG['r_panic_lookback'])
@@ -74,8 +74,8 @@ def main():
                 if t['date'] > row[0]:
                     bad += 1
                     if bad <= 3:
-                        print('  ✗ %s 快照 %s 含未来笔顶 %s' % (code, row[0], t['date']))
-    print('  抽查 %d 个笔顶，未来泄露 %d 个 %s' % (checked, bad, 'OK' if bad == 0 else '✗FAIL'))
+                        print('  %s 快照 %s 含未来笔顶 %s' % (code, row[0], t['date']))
+    print('  抽查 %d 个笔顶，未来泄露 %d 个 %s' % (checked, bad, 'OK' if bad == 0 else 'FAIL'))
 
     print('═' * 60)
     print('[4] 长假周周K抽查（A1 引擎层：2024 国庆 09-30 单日周 + 2024 春节 02-05~02-09 休市）')

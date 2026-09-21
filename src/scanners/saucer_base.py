@@ -964,14 +964,14 @@ if __name__ == '__main__':
     params = load_params()
     
     if args.scan:
-        print(f"🚀 开始批量扫描碟形基部: {args.date} (池={args.pool})")
+        print(f"开始批量扫描碟形基部: {args.date} (池={args.pool})")
         results = scan_batch(args.date, args.pool, params)
-        print(f"✅ 扫描完成: 找到 {len(results)} 个碟形基部突破信号")
+        print(f"[OK] 扫描完成: 找到 {len(results)} 个碟形基部突破信号")
         
         if args.output:
             with open(args.output, 'w', encoding='utf-8') as f:
                 json.dump(results, f, ensure_ascii=False, indent=2, default=str)
-            print(f"📁 结果已保存至: {args.output}")
+            print(f"结果已保存至: {args.output}")
         else:
             for s in results[:20]:
                 print(f"  {s['stock_code']} {s['pattern_type']} 回调{s['drawdown_pct']}% 买点{s['buy_point']}")
@@ -987,16 +987,16 @@ if __name__ == '__main__':
         """, (args.stock, args.date, args.date)).fetchall()
         
         if len(klines) < 120:
-            print(f"⚠️ K线数据不足: {len(klines)} 条")
+            print(f"[WARN] K线数据不足: {len(klines)} 条")
             sys.exit(1)
         
         daily = [dict(r) for r in klines]
         sigs = detect(daily, params)
         
-        print(f"🔍 {args.stock} @ {args.date}")
+        print(f"{args.stock} @ {args.date}")
         print(f"   碟形基部突破信号: {len(sigs)} 个")
         for s in sigs:
-            print(f"   📅 {s['signal_date']} 类型={s['pattern_type']} 回调={s['drawdown_pct']}%")
+            print(f"   {s['signal_date']} 类型={s['pattern_type']} 回调={s['drawdown_pct']}%")
             print(f"      前高={s['prior_high_price']}({s['prior_high_date']}) 碟底={s['bottom_price']}({s['bottom_date']})")
             print(f"      买点={s['buy_point']} 量比={s['breakout_vol_ratio']}")
             print(f"      碟底振幅={s['bottom_amp_5d']}%/10d={s['bottom_amp_10d']} 质量={s['bottom_quality']}")

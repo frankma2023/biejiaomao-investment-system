@@ -775,7 +775,7 @@ if __name__ == '__main__':
         if last_error:
             elapsed = time.time() - t0
             errors.append((scan_date, str(last_error)[:200]))
-            print(f'  ✗ ({elapsed:.0f}s) {last_error}')
+            print(f'  ({elapsed:.0f}s) {last_error}')
             # 写入错误日志，供 --retry-failed 批量补跑
             try:
                 os.makedirs(os.path.dirname(ERROR_LOG), exist_ok=True)

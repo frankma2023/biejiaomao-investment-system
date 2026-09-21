@@ -204,7 +204,7 @@ if __name__ == '__main__':
     if args.range:
         daily = _load_kline(args.stock, args.range[0], args.range[1])
         sigs = detect_range(daily, None, args.stock)
-        print(f"🔍 {args.stock} {args.range[0]}~{args.range[1]} 放量滞涨信号: {len(sigs)}")
+        print(f"{args.stock} {args.range[0]}~{args.range[1]} 放量滞涨信号: {len(sigs)}")
         for s in sigs:
             d = s['details']
             print(f"  {s['signal_date']} [{s['signal_level']}] 第1日{d['d1_date']} "
@@ -216,7 +216,7 @@ if __name__ == '__main__':
         sigs = detect(daily, None, args.stock)
         # 单日模式：只看指定日期当天的信号
         sigs = [s for s in sigs if s['signal_date'] == end]
-        print(f"🔍 {args.stock} @ {end} 放量滞涨信号: {len(sigs)}")
+        print(f"{args.stock} @ {end} 放量滞涨信号: {len(sigs)}")
         for s in sigs:
             d = s['details']
             print(f"  {s['signal_date']} [{s['signal_level']}] 第1日{d['d1_date']} "

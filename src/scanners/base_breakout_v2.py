@@ -243,10 +243,10 @@ if __name__ == '__main__':
     params['stock_code'] = args.stock
     signals = detect(daily, params)
 
-    print(f"🔍 {args.stock} @ {args.date}")
+    print(f"{args.stock} @ {args.date}")
     print(f"   信号数: {len(signals)}")
     for s in signals:
-        print(f"   📅 {s['signal_date']} | 前高¥{s['prior_high_price']} → 低¥{s['trough_price']} "
+        print(f"   {s['signal_date']} | 前高¥{s['prior_high_price']} → 低¥{s['trough_price']} "
               f"({s['drawdown_pct']}%) | 基部{s['base_days']}天")
         print(f"      突破¥{s['breakout_close']} (+{s['breakout_gain_pct']}%) "
               f"量比{s['breakout_vol_ratio']}x | MA10={s['ma10']} MA20={s['ma20']}")

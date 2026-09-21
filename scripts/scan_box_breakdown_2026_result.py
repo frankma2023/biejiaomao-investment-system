@@ -126,7 +126,7 @@ def main():
         params = load_params()
         log(f'引擎参数加载 OK（YAML 配置有效）')
     except Exception as e:
-        log(f'❌ 引擎参数加载失败: {type(e).__name__}: {e}')
+        log(f'[FAIL] 引擎参数加载失败: {type(e).__name__}: {e}')
         sys.exit(1)
 
     log(f'═══ 2026 年 A 股跌破箱体扫描 ═══')
@@ -153,7 +153,7 @@ def main():
                 log(f'进度 {done}/{len(codes)} ({elapsed:.0f}s, 剩余约{remain:.0f}s) 命中 {len(results)} 只')
 
     elapsed = time.time() - t0
-    log(f'✅ 扫描完成 {elapsed:.0f}s, 命中 {len(results)} 只')
+    log(f'[OK] 扫描完成 {elapsed:.0f}s, 命中 {len(results)} 只')
 
     # 查名称
     name_map = get_name_map()
@@ -206,7 +206,7 @@ def main():
     }
     with open(OUT_JSON, 'w', encoding='utf-8') as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    log(f'📄 结果已写入 {OUT_JSON}')
+    log(f'结果已写入 {OUT_JSON}')
 
     # 终端打印
     def show(title, items, limit):

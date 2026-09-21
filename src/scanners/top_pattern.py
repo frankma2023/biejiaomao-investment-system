@@ -951,7 +951,7 @@ if __name__ == '__main__':
     daily = [dict(r) for r in klines]
     result = detect_all(daily, stock_code=args.stock)
 
-    print(f"🔍 {args.stock} @ {args.date}")
+    print(f"{args.stock} @ {args.date}")
     print(f"   峰: {len(result['peaks'])}  谷: {len(result['troughs'])}")
     for s in result['signals']:
         icon = {'strong_confirmed': '🔴', 'weak_confirmed': '🟡', 'forming': '⚠️'}.get(s['status'], '❓')

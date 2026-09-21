@@ -104,13 +104,13 @@ if __name__ == '__main__':
             if completed > 0:
                 avg = (time.time() - t_start) / completed
                 eta = avg * (len(dates) - i - 1)
-                print(f"✓ B1:{cnt[0]} B2:{cnt[1]} 纯B1:{cnt[2]} ({elapsed:.0f}s) ETA {eta/3600:.1f}h")
+                print(f"B1:{cnt[0]} B2:{cnt[1]} 纯B1:{cnt[2]} ({elapsed:.0f}s) ETA {eta/3600:.1f}h")
             else:
-                print(f"✓ ({elapsed:.0f}s)")
+                print(f"({elapsed:.0f}s)")
         except Exception as e:
             elapsed = time.time() - t0
             errors.append((date, str(e)[:200]))
-            print(f"✗ ({elapsed:.0f}s) {e}")
+            print(f"({elapsed:.0f}s) {e}")
 
     total_elapsed = time.time() - t_start
     print(f"\n=== 完成 ===")

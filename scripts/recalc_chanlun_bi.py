@@ -349,7 +349,7 @@ def do_backup():
             for r in c.execute(f'SELECT * FROM {t}'):
                 f.write(json.dumps(dict(r), ensure_ascii=False) + '\n')
     c.close()
-    log(f'✅ 备份完成 → {bdir}')
+    log(f'[OK] 备份完成 → {bdir}')
 
 
 def do_verify():
@@ -424,14 +424,14 @@ def do_purge_old():
     full_n = c.execute("SELECT COUNT(*) FROM chanlun_recalc_progress "
                        "WHERE version=? AND mode='full'", (VERSION,)).fetchone()[0]
     if full_n < 100:
-        log(f'  ⚠⚠ 尚未跑过 --mode full（逐日快照仍是旧口径，full 只登记了 {full_n} 只）。')
+        log(f'  [WARN][WARN] 尚未跑过 --mode full（逐日快照仍是旧口径，full 只登记了 {full_n} 只）。')
         log(f'      此时 purge 会把历史逐日行删掉且**不会重建**（那些日期未重算）。')
         log(f'      建议先跑完 full 再 purge。')
     if orphan_s:
-        log(f'  ⚠ {orphan_s:,} 只股票只在 chanlun 表、不在 daily_kline_adj 里'
+        log(f'  [WARN] {orphan_s:,} 只股票只在 chanlun 表、不在 daily_kline_adj 里'
             f'（{orphan_r:,} 行）—— 扫描永远覆盖不到它们，删后不会重建')
     if undone:
-        log(f'  ⚠ {undone:,} 行属于尚未登记进度的股票 —— 删后不会重建')
+        log(f'  [WARN] {undone:,} 行属于尚未登记进度的股票 —— 删后不会重建')
     log('')
 
     ans = input('确认删除？输入 yes 执行：').strip().lower()
@@ -447,7 +447,7 @@ def do_purge_old():
                        WHERE s.stock_code=chanlun_bi_json.stock_code
                          AND s.scan_date=chanlun_bi_json.scan_date
                          AND s.algo_version=?)""", (VERSION,))
-    log('✅ 已清理')
+    log('[OK] 已清理')
     c.close()
 
 
@@ -499,7 +499,7 @@ def main():
     for _t in ('chanlun_scan_daily', 'chanlun_bi_json'):
         if not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
                          (_t,)).fetchone():
-            log(f'✗ 缺少表 {_t}，请先跑缠论扫描建表（src/scanners/chanlun_scan.py）')
+            log(f'缺少表 {_t}，请先跑缠论扫描建表（src/scanners/chanlun_scan.py）')
             c.close()
             return 1
 
@@ -516,7 +516,7 @@ def main():
                 if d:
                     tasks.append((x, [d]))
                 else:
-                    log(f'  ⚠ {x} 在 daily_kline_adj 中无数据，跳过')
+                    log(f'  [WARN] {x} 在 daily_kline_adj 中无数据，跳过')
         else:
             dates = trading_dates(c, a.start, a.end or END_SENTINEL)
             tasks = [(x, dates) for x in codes]
@@ -527,7 +527,7 @@ def main():
         end = a.end or c.execute("SELECT MAX(date) FROM daily_kline_adj").fetchone()[0]
         dates = trading_dates(c, a.start, end)
         if not dates:
-            log(f'✗ 区间 [{a.start} ~ {end}] 内无交易日，请检查 --start / --end')
+            log(f'区间 [{a.start} ~ {end}] 内无交易日，请检查 --start / --end')
             c.close()
             return 1
         stk = [r[0] for r in c.execute(
@@ -575,7 +575,7 @@ def main():
     else:
         log('  说明：重画全部交易日，供历史回填使用（很慢，可中断续跑）')
         if a.start != '2014-01-01' or a.end:
-            log('  ⚠ 本次区间非完整区间，完成后会按该区间登记进度；')
+            log('  [WARN] 本次区间非完整区间，完成后会按该区间登记进度；')
             log('     下次跑完整区间需加 --reset（或只重跑未登记的股票）')
     log('═' * 74)
     if a.plan:
@@ -605,7 +605,7 @@ def main():
                 elif err:
                     fail += 1
                     errs.append(f'{code}: {err}')
-                    log(f'  ❌ {code}  {err}')
+                    log(f'  [FAIL] {code}  {err}')
                 else:
                     ok += 1
                     saved_total += saved
@@ -620,12 +620,12 @@ def main():
         # Ctrl+C：已完成的进度都已登记，直接重跑就能续；
         # 走到下面照样打印汇总并落盘失败清单。
         log('')
-        log(f'⚠ 收到中断信号（已处理 {i}/{n_stock}）。'
+        log(f'[WARN] 收到中断信号（已处理 {i}/{n_stock}）。'
             f'已完成的进度都已登记，直接重跑本脚本即可续跑。')
 
     el = time.time() - t0
     log('─' * 74)
-    log(f'🏁 完成：成功 {ok:,} / 跳过 {skipped:,} / 失败 {fail:,}｜'
+    log(f'完成：成功 {ok:,} / 跳过 {skipped:,} / 失败 {fail:,}｜'
         f'写入 {saved_total:,} 个日期点｜耗时 {el / 60:.1f} 分钟')
     if errs:
         p = os.path.join(ROOT, 'logs', 'recalc_chanlun_bi_errors.txt')

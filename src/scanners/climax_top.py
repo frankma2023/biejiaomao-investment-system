@@ -477,7 +477,7 @@ if __name__ == '__main__':
 
     signals = detect(daily, params, baseline_price=baseline, stock_code=args.stock)
 
-    print(f"🔍 {args.stock} @ {args.date}  baseline={baseline}")
+    print(f"{args.stock} @ {args.date}  baseline={baseline}")
     print(f"   高潮见顶信号: {len(signals)}")
     for s in signals:
         typ = '🔴 confirmed' if s['signal_type'] == 'climax_confirmed' else '⚠️ warning'

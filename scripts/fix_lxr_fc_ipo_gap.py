@@ -66,7 +66,7 @@ for code in codes:
                        WHERE stock_code=? AND lxr_fc_close IS NOT NULL
                        ORDER BY date LIMIT 60""", (code,)).fetchall()
     if not seg:
-        print(f'{code:<8}{gap["n"]:>5}{"":>26}{"":>13}{"":>10}  ⚠ 无任何 lxr_fc，跳过')
+        print(f'{code:<8}{gap["n"]:>5}{"":>26}{"":>13}{"":>10}  [WARN] 无任何 lxr_fc，跳过')
         skipped.append(code)
         continue
     first = seg[0]['date']
@@ -116,7 +116,7 @@ for code, k0 in safe:
                     (k0, k0, k0, k0, code))
     total += cur.rowcount
 c.commit()
-print(f'\n✅ 已回填 {total:,} 行')
+print(f'\n[OK] 已回填 {total:,} 行')
 r = c.execute("""SELECT COUNT(*) n FROM daily_kline WHERE date>='2016-01-01'
                  AND ex_close IS NOT NULL AND lxr_fc_close IS NULL""").fetchone()
 print(f'剩余 ex 有值但 lxr_fc 为空：{r["n"]:,} 行')

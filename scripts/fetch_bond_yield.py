@@ -54,7 +54,7 @@ def fetch(start_date):
     for key, candidates in COL_MAP.items():
         c = _match_col(df, candidates)
         if c is None:
-            print(f'⚠️ 列 {key} 未找到（候选 {candidates}），实际列: {list(df.columns)}', file=sys.stderr)
+            print(f'[WARN] 列 {key} 未找到（候选 {candidates}），实际列: {list(df.columns)}', file=sys.stderr)
             return None
         cols[key] = c
 
@@ -94,7 +94,7 @@ def main():
         print(f'拉取国债收益率: {start} 起 ...')
         rows = fetch(start)
         if rows is None:
-            print('❌ 数据源列名不匹配，中止（避免坏数据落库）')
+            print('[FAIL] 数据源列名不匹配，中止（避免坏数据落库）')
             return 1
         if not rows:
             print('无新数据')

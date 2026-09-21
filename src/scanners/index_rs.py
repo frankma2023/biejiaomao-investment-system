@@ -65,7 +65,7 @@ def load_index_codes():
 
 def compute(target_date):
     conn = get_db()
-    logger.info(f"🐺 指数RS计算 — {target_date}")
+    logger.info(f"指数RS计算 — {target_date}")
 
     codes = load_index_codes()
     logger.info(f"  指数池: {len(codes)} 个")
@@ -201,7 +201,7 @@ def compute(target_date):
 
     conn.commit()
     conn.close()
-    logger.info(f"  ✅ {len(results)} 个指数已写入 index_rs_daily")
+    logger.info(f"  [OK] {len(results)} 个指数已写入 index_rs_daily")
 
 
 if __name__ == "__main__":

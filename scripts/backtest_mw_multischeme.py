@@ -304,7 +304,7 @@ for scheme_name, col_idx in schemes:
     
     if len(spreads) == 2:
         diff = spreads[0] - spreads[1]
-        print(f"  Q1-Q5胜率差: {diff:+.1f}pp {'✅ 有区分力' if abs(diff)>3 else '❌ 无区分力'}")
+        print(f"  Q1-Q5胜率差: {diff:+.1f}pp {'[OK] 有区分力' if abs(diff)>3 else '[FAIL] 无区分力'}")
 
 conn.close()
 print(f"\n总耗时: {(datetime.now()-t0).total_seconds():.0f}s")

@@ -292,7 +292,7 @@ if __name__ == '__main__':
     daily = [dict(r) for r in rows]
     sigs = detect(daily)
 
-    print(f"🔍 {args.stock} @ {args.date} — 跌破箱体事件: {len(sigs)} 个")
+    print(f"{args.stock} @ {args.date} — 跌破箱体事件: {len(sigs)} 个")
     for s in sigs:
         if s['signal_level']:
             print(f"   {s['signal_date']} [{s['signal_level']}] 下沿 {s['band_bottom']} "

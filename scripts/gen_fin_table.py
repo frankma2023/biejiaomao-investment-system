@@ -97,4 +97,4 @@ for r in rs_data[-5:]:
 # 保存为JSON
 with open('D:\\hanako\\_fin_data.json', 'w', encoding='utf-8') as f:
     json.dump(result, f, ensure_ascii=False, default=str)
-print(f"\n✅ 完整数据已保存")
+print(f"\n[OK] 完整数据已保存")
