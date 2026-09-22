@@ -1,4 +1,4 @@
-"""
+r"""
 Hanako 本地 SQLite 数据加载器
 将 D:\hanako\investment-system\data\lixinger.db 中的 A 股数据
 通过 Vibe-Trading 的 DataLoader 协议暴露，替代 Tushare/AKShare 等不稳定源。
