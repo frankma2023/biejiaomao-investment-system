@@ -111,7 +111,9 @@ b1_scored = {}
 for r in b1_rows:
     ts = tech_score_b1(r['stock_code'], r['b1_date'])
     if ts is not None:
+        b1_scored[(r['stock_code'], r['b1_date'])] = {
             'net_ret': r['net_ret_pct'],
+            'is_win': r['is_win'],
             'b1_tech': ts,
         }
 
@@ -176,5 +178,5 @@ for label, group in [('无PP_V1', g1), ('PP_V1但tech<70', g2), ('PP_V1且tech�
     if st: print(f'  {label:<30s} {st["n"]:>6d} {st["wr"]:>6.1f}% {st["avg"]:>6.2f}%')
 
 # 全量B1基准
-all_b1 = s([{'b1_net_ret': r['net_ret_pct'], 'b1_is_win': r['is_win']} for r in b1_rows]))
+all_b1 = s([{'b1_net_ret': r['net_ret_pct'], 'b1_is_win': r['is_win']} for r in b1_rows])
 print(f'\n  全量B1基准: {all_b1["n"]:,d}条, {all_b1["wr"]:.1f}%胜率, {all_b1["avg"]:+.2f}%收益')

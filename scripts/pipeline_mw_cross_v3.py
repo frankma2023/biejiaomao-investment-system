@@ -190,14 +190,14 @@ print('\n' + '-' * 85)
 print(f'类型1: 立即买入 (管道+MW高分+B2确认): {len(cat1)}只')
 if cat1:
     for e in cat1:
-        print(f'  {e[\"code\"]} {e[\"name\"]} B1={e[\"b1_only\"]}分 {e[\"conf\"]} RPS={e[\"rps250\"]} {\"PLUS\" if e[\"is_plus\"] else \"\"}')
+        print(f'  {e["code"]} {e["name"]} B1={e["b1_only"]}分 {e["conf"]} RPS={e["rps250"]} {"PLUS" if e["is_plus"] else ""}')
 
 print(f'\n类型2: 等待B2 (管道+MW高分+无B2): {len(cat2)}只')
 if cat2:
-    print(f'  {\"代码\":<8s} {\"名称\":<8s} {\"B1\":>4s} {\"置信\":<4s} {\"PPV1\":<5s} {\"RPS\":>4s} {\"行业RS\":>6s} {\"PP_V2\":<6s} {\"行业\":<14s} {\"通过原因\":<20s}')
+    print(f'  {"代码":<8s} {"名称":<8s} {"B1":>4s} {"置信":<4s} {"PPV1":<5s} {"RPS":>4s} {"行业RS":>6s} {"PP_V2":<6s} {"行业":<14s} {"通过原因":<20s}')
     for e in cat2:
         reason = next((s['reason'] for s in pipeline_stocks if s['code']==e['code']), '')
-        print(f'  {e[\"code\"]:<8s} {e[\"name\"]:<8s} {e[\"b1_only\"]:>4d} {e[\"conf\"]:<4s} {\"[OK]\" if e[\"ppv1\"] else \"—\":<5s} {e[\"rps250\"]:>4d} {str(e[\"ind_rs\"] or \"—\"):>6s} {\"[OK]\" if e[\"in_ppv2\"] else \"—\":<6s} {(e[\"ind_name\"] or \"\")[:14]:<14s} {reason:<20s}')
+        print(f'  {e["code"]:<8s} {e["name"]:<8s} {e["b1_only"]:>4d} {e["conf"]:<4s} {"[OK]" if e["ppv1"] else "—":<5s} {e["rps250"]:>4d} {str(e["ind_rs"] or "—"):>6s} {"[OK]" if e["in_ppv2"] else "—":<6s} {(e["ind_name"] or "")[:14]:<14s} {reason:<20s}')
 
 print(f'\n类型3: 管道候选 (无MW高分): {len(cat3)}只 (Top10)')
 if cat3:
@@ -207,20 +207,20 @@ if cat3:
             c.execute("SELECT name FROM stock_basic WHERE stock_code=?", (e['code'],))
             sr = c.fetchone(); name = sr['name'] if sr else ''
         reason = next((s['reason'] for s in pipeline_stocks if s['code']==e['code']), '')
-        print(f'  {e[\"code\"]} {name:<8s} RPS={e[\"rps250\"]} {\"MW[OK]\" if e[\"b1_only\"]>0 else \"\"} {reason}')
+        print(f'  {e["code"]} {name:<8s} RPS={e["rps250"]} {"MW[OK]" if e["b1_only"]>0 else ""} {reason}')
 
 print(f'\n类型4: MW高分但管道不通过: {len(cat4)}只')
 for e in cat4:
     rs = rs_dict.get(e['code'], {})
     issues = []
     if e['code'] not in all_sector_stocks and (e['ind_rs'] is None or e['ind_rs'] < 75):
-        issues.append(f'不在L2/主题板块且行业RS={e[\"ind_rs\"] or \"—\"}<75')
+        issues.append(f'不在L2/主题板块且行业RS={e["ind_rs"] or "—"}<75')
     if rs.get('rps250', 0) < 60:
-        issues.append(f'RPS={e[\"rps250\"]}<60(高置信最低门槛)')
-    print(f'  {e[\"code\"]} {e[\"name\"]} B1={e[\"b1_only\"]}分 {e[\"conf\"]} {\"·\".join(issues)}')
+        issues.append(f'RPS={e["rps250"]}<60(高置信最低门槛)')
+    print(f'  {e["code"]} {e["name"]} B1={e["b1_only"]}分 {e["conf"]} {"·".join(issues)}')
 
 # ═══ 最终建议 ═══
-print(f'\n{\"=\" * 85}')
+print(f'\n{"=" * 85}')
 print('整合决策')
 print('=' * 85)
 print(f'''
@@ -235,10 +235,10 @@ print(f'''
 
 if cat1:
     t = cat1[0]
-    print(f'\n  {t[\"code\"]} {t[\"name\"]} | B1={t[\"b1_only\"]}分/{t[\"conf\"]} | 仓位{pos}%×72%≈{pos*0.72:.0f}%')
+    print(f'\n  {t["code"]} {t["name"]} | B1={t["b1_only"]}分/{t["conf"]} | 仓位{pos}%×72%≈{pos*0.72:.0f}%')
 elif cat2:
     t = cat2[0]
-    print(f'\n  观察池首位: {t[\"code\"]} {t[\"name\"]} B1={t[\"b1_only\"]}分/{t[\"conf\"]} RPS={t[\"rps250\"]}')
+    print(f'\n  观察池首位: {t["code"]} {t["name"]} B1={t["b1_only"]}分/{t["conf"]} RPS={t["rps250"]}')
     print(f'     等待B2确认 → 仓位{pos}%×72%≈{pos*0.72:.0f}%')
     if regime == '熊市': print(f'     [WARN] 熊市环境,MW样本极少,建议轻仓')
 

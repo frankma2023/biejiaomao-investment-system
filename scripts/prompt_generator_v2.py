@@ -246,9 +246,11 @@ def generate_prompt(data, market, sector_context=None, market_groups=None):
         buy_sigs = [s for s in signals if s.get('direction') == 'up' or s.get('signal_type') in ('buy','pp','bo','b1','b2')]
         sell_sigs = [s for s in signals if s.get('direction') == 'down' or s.get('signal_type') in ('sell','top','rule')]
         if buy_sigs:
-            lines.append(f"- 买入信号: {', '.join(f'{s[\"signal_name\"]}({s[\"date\"]})' for s in buy_sigs[-5:])}")
+            buy_txt = ', '.join(f"{s['signal_name']}({s['date']})" for s in buy_sigs[-5:])
+            lines.append(f"- 买入信号: {buy_txt}")
         if sell_sigs:
-            lines.append(f"- 卖出信号: {', '.join(f'{s[\"signal_name\"]}({s[\"date\"]})' for s in sell_sigs[-5:])}")
+            sell_txt = ', '.join(f"{s['signal_name']}({s['date']})" for s in sell_sigs[-5:])
+            lines.append(f"- 卖出信号: {sell_txt}")
         lines.append("")
 
     # 大盘环境
