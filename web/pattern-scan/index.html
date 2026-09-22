@@ -155,11 +155,17 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==="dark"
 <script>
 (function(){
   var p=new URLSearchParams(location.search);
-  var autoCode=p.get('code');
-  if(autoCode){
-    document.getElementById('code').value=autoCode;
-    setTimeout(function(){if(typeof scan==='function')scan()},300);
-  }
+  var autoCode=p.get('code'), s=p.get('start'), e=p.get('end');
+  // 必须挂在 DOMContentLoaded 上：app.js 的默认 18 个月区间在更早注册的监听器里设置，
+  // 本段若直接执行会被其覆盖
+  document.addEventListener('DOMContentLoaded', function(){
+    if(s) document.getElementById('date-start').value=s;
+    if(e) document.getElementById('date-end').value=e;
+    if(autoCode){
+      document.getElementById('code').value=autoCode;
+      setTimeout(function(){if(typeof scan==='function')scan()},300);
+    }
+  });
 })();
 </script>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js")}</script>

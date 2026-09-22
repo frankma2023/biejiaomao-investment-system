@@ -445,6 +445,25 @@ def _build_record(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int, p2: float,
 
     return {
         'record_type': None,
+        # pattern-scan 等前端消费的字段
+        'type': 'bullish',
+        'details': {
+            'description': (f"杯口 {p2:.2f} → 买点 {buy_point:.2f} | "
+                            f"深 {depth * 100:.1f}% 柄 {hdd * 100:.1f}% "
+                            f"{t_idx - t2_idx}日"),
+            'prior_high': round(p0, 3),
+            'prior_high_date': daily[d1['t0_idx']]['date'],
+            'bottom': round(p1, 3),
+            'bottom_date': daily[t1_idx]['date'],
+            'mouth': round(p2, 3),
+            'mouth_date': daily[t2_idx]['date'],
+            'handle_low': round(p3, 3),
+            'handle_low_date': daily[p3_idx]['date'],
+            'buy_point': round(buy_point, 3),
+            'target_price': round(buy_point * (1 + params['suggested_tp']), 3),
+            'stop_price': round(buy_point * (1 - params['suggested_sl']), 3),
+            'suggested_max_hold': params['suggested_max_hold'],
+        },
         'stock_code': t.get('stock_code'),
         'date': t['date'],
         'prior_high_date': daily[d1['t0_idx']]['date'],
@@ -487,9 +506,10 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
            market_cap: Optional[float] = None,
            bi_list: Optional[List[Dict]] = None,
            stock_code: Optional[str] = None,
+           record_types=('SIGNAL',),
            diagnose: bool = False):
     """
-    单次无状态扫描，输出 CANDIDATE 与 SIGNAL 两类记录。
+    单次无状态扫描，产出 CANDIDATE / SIGNAL 两类记录。
 
     对每个检测日 T，结构点全部由 [.., T-1] 的数据拟合；T 当日只用于突破判定。
     因此同一份数据重复运行结果完全一致（幂等），无跨日状态。
@@ -500,6 +520,9 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
         market_cap: 流通市值（亿），用于 min_market_cap 过滤。
         bi_list: 缠论笔列表；None 时按 stock_code 从库中加载。
         stock_code: 股票代码，用于加载笔数据。
+        record_types: 需要返回的记录类型。默认只返回 SIGNAL——CANDIDATE 会在
+            同一结构的整个跟踪窗口内逐日重复出现（全市场约 37 条/日），
+            全量返回会淹没前端图表与下游清单；需要时显式传入 ('SIGNAL','CANDIDATE')。
         diagnose: True 时返回 (records, 漏斗统计)。
 
     Returns:
@@ -576,6 +599,9 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
                 t2 = t_idx
 
     records.sort(key=lambda r: r['date'])
+    if record_types is not None:
+        keep = set(record_types)
+        records = [r for r in records if r['record_type'] in keep]
     return (records, stats) if diagnose else records
 
 
@@ -611,7 +637,8 @@ def main():
 
     if not daily:
         print(f"{args.stock} 无K线数据"); return
-    records, stats = detect(daily, params, stock_code=args.stock, diagnose=True)
+    records, stats = detect(daily, params, stock_code=args.stock,
+                            record_types=('SIGNAL', 'CANDIDATE'), diagnose=True)
 
     print(f"{args.stock} {name['name'] if name else ''} @ {end}   K线 {len(daily)} 根")
     if args.diagnose:

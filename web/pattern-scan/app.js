@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 形态识别看板 - 前端逻辑 v2
  * 单 ECharts 三格（K线+MA / 布林带 / 成交量）+ 分析建议 + 信号时间线
  */
@@ -140,6 +140,8 @@ function buildMaps(engines) {
       state.colorMap[eng.name] = { color: '#FFD700', symbol: 'star', size: 18 };
     } else if (eng.name === 'box_breakdown') {
       state.colorMap[eng.name] = { color: '#10B981', symbol: 'triangle', size: 16 };  // rotate 由渲染处硬编码 symbolRotate:180
+    } else if (eng.name === 'cup_handle_v2') {
+      state.colorMap[eng.name] = { color: '#00E5FF', symbol: 'pin', size: 17 };
     } else if (eng.category === 'candlestick') {
       state.colorMap[eng.name + '_bullish'] = { color: '#9C27B0', symbol: 'emptyCircle', size: 10 };
       state.colorMap[eng.name + '_bearish'] = { color: '#333333', symbol: 'emptyCircle', size: 10 };
@@ -317,6 +319,18 @@ function renderChart() {
           labelColor: sig.source === 'box_breakdown' ? '#10B981' : '#FFD700'
         };
       }
+      // 杯柄形态：附加四个结构点与买点，供 hover 画价位线
+      if (sig.source === 'cup_handle_v2' && sig.details) {
+        var cd = sig.details;
+        var si = dateIndex[cd.prior_high_date];
+        pt.cupInfo = {
+          priorHigh: cd.prior_high, bottom: cd.bottom, mouth: cd.mouth,
+          handleLow: cd.handle_low, buyPoint: cd.buy_point,
+          // 前高常早于可见区间起点，此时从最左侧起画，否则线长为 0
+          startIdx: si !== undefined ? si : 0,
+          endIdx: idx
+        };
+      }
       signalPoints.push(pt);
     });
   });
@@ -425,6 +439,25 @@ function renderChart() {
   series.push({
     id: 'box-mark-series',
     name: '箱体突破区间',
+    type: 'line',
+    xAxisIndex: 0,
+    yAxisIndex: 0,
+    data: [],
+    silent: true,
+    z: 5,
+    markLine: {
+      silent: true,
+      symbol: ['none', 'none'],
+      data: []
+    }
+  });
+
+  // Grid 0 — 杯柄形态区间（hover 时显示四结构点与买点线，平时空）
+  // 必须先在此声明同 id 的空 series：hover 里用 setOption({series:{id:...}}) 更新，
+  // 若 id 不存在，ECharts 会新建一个无数据的幽灵 series，markLine 不会渲染
+  series.push({
+    id: 'cup-mark-series',
+    name: '杯柄结构',
     type: 'line',
     xAxisIndex: 0,
     yAxisIndex: 0,
@@ -595,6 +628,18 @@ function renderChart() {
               var tsTier = ts>=85?'极高':ts>=75?'很高':ts>=65?'高':ts>=50?'中':'低';
               html += ' <span style="font-size:9px;color:#f59e0b">[TS:' + ts + '/' + tsTier + ']</span>';
             }
+            // 杯柄形态：展开四个结构点与交易参数
+            if (sig.source === 'cup_handle_v2' && sig.details) {
+              var cu = sig.details;
+              html += '<div style="font-size:9px;color:#888;margin:2px 0 0 10px;line-height:1.5">'
+                   + '前高 <b>' + cu.prior_high + '</b>(' + cu.prior_high_date + ') → '
+                   + '杯底 <b>' + cu.bottom + '</b> → 杯口 <b>' + cu.mouth + '</b> → '
+                   + '柄低 <b>' + cu.handle_low + '</b><br/>'
+                   + '<span style="color:#00E5FF">买点 ' + cu.buy_point
+                   + ' · 目标 ' + cu.target_price + ' · 止损 ' + cu.stop_price
+                   + ' · 持有≤' + cu.suggested_max_hold + '日</span>'
+                   + '</div>';
+            }
             html += '<br/>';
           });
         }
@@ -716,15 +761,61 @@ function renderChart() {
     });
     boxMarkAdded = false;
   }
+
+  // ── 杯柄形态信号 hover → 画四个结构点 + 买点线 ──
+  var cupMarkAdded = false;
+  var CUP_LEVELS = [
+    ['前高', 'priorHigh', 'rgba(255,138,128,0.9)'],
+    ['杯口/买点', 'mouth', 'rgba(0,229,255,0.95)'],
+    ['柄低', 'handleLow', 'rgba(179,157,219,0.9)'],
+    ['杯底', 'bottom', 'rgba(129,199,132,0.9)']
+  ];
+  function addCupMarks(ci) {
+    if (!ci || cupMarkAdded) return;
+    var markData = CUP_LEVELS.map(function (lv) {
+      var v = ci[lv[1]];
+      if (v == null) return null;
+      return [
+        { coord: [ci.startIdx, v], value: lv[0] + ' ' + v },
+        { coord: [ci.endIdx, v] }
+      ];
+    }).filter(Boolean);
+    if (!markData.length) return;
+    state.chart.setOption({
+      series: {
+        id: 'cup-mark-series',
+        markLine: {
+          silent: true,
+          symbol: ['none', 'none'],
+          lineStyle: { type: 'dotted', width: 1.2, color: 'rgba(0,229,255,0.85)' },
+          label: { show: true, fontSize: 9, color: '#00E5FF', position: 'end' },
+          data: markData
+        }
+      }
+    });
+    cupMarkAdded = true;
+  }
+  function removeCupMarks() {
+    if (!cupMarkAdded) return;
+    state.chart.setOption({
+      series: {
+        id: 'cup-mark-series',
+        markLine: { silent: true, symbol: ['none', 'none'], data: [] }
+      }
+    });
+    cupMarkAdded = false;
+  }
   state.chart.off('mouseover');
   state.chart.on('mouseover', function (params) {
-    if (params.seriesName === '信号标注' && params.data && params.data.boxInfo) {
-      addBoxMarks(params.data.boxInfo);
+    if (params.seriesName === '信号标注' && params.data) {
+      if (params.data.boxInfo) addBoxMarks(params.data.boxInfo);
+      if (params.data.cupInfo) addCupMarks(params.data.cupInfo);
     }
   });
   state.chart.off('globalout');
   state.chart.on('globalout', function () {
     removeBoxMarks();
+    removeCupMarks();
   });
 
   // ── 点击信号标注 → 高亮 ──
