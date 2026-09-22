@@ -1,0 +1,56 @@
+# 杯柄形态放量突破检测引擎 V2 · 配置
+# 文件: config/market/cup_handle_v2.yaml
+# 规格: docs/product/杯柄形态突破检测引擎_产品需求书_v2.md
+#
+# 所有阈值均在 21,658 个真实样本上标定，逐条依据见 PRD §6。
+# 引擎逻辑代码中不得出现任何魔法数字；本文件缺失或参数缺失时引擎必须报错。
+
+cup_handle_v2:
+  # ── 结构识别（PRD §2.3 / §2.5）──────────────────────
+  min_prior_advance: 0.25         # 前置最小涨幅（前高相对再前一笔低点）
+  min_descent_bars: 10            # 前高→杯底 最少 K 线数，排除一日尖顶
+  cup_min_age: 35                 # 杯底距检测日的交易日下限（约 7 周）
+  cup_max_age: 325                # 杯底距检测日的交易日上限（约 65 周）
+  mouth_lock_pullback: 0.03       # 自最高点回落此幅度即确认杯口
+  min_ascent_bars: 5              # 杯底→杯口 最少交易日数
+
+  # ── 形态校验（PRD §3.1，V5~V12）─────────────────────
+  depth_min: 0.15                 # 杯身深度 (P2-P1)/P2 下限
+  depth_max: 0.40                 # 上限；>50% 属「死亡酒碗」失败形态
+  mouth_vs_high_max: 1.10         # 杯口/前高 上限；>1.10 档胜率明显走低
+  handle_dd_min: 0.05             # 柄部回撤 (P2-P3)/P2 下限
+  handle_dd_max: 0.15             # 上限；深柄突破率下降
+  handle_days_max: 15             # 柄部最长交易日；>11 日胜率跌破基准
+  mouth_to_signal_max: 12         # 杯口→突破 最长交易日（★ 最强判据）
+  handle_position_ratio: 0.50     # 柄低 ≥ 杯底 + 比例 ×（杯口 − 杯底）
+  handle_red_vol_ratio: 1.30      # 柄部期间「放量长阴」判定阈值
+
+  # ── SIGNAL 触发（PRD §3.2）─────────────────────────
+  buy_point_buffer: 0.01          # 买点缓冲（元），O'Neil 原文
+  breakout_vol_ratio: 1.50        # 突破日量 / MA(vol)，原书标准「量增 50%」
+  vol_ma_window: 20               # 放量参照均量窗口
+  close_position_min: 0.50        # 收盘在日内区间的分位下限
+  require_green: true             # 是否要求阳线
+  require_above_ma50: true        # 是否要求收盘 > MA50
+  ma_trend_window: 50             # 趋势均线窗口
+
+  # ── CANDIDATE 有效性（PRD §3.3）─────────────────────
+  cup_invalidate_tolerance: 0.02  # 收盘跌破 杯底×(1−此值) 即候选失效
+
+  # ── 输出：建议退出参数（PRD §6.4 期望最高档）──────────
+  suggested_tp: 0.15              # 止盈幅度：+2.18%/笔，胜率 49.7%，盈亏比 1.51
+  suggested_sl: 0.10              # 止损幅度
+  suggested_max_hold: 20          # 最长持有交易日
+
+  # ── 输出：仅记录、不参与判定（PRD §5.2）──────────────
+  ma_support_ref: 10              # 支撑参照均线（标定显示仅 MA10 有区分度）
+  voodoo_vol_ratio: 0.65          # 「巫毒日」判定：量 < 均量 × 此值
+  bottom_amp_window: 5            # 杯底 ±N 日振幅统计窗口
+  bottom_amp_min: 0.0             # 杯底振幅下限，0 = 不设门槛（v1 的平坦性检查已取消）
+
+  # ── 其它过滤 ────────────────────────────────────────
+  min_market_cap: 0               # 流通市值下限（亿），0 = 关闭
+
+  # ── 持仓分流（PRD §7.3，由 discipline/monitoring 使用）──
+  speed_rule_days: 15
+  speed_rule_gain: 0.20
