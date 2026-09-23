@@ -6213,6 +6213,55 @@ def api_cockpit_latest():
     })
 
 
+def _cup_rows(db, date):
+    """按类型拆分某日的杯柄记录。"""
+    rows = db.execute(
+        "SELECT * FROM cup_handle_v2_daily WHERE date=? "
+        "ORDER BY record_type DESC, mouth_to_date_days, stock_code",
+        (date,)).fetchall()
+    recs = [dict(r) for r in rows]
+    return recs
+
+
+@app.route('/api/cockpit/cup-handle', methods=['GET', 'OPTIONS'])
+def api_cockpit_cup_handle():
+    """杯柄形态 V2 当日记录。
+
+    SIGNAL 为当日放量突破（可交易）；CANDIDATE 为结构成立、买点已定、
+    尚未突破的观察标的。请求日无记录时回退到最近有记录的交易日，
+    并以 fallback=True 标记，避免非交易日页面空白。
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    db = get_db()
+    empty = {'date': None, 'signals': [], 'candidates': [],
+             'counts': {'signal': 0, 'candidate': 0}}
+    try:
+        want = request.args.get('date')
+        latest = db.execute("SELECT MAX(date) FROM cup_handle_v2_daily").fetchone()
+        latest = latest[0] if latest else None
+        if not latest:
+            return jsonify(empty)
+        date = want or latest
+        recs = _cup_rows(db, date)
+        fallback = False
+        if not recs and date != latest:
+            date, recs, fallback = latest, _cup_rows(db, latest), True
+    except sqlite3.OperationalError:
+        # 表尚未建立：扫描步骤未运行过
+        return jsonify(empty)
+    signals = [r for r in recs if r['record_type'] == 'SIGNAL']
+    candidates = [r for r in recs if r['record_type'] == 'CANDIDATE']
+    return jsonify({
+        'date': date,
+        'latest_date': latest,
+        'fallback': fallback,
+        'signals': signals,
+        'candidates': candidates,
+        'counts': {'signal': len(signals), 'candidate': len(candidates)},
+    })
+
+
 @app.route('/api/cockpit/run', methods=['POST', 'OPTIONS'])
 def api_cockpit_run():
     """手动触发管道运行"""

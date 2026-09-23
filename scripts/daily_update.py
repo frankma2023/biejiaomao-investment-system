@@ -354,6 +354,10 @@ TASKS.append(("27b.缠论分钟数据", [PYTHON_EXE, "scripts/fetch_tdx_minute.p
 # 必须跑在 MW 信号扫描之前，否则 MW 引擎 0% 兜底下会跳过全部股票
 TASKS.append(("27c.缠论批量扫描", [PYTHON_EXE, "src/scanners/chanlun_scan.py", "--date", today_str, "--all"]))
 
+# 27d. 杯柄形态 V2（依赖 27c 的当日笔；同时落 SIGNAL 与 CANDIDATE 两类记录，
+# 供驾驶舱「杯柄信号」页消费。引擎按结构去重，候选约 3 条/日，增量幂等可重复）
+TASKS.append(("27d.杯柄形态V2", [PYTHON_EXE, "scripts/scan_cup_handle_v2.py", "--date", today_str]))
+
 # 步骤 28~29：MW 信号 + 回测（依赖缠论 bi + 个股 RS 就位）
 # 28. 缠论 vs 欧奈尔回测对比
 TASKS.append(("28.缠论vs欧奈尔回测", [PYTHON_EXE, "src/scanners/chanlun_backtest_compare.py", "--date", today_str, "--filter"]))

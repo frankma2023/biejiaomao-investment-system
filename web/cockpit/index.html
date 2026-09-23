@@ -23,6 +23,7 @@ body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary)
 .btn-glass{padding:6px 14px;border:1px solid var(--accent-border);border-radius:10px;background:var(--accent-subtle);color:var(--accent);cursor:pointer;font-size:11px;font-weight:500;font-family:var(--font-body)}
 .btn-glass:hover{background:rgba(245,158,11,.18)}
 .btn-glass.sm{padding:4px 10px;font-size:10px}
+.btn-glass.sm.on{background:var(--accent);color:#0d0d12;border-color:var(--accent);font-weight:600}
 
 /* Tab */
 .tab-bar{display:flex;gap:0;margin-bottom:10px;border-bottom:1px solid var(--border)}
@@ -99,10 +100,12 @@ html[data-theme="light"] .control-bar input{background:rgba(255,255,255,.7)}
 <div class="tab-bar">
   <button class="tab-btn active" onclick="switchTab('b1')" id="tab-b1">🔔 高关注B1 <span class="cnt" id="cnt-b1">0</span></button>
   <button class="tab-btn" onclick="switchTab('b2')" id="tab-b2">✅ B2确认 <span class="cnt" id="cnt-b2">0</span></button>
+  <button class="tab-btn" onclick="switchTab('cup')" id="tab-cup">☕ 杯柄信号 <span class="cnt" id="cnt-cup">0</span></button>
 </div>
 
 <div class="flow-hint" id="flow-hint"></div>
 <div id="signals"></div>
+<div id="cup-signals" style="display:none"></div>
 </div>
 
 <script src="../shared/js/nav.js"></script>
@@ -111,12 +114,17 @@ html[data-theme="light"] .control-bar input{background:rgba(255,255,255,.7)}
 <script>
 var API='http://'+window.location.hostname+':8788';
 var allSignals=[],currentTab='b1',currentDate='';
+var cupData={signals:[],candidates:[],date:'',latest_date:'',fallback:false};
+var cupView='signal';
 
 function switchTab(t){
   currentTab=t;
-  document.getElementById('tab-b1').classList.toggle('active',t==='b1');
-  document.getElementById('tab-b2').classList.toggle('active',t==='b2');
-  render();
+  ['b1','b2','cup'].forEach(function(k){
+    document.getElementById('tab-'+k).classList.toggle('active',t===k);
+  });
+  document.getElementById('signals').style.display = (t==='cup')?'none':'';
+  document.getElementById('cup-signals').style.display = (t==='cup')?'':'none';
+  if(t==='cup') renderCup(); else render();
 }
 
 function loadToday(){
@@ -133,17 +141,21 @@ async function loadDate(){
   document.getElementById('meta-info').textContent='加载中...';
   
   // 加载 B1 和 B2 信号
-  var [b1r,b2r]=await Promise.all([
+  var [b1r,b2r,cupr]=await Promise.all([
     fetch(API+'/api/mw/signals?type=b1&start='+d+'&end='+d).then(r=>r.json()),
-    fetch(API+'/api/mw/signals?type=b2&start='+d+'&end='+d).then(r=>r.json())
+    fetch(API+'/api/mw/signals?type=b2&start='+d+'&end='+d).then(r=>r.json()),
+    fetch(API+'/api/cockpit/cup-handle?date='+d).then(r=>r.json()).catch(()=>({signals:[],candidates:[]}))
   ]);
-  
+
   allSignals=(b1r.signals||[]).map(function(s){s._tab='b1';return s;})
     .concat((b2r.signals||[]).map(function(s){s._tab='b2';return s;}));
-  
+
+  cupData=cupr||{signals:[],candidates:[],counts:{}};
+  document.getElementById('cnt-cup').textContent=(cupData.signals||[]).length;
+
   var meta=((b1r.signals||[]).length+(b2r.signals||[]).length)+'个MW信号';
   document.getElementById('meta-info').textContent=d+' · '+meta;
-  render();
+  if(currentTab==='cup') renderCup(); else render();
 }
 
 function getPosition(s,isB2){
@@ -273,6 +285,87 @@ function render(){
   }).join('');
 }
 
+function toggleCupView(v){
+  cupView=v;
+  renderCup();
+}
+
+function renderCup(){
+  var list=(cupView==='signal'?cupData.signals:cupData.candidates)||[];
+  var nSig=(cupData.signals||[]).length, nCand=(cupData.candidates||[]).length;
+
+  document.getElementById('cnt-cup').textContent=nSig;
+
+  var hint='☕ 杯柄形态 → 柄部缩量小幅回调 → 放量突破杯口当日为买点（买点=杯口价×1.01，不突破不买入）';
+  if(cupData.fallback){
+    hint='⚠️ '+currentDate+' 无杯柄记录，已回退显示最近交易日 '+cupData.date;
+  }else if(cupData.date){
+    hint='☕ '+cupData.date+'　'+hint.slice(2);
+  }
+  document.getElementById('flow-hint').textContent=hint;
+
+  var el=document.getElementById('cup-signals');
+  var head='<div style="display:flex;gap:8px;margin:10px 0">'+
+    '<button class="btn-glass sm'+(cupView==='signal'?' on':'')+'" onclick="toggleCupView(\'signal\')">🚀 突破信号 '+nSig+'</button>'+
+    '<button class="btn-glass sm'+(cupView==='candidate'?' on':'')+'" onclick="toggleCupView(\'candidate\')">👀 观察候选 '+nCand+'</button>'+
+    '</div>';
+
+  if(!list.length){
+    el.innerHTML=head+'<div class="empty-state">'+
+      (cupView==='signal'?'当日无杯柄放量突破信号':'当日无新的杯柄观察候选')+'</div>';
+    return;
+  }
+
+  el.innerHTML=head+list.map(function(r,i){
+    var isSig=r.record_type==='SIGNAL';
+    var link='../pattern-scan/?code='+r.stock_code+'&start='+(r.prior_high_date||'')+'&end='+r.date;
+    var detail='<table>'+
+      '<tr><td class="lbl">买点</td><td class="val ok">'+r.buy_point+
+        '</td><td class="lbl">目标/止损</td><td class="val">'+r.target_price+' / '+r.stop_price+'</td></tr>'+
+      '<tr><td class="lbl">前高</td><td class="val">'+r.prior_high_price+' ('+r.prior_high_date+')</td>'+
+        '<td class="lbl">杯底</td><td class="val">'+r.bottom_price+' ('+r.bottom_date+')</td></tr>'+
+      '<tr><td class="lbl">杯口</td><td class="val">'+r.mouth_price+' ('+r.mouth_date+')</td>'+
+        '<td class="lbl">柄低</td><td class="val">'+r.handle_low_price+' ('+r.handle_low_date+')</td></tr>'+
+      '<tr><td class="lbl">杯口/前高</td><td class="val">'+(r.mouth_vs_high!=null?r.mouth_vs_high.toFixed(3):'—')+'</td>'+
+        '<td class="lbl">前置上涨</td><td class="val">'+(r.prior_advance_pct!=null?r.prior_advance_pct.toFixed(1)+'%':'—')+'</td></tr>'+
+      '<tr><td class="lbl">柄部对MA10</td><td class="val '+(r.ma10_held?'ok':'no')+'">'+
+        (r.hd_min_ma10!=null?r.hd_min_ma10.toFixed(3):'—')+(r.ma10_held?' 守住':' 破位')+'</td>'+
+        '<td class="lbl">杯底振幅</td><td class="val">'+(r.bottom_amp!=null?(r.bottom_amp*100).toFixed(1)+'%':'—')+'</td></tr>'+
+      '</table>'+
+      '<div style="margin-top:8px">'+
+        '<a href="'+link+'" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">🔍 形态复核</a>'+
+        '<span style="margin:0 8px">|</span>'+
+        '<span style="font-size:10px;color:var(--muted)">建议持有 '+r.suggested_max_hold+' 个交易日</span>'+
+      '</div>';
+
+    return '<div class="signal-card" onclick="toggleExpand(\'c'+i+'\')">'+
+      '<div class="top-row">'+
+        '<span class="stock-info"><a href="'+link+'" target="_blank">'+(r.stock_name||r.stock_code)+
+          '</a><span class="code">'+r.stock_code+'</span></span>'+
+        '<span class="badge '+(isSig?'badge-score-hi':'badge-score')+'">'+
+          (isSig?'🚀 突破':'👀 候选')+'</span>'+
+      '</div>'+
+      '<div class="node-line">'+
+        '<span class="node-dot nd-H"></span> 前高 '+r.prior_high_price+
+        ' <span style="color:var(--muted)">→</span> '+
+        '<span class="node-dot nd-L"></span> 杯底 '+r.bottom_price+
+        ' <span style="color:var(--muted)">→</span> '+
+        '<span class="node-dot nd-B1"></span> 杯口 '+r.mouth_price+
+        ' <span style="color:var(--muted)">→</span> '+
+        '<span class="node-dot nd-B2"></span> 买点 '+r.buy_point+
+      '</div>'+
+      '<div class="key-stats">'+
+        '<div class="kstat"><div class="kv">'+(r.depth_pct!=null?r.depth_pct.toFixed(1)+'%':'—')+'</div><div class="kl">杯身深度</div></div>'+
+        '<div class="kstat"><div class="kv">'+(r.handle_dd_pct!=null?r.handle_dd_pct.toFixed(1)+'%':'—')+'</div><div class="kl">柄部回撤</div></div>'+
+        '<div class="kstat"><div class="kv">'+r.handle_days+'</div><div class="kl">柄部天数</div></div>'+
+        '<div class="kstat"><div class="kv">'+(r.breakout_vol_ratio!=null?r.breakout_vol_ratio.toFixed(2):'—')+
+          '</div><div class="kl">突破量比</div></div>'+
+      '</div>'+
+      '<div class="expand" id="exp-c'+i+'">'+detail+'</div>'+
+    '</div>';
+  }).join('');
+}
+
 function toggleExpand(i){
   var el=document.getElementById('exp-'+i);
   el.style.display=el.style.display==='block'?'none':'block';
@@ -285,7 +378,10 @@ function toggleTheme(){
 }
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 
+// 支持 ?tab=cup / ?tab=b2 直达，便于从日报或其它页面链接过来
+var _wantTab=new URLSearchParams(location.search).get('tab');
 loadToday();
+if(_wantTab && ['b1','b2','cup'].indexOf(_wantTab)>=0) switchTab(_wantTab);
 </script>
 </body>
 </html>
