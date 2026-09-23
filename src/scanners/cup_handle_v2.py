@@ -518,11 +518,16 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
         daily: 日K列表，按日期升序，元素含 date/open/high/low/close/volume。
         params: 参数字典；None 时从配置文件加载。
         market_cap: 流通市值（亿），用于 min_market_cap 过滤。
-        bi_list: 缠论笔列表；None 时按 stock_code 从库中加载。
+        bi_list: 缠论笔列表；None 时按 stock_code 取「daily 最后一根K线当日」的笔快照。
+            调用方若自行传入，须保证该笔序列只用了不晚于最后一根K线的数据；
+            chanlun_bi_json 是每股 50 笔的滚动窗口且端点会随后续K线调整，
+            一次性用最新快照扫全history会把未来信息带进笔的划分。
         stock_code: 股票代码，用于加载笔数据。
         record_types: 需要返回的记录类型。默认只返回 SIGNAL——CANDIDATE 会在
-            同一结构的整个跟踪窗口内逐日重复出现（全市场约 37 条/日），
-            全量返回会淹没前端图表与下游清单；需要时显式传入 ('SIGNAL','CANDIDATE')。
+            同一结构的整个跟踪窗口内逐日重复出现，全量返回会淹没前端图表与下游
+            清单；需要时显式传入 ('SIGNAL','CANDIDATE')。
+            每个结构（杯底日 + 杯口日 唯一标识）每类记录只输出一次：
+            CANDIDATE 输出在「首次成为候选」那天。
         diagnose: True 时返回 (records, 漏斗统计)。
 
     Returns:
@@ -544,7 +549,10 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
         return ([], stats) if diagnose else []
 
     if bi_list is None and cap:
-        bi_list = _load_bi(cap)
+        # chanlun_bi_json 是每股 50 笔的滚动窗口，且笔的端点会随后续K线继续调整：
+        # 实测 000007 的 2024-09-19 快照与 2026-09-22 快照，50 笔中仅 26 笔完全一致。
+        # 因此必须取检测日当天的快照；用最新快照评估历史K线等于让笔的划分偷看未来数据。
+        bi_list = _load_bi(cap, daily[-1]['date'])
     if not bi_list or len(bi_list) < 2:
         return ([], stats) if diagnose else []
 
@@ -567,7 +575,10 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
         return ([], stats) if diagnose else []
 
     records = []
-    seen = set()          # (date, t2_idx, t1_idx) 去重：一只股票同一天只出一条记录
+    # 方案1：每个结构（由 t1 = 杯底索引、t2 = 杯口索引 唯一标识）每类记录只输出一次。
+    # 否则同一结构会在整个跟踪窗口内逐日重复成为候选（全市场约 37 条/日），
+    # 淹没前端图表与下游清单。
+    emitted = {'CANDIDATE': set(), 'SIGNAL': set()}
     for d1 in d1s:
         t1 = d1['t1_idx']
         lo = t1 + params['cup_min_age']
@@ -586,10 +597,11 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
             rec = _evaluate(daily, ctx, d1, t_idx, p2, t2, params)
             if rec is not None:
                 stats['passed_v'] += 1
-                stats[rec['record_type']] = stats.get(rec['record_type'], 0) + 1
-                key = (rec['date'], t2, t1)
-                if key not in seen:
-                    seen.add(key)
+                rt = rec['record_type']
+                stats[rt] = stats.get(rt, 0) + 1
+                key = (t1, t2)
+                if key not in emitted[rt]:
+                    emitted[rt].add(key)
                     records.append(rec)
             else:
                 stats['v_fail'] += 1
