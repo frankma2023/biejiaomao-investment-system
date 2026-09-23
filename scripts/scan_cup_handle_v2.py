@@ -99,7 +99,7 @@ def main():
                     help='扫描日；默认取K线最新交易日。非交易日会回退到之前最近的交易日')
     ap.add_argument('--limit', type=int, default=0, help='调试用：只扫前 N 只')
     ap.add_argument('--force', action='store_true',
-                    help='允许覆盖已发布记录（默认历史产出只增不改）')
+                    help='重算该日：先删除当日已发布记录再写入（默认历史产出只增不改）')
     args = ap.parse_args()
 
     params = ch.load_params()
@@ -119,7 +119,14 @@ def main():
     snap = conn.execute("SELECT MAX(scan_date) FROM chanlun_bi_json WHERE scan_date<=?",
                         (target,)).fetchone()[0]
     print(f'扫描日 {target}（请求 {want}）　笔快照 {snap}　'
-          f'{"覆盖模式" if args.force else "只增不改"}')
+          f'{"重算当日" if args.force else "只增不改"}')
+
+    if args.force:
+        # 必须整日清空：引擎口径变化后，旧记录的唯一键可能与新记录不同，
+        # 只靠 INSERT OR REPLACE 会留下删不掉的陈旧行。
+        n = conn.execute("DELETE FROM cup_handle_v2_daily WHERE date=?", (target,)).rowcount
+        conn.commit()
+        print(f'  已删除 {target} 的旧记录 {n} 条')
 
     codes = [r[0] for r in conn.execute(
         "SELECT stock_code FROM stock_basic WHERE stock_code GLOB '[036][0-9][0-9][0-9][0-9][0-9]' "

@@ -587,11 +587,17 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
     if not d1s:
         return ([], stats) if diagnose else []
 
-    records = []
-    # 方案1：每个结构（由 t1 = 杯底索引、t2 = 杯口索引 唯一标识）每类记录只输出一次。
-    # 否则同一结构会在整个跟踪窗口内逐日重复成为候选（全市场约 37 条/日），
-    # 淹没前端图表与下游清单。
-    emitted = {'CANDIDATE': set(), 'SIGNAL': set()}
+    # 一个杯子只有一个杯底：同一杯口下每类记录只保留最深的那条。
+    # 多根向下笔会指向同一个杯口——27.1 → 19.35 → 25.25 → 19.92 → 26.51 的 W 形底，
+    # 两根向下笔的杯口都是 26.51（003030）；年线级别的新低也会取代一年前的老基部
+    # （002479：4.819 与 4.16 共享同一杯口）。不按 (杯底, 杯口) 而按 (杯口, 类型) 去重，
+    # 正是为了让「同一只杯子」只留一条。
+    #
+    # 去重放在 V 校验之后：更深的杯底若因深度超限被否，说明那个基部本就不是杯柄，
+    # 但更浅的读数可能对应另一个成立的前高→杯口区间，不该被连带否掉。
+    # 深者优先而非先到先得：同一根 D1 在连续检测日上的 bottom_price 相同，
+    # 严格小于号保证 CANDIDATE 仍落在「首次成为候选」那天。
+    best = {}           # (record_type, t2) -> rec
     for d1 in d1s:
         t1 = d1['t1_idx']
         lo = t1 + params['cup_min_age']
@@ -608,21 +614,22 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
         for t_idx in range(lo, hi + 1):
             stats['points'] += 1
             rec = _evaluate(daily, ctx, d1, t_idx, p2, t2, params)
-            if rec is not None:
+            if rec is None:
+                stats['v_fail'] += 1
+            else:
                 stats['passed_v'] += 1
                 rt = rec['record_type']
                 stats[rt] = stats.get(rt, 0) + 1
-                key = (t1, t2)
-                if key not in emitted[rt]:
-                    emitted[rt].add(key)
-                    records.append(rec)
-            else:
-                stats['v_fail'] += 1
+                key = (rt, t2)
+                prev = best.get(key)
+                if prev is None or rec['bottom_price'] < prev['bottom_price']:
+                    best[key] = rec
             # 为下一轮纳入 closes[t_idx]
             if closes[t_idx] > p2:
                 p2 = closes[t_idx]
                 t2 = t_idx
 
+    records = list(best.values())
     records.sort(key=lambda r: r['date'])
     if as_of is not None:
         records = [r for r in records if r['date'] == as_of]
