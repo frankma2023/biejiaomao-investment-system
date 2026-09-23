@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS cup_handle_v2_daily (
     handle_days         INTEGER,
     mouth_to_date_days  INTEGER,
     prior_advance_pct   REAL,
+    advance_origin_price REAL,
     breakout_close      REAL,
     breakout_vol_ratio  REAL,
     hd_min_ma10         REAL,
@@ -77,6 +78,7 @@ def _row(rec, name):
         rec['buy_point'], d['target_price'], d['stop_price'], d['suggested_max_hold'],
         rec['depth_pct'], rec['mouth_vs_high'], rec['handle_dd_pct'], rec['handle_days'],
         rec['mouth_to_date_days'], rec['prior_advance_pct'],
+        rec['advance_origin_price'],
         rec['breakout_close'], rec['breakout_vol_ratio'],
         rec['hd_min_ma10'], 1 if rec['ma10_held'] else 0,
         rec['bottom_amp'], rec['voodoo_days'],
@@ -88,7 +90,7 @@ COLS = ('date,stock_code,stock_name,record_type,'
         'mouth_date,mouth_price,handle_low_date,handle_low_price,'
         'buy_point,target_price,stop_price,suggested_max_hold,'
         'depth_pct,mouth_vs_high,handle_dd_pct,handle_days,'
-        'mouth_to_date_days,prior_advance_pct,'
+        'mouth_to_date_days,prior_advance_pct,advance_origin_price,'
         'breakout_close,breakout_vol_ratio,hd_min_ma10,ma10_held,'
         'bottom_amp,voodoo_days')
 
@@ -137,7 +139,7 @@ def main():
         "SELECT stock_code, name FROM stock_basic")}
 
     verb = 'INSERT OR REPLACE' if args.force else 'INSERT OR IGNORE'
-    sql = f"{verb} INTO cup_handle_v2_daily ({COLS}) VALUES ({','.join(['?'] * 28)})"
+    sql = f"{verb} INTO cup_handle_v2_daily ({COLS}) VALUES ({','.join(['?'] * 29)})"
 
     t0 = time.time()
     n_sig = n_cand = n_skip = n_lag = 0

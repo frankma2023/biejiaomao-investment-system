@@ -44,7 +44,7 @@ CONFIG_PATH = os.path.join(PROJECT_DIR, "config", "market", "cup_handle_v2.yaml"
 
 # 全部必需参数。缺任意一项即报错——禁止代码内兜底（PRD §4.1 / §8.2）
 REQUIRED_PARAMS = (
-    'min_prior_advance', 'min_descent_bars', 'cup_min_age', 'cup_max_age',
+    'min_prior_advance', 'advance_origin_tolerance', 'min_descent_bars', 'cup_min_age', 'cup_max_age',
     'mouth_lock_pullback', 'rim_gap_window', 'rim_gap_max', 'min_ascent_bars',
     'depth_min', 'depth_max', 'mouth_vs_high_max',
     'handle_dd_min', 'handle_dd_max', 'handle_days_max', 'mouth_to_signal_max',
@@ -124,6 +124,8 @@ def _validate_geometry(p: Dict) -> None:
         errs.append("mouth_lock_pullback 必须在 (0, 1) 内")
     if not 0 < p['rim_gap_max'] < 1:
         errs.append("rim_gap_max 必须在 (0, 1) 内")
+    if not 0 <= p['advance_origin_tolerance'] < 1:
+        errs.append("advance_origin_tolerance 必须在 [0, 1) 内")
     if p['rim_gap_window'] < 1:
         errs.append("rim_gap_window 至少为 1")
     if p['handle_position_ratio'] < 0:
@@ -261,13 +263,23 @@ def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int], params: Dict)
         if (p0 - prev_low) / prev_low < params['min_prior_advance']:
             continue
 
+        # V13: 杯底不得跌破前置上涨的起点。
+        # 杯柄本质是上涨过程中的调整；跌破起点意味着这波上涨被完全回吐，
+        # 结构上已不是「上升趋势中的整理」，而是趋势转折。
+        # 603903: 起点 11.01(06-22)，杯底 10.28(07-30)，跌破 6.6% → 否决。
+        # 留 advance_origin_tolerance 容差：相邻两笔共享转折点，报价噪声会让
+        # 杯底「低于起点 0.012 元」这种浮点级差异出现（003030 实测），
+        # 严格 > 比较会把它误杀，反而留下 W 形的浅读数。
+        if p1 <= prev_low * (1 - params['advance_origin_tolerance']):
+            continue
+
         # V3: 下行 K 线数
         bars = d1.get('length')
         if not (isinstance(bars, (int, float)) and bars >= params['min_descent_bars']):
             continue
 
         out.append({
-            'p0': float(p0), 'p1': float(p1),
+            'p0': float(p0), 'p1': float(p1), 'prev_low': float(prev_low),
             't0_idx': date_idx[t0], 't1_idx': date_idx[t1],
             'bars': int(bars),
         })
@@ -515,7 +527,10 @@ def _build_record(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int, p2: float,
         'hd_min_ma50': round(hd_min[50], 4) if hd_min[50] is not None else None,
         'ma10_held': bool(hd_min[10] is not None and hd_min[10] >= 1.0),
         'voodoo_days': voodoo,
-        'prior_advance_pct': round((p0 / (d1['p1'] or 1) - 1) * 100, 2),
+        # 前置上涨 = 前高相对【再前一笔的低点】的涨幅。不能写成 (p0/p1-1)——
+        # 那是「前高到杯底的跌幅」，与杯身深度同源，曾在此处误用。
+        'prior_advance_pct': round((p0 / d1['prev_low'] - 1) * 100, 2),
+        'advance_origin_price': round(d1['prev_low'], 3),
         # ── 交易字段 ──
         'buy_point': round(buy_point, 3),
         'entry_rule': 'buy_stop_at_pivot',
