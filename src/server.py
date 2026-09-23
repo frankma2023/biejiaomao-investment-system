@@ -6251,14 +6251,17 @@ def api_cockpit_cup_handle():
         # 表尚未建立：扫描步骤未运行过
         return jsonify(empty)
     signals = [r for r in recs if r['record_type'] == 'SIGNAL']
+    confirms = [r for r in recs if r['record_type'] == 'CONFIRM']
     candidates = [r for r in recs if r['record_type'] == 'CANDIDATE']
     return jsonify({
         'date': date,
         'latest_date': latest,
         'fallback': fallback,
         'signals': signals,
+        'confirms': confirms,
         'candidates': candidates,
-        'counts': {'signal': len(signals), 'candidate': len(candidates)},
+        'counts': {'signal': len(signals), 'confirm': len(confirms),
+                   'candidate': len(candidates)},
     })
 
 

@@ -312,21 +312,14 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     Returns:
         记录 dict（含 record_type）或 None。
 
-    突破确认（PRD §3.2 S7）：开启 require_breakout_confirm 后，检测日 T 判定的是
-    「T-1 放量突破、T 仍站稳杯口之上」。此时杯口必须取 T-2 时的取值——否则突破日
-    自己抬高了的运行最大值会把买点顶上去，S1 永远不成立。判据只用到 <= T 的数据。
+    突破确认（PRD §3.2 S7）：SIGNAL 始终发在**突破日**（轻仓买入点，能吃到
+    杯口价）；次日站稳杯口之上时，detect() 额外补一条 CONFIRM 记录（加仓点）。
+    两者并存，不互相压制——见 §7.5。
     """
     closes = ctx['closes']
     p1 = d1['p1']
     t1_idx = d1['t1_idx']
-
-    if params['require_breakout_confirm']:
-        if p2_prev is None or t2_prev is None:
-            return None
-        p2, t2_idx = p2_prev, t2_prev
-        bar = t_idx - 1                    # 突破日
-    else:
-        bar = t_idx                        # 检测日即突破日
+    bar = t_idx
 
     # V4: 杯底距检测日的交易日区间
     age = t_idx - t1_idx
@@ -392,17 +385,15 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
                          handle, depth, hdd, handle_days, buy_point, params,
                          bar_idx=bar)
 
-    # S1~S6（+ S7 确认）：突破日放量收上买点
+    # S1~S6：突破日放量收上买点
     if daily[bar]['close'] > buy_point:
-        held = (not params['require_breakout_confirm']) or daily[t_idx]['close'] > p2
-        if held and _is_signal(daily, ctx, bar, t2_idx, p2, buy_point, params):
+        if _is_signal(daily, ctx, bar, t2_idx, p2, buy_point, params):
             base['record_type'] = 'SIGNAL'
             base['breakout_close'] = round(daily[bar]['close'], 3)
             ma20v = ctx['vol_ma'][bar]
             base['breakout_vol_ratio'] = (
                 round(daily[bar]['volume'] / ma20v, 3) if ma20v else None)
             return base
-        # 突破已发生但未确认：结构用尽，不再回退成候选
         return None
 
     # W1/W2/W3: 候选
@@ -680,13 +671,11 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
         # 杯口从杯底当天起逐日推进，且只用「不是跳涨日」的收盘来抬高杯口。
         p2 = closes[t1]
         t2 = t1
-        p2_prev = t2_prev = None
 
         for t_idx in range(t1, hi + 1):
             if t_idx >= lo:
                 stats['points'] += 1
-                rec = _evaluate(daily, ctx, d1, t_idx, p2, t2, params,
-                                p2_prev, t2_prev)
+                rec = _evaluate(daily, ctx, d1, t_idx, p2, t2, params)
                 if rec is None:
                     stats['v_fail'] += 1
                 else:
@@ -697,9 +686,6 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
                     prev = best.get(key)
                     if prev is None or rec['bottom_price'] < prev['bottom_price']:
                         best[key] = rec
-            # 记住 t_idx-1 时的杯口口径：突破确认要用 T-2 的杯口，
-            # 否则突破日自己抬高的运行最大值会把买点顶上去，S1 永不成立。
-            p2_prev, t2_prev = p2, t2
             # 杯口只能被「走到」，不能被「跳上去」（PRD §2.5）。
             #
             # 原来的 p2 = max(close[t1 .. t_idx-1]) 会让任何一根收盘都成为新杯口。
@@ -717,6 +703,31 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
                 t2 = t_idx
 
     records = list(best.values())
+
+    # 加仓点（PRD §3.2 S7，用户规则 5）：突破日发 SIGNAL（轻仓、吃杯口价），
+    # 次日收盘仍站在杯口之上时补一条 CONFIRM（加仓）。两者并存互不压制。
+    # 判据只用 <= 突破日+1 的数据，记录日期即确认日，因果性与幂等不受影响。
+    if params['require_breakout_confirm']:
+        di = {k['date']: i for i, k in enumerate(daily)}
+        extra = []
+        for rec in records:
+            if rec['record_type'] != 'SIGNAL':
+                continue
+            i = di.get(rec['date'])
+            if i is None or i + 1 >= n:
+                continue
+            if closes[i + 1] > rec['mouth_price']:
+                c = dict(rec)
+                c['record_type'] = 'CONFIRM'
+                c['date'] = daily[i + 1]['date']
+                c['details'] = dict(rec['details'])
+                c['details']['description'] = (
+                    '加仓：突破日 %s 后次日收 %.2f 仍站稳杯口 %.2f | %s'
+                    % (rec['date'], closes[i + 1], rec['mouth_price'],
+                       rec['details']['description']))
+                extra.append(c)
+        records.extend(extra)
+
     records.sort(key=lambda r: r['date'])
     if as_of is not None:
         records = [r for r in records if r['date'] == as_of]
@@ -775,7 +786,7 @@ def main():
         print(f"{args.stock} 无K线数据"); return
     as_of = None if args.all_dates else daily[-1]['date']
     records, stats = detect(daily, params, stock_code=args.stock, as_of=as_of,
-                            record_types=('SIGNAL', 'CANDIDATE'), diagnose=True)
+                            record_types=('SIGNAL', 'CONFIRM', 'CANDIDATE'), diagnose=True)
 
     print(f"{args.stock} {name['name'] if name else ''} @ {daily[-1]['date']}   "
           f"K线 {len(daily)} 根   笔快照 {_snapshot_date(args.stock, daily[-1]['date'])}"

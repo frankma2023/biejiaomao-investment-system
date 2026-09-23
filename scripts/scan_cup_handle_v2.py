@@ -142,7 +142,7 @@ def main():
     sql = f"{verb} INTO cup_handle_v2_daily ({COLS}) VALUES ({','.join(['?'] * 29)})"
 
     t0 = time.time()
-    n_sig = n_cand = n_skip = n_lag = 0
+    n_sig = n_conf = n_cand = n_skip = n_lag = 0
     for i, code in enumerate(codes, 1):
         daily = ch._load_daily(conn, code, target, 2500)
         if len(daily) < 400:
@@ -152,7 +152,7 @@ def main():
             n_lag += 1
             continue
         recs = ch.detect(daily, params, stock_code=code, as_of=target,
-                         record_types=('SIGNAL', 'CANDIDATE'))
+                         record_types=('SIGNAL', 'CONFIRM', 'CANDIDATE'))
         for r in recs:
             cur = conn.execute(sql, _row(r, names.get(code, '')))
             if cur.rowcount == 0:
@@ -160,10 +160,12 @@ def main():
                 continue
             if r['record_type'] == 'SIGNAL':
                 n_sig += 1
+            elif r['record_type'] == 'CONFIRM':
+                n_conf += 1
             else:
                 n_cand += 1
         if i % 800 == 0:
-            print(f'  ...{i:,}/{len(codes):,}  SIGNAL {n_sig}  CANDIDATE {n_cand}  '
+            print(f'  ...{i:,}/{len(codes):,}  SIGNAL {n_sig}  CONFIRM {n_conf}  CANDIDATE {n_cand}  '
                   f'({time.time()-t0:.0f}s)', flush=True)
     conn.commit()
     conn.close()

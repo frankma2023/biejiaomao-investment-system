@@ -302,12 +302,15 @@ function reviewLink(r){
 }
 
 function renderCup(){
-  var list=(cupView==='signal'?cupData.signals:cupData.candidates)||[];
+  var list=(cupView==='signal'?cupData.signals
+           :cupView==='confirm'?cupData.confirms
+           :cupData.candidates)||[];
   var nSig=(cupData.signals||[]).length, nCand=(cupData.candidates||[]).length;
+  var nConf=(cupData.confirms||[]).length;
 
   document.getElementById('cnt-cup').textContent=nSig;
 
-  var hint='☕ 杯柄形态 → 柄部缩量小幅回调 → 放量突破杯口当日为买点（买点=杯口价×1.01，不突破不买入）';
+  var hint='☕ 杯柄形态 → 柄部缩量小幅回调 → 放量突破杯口当日轻仓（买点=杯口价×1.01，不突破不买入）→ 次日仍站稳杯口之上则加仓';
   if(cupData.fallback){
     hint='⚠️ '+currentDate+' 无杯柄记录，已回退显示最近交易日 '+cupData.date;
   }else if(cupData.date){
@@ -318,17 +321,19 @@ function renderCup(){
   var el=document.getElementById('cup-signals');
   var head='<div style="display:flex;gap:8px;margin:10px 0">'+
     '<button class="btn-glass sm'+(cupView==='signal'?' on':'')+'" onclick="toggleCupView(\'signal\')">🚀 突破信号 '+nSig+'</button>'+
+    '<button class="btn-glass sm'+(cupView==='confirm'?' on':'')+'" onclick="toggleCupView(\'confirm\')">➕ 确认加仓 '+nConf+'</button>'+
     '<button class="btn-glass sm'+(cupView==='candidate'?' on':'')+'" onclick="toggleCupView(\'candidate\')">👀 观察候选 '+nCand+'</button>'+
     '</div>';
 
   if(!list.length){
     el.innerHTML=head+'<div class="empty-state">'+
-      (cupView==='signal'?'当日无杯柄放量突破信号':'当日无新的杯柄观察候选')+'</div>';
+      (cupView==='signal'?'当日无杯柄放量突破信号'
+       :cupView==='confirm'?'当日无确认加仓信号':'当日无新的杯柄观察候选')+'</div>';
     return;
   }
 
   el.innerHTML=head+list.map(function(r,i){
-    var isSig=r.record_type==='SIGNAL';
+    var isSig=r.record_type==='SIGNAL', isConf=r.record_type==='CONFIRM';
     var link=reviewLink(r);
     var detail='<table>'+
       '<tr><td class="lbl">买点</td><td class="val ok">'+r.buy_point+
@@ -353,8 +358,8 @@ function renderCup(){
       '<div class="top-row">'+
         '<span class="stock-info"><a href="'+link+'" target="_blank">'+(r.stock_name||r.stock_code)+
           '</a><span class="code">'+r.stock_code+'</span></span>'+
-        '<span class="badge '+(isSig?'badge-score-hi':'badge-score')+'">'+
-          (isSig?'🚀 突破':'👀 候选')+'</span>'+
+        '<span class="badge '+(isSig?'badge-score-hi':isConf?'badge-pos':'badge-score')+'">'+
+          (isSig?'🚀 突破·轻仓':isConf?'➕ 确认·加仓':'👀 候选')+'</span>'+
       '</div>'+
       '<div class="node-line">'+
         '<span class="node-dot nd-H"></span> 前高 '+r.prior_high_price+
