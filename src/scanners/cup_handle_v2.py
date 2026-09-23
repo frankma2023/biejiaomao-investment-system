@@ -45,7 +45,7 @@ CONFIG_PATH = os.path.join(PROJECT_DIR, "config", "market", "cup_handle_v2.yaml"
 # 全部必需参数。缺任意一项即报错——禁止代码内兜底（PRD §4.1 / §8.2）
 REQUIRED_PARAMS = (
     'min_prior_advance', 'min_descent_bars', 'cup_min_age', 'cup_max_age',
-    'mouth_lock_pullback', 'min_ascent_bars',
+    'mouth_lock_pullback', 'rim_gap_window', 'rim_gap_max', 'min_ascent_bars',
     'depth_min', 'depth_max', 'mouth_vs_high_max',
     'handle_dd_min', 'handle_dd_max', 'handle_days_max', 'mouth_to_signal_max',
     'handle_position_ratio', 'handle_red_vol_ratio',
@@ -122,6 +122,10 @@ def _validate_geometry(p: Dict) -> None:
         errs.append("mouth_lock_pullback 不应大于 handle_dd_max（否则杯口确认晚于柄部成立）")
     if not 0 < p['mouth_lock_pullback'] < 1:
         errs.append("mouth_lock_pullback 必须在 (0, 1) 内")
+    if not 0 < p['rim_gap_max'] < 1:
+        errs.append("rim_gap_max 必须在 (0, 1) 内")
+    if p['rim_gap_window'] < 1:
+        errs.append("rim_gap_window 至少为 1")
     if p['handle_position_ratio'] < 0:
         errs.append("handle_position_ratio 不应为负")
     if p['handle_position_ratio'] >= 1:
@@ -193,6 +197,30 @@ def _load_bi(stock_code: str, target_date: Optional[str] = None) -> List[Dict]:
 
 
 # ─── 结构拟合 ─────────────────────────────────────────
+
+def _mark_gaps(closes: List[float], window: int, max_gap: float) -> List[bool]:
+    """
+    标记「跳涨日」：收盘高出前 window 日最高收盘 max_gap 以上。
+
+    跳涨日意味着价格突破了一段既有区间，因此不能充当杯口——杯口是杯子右侧的顶，
+    突破它才是买点；让突破日自己当杯口，突破就永远成立（PRD §2.5）。
+
+    Args:
+        closes: 收盘价序列。
+        window: 回看窗口（交易日）。
+        max_gap: 允许高出前高的最大比例。
+
+    Returns:
+        与 closes 等长的布尔列表，True 表示该日为跳涨日。
+    """
+    n = len(closes)
+    out = [False] * n
+    for i in range(1, n):
+        prev = closes[max(0, i - window):i]
+        if prev and closes[i] > max(prev) * (1 + max_gap):
+            out[i] = True
+    return out
+
 
 def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int], params: Dict) -> List[Dict]:
     """
@@ -598,34 +626,44 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
     # 深者优先而非先到先得：同一根 D1 在连续检测日上的 bottom_price 相同，
     # 严格小于号保证 CANDIDATE 仍落在「首次成为候选」那天。
     best = {}           # (record_type, t2) -> rec
+    is_gap = _mark_gaps(closes, params['rim_gap_window'], params['rim_gap_max'])
     for d1 in d1s:
         t1 = d1['t1_idx']
         lo = t1 + params['cup_min_age']
         hi = min(t1 + params['cup_max_age'], n - 1)
         if lo > hi:
             continue
-        # 初始化 running_max 覆盖 [t1, lo-1]
-        seg = closes[t1:lo]
-        if not seg:
-            continue
-        p2 = max(seg)
-        t2 = t1 + seg.index(p2)
+        # 杯口从杯底当天起逐日推进，且只用「不是跳涨日」的收盘来抬高杯口。
+        p2 = closes[t1]
+        t2 = t1
 
-        for t_idx in range(lo, hi + 1):
-            stats['points'] += 1
-            rec = _evaluate(daily, ctx, d1, t_idx, p2, t2, params)
-            if rec is None:
-                stats['v_fail'] += 1
-            else:
-                stats['passed_v'] += 1
-                rt = rec['record_type']
-                stats[rt] = stats.get(rt, 0) + 1
-                key = (rt, t2)
-                prev = best.get(key)
-                if prev is None or rec['bottom_price'] < prev['bottom_price']:
-                    best[key] = rec
-            # 为下一轮纳入 closes[t_idx]
-            if closes[t_idx] > p2:
+        for t_idx in range(t1, hi + 1):
+            if t_idx >= lo:
+                stats['points'] += 1
+                rec = _evaluate(daily, ctx, d1, t_idx, p2, t2, params)
+                if rec is None:
+                    stats['v_fail'] += 1
+                else:
+                    stats['passed_v'] += 1
+                    rt = rec['record_type']
+                    stats[rt] = stats.get(rt, 0) + 1
+                    key = (rt, t2)
+                    prev = best.get(key)
+                    if prev is None or rec['bottom_price'] < prev['bottom_price']:
+                        best[key] = rec
+            # 杯口只能被「走到」，不能被「跳上去」（PRD §2.5）。
+            #
+            # 原来的 p2 = max(close[t1 .. t_idx-1]) 会让任何一根收盘都成为新杯口。
+            # 603903 就是被这一点毁掉的：真杯口是 08-18 的 14.76，之后 15 个交易日
+            # 在 13.55~14.55 之间横盘；09-09 收 15.12 是【突破这次横盘的尝试】，
+            # 但引擎把 15.12 记成了新杯口，于是 09-10 跌回 14.61（跌破真杯口）
+            # 被重新解读成「柄部正常回落」，09-22 的二次上攻成了新突破。
+            #
+            # 跳涨日 = 收盘高出前 rim_gap_window 日最高收盘 rim_gap_max 以上，
+            # 即「突破了一段既有区间」。此类日不能充当杯口——杯口是右侧的顶，
+            # 突破它才叫买点；让突破日自己当杯口，突破就永远成立了。
+            # 判据只用 <= t_idx-1 的数据，因果性与幂等不受影响。
+            if closes[t_idx] > p2 and not is_gap[t_idx]:
                 p2 = closes[t_idx]
                 t2 = t_idx
 
