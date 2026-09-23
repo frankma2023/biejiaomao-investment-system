@@ -303,6 +303,11 @@ function renderChart() {
         name = state.displayNameMap[sig.source] || sig.source;
       }
       var style = getSignalStyle(sig);
+      // 杯柄「确认加仓」记录：与突破日区分（洋红菱形 vs 青色 pin）
+      if (sig.source === 'cup_handle_v2' && sig.record_type === 'CONFIRM') {
+        style = { color: '#FF2D95', symbol: 'diamond', size: 15 };
+        name = '加仓 · ' + name;
+      }
       var y = k.low - gap * (i + 1);
       var pt = {
         name: name,
@@ -331,6 +336,10 @@ function renderChart() {
         pt.cupInfo = {
           priorHigh: cd.prior_high, bottom: cd.bottom, mouth: cd.mouth,
           handleLow: cd.handle_low, buyPoint: cd.buy_point,
+          priorHighIdx: dateIndex[cd.prior_high_date],
+          bottomIdx: dateIndex[cd.bottom_date],
+          mouthIdx: dateIndex[cd.mouth_date],
+          handleLowIdx: dateIndex[cd.handle_low_date],
           // 前高常早于可见区间起点，此时从最左侧起画，否则线长为 0
           startIdx: si !== undefined ? si : 0,
           endIdx: idx
@@ -769,22 +778,39 @@ function renderChart() {
 
   // ── 杯柄形态信号 hover → 画四个结构点 + 买点线 ──
   var cupMarkAdded = false;
+  // [显示名, 价位字段, 日期索引字段, 颜色]
   var CUP_LEVELS = [
-    ['前高', 'priorHigh', 'rgba(255,138,128,0.9)'],
-    ['杯口/买点', 'mouth', 'rgba(0,229,255,0.95)'],
-    ['柄低', 'handleLow', 'rgba(179,157,219,0.9)'],
-    ['杯底', 'bottom', 'rgba(129,199,132,0.9)']
+    ['前高', 'priorHigh', 'priorHighIdx', '#FF8A80'],
+    ['杯口', 'mouth', 'mouthIdx', '#00E5FF'],
+    ['买点', 'buyPoint', null, '#FFD700'],
+    ['柄低', 'handleLow', 'handleLowIdx', '#B39DDB'],
+    ['杯底', 'bottom', 'bottomIdx', '#81C784']
   ];
   function addCupMarks(ci) {
     if (!ci || cupMarkAdded) return;
-    var markData = CUP_LEVELS.map(function (lv) {
-      var v = ci[lv[1]];
-      if (v == null) return null;
-      return [
-        { coord: [ci.startIdx, v], value: lv[0] + ' ' + v },
-        { coord: [ci.endIdx, v] }
-      ];
-    }).filter(Boolean);
+    // 1) 价位虚线：从最左侧画到突破点，右端带标签
+    var markData = CUP_LEVELS.filter(function (lv) { return ci[lv[1]] != null; })
+      .map(function (lv) {
+        return [
+          { coord: [ci.startIdx, ci[lv[1]]] },
+          { coord: [ci.endIdx, ci[lv[1]]],
+            lineStyle: { color: lv[3] },
+            label: { show: true, formatter: lv[0] + ' ' + ci[lv[1]],
+                     color: lv[3], fontSize: 9, position: 'end' } }
+        ];
+      });
+    // 2) 结构点圆点：落在各自的真实日期上（前高可能早于可见区间 → 跳过）
+    var pointData = CUP_LEVELS.filter(function (lv) {
+      return lv[2] && ci[lv[2]] !== undefined && ci[lv[1]] != null;
+    }).map(function (lv) {
+      return {
+        name: lv[0] + ' ' + ci[lv[1]],
+        coord: [ci[lv[2]], ci[lv[1]]],
+        itemStyle: { color: lv[3] },
+        label: { show: true, formatter: lv[0], color: lv[3],
+                 fontSize: 9, position: 'top', distance: 4 }
+      };
+    });
     if (!markData.length) return;
     state.chart.setOption({
       series: {
@@ -792,9 +818,14 @@ function renderChart() {
         markLine: {
           silent: true,
           symbol: ['none', 'none'],
-          lineStyle: { type: 'dotted', width: 1.2, color: 'rgba(0,229,255,0.85)' },
-          label: { show: true, fontSize: 9, color: '#00E5FF', position: 'end' },
+          lineStyle: { type: 'dotted', width: 1.1, color: 'rgba(0,229,255,0.55)' },
           data: markData
+        },
+        markPoint: {
+          silent: true,
+          symbol: 'circle',
+          symbolSize: 7,
+          data: pointData
         }
       }
     });
@@ -805,7 +836,8 @@ function renderChart() {
     state.chart.setOption({
       series: {
         id: 'cup-mark-series',
-        markLine: { silent: true, symbol: ['none', 'none'], data: [] }
+        markLine: { silent: true, symbol: ['none', 'none'], data: [] },
+        markPoint: { silent: true, data: [] }
       }
     });
     cupMarkAdded = false;

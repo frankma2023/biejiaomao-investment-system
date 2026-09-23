@@ -1,4 +1,4 @@
-const CACHE = 'hana-v4';   // 提升版本号：非导航资源是缓存优先，不升级则 app.js 改动到不了浏览器
+const CACHE = 'hana-v5';   // 提升版本号：非导航资源是缓存优先，不升级则 app.js 改动到不了浏览器
 const URLS = [
   '/mobile/',
   '/cockpit/',

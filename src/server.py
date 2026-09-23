@@ -5765,7 +5765,8 @@ def api_pattern_scan():
         k['stock_code'] = code
 
     # ── 运行全部引擎 ──
-    signals = run_all_engines(klines=klines_full, indicators=indicators)
+    signals = run_all_engines(klines=klines_full, indicators=indicators,
+                              record_types=('SIGNAL', 'CONFIRM'))
 
     # ── 过滤到请求的日期范围 ──
     if start:

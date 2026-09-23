@@ -176,7 +176,8 @@ def get_run_failures():
     return list(_run_failures)
 
 
-def run_all_engines(klines, indicators=None, silent=False, whitelist=None):
+def run_all_engines(klines, indicators=None, silent=False, whitelist=None,
+                    record_types=None):
     """
     运行全部已发现的引擎。
 
@@ -187,6 +188,9 @@ def run_all_engines(klines, indicators=None, silent=False, whitelist=None):
             每个 (引擎名, 阶段) 在进程内首次失败时必定告警一次，
             完整记录另可通过 get_run_failures() 读取。
         whitelist: 可选，只运行指定名称的引擎列表
+        record_types: 可选，只传给声明了该形参的引擎（如 cup_handle_v2），
+            用于索取 SIGNAL / CONFIRM / CANDIDATE 中的哪几类记录。
+            不声明的引擎不受影响。
 
     Returns:
         all_signals: List[dict]，每条信号已自动注入 source 字段
@@ -214,6 +218,8 @@ def run_all_engines(klines, indicators=None, silent=False, whitelist=None):
                 kwargs['daily_klines'] = klines
             if 'indicators' in params and indicators is not None:
                 kwargs['indicators'] = indicators
+            if 'record_types' in params and record_types is not None:
+                kwargs['record_types'] = record_types
             if 'params' in params:
                 # 引擎未提供 load_params()（或它抛错）时分两种情形：
                 #   params 有默认值 → 省略即可，由引擎自身的默认逻辑接管；
