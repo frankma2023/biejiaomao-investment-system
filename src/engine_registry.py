@@ -98,6 +98,9 @@ def discover_engines(force_reload=False):
         'base_detector',      # 基础工具模块，被其他引擎消费
         '__init__',
         'distribution_day',   # 大盘指数级别引擎，不参与个股扫描
+        # v1 杯柄：买点取自包含检测日自身的窗口最大值，而突破判定又要求检测日收盘
+        # 超过该值（x >= x + 0.01），数学上不可能产出信号。已由 cup_handle_v2 取代。
+        'cup_handle',
     }
 
     for _, name, _ in pkgutil.iter_modules(pkg.__path__):

@@ -553,7 +553,7 @@ def score_stock(stock_code, target_date, params=None, save=False, signals=None):
 
     # N 因子计分引擎白名单（v3.5 性能）：只跑 bullish 配分引擎，bearish 引擎（box_breakdown/top_pattern 等）不参与 N 计分不跑——002001 实测省 ~5s/只
     n_engines = ('base_breakout_v2', 'base_breakout', 'pocket_pivot_v2', 'pocket_pivot',
-                 'box_breakout', 'double_bottom', 'flat_base', 'saucer_base', 'cup_handle',
+                 'box_breakout', 'double_bottom', 'flat_base', 'saucer_base', 'cup_handle_v2',
                  'cdl', 'talib', 'mw_signal')
     # 引擎输入截断 600 根（v3.6 性能）：box_breakout 等引擎全历史事件扫描 O(n²)——评分只需近 5 天信号，
     # 600 根(2.4年)覆盖 52 周高点判断+箱体形成期。实测引擎 0.8s→0.25s（box_breakout 0.51s→0.13s）

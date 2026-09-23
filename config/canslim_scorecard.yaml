@@ -51,7 +51,7 @@ n_new:
     double_bottom: 2
     flat_base: 2
     saucer_base: 2
-    cup_handle: 2
+    cup_handle_v2: 2
     cdl_bullish: 2
     talib_bullish: 1
   mw_quality:
@@ -71,7 +71,7 @@ n_new:
     - double_bottom
     - flat_base
     - saucer_base
-    - cup_handle
+    - cup_handle_v2
     pivot:
     - pocket_pivot_v2
     - pocket_pivot

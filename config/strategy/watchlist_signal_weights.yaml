@@ -43,7 +43,7 @@ signals:
     dir: long
     score: 25
     source: expert
-  cup_handle:
+  cup_handle_v2:
     dir: long
     score: 25
     source: expert
