@@ -30,12 +30,17 @@ let state = {
 
 // ── 初始化 ──
 document.addEventListener('DOMContentLoaded', function () {
-  // 默认日期范围：18个月
+  // 默认日期范围：最近 18 个月。用本地日期拼接，不能走 toISOString——
+  // 东八区 00:00~07:59 会被转成前一天。
   var end = new Date();
   var start = new Date(end);
   start.setMonth(start.getMonth() - 18);
-  document.getElementById('date-start').value = start.toISOString().slice(0, 10);
-  document.getElementById('date-end').value = end.toISOString().slice(0, 10);
+  var fmtDate = function (d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+           '-' + String(d.getDate()).padStart(2, '0');
+  };
+  document.getElementById('date-start').value = fmtDate(start);
+  document.getElementById('date-end').value = fmtDate(end);
 
   // URL 参数预填股票代码 (如 ?code=600519)
   var urlParams = new URLSearchParams(window.location.search);

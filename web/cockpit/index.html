@@ -290,6 +290,17 @@ function toggleCupView(v){
   renderCup();
 }
 
+// 形态复核链接：以信号日为锚点往前 18 个月。用 UTC 构造避免 toISOString 在东八区
+// 把日期回退一天；月份溢出（3/31 往前 18 个月）按当月最后一天夹取。
+function reviewLink(r){
+  var p=(r.date||'').split('-');
+  var back=new Date(Date.UTC(+p[0], +p[1]-1-18, 1));
+  var last=new Date(Date.UTC(back.getUTCFullYear(), back.getUTCMonth()+1, 0)).getUTCDate();
+  back.setUTCDate(Math.min(+p[2], last));
+  var start=back.toISOString().slice(0,10);
+  return '../pattern-scan/?code='+r.stock_code+'&start='+start+'&end='+r.date;
+}
+
 function renderCup(){
   var list=(cupView==='signal'?cupData.signals:cupData.candidates)||[];
   var nSig=(cupData.signals||[]).length, nCand=(cupData.candidates||[]).length;
@@ -318,7 +329,7 @@ function renderCup(){
 
   el.innerHTML=head+list.map(function(r,i){
     var isSig=r.record_type==='SIGNAL';
-    var link='../pattern-scan/?code='+r.stock_code+'&start='+(r.prior_high_date||'')+'&end='+r.date;
+    var link=reviewLink(r);
     var detail='<table>'+
       '<tr><td class="lbl">买点</td><td class="val ok">'+r.buy_point+
         '</td><td class="lbl">目标/止损</td><td class="val">'+r.target_price+' / '+r.stop_price+'</td></tr>'+
