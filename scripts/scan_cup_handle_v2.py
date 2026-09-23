@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """杯柄形态 V2 每日全市场落库。
 
-把当日新出现的两类记录写入 cup_handle_v2_daily：
-    SIGNAL    当日放量突破（可交易信号）
-    CANDIDATE 结构已完成、买点已定、尚未突破（供下游挂单/筛选）
+站在扫描日当天看：K线截断到当日、缠论笔取当日快照、只写当日新出现的记录。
+实盘当时判断不出就是判断不出——后续K线变化导致笔重划，不允许改写已发布的记录，
+因此写入用 INSERT OR IGNORE（该行为是历史产出，只增不改；确需重算用 --force）。
 
-引擎按「每个结构每类只输出一次」去重，故候选量约为每日 3 条，
-可作为观察清单直接消费。
+写入 cup_handle_v2_daily 的两类记录：
+    SIGNAL    当日放量突破（可交易信号）
+    CANDIDATE 结构已完成、买点已定、尚未突破（供下游筛选/观察）
+
+引擎按「每个结构每类只输出一次」去重，候选输出在首次成为候选那天，
+故每日候选量约为个位数，可直接作为观察清单消费。
 
 用法：
-    python scripts/scan_cup_handle_v2.py [--date YYYY-MM-DD]
+    python scripts/scan_cup_handle_v2.py [--date YYYY-MM-DD] [--force]
 """
 import argparse
 import os
@@ -91,8 +95,11 @@ COLS = ('date,stock_code,stock_name,record_type,'
 
 def main():
     ap = argparse.ArgumentParser(description='杯柄形态 V2 每日全市场落库')
-    ap.add_argument('--date', default=None, help='目标日期，默认取K线最新交易日')
+    ap.add_argument('--date', default=None,
+                    help='扫描日；默认取K线最新交易日。非交易日会回退到之前最近的交易日')
     ap.add_argument('--limit', type=int, default=0, help='调试用：只扫前 N 只')
+    ap.add_argument('--force', action='store_true',
+                    help='允许覆盖已发布记录（默认历史产出只增不改）')
     args = ap.parse_args()
 
     params = ch.load_params()
@@ -100,12 +107,19 @@ def main():
     conn.row_factory = sqlite3.Row
     conn.executescript(DDL)
 
-    # 目标日必须落在K线上，否则非交易日运行会把当日记录全部滤掉。
-    if args.date:
-        target = args.date
-    else:
-        target = conn.execute("SELECT MAX(date) FROM daily_kline_adj").fetchone()[0]
-        print(f'目标日（取K线最新交易日）: {target}')
+    # 站在 target 这一天看：K线截断到当日，笔取当日快照，只写当日新出现的记录。
+    want = args.date or conn.execute(
+        "SELECT MAX(date) FROM daily_kline_adj").fetchone()[0]
+    row = conn.execute("SELECT MAX(date) FROM daily_kline_adj WHERE date<=?",
+                       (want,)).fetchone()
+    target = row[0] if row else None
+    if not target:
+        print(f'[FAIL] {want} 之前没有任何K线，无法确定扫描日')
+        return
+    snap = conn.execute("SELECT MAX(scan_date) FROM chanlun_bi_json WHERE scan_date<=?",
+                        (target,)).fetchone()[0]
+    print(f'扫描日 {target}（请求 {want}）　笔快照 {snap}　'
+          f'{"覆盖模式" if args.force else "只增不改"}')
 
     codes = [r[0] for r in conn.execute(
         "SELECT stock_code FROM stock_basic WHERE stock_code GLOB '[036][0-9][0-9][0-9][0-9][0-9]' "
@@ -115,20 +129,26 @@ def main():
     names = {r['stock_code']: r['name'] for r in conn.execute(
         "SELECT stock_code, name FROM stock_basic")}
 
+    verb = 'INSERT OR REPLACE' if args.force else 'INSERT OR IGNORE'
+    sql = f"{verb} INTO cup_handle_v2_daily ({COLS}) VALUES ({','.join(['?'] * 28)})"
+
     t0 = time.time()
-    n_sig = n_cand = 0
+    n_sig = n_cand = n_skip = n_lag = 0
     for i, code in enumerate(codes, 1):
         daily = ch._load_daily(conn, code, target, 2500)
         if len(daily) < 400:
             continue
-        recs = ch.detect(daily, params, stock_code=code,
+        # 停牌股最后一根K线可能早于 target：那它当天没有可判定的行情，跳过。
+        if daily[-1]['date'] != target:
+            n_lag += 1
+            continue
+        recs = ch.detect(daily, params, stock_code=code, as_of=target,
                          record_types=('SIGNAL', 'CANDIDATE'))
         for r in recs:
-            if r['date'] != target:
+            cur = conn.execute(sql, _row(r, names.get(code, '')))
+            if cur.rowcount == 0:
+                n_skip += 1
                 continue
-            conn.execute(f"INSERT OR REPLACE INTO cup_handle_v2_daily ({COLS}) "
-                         f"VALUES ({','.join(['?'] * 28)})",
-                         _row(r, names.get(code, '')))
             if r['record_type'] == 'SIGNAL':
                 n_sig += 1
             else:
@@ -138,8 +158,9 @@ def main():
                   f'({time.time()-t0:.0f}s)', flush=True)
     conn.commit()
     conn.close()
-    print(f'{target}: 扫描 {len(codes):,} 只   写入 SIGNAL {n_sig} / CANDIDATE {n_cand}   '
-          f'耗时 {time.time()-t0:.0f}s')
+    print(f'{target}: 扫描 {len(codes):,} 只（停牌跳过 {n_lag}）   '
+          f'新写入 SIGNAL {n_sig} / CANDIDATE {n_cand}   '
+          f'已存在跳过 {n_skip}   耗时 {time.time()-t0:.0f}s')
 
 
 if __name__ == '__main__':

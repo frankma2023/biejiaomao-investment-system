@@ -507,6 +507,7 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
            bi_list: Optional[List[Dict]] = None,
            stock_code: Optional[str] = None,
            record_types=('SIGNAL',),
+           as_of: Optional[str] = None,
            diagnose: bool = False):
     """
     单次无状态扫描，产出 CANDIDATE / SIGNAL 两类记录。
@@ -528,6 +529,10 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
             清单；需要时显式传入 ('SIGNAL','CANDIDATE')。
             每个结构（杯底日 + 杯口日 唯一标识）每类记录只输出一次：
             CANDIDATE 输出在「首次成为候选」那天。
+        as_of: 「当天视角」日期。传入后 daily 先截断到 ≤ as_of，笔快照取 ≤ as_of 的
+            最后一个（chanlun_bi_json 是每股 50 笔的滚动窗口且端点会随后续K线调整，
+            用最新快照评估历史K线会把未来信息带进笔的划分），返回值只保留
+            date == as_of 的记录。逐日扫描必须传它。
         diagnose: True 时返回 (records, 漏斗统计)。
 
     Returns:
@@ -538,6 +543,14 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
 
     stats = {'points': 0, 'no_d1': 0, 'v_fail': 0, 'passed_v': 0,
              'SIGNAL': 0, 'CANDIDATE': 0, 'other': 0}
+
+    # as_of：只站在 as_of 这一天看。K线截断到当日，笔快照随之取当日快照，
+    # 返回的记录也只保留当日新出现的那一条。实盘当时判断不出，就永远判断不出，
+    # 不允许后续K线改写历史产出。
+    if as_of is not None:
+        daily = [k for k in daily if k['date'] <= as_of]
+        if not daily:
+            return ([], stats) if diagnose else []
 
     n = len(daily)
     need = params['cup_max_age'] + params['min_descent_bars'] + 60
@@ -611,6 +624,8 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
                 t2 = t_idx
 
     records.sort(key=lambda r: r['date'])
+    if as_of is not None:
+        records = [r for r in records if r['date'] == as_of]
     if record_types is not None:
         keep = set(record_types)
         records = [r for r in records if r['record_type'] in keep]
@@ -628,12 +643,27 @@ def _load_daily(conn, stock_code: str, end_date: str, days: int) -> List[Dict]:
     return [dict(r) for r in rows if r['close'] is not None]
 
 
+def _snapshot_date(stock_code: str, as_of: str) -> str:
+    """该股在 as_of 视角下实际用到的笔快照日期，便于核对口径。"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        row = conn.execute(
+            "SELECT MAX(scan_date) FROM chanlun_bi_json WHERE stock_code=? AND scan_date<=?",
+            (stock_code, as_of)).fetchone()
+        conn.close()
+        return row[0] if row and row[0] else '无'
+    except sqlite3.Error:
+        return '未知'
+
+
 def main():
     ap = argparse.ArgumentParser(description='杯柄形态放量突破检测 V2')
     ap.add_argument('--stock', default='600519')
     ap.add_argument('--date', default=None, help='截止日期，默认今天')
     ap.add_argument('--days', type=int, default=2500, help='回溯日历天数')
     ap.add_argument('--diagnose', action='store_true', help='输出逐层漏斗')
+    ap.add_argument('--all-dates', action='store_true',
+                    help='列出历史全部记录（默认只给 --date 当天的当天视角）')
     args = ap.parse_args()
 
     from datetime import date as _d
@@ -649,10 +679,13 @@ def main():
 
     if not daily:
         print(f"{args.stock} 无K线数据"); return
-    records, stats = detect(daily, params, stock_code=args.stock,
+    as_of = None if args.all_dates else daily[-1]['date']
+    records, stats = detect(daily, params, stock_code=args.stock, as_of=as_of,
                             record_types=('SIGNAL', 'CANDIDATE'), diagnose=True)
 
-    print(f"{args.stock} {name['name'] if name else ''} @ {end}   K线 {len(daily)} 根")
+    print(f"{args.stock} {name['name'] if name else ''} @ {daily[-1]['date']}   "
+          f"K线 {len(daily)} 根   笔快照 {_snapshot_date(args.stock, daily[-1]['date'])}"
+          f"{'   [全历史]' if as_of is None else '   [当天视角]'}")
     if args.diagnose:
         print("\n=== 漏斗 ===")
         for k, v in stats.items():
