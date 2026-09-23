@@ -109,8 +109,7 @@ bi = [
 
 params = ch.load_params()
 records, stats = ch.detect(daily, params, bi_list=bi, stock_code='SYN001',
-                           as_of=D[T_SIG], record_types=('SIGNAL', 'CANDIDATE'),
-                           diagnose=True)
+                           record_types=('SIGNAL', 'CONFIRM'), diagnose=True)
 print('=== 引擎判定（K线 %d 根）===' % N)
 print('  记录数 =', len(records), ' 漏斗 =', stats)
 for r in records:
@@ -123,6 +122,7 @@ sig = [r for r in records if r['record_type'] == 'SIGNAL']
 if not sig:
     sys.exit('引擎未认可该合成形态，先修构造再画图')
 r = sig[0]
+conf = [x for x in records if x['record_type'] == 'CONFIRM'][0]
 
 # ────────────────────────── 画图 ──────────────────────────
 fig, (ax, axv) = plt.subplots(2, 1, figsize=(17.5, 10), sharex=True,
@@ -232,10 +232,11 @@ lines = [
     'S1   收盘 %.2f       > 买点 %.3f' % (BRK, BUY),
     'S2   突破量比 %.2f     ≥ breakout_vol_ratio 1.50' % r['breakout_vol_ratio'],
     'S5   杯口→突破 %d 日     ≤ mouth_to_signal_max 12' % (T_BRK - T2),
-    'S7   次日确认：T 收 %.2f > 杯口 %.2f  → 信号日 = %s'
-    % (CONF, P2, r['date']),
+    'S7   次日确认：确认日收 %.2f > 杯口 %.2f  → 补 CONFIRM（加仓点）'
+    % (CONF, P2),
     '',
-    '以上全部通过 → 引擎判为 SIGNAL（信号日 = 确认日，不是突破日）',
+    'SIGNAL  突破日 %s（轻仓，买点 %.3f）' % (r['date'], r['buy_point']),
+    'CONFIRM 确认日 %s（加仓）' % conf['date'],
 ]
 ax.text(0.004, 0.945, '\n'.join(lines), transform=fig.transFigure, va='top', ha='left',
         fontsize=9.4, color='#b9c0d4', family='Microsoft YaHei', linespacing=1.55,
