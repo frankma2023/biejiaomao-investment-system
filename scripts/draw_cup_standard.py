@@ -38,7 +38,8 @@ T0 = TL0 + 30             # 前高 P0
 T1 = T0 + 15              # 杯底 P1
 T2 = T1 + 30              # 杯口 P2
 TH_END = T2 + 11          # 柄部最后一日
-T_SIG = T2 + 12           # 检测日（突破日）
+T_BRK = T2 + 12           # 突破日：放量收上买点
+T_SIG = T_BRK + 1         # 检测日 = 次日确认日：收盘仍站在杯口之上
 N = T_SIG + 1
 
 BASE = 9.60               # 前置历史的盘整中枢
@@ -49,6 +50,7 @@ P2 = 13.80                # 杯口
 P3 = 12.55                # 柄低
 BUY = P2 * 1.01           # 买点（引擎 S1 用 P2 + buy_point_buffer）
 BRK = 14.10               # 突破日收盘
+CONF = 13.95              # 确认日收盘（> 杯口 13.80 → 突破成立）
 
 HANDLE_DRIFT = [P3 + 0.06, P3 + 0.18, P3 + 0.10, P3 + 0.26,
                 P3 + 0.20, P3 + 0.32, P3 + 0.24]      # 499..505
@@ -69,15 +71,18 @@ for i in range(N):
     elif i <= T2 + 4:                              # ④ 柄部回落 P2 → P3
         u = (i - T2) / 4.0
         closes.append(P2 - (P2 - P3) * u)
-    elif i < T_SIG:                                # ④ 柄部横盘收敛
+    elif i < T_BRK:                                # ④ 柄部横盘收敛
         closes.append(HANDLE_DRIFT[i - (T2 + 5)])
-    else:                                          # ⑤ 放量突破
+    elif i == T_BRK:                               # ⑤ 放量突破
         closes.append(BRK)
+    else:                                          # ⑥ 次日站稳杯口 → 信号
+        closes.append(CONF)
 
 vols = [1.0e6] * N
-for i in range(T2 + 1, T_SIG):
+for i in range(T2 + 1, T_BRK):
     vols[i] = 5.5e5                                # 柄部缩量
-vols[T_SIG] = 2.4e6                               # 突破放量
+vols[T_BRK] = 2.4e6                               # 突破放量
+vols[T_SIG] = 1.3e6                               # 确认日量能回落但仍在
 
 base_d = date(2024, 1, 2)
 daily = []
@@ -154,7 +159,8 @@ bands = [(TL0, T0, '#ef4444', '① 前置上涨', 0),
          (T0, T1, '#10b981', '② 杯左侧', 1),
          (T1, T2, '#00E5FF', '③ 杯右侧', 0),
          (T2, TH_END, '#a78bfa', '④ 柄部', 1),
-         (TH_END, N - 1, '#FFD700', '⑤ 突破', 0)]
+         (TH_END, T_BRK, '#FFD700', '⑤ 突破', 0),
+         (T_BRK, N - 1, '#22d3ee', '⑥ 确认', 1)]
 ROW = (15.08, 14.52)                 # 两级错开，避免窄色带的标签互相压叠
 for a_, b_, col, lab, row in bands:
     ax.axvspan(a_ - .5, b_ - .5, color=col, alpha=.055, zorder=0)
@@ -225,9 +231,11 @@ lines = [
     'V13  杯底 %.2f       > 上涨起点 L0 = %.2f' % (P1, L0),
     'S1   收盘 %.2f       > 买点 %.3f' % (BRK, BUY),
     'S2   突破量比 %.2f     ≥ breakout_vol_ratio 1.50' % r['breakout_vol_ratio'],
-    'S5   杯口→突破 %d 日     ≤ mouth_to_signal_max 12' % (T_SIG - T2),
+    'S5   杯口→突破 %d 日     ≤ mouth_to_signal_max 12' % (T_BRK - T2),
+    'S7   次日确认：T 收 %.2f > 杯口 %.2f  → 信号日 = %s'
+    % (CONF, P2, r['date']),
     '',
-    '以上 13 项全部通过 → 引擎判为 SIGNAL',
+    '以上全部通过 → 引擎判为 SIGNAL（信号日 = 确认日，不是突破日）',
 ]
 ax.text(0.004, 0.945, '\n'.join(lines), transform=fig.transFigure, va='top', ha='left',
         fontsize=9.4, color='#b9c0d4', family='Microsoft YaHei', linespacing=1.55,

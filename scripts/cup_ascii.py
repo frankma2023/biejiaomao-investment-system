@@ -96,9 +96,11 @@ def main():
     from scanners import cup_handle_v2 as ch
 
     # 复刻 draw_cup_standard.py 的合成序列（同一条被引擎判为 SIGNAL 的曲线）
-    PRE, L0, P0, P1, P2, P3, BRK = 380, 10.00, 14.00, 10.50, 13.80, 12.55, 14.10
+    PRE, L0, P0, P1, P2, P3, BRK, CONF = (
+        380, 10.00, 14.00, 10.50, 13.80, 12.55, 14.10, 13.95)
     T0, T1, T2 = PRE + 30, PRE + 45, PRE + 75
-    T_SIG = T2 + 12
+    T_BRK = T2 + 12
+    T_SIG = T_BRK + 1        # 检测日 = 次日确认日
     N = T_SIG + 1
     drift = [P3 + .06, P3 + .18, P3 + .10, P3 + .26, P3 + .20, P3 + .32, P3 + .24]
     closes = []
@@ -115,31 +117,36 @@ def main():
             closes.append(P1 + (P2 - P1) * (1 - (1 - u) ** 2))
         elif i <= T2 + 4:
             closes.append(P2 - (P2 - P3) * (i - T2) / 4.0)
-        elif i < T_SIG:
+        elif i < T_BRK:
             closes.append(drift[i - (T2 + 5)])
-        else:
+        elif i == T_BRK:
             closes.append(BRK)
+        else:
+            closes.append(CONF)
 
     params = ch.load_params()
     xs = list(range(PRE - 26, N))
     series = [closes[i] for i in xs]
     W = 104
     col = {i: int(round((i - xs[0]) * (W - 1) / float(len(xs) - 1)))
-           for i in (PRE, T0, T1, T2, T2 + 4, T_SIG)}
+           for i in (PRE, T0, T1, T2, T2 + 4, T_BRK, T_SIG)}
     marks = {col[PRE]: ('L', L0), col[T0]: ('H', P0), col[T1]: ('B', P1),
-             col[T2]: ('M', P2), col[T2 + 4]: ('P', P3), col[T_SIG]: ('X', BRK)}
+             col[T2]: ('M', P2), col[T2 + 4]: ('P', P3),
+             col[T_BRK]: ('X', BRK), col[T_SIG]: ('C', CONF)}
     fig = render(series, W=W, H=23, lo=9.3, hi=14.6, marks=marks,
                  title='② 引擎实测样本（按比例，收盘价连线）  '
                        '判定 = SIGNAL   %d 根K线' % N)
     axis = None  # 横轴由 render() 输出
     tick = [' '] * (W + 10)
-    for i, lab in ((PRE, 'L0'), (T0, 'P0'), (T1, 'P1'), (T2, 'P2'), (T_SIG, '突破')):
+    for i, lab in ((PRE, 'L0'), (T0, 'P0'), (T1, 'P1'), (T2, 'P2'),
+                   (T_BRK, 'X'), (T_SIG, 'C')):
         c = col[i] + 8                      # 行首是 '%6.2f │' 共 8 字符
         for k, ch in enumerate(lab):
             if c + k < len(tick):
                 tick[c + k] = ch
     legend = ('\n   L=上涨起点 10.00   H=前高 14.00   B=杯底 10.50   '
-              'M=杯口 13.80   P=柄低 12.55   X=突破日 收 14.10\n'
+              'M=杯口 13.80   P=柄低 12.55\n'
+              '   X=突破日 收 14.10   C=确认日 收 13.95（> 杯口 13.80）→ 信号日\n'
               '   横轴为交易日，共 %d 根（含前置历史 26 根）；纵轴为收盘价（元）\n'
               % len(xs))
 

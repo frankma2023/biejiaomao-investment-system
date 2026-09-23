@@ -46,7 +46,8 @@ CONFIG_PATH = os.path.join(PROJECT_DIR, "config", "market", "cup_handle_v2.yaml"
 REQUIRED_PARAMS = (
     'min_prior_advance', 'advance_origin_tolerance', 'min_descent_bars', 'cup_min_age', 'cup_max_age',
     'mouth_lock_pullback', 'rim_gap_window', 'rim_gap_max', 'min_ascent_bars',
-    'depth_min', 'depth_max', 'mouth_vs_high_max',
+    'depth_min', 'depth_max', 'mouth_vs_high_max', 'mouth_span_max',
+    'require_breakout_confirm',
     'handle_dd_min', 'handle_dd_max', 'handle_days_max', 'mouth_to_signal_max',
     'handle_position_ratio', 'handle_red_vol_ratio',
     'buy_point_buffer', 'breakout_vol_ratio', 'vol_ma_window',
@@ -124,6 +125,10 @@ def _validate_geometry(p: Dict) -> None:
         errs.append("mouth_lock_pullback 必须在 (0, 1) 内")
     if not 0 < p['rim_gap_max'] < 1:
         errs.append("rim_gap_max 必须在 (0, 1) 内")
+    if p['mouth_vs_high_max'] > 1:
+        errs.append("mouth_vs_high_max 不应大于 1（前高必须高于杯口）")
+    if p['mouth_span_max'] < 1:
+        errs.append("mouth_span_max 至少为 1")
     if not 0 <= p['advance_origin_tolerance'] < 1:
         errs.append("advance_origin_tolerance 必须在 [0, 1) 内")
     if p['rim_gap_window'] < 1:
@@ -287,33 +292,53 @@ def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int], params: Dict)
 
 
 def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
-              p2: float, t2_idx: int, params: Dict) -> Optional[Dict]:
+              p2: float, t2_idx: int, params: Dict,
+              p2_prev: Optional[float] = None,
+              t2_prev: Optional[int] = None) -> Optional[Dict]:
     """
-    在检测日 t_idx 上，对给定 D1 与杯口 (p2, t2_idx) 执行形态校验与分类。
+    在检测日 t_idx 上，对给定 D1 与杯口执行形态校验与分类。
 
     Args:
         daily: 日K列表。
         ctx: 预计算上下文（均线数组等）。
         d1: D1 候选。
-        t_idx: 检测日索引。
-        p2: 杯口价（= max(close[t1 .. t_idx-1])）。
+        t_idx: 检测日（= 记录的输出日期）。
+        p2: 杯口价，= max(close[t1 .. t_idx-1])。
         t2_idx: 杯口所在索引。
         params: 参数字典。
+        p2_prev: 杯口价在 t_idx-2 时的取值；仅 require_breakout_confirm 时使用。
+        t2_prev: 对应的杯口索引。
 
     Returns:
         记录 dict（含 record_type）或 None。
+
+    突破确认（PRD §3.2 S7）：开启 require_breakout_confirm 后，检测日 T 判定的是
+    「T-1 放量突破、T 仍站稳杯口之上」。此时杯口必须取 T-2 时的取值——否则突破日
+    自己抬高了的运行最大值会把买点顶上去，S1 永远不成立。判据只用到 <= T 的数据。
     """
     closes = ctx['closes']
     p1 = d1['p1']
     t1_idx = d1['t1_idx']
+
+    if params['require_breakout_confirm']:
+        if p2_prev is None or t2_prev is None:
+            return None
+        p2, t2_idx = p2_prev, t2_prev
+        bar = t_idx - 1                    # 突破日
+    else:
+        bar = t_idx                        # 检测日即突破日
 
     # V4: 杯底距检测日的交易日区间
     age = t_idx - t1_idx
     if not (params['cup_min_age'] <= age <= params['cup_max_age']):
         return None
 
-    # V6: 杯口/前高
+    # V6: 前高必须高于杯口（杯口是杯子右侧的顶，高于前高说明已经在突破途中）
     if p2 > d1['p0'] * params['mouth_vs_high_max']:
+        return None
+
+    # V14: 前高→杯口 的时长上限。调整拖太久就不是上涨过程中的整理
+    if t2_idx - d1['t0_idx'] > params['mouth_span_max']:
         return None
 
     # 杯底→杯口 的上升段长度
@@ -325,10 +350,10 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     if not (params['depth_min'] <= depth <= params['depth_max']):
         return None
 
-    # 柄部区间 = (t2_idx, t_idx-1]
-    if t_idx - 1 < t2_idx:
+    # 柄部区间 = (t2_idx, bar-1]，不含杯口当日、不含突破日
+    if bar - 1 < t2_idx:
         return None
-    handle = closes[t2_idx + 1: t_idx]           # 不含杯口当日，不含检测日
+    handle = closes[t2_idx + 1: bar]
     if not handle:
         return None
     p3 = min(handle)
@@ -343,7 +368,7 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
         return None
 
     # V9: 柄部时长
-    handle_days = t_idx - 1 - t2_idx
+    handle_days = bar - 1 - t2_idx
     if handle_days > params['handle_days_max']:
         return None
 
@@ -355,34 +380,35 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     vols = ctx['volumes']
     vol_ma = ctx['vol_ma']
     red_ratio = params['handle_red_vol_ratio']
-    for k in range(t2_idx + 1, t_idx):
+    for k in range(t2_idx + 1, bar):
         ma = vol_ma[k]
         if ma and ma > 0 and closes[k] < daily[k]['open'] and vols[k] > ma * red_ratio:
             return None
 
     # ── 分类 ──────────────────────────────────────────
-    t = daily[t_idx]
     buy_point = p2 + params['buy_point_buffer']
-    t2_date = daily[t2_idx]['date']
     p3_idx = t2_idx + 1 + handle.index(p3)
-
     base = _build_record(daily, ctx, d1, t_idx, p2, t2_idx, p3, p3_idx,
-                         handle, depth, hdd, handle_days, buy_point, params)
+                         handle, depth, hdd, handle_days, buy_point, params,
+                         bar_idx=bar)
 
-    # S1: 价格突破
-    if t['close'] > buy_point:
-        if _is_signal(daily, ctx, t_idx, t2_idx, p2, buy_point, params):
+    # S1~S6（+ S7 确认）：突破日放量收上买点
+    if daily[bar]['close'] > buy_point:
+        held = (not params['require_breakout_confirm']) or daily[t_idx]['close'] > p2
+        if held and _is_signal(daily, ctx, bar, t2_idx, p2, buy_point, params):
             base['record_type'] = 'SIGNAL'
-            base['breakout_close'] = round(t['close'], 3)
-            ma20v = ctx['vol_ma'][t_idx]
-            base['breakout_vol_ratio'] = round(t['volume'] / ma20v, 3) if ma20v else None
+            base['breakout_close'] = round(daily[bar]['close'], 3)
+            ma20v = ctx['vol_ma'][bar]
+            base['breakout_vol_ratio'] = (
+                round(daily[bar]['volume'] / ma20v, 3) if ma20v else None)
             return base
+        # 突破已发生但未确认：结构用尽，不再回退成候选
         return None
 
     # W1/W2/W3: 候选
-    if t_idx - t2_idx > params['mouth_to_signal_max']:
+    if bar - t2_idx > params['mouth_to_signal_max']:
         return None
-    if t['close'] < p1 * (1 - params['cup_invalidate_tolerance']):
+    if daily[t_idx]['close'] < p1 * (1 - params['cup_invalidate_tolerance']):
         return None
     base['record_type'] = 'CANDIDATE'
     return base
@@ -436,7 +462,8 @@ def _is_signal(daily: List[Dict], ctx: Dict, t_idx: int, t2_idx: int,
 def _build_record(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int, p2: float,
                   t2_idx: int, p3: float, p3_idx: int, handle: List[float],
                   depth: float, hdd: float, handle_days: int,
-                  buy_point: float, params: Dict) -> Dict:
+                  buy_point: float, params: Dict,
+                  bar_idx: Optional[int] = None) -> Dict:
     """
     组装输出记录（PRD §5）。
 
@@ -444,7 +471,7 @@ def _build_record(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int, p2: float,
         daily: 日K列表。
         ctx: 预计算上下文。
         d1: D1 候选。
-        t_idx: 检测日索引。
+        t_idx: 记录的输出日期索引（突破确认开启时 = 突破日 + 1）。
         p2: 杯口价。
         t2_idx: 杯口索引。
         p3: 柄低价。
@@ -455,10 +482,12 @@ def _build_record(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int, p2: float,
         handle_days: 柄部交易日数。
         buy_point: 买点价。
         params: 参数字典。
+        bar_idx: 突破日索引；None 时等于 t_idx。
 
     Returns:
         记录 dict。
     """
+    bar = t_idx if bar_idx is None else bar_idx
     closes = ctx['closes']
     t = daily[t_idx]
     p0, p1 = d1['p0'], d1['p1']
@@ -473,13 +502,13 @@ def _build_record(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int, p2: float,
     hd_min = {}
     for w in (10, 20, 50):
         ma = ctx['ma'][w]
-        vals = [closes[k] / ma[k] for k in range(t2_idx + 1, t_idx)
+        vals = [closes[k] / ma[k] for k in range(t2_idx + 1, bar)
                 if ma[k] and ma[k] > 0]
         hd_min[w] = min(vals) if vals else None
 
     # 巫毒日：柄部量能低于均量阈值的天数
     ma_v = ctx['vol_ma']
-    voodoo = sum(1 for k in range(t2_idx + 1, t_idx)
+    voodoo = sum(1 for k in range(t2_idx + 1, bar)
                  if ma_v[k] and ma_v[k] > 0
                  and ctx['volumes'][k] < ma_v[k] * params['voodoo_vol_ratio'])
 
@@ -490,7 +519,7 @@ def _build_record(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int, p2: float,
         'details': {
             'description': (f"杯口 {p2:.2f} → 买点 {buy_point:.2f} | "
                             f"深 {depth * 100:.1f}% 柄 {hdd * 100:.1f}% "
-                            f"{t_idx - t2_idx}日"),
+                            f"{bar - t2_idx}日"),
             'prior_high': round(p0, 3),
             'prior_high_date': daily[d1['t0_idx']]['date'],
             'bottom': round(p1, 3),
@@ -520,7 +549,7 @@ def _build_record(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int, p2: float,
         'mouth_vs_high': round(p2 / p0, 4),
         'handle_dd_pct': round(hdd * 100, 2),
         'handle_days': handle_days,
-        'mouth_to_date_days': t_idx - t2_idx,
+        'mouth_to_date_days': bar - t2_idx,
         'bottom_amp': round(bottom_amp, 4) if bottom_amp is not None else None,
         'hd_min_ma10': round(hd_min[10], 4) if hd_min[10] is not None else None,
         'hd_min_ma20': round(hd_min[20], 4) if hd_min[20] is not None else None,
@@ -651,11 +680,13 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
         # 杯口从杯底当天起逐日推进，且只用「不是跳涨日」的收盘来抬高杯口。
         p2 = closes[t1]
         t2 = t1
+        p2_prev = t2_prev = None
 
         for t_idx in range(t1, hi + 1):
             if t_idx >= lo:
                 stats['points'] += 1
-                rec = _evaluate(daily, ctx, d1, t_idx, p2, t2, params)
+                rec = _evaluate(daily, ctx, d1, t_idx, p2, t2, params,
+                                p2_prev, t2_prev)
                 if rec is None:
                     stats['v_fail'] += 1
                 else:
@@ -666,6 +697,9 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
                     prev = best.get(key)
                     if prev is None or rec['bottom_price'] < prev['bottom_price']:
                         best[key] = rec
+            # 记住 t_idx-1 时的杯口口径：突破确认要用 T-2 的杯口，
+            # 否则突破日自己抬高的运行最大值会把买点顶上去，S1 永不成立。
+            p2_prev, t2_prev = p2, t2
             # 杯口只能被「走到」，不能被「跳上去」（PRD §2.5）。
             #
             # 原来的 p2 = max(close[t1 .. t_idx-1]) 会让任何一根收盘都成为新杯口。
