@@ -44,14 +44,17 @@ CONFIG_PATH = os.path.join(PROJECT_DIR, "config", "market", "cup_handle_v2.yaml"
 
 # 全部必需参数。缺任意一项即报错——禁止代码内兜底（PRD §4.1 / §8.2）
 REQUIRED_PARAMS = (
-    'min_prior_advance', 'advance_origin_tolerance', 'min_descent_bars', 'cup_min_age', 'cup_max_age',
-    'mouth_lock_pullback', 'rim_gap_window', 'rim_gap_max', 'min_ascent_bars',
-    'depth_min', 'depth_max', 'mouth_vs_high_max', 'mouth_span_max',
-    'recovery_dd_ratio', 'require_breakout_confirm',
-    'handle_dd_min', 'handle_dd_max', 'handle_days_max', 'mouth_to_signal_max',
-    'handle_position_ratio', 'handle_red_vol_ratio',
+    # ── 结构（前高 / 杯底 / 杯口 的准入）──
+    'min_prior_advance', 'advance_origin_tolerance',
+    'mouth_vs_high_max', 'mouth_span_max', 'mouth_to_signal_max',
+    'mouth_lock_pullback', 'depth_min', 'depth_max',
+    'recovery_dd_ratio', 'bottom_zone_pct', 'bottom_zone_days_max',
+    # ── 柄部 ──
+    'handle_pm_min', 'handle_position_ratio',
+    # ── 突破 ──
     'buy_point_buffer', 'breakout_vol_ratio', 'vol_ma_window',
-    'close_position_min', 'require_green', 'require_above_ma50', 'ma_trend_window',
+    'require_breakout_confirm',
+    # ── 其它 ──
     'cup_invalidate_tolerance',
     'suggested_tp', 'suggested_sl', 'suggested_max_hold',
     'ma_support_ref', 'voodoo_vol_ratio', 'bottom_amp_window', 'bottom_amp_min',
@@ -111,36 +114,30 @@ def _validate_geometry(p: Dict) -> None:
         ValueError: 存在互斥或越界的参数组合。
     """
     errs = []
-    if not p['cup_min_age'] < p['cup_max_age']:
-        errs.append("cup_min_age 必须小于 cup_max_age")
     if not p['depth_min'] < p['depth_max']:
         errs.append("depth_min 必须小于 depth_max")
-    if not p['handle_dd_min'] < p['handle_dd_max']:
-        errs.append("handle_dd_min 必须小于 handle_dd_max")
-    if p['handle_dd_max'] > p['depth_max']:
-        errs.append("handle_dd_max 不应大于 depth_max（柄部不可能比杯身还深）")
-    if p['mouth_lock_pullback'] > p['handle_dd_max']:
-        errs.append("mouth_lock_pullback 不应大于 handle_dd_max（否则杯口确认晚于柄部成立）")
-    if not 0 < p['mouth_lock_pullback'] < 1:
-        errs.append("mouth_lock_pullback 必须在 (0, 1) 内")
-    if not 0 < p['rim_gap_max'] < 1:
-        errs.append("rim_gap_max 必须在 (0, 1) 内")
     if p['mouth_vs_high_max'] > 1:
         errs.append("mouth_vs_high_max 不应大于 1（前高必须高于杯口）")
     if p['mouth_span_max'] < 1:
         errs.append("mouth_span_max 至少为 1")
+    if p['mouth_to_signal_max'] < 1:
+        errs.append("mouth_to_signal_max 至少为 1")
+    if not 0 < p['mouth_lock_pullback'] < 1:
+        errs.append("mouth_lock_pullback 必须在 (0, 1) 内")
     if not 0 < p['recovery_dd_ratio'] < 1:
         errs.append("recovery_dd_ratio 必须在 (0, 1) 内")
-    if not 0 <= p['advance_origin_tolerance'] < 1:
-        errs.append("advance_origin_tolerance 必须在 [0, 1) 内")
-    if p['rim_gap_window'] < 1:
-        errs.append("rim_gap_window 至少为 1")
+    if not 0 < p['bottom_zone_pct'] < 1:
+        errs.append("bottom_zone_pct 必须在 (0, 1) 内")
+    if p['bottom_zone_days_max'] < 1:
+        errs.append("bottom_zone_days_max 至少为 1")
+    if not 0 < p['handle_pm_min'] < 1:
+        errs.append("handle_pm_min 必须在 (0, 1) 内")
     if p['handle_position_ratio'] < 0:
         errs.append("handle_position_ratio 不应为负")
     if p['handle_position_ratio'] >= 1:
         errs.append("handle_position_ratio 应小于 1（柄低不可能高过杯口）")
-    if p['min_ascent_bars'] < 1:
-        errs.append("min_ascent_bars 至少为 1")
+    if not 0 <= p['advance_origin_tolerance'] < 1:
+        errs.append("advance_origin_tolerance 必须在 [0, 1) 内")
     if p['bottom_amp_min'] < 0:
         errs.append("bottom_amp_min 不应为负")
     if p['suggested_sl'] <= 0 or p['suggested_tp'] <= 0:
@@ -207,30 +204,6 @@ def _load_bi(stock_code: str, target_date: Optional[str] = None) -> List[Dict]:
 
 # ─── 结构拟合 ─────────────────────────────────────────
 
-def _mark_gaps(closes: List[float], window: int, max_gap: float) -> List[bool]:
-    """
-    标记「跳涨日」：收盘高出前 window 日最高收盘 max_gap 以上。
-
-    跳涨日意味着价格突破了一段既有区间，因此不能充当杯口——杯口是杯子右侧的顶，
-    突破它才是买点；让突破日自己当杯口，突破就永远成立（PRD §2.5）。
-
-    Args:
-        closes: 收盘价序列。
-        window: 回看窗口（交易日）。
-        max_gap: 允许高出前高的最大比例。
-
-    Returns:
-        与 closes 等长的布尔列表，True 表示该日为跳涨日。
-    """
-    n = len(closes)
-    out = [False] * n
-    for i in range(1, n):
-        prev = closes[max(0, i - window):i]
-        if prev and closes[i] > max(prev) * (1 + max_gap):
-            out[i] = True
-    return out
-
-
 def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int],
                          closes: List[float], params: Dict) -> List[Dict]:
     """
@@ -293,83 +266,82 @@ def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int],
         if p1 <= prev_low * (1 - params['advance_origin_tolerance']):
             continue
 
-        # V3: 下行 K 线数
-        bars = d1.get('length')
-        if not (isinstance(bars, (int, float)) and bars >= params['min_descent_bars']):
-            continue
-
         out.append({
             'p0': float(p0), 'p1': float(p1), 'prev_low': float(prev_low),
             't0_idx': i0, 't1_idx': i1,
-            'bars': int(bars),
         })
     return out
 
 
 def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
-              p2: float, t2_idx: int, params: Dict,
-              p2_prev: Optional[float] = None,
-              t2_prev: Optional[int] = None) -> Optional[Dict]:
+              p2: float, t2_idx: int, params: Dict) -> Optional[Dict]:
     """
     在检测日 t_idx 上，对给定 D1 与杯口执行形态校验与分类。
 
+    精简后的规则集（14 条，**一律收盘价口径**）：
+
+        结构点  L0 上涨起点 | H 前高 | B 杯底 | M 杯口 | P 柄低
+        ─────────────────────────────────────────────────────────
+         1  (H−L0)/L0 ≥ min_prior_advance      前置涨幅       [_build_d1_candidates]
+         2  B > L0×(1−advance_origin_tolerance) 杯底不破起点    [同上]
+         3  M < H                               前高高于杯口
+         4  depth ∈ [depth_min, depth_max]      杯身深度
+         5  B 是 [B,M] 区间最低收盘              杯底唯一
+         6  回升段最大回撤 ≤ depth×recovery_dd_ratio  「一跌一涨」两段
+         7  P/M ≥ handle_pm_min                 柄部回撤上限
+         8  P ≥ B + handle_position_ratio×(M−B) 柄低在杯身上半部
+         9  杯底区 [B,B×(1+δ)] 内 B 前后各 ≤ N 日  底部不拖太久
+        10  M 日 − H 日 ≤ mouth_span_max         调整不过长
+        11  bar − M 日 ≤ mouth_to_signal_max     ★ 最强判据
+        12  bar 收 > M + buy_point_buffer        S1 突破
+        13  bar 量 ≥ MA20(量)×breakout_vol_ratio  S2 放量
+        14  bar 次日收 > M → 补 CONFIRM           次日确认（在 detect 里补）
+        ─────────────────────────────────────────────────────────
+        +   P ≤ M×(1−mouth_lock_pullback)       杯口确实是顶（柄部定义的前提）
+
+    已删除的旧规则：杯龄区间、最小下跌K线数、最小上升段根数、柄部时长上限、
+    柄部放量长阴、阳线、收盘位置、MA50、跳涨日、笔数限制、柄部回撤下限。
+
     Args:
         daily: 日K列表。
-        ctx: 预计算上下文（均线数组等）。
-        d1: D1 候选。
-        t_idx: 检测日（= 记录的输出日期）。
+        ctx: 预计算上下文。
+        d1: D1 候选（含 p0/p1/prev_low/t0_idx/t1_idx/first_lower_idx）。
+        t_idx: 检测日索引，同时也是突破日（记录的输出日期）。
         p2: 杯口价，= max(close[t1 .. t_idx-1])。
         t2_idx: 杯口所在索引。
         params: 参数字典。
-        p2_prev: 杯口价在 t_idx-2 时的取值；仅 require_breakout_confirm 时使用。
-        t2_prev: 对应的杯口索引。
 
     Returns:
         记录 dict（含 record_type）或 None。
-
-    突破确认（PRD §3.2 S7）：SIGNAL 始终发在**突破日**（轻仓买入点，能吃到
-    杯口价）；次日站稳杯口之上时，detect() 额外补一条 CONFIRM 记录（加仓点）。
-    两者并存，不互相压制——见 §7.5。
     """
     closes = ctx['closes']
-    p1 = d1['p1']
+    p0, p1 = d1['p0'], d1['p1']
     t1_idx = d1['t1_idx']
     bar = t_idx
 
-    # V4: 杯底距检测日的交易日区间
-    age = t_idx - t1_idx
-    if not (params['cup_min_age'] <= age <= params['cup_max_age']):
+    # 规则 3: 前高必须高于杯口
+    if p2 > p0 * params['mouth_vs_high_max']:
         return None
 
-    # V6: 前高必须高于杯口（杯口是杯子右侧的顶，高于前高说明已经在突破途中）
-    if p2 > d1['p0'] * params['mouth_vs_high_max']:
-        return None
-
-    # V14: 前高→杯口 的时长上限。调整拖太久就不是上涨过程中的整理
+    # 规则 10: 前高→杯口 的时长上限
     if t2_idx - d1['t0_idx'] > params['mouth_span_max']:
         return None
 
-    # V15: 杯底必须是杯身区间的最低收盘——区间内任何一根K线收得更低，杯底就不成立
+    # 规则 5: 杯底必须是杯身区间的最低收盘
     fl = d1.get('first_lower_idx')
     if fl is not None and t2_idx >= fl:
         return None
 
-    # 杯底→杯口 的上升段长度
-    if t2_idx - t1_idx < params['min_ascent_bars']:
-        return None
-
-    # V5: 杯身深度
+    # 规则 4: 杯身深度
     depth = (p2 - p1) / p2
     if not (params['depth_min'] <= depth <= params['depth_max']):
         return None
 
-    # V17: 回升段不得被深度回调反复打断。
-    # 杯身是「一跌一涨」两段；从杯底 B 到杯口 M 若中途出现自最高收盘的深度回撤，
-    # 就是多次反弹与下跌交替，已经不是欧奈尔定义的杯子。
-    # 003030：回升段先到 25.25 再跌回 19.92（−21.1%）、再到 26.15 又跌回 18.98
-    # （−27.4%），最大回撤 27.4% ≫ 杯深 27.0% × 50% = 13.5%，须否决。
-    # 阈值用「杯身深度的比例」而非绝对值：20% 的杯子和 40% 的杯子能容忍的
-    # 中途回撤本就不该一样，相对值自动缩放。
+    # 规则 6: 回升段不得被深度回调反复打断。
+    # 杯身是「一跌一涨」两段；中途出现自最高收盘的深度回撤，就是多次反弹与下跌
+    # 交替，已不是欧奈尔定义的杯子。003030：先到 25.25 跌回 19.92（−21.1%）、
+    # 再到 26.15 又跌回 18.98（−27.4%），最大回撤 27.4% ≫ 杯深 27.0%×50%。
+    # 阈值取杯深的比例而非绝对值：不同深度的杯子能容忍的中途回撤本就不同。
     run_max = closes[t1_idx]
     worst = 0.0
     for k in range(t1_idx + 1, t2_idx + 1):
@@ -382,7 +354,24 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     if worst > params['recovery_dd_ratio'] * depth:
         return None
 
-    # 柄部区间 = (t2_idx, bar-1]，不含杯口当日、不含突破日
+    # 规则 9: 杯底区 [B, B×(1+δ)] 内，杯底前后各自的交易日数不得超过上限。
+    # 价格在杯底附近磨太久就是平底/箱体，不是杯子。
+    zone = p1 * (1 + params['bottom_zone_pct'])
+    zmax = params['bottom_zone_days_max']
+    n_before = 0
+    k = t1_idx - 1
+    while k >= 0 and closes[k] <= zone:
+        n_before += 1
+        k -= 1
+    n_after = 0
+    k = t1_idx + 1
+    while k <= t2_idx and closes[k] <= zone:
+        n_after += 1
+        k += 1
+    if n_before > zmax or n_after > zmax:
+        return None
+
+    # 柄部区间 = (杯口日, 突破日)，不含杯口当日、不含突破日
     if bar - 1 < t2_idx:
         return None
     handle = closes[t2_idx + 1: bar]
@@ -390,32 +379,20 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
         return None
     p3 = min(handle)
 
-    # V7/B1: 杯口已回落确认
+    # V7: 杯口已回落确认（否则 P2 不是顶，而是半山腰）
     if p3 > p2 * (1 - params['mouth_lock_pullback']):
         return None
 
-    # V8: 柄部回撤
+    # 规则 7: 柄部回撤上限（P/M ≥ handle_pm_min）
     hdd = (p2 - p3) / p2
-    if not (params['handle_dd_min'] <= hdd <= params['handle_dd_max']):
+    if p3 < p2 * params['handle_pm_min']:
         return None
 
-    # V9: 柄部时长
-    handle_days = bar - 1 - t2_idx
-    if handle_days > params['handle_days_max']:
-        return None
-
-    # V10: 柄低须在杯身上半部
+    # 规则 8: 柄低须在杯身上半部
     if p3 < p1 + (p2 - p1) * params['handle_position_ratio']:
         return None
 
-    # V11: 柄部期间不得出现放量长阴
-    vols = ctx['volumes']
-    vol_ma = ctx['vol_ma']
-    red_ratio = params['handle_red_vol_ratio']
-    for k in range(t2_idx + 1, bar):
-        ma = vol_ma[k]
-        if ma and ma > 0 and closes[k] < daily[k]['open'] and vols[k] > ma * red_ratio:
-            return None
+    handle_days = bar - 1 - t2_idx
 
     # ── 分类 ──────────────────────────────────────────
     buy_point = p2 + params['buy_point_buffer']
@@ -424,9 +401,9 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
                          handle, depth, hdd, handle_days, buy_point, params,
                          bar_idx=bar)
 
-    # S1~S6：突破日放量收上买点
+    # 规则 12/13: 突破日放量收上买点
     if daily[bar]['close'] > buy_point:
-        if _is_signal(daily, ctx, bar, t2_idx, p2, buy_point, params):
+        if _is_signal(daily, ctx, bar, t2_idx, p2, params):
             base['record_type'] = 'SIGNAL'
             base['breakout_close'] = round(daily[bar]['close'], 3)
             ma20v = ctx['vol_ma'][bar]
@@ -435,7 +412,7 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
             return base
         return None
 
-    # W1/W2/W3: 候选
+    # 规则 11: 候选须仍在跟踪窗口内，且未跌破杯底
     if bar - t2_idx > params['mouth_to_signal_max']:
         return None
     if daily[t_idx]['close'] < p1 * (1 - params['cup_invalidate_tolerance']):
@@ -445,47 +422,32 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
 
 
 def _is_signal(daily: List[Dict], ctx: Dict, t_idx: int, t2_idx: int,
-               p2: float, buy_point: float, params: Dict) -> bool:
+               p2: float, params: Dict) -> bool:
     """
-    SIGNAL 判定（PRD §3.2 S2~S6，S1 由调用方判定）。
+    突破日判定（规则 11 间隔 + 规则 13 放量；规则 12 的收盘突破由调用方判定）。
 
     Args:
         daily: 日K列表。
         ctx: 预计算上下文。
-        t_idx: 检测日索引。
+        t_idx: 突破日索引。
         t2_idx: 杯口索引。
-        p2: 杯口价。
-        buy_point: 买点价。
+        p2: 杯口价（保留形参以便后续扩展）。
         params: 参数字典。
 
     Returns:
-        是否构成信号。
+        是否构成突破。
     """
     t = daily[t_idx]
 
-    # S5: 杯口→突破 的间隔（最强判据）
+    # 规则 11: 杯口→突破 的间隔（★ 最强判据，实测 5~9 日档 50.9% → 33~37 日档 20.3%）
     if t_idx - t2_idx > params['mouth_to_signal_max']:
         return False
 
-    # S2: 放量
+    # 规则 13: 放量（欧奈尔对「突破」的定义就是放量；只判价格会让缩量假突破全通过）
     ma_v = ctx['vol_ma'][t_idx]
     if not ma_v or ma_v <= 0 or t['volume'] < ma_v * params['breakout_vol_ratio']:
         return False
 
-    # S3: 阳线
-    if params['require_green'] and t['close'] <= t['open']:
-        return False
-
-    # S4: 收盘位置
-    rng = t['high'] - t['low']
-    if rng > 0 and (t['close'] - t['low']) / rng < params['close_position_min']:
-        return False
-
-    # S6: 趋势确认
-    if params['require_above_ma50']:
-        ma = ctx['ma_trend'][t_idx]
-        if not ma or t['close'] <= ma:
-            return False
     return True
 
 
@@ -655,7 +617,8 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
             return ([], stats) if diagnose else []
 
     n = len(daily)
-    need = params['cup_max_age'] + params['min_descent_bars'] + 60
+    # 杯底距今最长 mouth_span_max（前高→杯口）+ 杯口后跟踪窗口 + 指标预热
+    need = params['mouth_span_max'] + params['mouth_to_signal_max'] + 60
     if n < need:
         return ([], stats) if diagnose else []
 
@@ -681,7 +644,6 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
     ctx = {
         'closes': closes, 'volumes': volumes,
         'vol_ma': _rolling_mean(volumes, params['vol_ma_window']),
-        'ma_trend': _rolling_mean(closes, params['ma_trend_window']),
         'ma': {w: _rolling_mean(closes, w) for w in (10, 20, 50)},
     }
 
@@ -689,15 +651,14 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
     if not d1s:
         return ([], stats) if diagnose else []
 
-    # V15 预计算：杯底之后第一根「最低价跌破杯底」的K线。
-    # 该下标 <= 杯口日即说明杯底不是区间最低点，结构作废。
+    # 规则 5 预计算：杯底之后第一根收盘更低的K线。
+    # 该下标 <= 杯口日即说明杯底不是杯身区间的最低点，结构作废。
     for d1 in d1s:
         t1 = d1['t1_idx']
         p1 = d1['p1']
         d1['first_lower_idx'] = next(
             (k for k in range(t1 + 1, n) if closes[k] < p1), n)
 
-    # V16 用：每根笔的起始日，按日期升序，供二分定位杯口落在哪根笔里
     # 一个杯子只有一个杯底：同一杯口下每类记录只保留最深的那条。
     # 多根向下笔会指向同一个杯口——27.1 → 19.35 → 25.25 → 19.92 → 26.51 的 W 形底，
     # 两根向下笔的杯口都是 26.51（003030）；年线级别的新低也会取代一年前的老基部
@@ -709,11 +670,11 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
     # 深者优先而非先到先得：同一根 D1 在连续检测日上的 bottom_price 相同，
     # 严格小于号保证 CANDIDATE 仍落在「首次成为候选」那天。
     best = {}           # (record_type, t2) -> rec
-    is_gap = _mark_gaps(closes, params['rim_gap_window'], params['rim_gap_max'])
     for d1 in d1s:
         t1 = d1['t1_idx']
-        lo = t1 + params['cup_min_age']
-        hi = min(t1 + params['cup_max_age'], n - 1)
+        # 杯口不早于杯底；不晚于前高 + mouth_span_max 个交易日
+        lo = t1
+        hi = min(d1['t0_idx'] + params['mouth_span_max'], n - 1)
         if lo > hi:
             continue
         # 杯口从杯底当天起逐日推进，且只用「不是跳涨日」的收盘来抬高杯口。
@@ -734,19 +695,9 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
                     prev = best.get(key)
                     if prev is None or rec['bottom_price'] < prev['bottom_price']:
                         best[key] = rec
-            # 杯口只能被「走到」，不能被「跳上去」（PRD §2.5）。
-            #
-            # 原来的 p2 = max(close[t1 .. t_idx-1]) 会让任何一根收盘都成为新杯口。
-            # 603903 就是被这一点毁掉的：真杯口是 08-18 的 14.76，之后 15 个交易日
-            # 在 13.55~14.55 之间横盘；09-09 收 15.12 是【突破这次横盘的尝试】，
-            # 但引擎把 15.12 记成了新杯口，于是 09-10 跌回 14.61（跌破真杯口）
-            # 被重新解读成「柄部正常回落」，09-22 的二次上攻成了新突破。
-            #
-            # 跳涨日 = 收盘高出前 rim_gap_window 日最高收盘 rim_gap_max 以上，
-            # 即「突破了一段既有区间」。此类日不能充当杯口——杯口是右侧的顶，
-            # 突破它才叫买点；让突破日自己当杯口，突破就永远成立了。
-            # 判据只用 <= t_idx-1 的数据，因果性与幂等不受影响。
-            if closes[t_idx] > p2 and not is_gap[t_idx]:
+            # 杯口 = 杯底之后的最高收盘（无状态，逐日推进）。
+            # 原「跳涨日不得充当杯口」规则随本次精简一并删除。
+            if closes[t_idx] > p2:
                 p2 = closes[t_idx]
                 t2 = t_idx
 
