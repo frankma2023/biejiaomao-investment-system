@@ -56,6 +56,11 @@ for s in sigs:
         'r': exitA(bars, di, bp), 'mx': maxgain(bars, di, bp),
         'depth': float(s['depth_pct']), 'hdd': float(s['handle_dd_pct']),
         'mts': int(s['mouth_to_days']), 'vr': float(s['vol_ratio'] or 0),
+        'zb': int(s['zone_before']), 'za': int(s['zone_after']),
+        'zsum': int(s['zone_before']) + int(s['zone_after']),
+        'rdd': float(s['recovery_dd_pct']),
+        'mspan': int(s['mouth_span_days']),
+        'hd': int(s['handle_days']),
     })
 
 base = [x['r'] for x in rows]
@@ -89,3 +94,9 @@ bucket('mts', [5, 9, 12, 16, 25], '杯口→突破 间隔（mouth_to_signal_max=
 bucket('depth', [15, 20, 25, 30, 35, 40], '杯身深度 pct（depth 15~40）')
 bucket('hdd', [5, 8, 10, 12, 15, 20], '柄部回撤 pct（handle_dd_max=15 / P/M>=0.8）')
 bucket('vr', [1.5, 2.0, 2.5, 3.5, 5.0], '突破量比（breakout_vol_ratio=1.5）')
+bucket('zsum', [1, 2, 4, 7, 11], '杯底区停留总天数（规则 9，现值无下限、上限10）')
+bucket('zb', [1, 2, 4, 7], '杯底区 前侧 天数（规则 9）')
+bucket('za', [1, 2, 4, 7], '杯底区 后侧 天数（规则 9）')
+bucket('rdd', [2, 5, 8, 12, 16], '回升段最大回撤 pct（规则 6 上限 = 杯深x50%）')
+bucket('mspan', [30, 60, 100, 150], '前高→杯口 交易日（规则 10 上限 100）')
+bucket('hd', [5, 10, 15, 20], '柄部交易日数（原 handle_days_max=15，已删）')
