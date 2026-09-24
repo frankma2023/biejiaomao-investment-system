@@ -92,7 +92,7 @@ for i in range(N):
     daily.append({
         'date': (base_d + timedelta(days=i)).strftime('%Y-%m-%d'),
         'open': round(op, 3), 'high': round(max(op, cl) * 1.006, 3),
-        'low': round(min(op, cl) * 0.994, 3), 'close': round(cl, 3),
+        'low': round(min(op, cl), 3), 'close': round(cl, 3),
         'volume': vols[i], 'stock_code': 'SYN001'})
 D = [k['date'] for k in daily]
 
