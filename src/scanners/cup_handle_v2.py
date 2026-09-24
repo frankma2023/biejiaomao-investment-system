@@ -58,7 +58,7 @@ REQUIRED_PARAMS = (
     # ── 其它 ──
     'cup_invalidate_tolerance',
     'suggested_tp', 'suggested_sl', 'suggested_max_hold',
-    'ma_support_ref', 'voodoo_vol_ratio', 'bottom_amp_window', 'bottom_amp_min',
+    'voodoo_vol_ratio', 'bottom_amp_window',
     'min_market_cap', 'speed_rule_days', 'speed_rule_gain',
 )
 
@@ -143,8 +143,6 @@ def _validate_geometry(p: Dict) -> None:
         errs.append("handle_position_ratio 应小于 1（柄低不可能高过杯口）")
     if not 0 <= p['advance_origin_tolerance'] < 1:
         errs.append("advance_origin_tolerance 必须在 [0, 1) 内")
-    if p['bottom_amp_min'] < 0:
-        errs.append("bottom_amp_min 不应为负")
     if p['suggested_sl'] <= 0 or p['suggested_tp'] <= 0:
         errs.append("suggested_tp / suggested_sl 必须为正")
     if errs:
