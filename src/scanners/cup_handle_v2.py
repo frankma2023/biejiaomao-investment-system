@@ -21,7 +21,6 @@ v1（cup_handle.py）在数学上不可能产出信号：其买点取自包含�
 """
 
 import argparse
-import bisect
 import os
 import sqlite3
 import sys
@@ -48,7 +47,7 @@ REQUIRED_PARAMS = (
     'min_prior_advance', 'advance_origin_tolerance', 'min_descent_bars', 'cup_min_age', 'cup_max_age',
     'mouth_lock_pullback', 'rim_gap_window', 'rim_gap_max', 'min_ascent_bars',
     'depth_min', 'depth_max', 'mouth_vs_high_max', 'mouth_span_max',
-    'mouth_max_legs', 'require_breakout_confirm',
+    'recovery_dd_ratio', 'require_breakout_confirm',
     'handle_dd_min', 'handle_dd_max', 'handle_days_max', 'mouth_to_signal_max',
     'handle_position_ratio', 'handle_red_vol_ratio',
     'buy_point_buffer', 'breakout_vol_ratio', 'vol_ma_window',
@@ -130,8 +129,8 @@ def _validate_geometry(p: Dict) -> None:
         errs.append("mouth_vs_high_max 不应大于 1（前高必须高于杯口）")
     if p['mouth_span_max'] < 1:
         errs.append("mouth_span_max 至少为 1")
-    if p['mouth_max_legs'] < 0:
-        errs.append("mouth_max_legs 不应为负")
+    if not 0 < p['recovery_dd_ratio'] < 1:
+        errs.append("recovery_dd_ratio 必须在 (0, 1) 内")
     if not 0 <= p['advance_origin_tolerance'] < 1:
         errs.append("advance_origin_tolerance 必须在 [0, 1) 内")
     if p['rim_gap_window'] < 1:
@@ -232,7 +231,8 @@ def _mark_gaps(closes: List[float], window: int, max_gap: float) -> List[bool]:
     return out
 
 
-def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int], params: Dict) -> List[Dict]:
+def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int],
+                         closes: List[float], params: Dict) -> List[Dict]:
     """
     从笔序列中筛出可作为「前高 → 杯底」的向下笔 D1（PRD §2.3）。
 
@@ -245,6 +245,10 @@ def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int], params: Dict)
     Args:
         bi: 缠论笔列表。
         date_idx: 日期 -> 日K索引。
+        closes: 收盘价序列。**口径统一：结构点一律取收盘价**，不再混用笔的
+            high/low——触发条件 S1 本身就是「收盘 > 买点」，结构点用另一口径会
+            让买点线画在收盘价上、杯底线画在最低价上；单日影线还会毁掉形态
+            （603903 前高 16.60 是上影线，当日收盘只有 15.84）。
         params: 参数字典。
 
     Returns:
@@ -259,14 +263,22 @@ def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int], params: Dict)
         t0, t1 = _d10(d1.get('sdt')), _d10(d1.get('edt'))
         if t0 not in date_idx or t1 not in date_idx:
             continue
-
-        p0, p1 = d1.get('high'), d1.get('low')
-        if not (isinstance(p0, (int, float)) and isinstance(p1, (int, float)) and p0 > p1 > 0):
+        i0, i1 = date_idx[t0], date_idx[t1]
+        if i1 <= i0:
             continue
 
-        # V2: 前置上涨（相对再前一笔的低点）
-        prev_low = prev.get('low')
-        if not (isinstance(prev_low, (int, float)) and prev_low > 0):
+        # 前高 = 向下笔区间内的最高收盘；杯底 = 最低收盘
+        p0 = max(closes[i0:i1 + 1])
+        p1 = min(closes[i0:i1 + 1])
+        if not p0 > p1 > 0:
+            continue
+
+        # V2: 前置上涨（相对再前一笔的低点，同样取收盘口径）
+        pt0, pt1 = _d10(prev.get('sdt')), _d10(prev.get('edt'))
+        if pt0 not in date_idx or pt1 not in date_idx:
+            continue
+        prev_low = min(closes[date_idx[pt0]:date_idx[pt1] + 1])
+        if not prev_low > 0:
             continue
         if (p0 - prev_low) / prev_low < params['min_prior_advance']:
             continue
@@ -288,8 +300,8 @@ def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int], params: Dict)
 
         out.append({
             'p0': float(p0), 'p1': float(p1), 'prev_low': float(prev_low),
-            't0_idx': date_idx[t0], 't1_idx': date_idx[t1],
-            'bars': int(bars), 'bi_idx': i,
+            't0_idx': i0, 't1_idx': i1,
+            'bars': int(bars),
         })
     return out
 
@@ -337,20 +349,10 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     if t2_idx - d1['t0_idx'] > params['mouth_span_max']:
         return None
 
-    # V15: 杯底必须是杯身区间的最低点——区间内任何一根K线跌破杯底，杯底就不成立
+    # V15: 杯底必须是杯身区间的最低收盘——区间内任何一根K线收得更低，杯底就不成立
     fl = d1.get('first_lower_idx')
     if fl is not None and t2_idx >= fl:
         return None
-
-    # V16: 杯底→杯口之间夹的笔数上限。杯柄的杯身是一段「下跌—回升」，
-    # 中间最多允许一次回调；夹着七八根笔的是宽幅震荡区间，不是杯子。
-    # 003030：杯底 06-05 → 杯口 09-08 之间夹了 7 根笔（多个高低点），须否决。
-    bi_sdt = ctx.get('bi_sdt')
-    if bi_sdt:
-        j = bisect.bisect_right(bi_sdt, daily[t2_idx]['date']) - 1
-        legs = j - d1['bi_idx'] - 2          # 不含杯底后那根回升笔
-        if legs > params['mouth_max_legs']:
-            return None
 
     # 杯底→杯口 的上升段长度
     if t2_idx - t1_idx < params['min_ascent_bars']:
@@ -359,6 +361,25 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     # V5: 杯身深度
     depth = (p2 - p1) / p2
     if not (params['depth_min'] <= depth <= params['depth_max']):
+        return None
+
+    # V17: 回升段不得被深度回调反复打断。
+    # 杯身是「一跌一涨」两段；从杯底 B 到杯口 M 若中途出现自最高收盘的深度回撤，
+    # 就是多次反弹与下跌交替，已经不是欧奈尔定义的杯子。
+    # 003030：回升段先到 25.25 再跌回 19.92（−21.1%）、再到 26.15 又跌回 18.98
+    # （−27.4%），最大回撤 27.4% ≫ 杯深 27.0% × 50% = 13.5%，须否决。
+    # 阈值用「杯身深度的比例」而非绝对值：20% 的杯子和 40% 的杯子能容忍的
+    # 中途回撤本就不该一样，相对值自动缩放。
+    run_max = closes[t1_idx]
+    worst = 0.0
+    for k in range(t1_idx + 1, t2_idx + 1):
+        if closes[k] > run_max:
+            run_max = closes[k]
+        elif run_max > 0:
+            dd = (run_max - closes[k]) / run_max
+            if dd > worst:
+                worst = dd
+    if worst > params['recovery_dd_ratio'] * depth:
         return None
 
     # 柄部区间 = (t2_idx, bar-1]，不含杯口当日、不含突破日
@@ -664,7 +685,7 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
         'ma': {w: _rolling_mean(closes, w) for w in (10, 20, 50)},
     }
 
-    d1s = _build_d1_candidates(bi_list, date_idx, params)
+    d1s = _build_d1_candidates(bi_list, date_idx, closes, params)
     if not d1s:
         return ([], stats) if diagnose else []
 
@@ -674,11 +695,9 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
         t1 = d1['t1_idx']
         p1 = d1['p1']
         d1['first_lower_idx'] = next(
-            (k for k in range(t1 + 1, n) if daily[k]['low'] < p1), n)
+            (k for k in range(t1 + 1, n) if closes[k] < p1), n)
 
     # V16 用：每根笔的起始日，按日期升序，供二分定位杯口落在哪根笔里
-    ctx['bi_sdt'] = sorted(_d10(x['sdt']) for x in bi_list if x.get('sdt'))
-
     # 一个杯子只有一个杯底：同一杯口下每类记录只保留最深的那条。
     # 多根向下笔会指向同一个杯口——27.1 → 19.35 → 25.25 → 19.92 → 26.51 的 W 形底，
     # 两根向下笔的杯口都是 26.51（003030）；年线级别的新低也会取代一年前的老基部
