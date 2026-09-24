@@ -141,7 +141,12 @@ def main():
                                  rec['bottom_price'], rec['prior_high_price'],
                                  rec['depth_pct'], rec['handle_dd_pct'],
                                  rec['mouth_to_date_days'],
-                                 rec['breakout_close'], rec['breakout_vol_ratio']))
+                                 rec['breakout_close'], rec['breakout_vol_ratio'],
+                                 rec.get('zone_before_days'),
+                                 rec.get('zone_after_days'),
+                                 rec.get('recovery_dd_pct'),
+                                 rec.get('mouth_span_days'),
+                                 rec.get('handle_days')))
         if ci % 200 == 0:
             print('  ...%d/%d  股票 %d  SIGNAL %d  (%.0fs)'
                   % (ci, len(codes), n_day, len(rows), time.time() - t0), flush=True)
@@ -149,7 +154,8 @@ def main():
     conn.close()
     with open(OUT, 'w', encoding='utf-8') as f:
         f.write('code,date,buy_point,mouth_price,bottom_price,prior_high,'
-                'depth_pct,handle_dd_pct,mouth_to_days,breakout_close,vol_ratio\n')
+                'depth_pct,handle_dd_pct,mouth_to_days,breakout_close,vol_ratio,'
+                'zone_before,zone_after,recovery_dd_pct,mouth_span_days,handle_days\n')
         for r in rows:
             f.write(','.join(str(x) for x in r) + '\n')
     print('逐日回放：%d 只有笔快照  判定 %d 个(股票,交易日)  SIGNAL %d 条  耗时 %.0fs'

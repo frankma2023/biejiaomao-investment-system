@@ -400,6 +400,11 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     base = _build_record(daily, ctx, d1, t_idx, p2, t2_idx, p3, p3_idx,
                          handle, depth, hdd, handle_days, buy_point, params,
                          bar_idx=bar)
+    # 标定用特征（输出字段，不参与判定）
+    base['zone_before_days'] = n_before
+    base['zone_after_days'] = n_after
+    base['recovery_dd_pct'] = round(worst * 100, 2)
+    base['mouth_span_days'] = t2_idx - d1['t0_idx']
 
     # 规则 12/13: 突破日放量收上买点
     if daily[bar]['close'] > buy_point:
