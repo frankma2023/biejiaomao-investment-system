@@ -177,7 +177,7 @@ def get_run_failures():
 
 
 def run_all_engines(klines, indicators=None, silent=False, whitelist=None,
-                    record_types=None):
+                    record_types=None, as_of=None):
     """
     运行全部已发现的引擎。
 
@@ -191,6 +191,9 @@ def run_all_engines(klines, indicators=None, silent=False, whitelist=None,
         record_types: 可选，只传给声明了该形参的引擎（如 cup_handle_v2），
             用于索取 SIGNAL / CONFIRM / CANDIDATE 中的哪几类记录。
             不声明的引擎不受影响。
+        as_of: 可选，只传给声明了该形参的引擎。语义为「站在 as_of 这一天看」：
+            K线截断到当日、笔快照取 ≤ as_of 的最后一个、只返回当日记录。
+            不传的话引擎会退回「最新快照扫全历史」，对历史区间会引入未来视角。
 
     Returns:
         all_signals: List[dict]，每条信号已自动注入 source 字段
@@ -220,6 +223,8 @@ def run_all_engines(klines, indicators=None, silent=False, whitelist=None,
                 kwargs['indicators'] = indicators
             if 'record_types' in params and record_types is not None:
                 kwargs['record_types'] = record_types
+            if 'as_of' in params and as_of is not None:
+                kwargs['as_of'] = as_of
             if 'params' in params:
                 # 引擎未提供 load_params()（或它抛错）时分两种情形：
                 #   params 有默认值 → 省略即可，由引擎自身的默认逻辑接管；

@@ -124,13 +124,15 @@ def main():
             if not bi:
                 continue
             n_day += 1
-            d1s = ch._build_d1_candidates(bi, date_idx, closes, params)
+            d1s = ch.prepare_d1(
+                ch._build_d1_candidates(bi, date_idx, closes, params), closes)
             for d1 in d1s:
                 t1 = d1['t1_idx']
                 t0i = d1['t0_idx']
                 if not (t0i < i) or t1 >= i:
                     continue
-                if i - t0i > params['mouth_span_max'] + 2:
+                if i - t0i > (params['mouth_span_max']
+                              + params['mouth_to_signal_max']):
                     continue
                 p2, t2 = _argmax_max(closes, t1, i - 1)
                 if p2 is None or t2 is None:

@@ -31,19 +31,38 @@ conn.close()
 
 
 def simulate(bars, j, tp, sl, hold, entry=None):
-    """j 为入场日索引。entry 为 None 时按当日开盘价成交（B 口径）。"""
-    if j >= len(bars):
-        return None
+    """
+    j 为入场日索引；entry 为 None 时按当日开盘价成交（B 口径）。
+
+    入场日盘中路径的处理是**保守性关键**：
+      · B 口径成交价 = 当日开盘，当天的后续路径完全可知 → 入场日即可判止盈止损
+      · A 口径成交价 = 盘中触及买点的价格，**该日 high 是先于还是后于成交无从得知**
+        → 入场日只用收盘结算，止盈止损从次日才开始判。不这样处理会系统性高估
+          （实测 TP5/SL10/H30 由 +2.46% 虚高到 +3.55%，胜率由 82.7% 虚高到 90.0%）
+
+    Args:
+        bars: 该股日线（已剔除 OHLC 为 None 的占位行）。
+        j: 入场日索引。
+        tp/sl/hold: 止盈/止损幅度、最长持有交易日。
+        entry: 指定成交价；None 表示按 bars[j].open 成交。
+
+    Returns:
+        每笔收益率；样本不足或数据缺失时返回 None。
+    """
+    if j >= len(bars) or j + hold > len(bars):
+        return None                      # 窗口不足，丢弃而不是静默截断
     e = bars[j]['open'] if entry is None else entry
     if not e:
         return None
-    for k in range(j, min(j + hold, len(bars))):
+    start = j if entry is None else j + 1
+    if entry is not None and bars[j]['close'] <= e * (1 - sl):
+        return -sl                       # 入场日只用收盘结算
+    for k in range(start, j + hold):
         if bars[k]['low'] <= e * (1 - sl):
             return -sl
         if bars[k]['high'] >= e * (1 + tp):
             return tp
-    k = min(j + hold, len(bars)) - 1
-    return bars[k]['close'] / e - 1
+    return bars[min(j + hold, len(bars)) - 1]['close'] / e - 1
 
 
 def hit(bars, j, tp, win):
@@ -119,9 +138,9 @@ for hold in (5, 10, 20, 30, 60, 120):
     rs = []
     mxs = []
     for _, b, j in entries:
-        k = min(j + hold, len(b)) - 1
-        if k <= j:
+        if j + hold > len(b):
             continue
+        k = j + hold - 1
         e = b[j]['open']
         if not e:
             continue

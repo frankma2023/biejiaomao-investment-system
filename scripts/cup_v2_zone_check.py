@@ -15,19 +15,30 @@ bars_by = {}
 for code in {s['code'] for s in sigs}:
     bars_by[code] = [dict(r) for r in conn.execute(
         "SELECT date,open,high,low,close FROM daily_kline_adj WHERE stock_code=? "
-        "AND date>='2020-01-01' ORDER BY date", (code,))]
+        "AND date>='2020-01-01' AND close IS NOT NULL "
+        "AND high IS NOT NULL AND low IS NOT NULL ORDER BY date", (code,))]
 conn.close()
 
 
 def exitA(bars, di, bp, tp=0.15, sl=0.10, hold=20):
+    """
+    A 口径：di 日按 bp（买点）成交，逐日判止盈/止损，同日双触按先止损。
+
+    **入场日只用收盘结算**：bp 是盘中触及买点的价格，该日 high 是先于还是后于
+    成交无从得知。用全天 high/low 会产生系统性高估。
+    窗口不足（di+hold 超出数据）时返回 None，丢弃样本而非静默截断。
+    """
+    if di + hold > len(bars):
+        return None
     e = bp
-    for k in range(di, min(di + hold, len(bars))):
+    if bars[di]['close'] <= e * (1 - sl):
+        return -sl
+    for k in range(di + 1, di + hold):
         if bars[k]['low'] <= e * (1 - sl):
             return -sl
         if bars[k]['high'] >= e * (1 + tp):
             return tp
-    k = min(di + hold, len(bars)) - 1
-    return bars[k]['close'] / e - 1
+    return bars[di + hold - 1]['close'] / e - 1
 
 
 rows = []

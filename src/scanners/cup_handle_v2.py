@@ -276,6 +276,30 @@ def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int],
     return out
 
 
+def prepare_d1(d1s: List[Dict], closes: List[float]) -> List[Dict]:
+    """
+    规则 5 的预计算：为每个 D1 标记「杯底之后第一根收盘更低的K线」下标。
+
+    **必须是 detect() 与逐日回放共用的同一份逻辑。** 回放脚本若绕过它直接调
+    _evaluate，d1['first_lower_idx'] 恒为 None，规则 5 会被静默跳过——实测会让
+    27.3% 的回放信号成为真实引擎永远产不出的假信号。
+
+    Args:
+        d1s: _build_d1_candidates 的输出。
+        closes: 收盘价序列。
+
+    Returns:
+        原地写入 first_lower_idx 后的 d1s。
+    """
+    n = len(closes)
+    for d1 in d1s:
+        t1 = d1['t1_idx']
+        p1 = d1['p1']
+        d1['first_lower_idx'] = next(
+            (k for k in range(t1 + 1, n) if closes[k] < p1), n)
+    return d1s
+
+
 def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
               p2: float, t2_idx: int, params: Dict) -> Optional[Dict]:
     """
@@ -663,13 +687,7 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
     if not d1s:
         return ([], stats) if diagnose else []
 
-    # 规则 5 预计算：杯底之后第一根收盘更低的K线。
-    # 该下标 <= 杯口日即说明杯底不是杯身区间的最低点，结构作废。
-    for d1 in d1s:
-        t1 = d1['t1_idx']
-        p1 = d1['p1']
-        d1['first_lower_idx'] = next(
-            (k for k in range(t1 + 1, n) if closes[k] < p1), n)
+    d1s = prepare_d1(d1s, closes)
 
     # 一个杯子只有一个杯底：同一杯口下每类记录只保留最深的那条。
     # 多根向下笔会指向同一个杯口——27.1 → 19.35 → 25.25 → 19.92 → 26.51 的 W 形底，
@@ -684,9 +702,12 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
     best = {}           # (record_type, t2) -> rec
     for d1 in d1s:
         t1 = d1['t1_idx']
-        # 杯口不早于杯底；不晚于前高 + mouth_span_max 个交易日
+        # 杯口不早于杯底；不晚于前高 + mouth_span_max。
+        # 循环上界还必须再加 mouth_to_signal_max，否则杯口靠近上限时
+        # [t2+2, t2+mouth_to_signal_max] 这段跟踪窗口会被整个截断。
         lo = t1
-        hi = min(d1['t0_idx'] + params['mouth_span_max'], n - 1)
+        hi = min(d1['t0_idx'] + params['mouth_span_max']
+                 + params['mouth_to_signal_max'], n - 1)
         if lo > hi:
             continue
         # 杯口从杯底当天起逐日推进，且只用「不是跳涨日」的收盘来抬高杯口。
