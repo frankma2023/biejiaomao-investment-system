@@ -48,7 +48,8 @@ REQUIRED_PARAMS = (
     'min_prior_advance', 'advance_origin_tolerance',
     'mouth_vs_high_max', 'mouth_span_max', 'mouth_to_signal_max',
     'mouth_lock_pullback', 'depth_min', 'depth_max',
-    'recovery_dd_ratio', 'bottom_zone_pct', 'bottom_zone_days_max',
+    'recovery_dd_max', 'bottom_zone_pct', 'bottom_zone_days_max',
+    'bottom_zone_before_min',
     # ── 柄部 ──
     'handle_pm_min', 'handle_position_ratio',
     # ── 突破 ──
@@ -124,8 +125,12 @@ def _validate_geometry(p: Dict) -> None:
         errs.append("mouth_to_signal_max 至少为 1")
     if not 0 < p['mouth_lock_pullback'] < 1:
         errs.append("mouth_lock_pullback 必须在 (0, 1) 内")
-    if not 0 < p['recovery_dd_ratio'] < 1:
-        errs.append("recovery_dd_ratio 必须在 (0, 1) 内")
+    if not 0 < p['recovery_dd_max'] < 1:
+        errs.append("recovery_dd_max 必须在 (0, 1) 内")
+    if p['bottom_zone_before_min'] < 0:
+        errs.append("bottom_zone_before_min 不应为负")
+    if p['bottom_zone_before_min'] > p['bottom_zone_days_max']:
+        errs.append("bottom_zone_before_min 不应大于 bottom_zone_days_max")
     if not 0 < p['bottom_zone_pct'] < 1:
         errs.append("bottom_zone_pct 必须在 (0, 1) 内")
     if p['bottom_zone_days_max'] < 1:
@@ -287,10 +292,10 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
          3  M < H                               前高高于杯口
          4  depth ∈ [depth_min, depth_max]      杯身深度
          5  B 是 [B,M] 区间最低收盘              杯底唯一
-         6  回升段最大回撤 ≤ depth×recovery_dd_ratio  「一跌一涨」两段
+         6  回升段最大回撤 ≤ recovery_dd_max      「一跌一涨」两段
          7  P/M ≥ handle_pm_min                 柄部回撤上限
          8  P ≥ B + handle_position_ratio×(M−B) 柄低在杯身上半部
-         9  杯底区 [B,B×(1+δ)] 内 B 前后各 ≤ N 日  底部不拖太久
+         9  杯底区 [B,B×(1+δ)]：前侧 N_min~N_max 日、后侧 ≤N_max 日
         10  M 日 − H 日 ≤ mouth_span_max         调整不过长
         11  bar − M 日 ≤ mouth_to_signal_max     ★ 最强判据
         12  bar 收 > M + buy_point_buffer        S1 突破
@@ -340,8 +345,7 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     # 规则 6: 回升段不得被深度回调反复打断。
     # 杯身是「一跌一涨」两段；中途出现自最高收盘的深度回撤，就是多次反弹与下跌
     # 交替，已不是欧奈尔定义的杯子。003030：先到 25.25 跌回 19.92（−21.1%）、
-    # 再到 26.15 又跌回 18.98（−27.4%），最大回撤 27.4% ≫ 杯深 27.0%×50%。
-    # 阈值取杯深的比例而非绝对值：不同深度的杯子能容忍的中途回撤本就不同。
+    # 再到 26.15 又跌回 18.98（−27.4%），最大回撤 27.4% > 15% → 否决。
     run_max = closes[t1_idx]
     worst = 0.0
     for k in range(t1_idx + 1, t2_idx + 1):
@@ -351,7 +355,7 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
             dd = (run_max - closes[k]) / run_max
             if dd > worst:
                 worst = dd
-    if worst > params['recovery_dd_ratio'] * depth:
+    if worst > params['recovery_dd_max']:
         return None
 
     # 规则 9: 杯底区 [B, B×(1+δ)] 内，杯底前后各自的交易日数不得超过上限。
@@ -369,6 +373,11 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
         n_after += 1
         k += 1
     if n_before > zmax or n_after > zmax:
+        return None
+    # 前侧下限：杯底之前若几乎没有停留（V 形尖底），样本实测每笔 +2.74%/胜 52%，
+    # 而前侧停留 2~4 天为 +5.10%/胜 62%、4~7 天为 +8.48%/胜 81%，单调递增。
+    # 后侧不设下限——标的从杯底起来后往往次日就离开杯底区，设了下限样本只剩十几条。
+    if n_before < params['bottom_zone_before_min']:
         return None
 
     # 柄部区间 = (杯口日, 突破日)，不含杯口当日、不含突破日
