@@ -49,7 +49,17 @@ for s in sigs:
              r.get('zone_before_days'), r.get('zone_after_days')))
 conn.close()
 
-print('\n盘后复核链接（形态识别页，自动定位到该信号）:')
-for s in sigs[:12]:
+def _shift18(d):
+    """突破日往前 18 个月，作为复核区间起点（start 不能晚于 end）。"""
+    y, m, day = (int(x) for x in d.split('-'))
+    m -= 18
+    while m < 1:
+        m += 12
+        y -= 1
+    return '%04d-%02d-%02d' % (y, m, min(day, 28))
+
+
+print('\n盘后复核链接（形态识别页，区间 = 突破日往前 18 个月）:')
+for s in sigs:
     print('  http://localhost:8772/pattern-scan/?code=%s&start=%s&end=%s'
-          % (s['code'], '2023-01-01', s['date']))
+          % (s['code'], _shift18(s['date']), s['date']))
