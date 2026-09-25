@@ -244,10 +244,18 @@ def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int],
             continue
 
         # 前高 = 向下笔区间内的最高收盘；杯底 = 最低收盘
-        p0 = max(closes[i0:i1 + 1])
-        p1 = min(closes[i0:i1 + 1])
+        # 前高 = 向下笔区间内的最高收盘；杯底 = 最低收盘。
+        # **日期必须取极值所在那一天，不能沿用笔的起止端点** —— 口径统一到收盘价后，
+        # 极值完全可能落在笔的内部。000868 实测：区间最低收盘 4.240 在 08-28，
+        # 而笔的终点 edt 是 08-29（收 4.270）；若日期写死为 edt，报出来的
+        # 「杯底 4.240 @ 08-29」在那一天根本不存在。前高同理。
+        seg = closes[i0:i1 + 1]
+        p0 = max(seg)
+        p1 = min(seg)
         if not p0 > p1 > 0:
             continue
+        t0_idx = i0 + seg.index(p0)
+        t1_idx = i0 + seg.index(p1)
 
         # V2: 前置上涨（相对再前一笔的低点，同样取收盘口径）
         pt0, pt1 = _d10(prev.get('sdt')), _d10(prev.get('edt'))
@@ -271,7 +279,7 @@ def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int],
 
         out.append({
             'p0': float(p0), 'p1': float(p1), 'prev_low': float(prev_low),
-            't0_idx': i0, 't1_idx': i1,
+            't0_idx': t0_idx, 't1_idx': t1_idx,
         })
     return out
 
