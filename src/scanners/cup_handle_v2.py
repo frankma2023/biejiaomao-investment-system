@@ -52,7 +52,7 @@ REQUIRED_PARAMS = (
     'recovery_dd_max', 'bottom_zone_pct', 'bottom_zone_days_max',
     'bottom_zone_before_min',
     # ── 柄部 ──
-    'handle_pm_min', 'handle_position_ratio',
+    'handle_pm_min', 'handle_days_min', 'handle_position_ratio',
     # ── 突破 ──
     'buy_point_buffer', 'breakout_vol_ratio', 'vol_ma_window',
     'require_breakout_confirm',
@@ -138,6 +138,8 @@ def _validate_geometry(p: Dict) -> None:
         errs.append("bottom_zone_days_max 至少为 1")
     if not 0 < p['handle_pm_min'] < 1:
         errs.append("handle_pm_min 必须在 (0, 1) 内")
+    if p['handle_days_min'] < 1:
+        errs.append("handle_days_min 至少为 1")
     if p['handle_position_ratio'] < 0:
         errs.append("handle_position_ratio 不应为负")
     if p['handle_position_ratio'] >= 1:
@@ -424,6 +426,13 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     if p3 > p2 * (1 - params['mouth_lock_pullback']):
         return None
 
+    handle_days = bar - 1 - t2_idx
+
+    # 规则 7b: 柄部交易日数下限。柄部是「小幅回调 + 缩量整理」，一天的回撤不构成柄部
+    # （001289 实测：杯口 04-01 → 柄低 04-02 → 04-03 就突破，柄部仅 1 日）
+    if handle_days < params['handle_days_min']:
+        return None
+
     # 规则 7: 柄部回撤上限（P/M ≥ handle_pm_min）
     hdd = (p2 - p3) / p2
     if p3 < p2 * params['handle_pm_min']:
@@ -432,8 +441,6 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     # 规则 8: 柄低须在杯身上半部
     if p3 < p1 + (p2 - p1) * params['handle_position_ratio']:
         return None
-
-    handle_days = bar - 1 - t2_idx
 
     # ── 分类 ──────────────────────────────────────────
     buy_point = p2 + params['buy_point_buffer']
