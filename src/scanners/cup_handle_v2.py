@@ -46,6 +46,7 @@ CONFIG_PATH = os.path.join(PROJECT_DIR, "config", "market", "cup_handle_v2.yaml"
 REQUIRED_PARAMS = (
     # ── 结构（前高 / 杯底 / 杯口 的准入）──
     'min_prior_advance', 'advance_origin_tolerance',
+    'require_bottom_above_origin',
     'mouth_vs_high_max', 'mouth_span_max', 'mouth_to_signal_max',
     'mouth_lock_pullback', 'depth_min', 'depth_max',
     'recovery_dd_max', 'bottom_zone_pct', 'bottom_zone_days_max',
@@ -267,14 +268,15 @@ def _build_d1_candidates(bi: List[Dict], date_idx: Dict[str, int],
         if (p0 - prev_low) / prev_low < params['min_prior_advance']:
             continue
 
-        # V13: 杯底不得跌破前置上涨的起点。
+        # 规则 2（可开关）: 杯底不得跌破前置上涨的起点。
         # 杯柄本质是上涨过程中的调整；跌破起点意味着这波上涨被完全回吐，
         # 结构上已不是「上升趋势中的整理」，而是趋势转折。
         # 603903: 起点 11.01(06-22)，杯底 10.28(07-30)，跌破 6.6% → 否决。
         # 留 advance_origin_tolerance 容差：相邻两笔共享转折点，报价噪声会让
         # 杯底「低于起点 0.012 元」这种浮点级差异出现（003030 实测），
         # 严格 > 比较会把它误杀，反而留下 W 形的浅读数。
-        if p1 <= prev_low * (1 - params['advance_origin_tolerance']):
+        if params['require_bottom_above_origin'] and \
+                p1 <= prev_low * (1 - params['advance_origin_tolerance']):
             continue
 
         out.append({
