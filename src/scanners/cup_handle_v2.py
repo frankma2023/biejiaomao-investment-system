@@ -312,8 +312,28 @@ def prepare_d1(d1s: List[Dict], closes: List[float]) -> List[Dict]:
     return d1s
 
 
+def _rej(funnel: Optional[Dict], rule: str) -> None:
+    """
+    记录一次「被某条规则否决」并返回 None。
+
+    漏斗统计用于回答「信号为什么这么少」——每条规则各杀掉多少候选。
+    之前靠一条条关闭规则去猜，猜错了三次；这里改为直接计数。
+
+    Args:
+        funnel: 计数器字典；None 时不做统计。
+        rule: 规则标识。
+
+    Returns:
+        恒为 None，便于写成 `return _rej(funnel, 'rule3')`。
+    """
+    if funnel is not None:
+        funnel[rule] = funnel.get(rule, 0) + 1
+    return None
+
+
 def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
-              p2: float, t2_idx: int, params: Dict) -> Optional[Dict]:
+              p2: float, t2_idx: int, params: Dict,
+              funnel: Optional[Dict] = None) -> Optional[Dict]:
     """
     在检测日 t_idx 上，对给定 D1 与杯口执行形态校验与分类。
 
@@ -360,21 +380,21 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
 
     # 规则 3: 前高必须高于杯口
     if p2 > p0 * params['mouth_vs_high_max']:
-        return None
+        return _rej(funnel, '3_前高>杯口')
 
     # 规则 10: 前高→杯口 的时长上限
     if t2_idx - d1['t0_idx'] > params['mouth_span_max']:
-        return None
+        return _rej(funnel, '10_前高→杯口≤100日')
 
     # 规则 5: 杯底必须是杯身区间的最低收盘
     fl = d1.get('first_lower_idx')
     if fl is not None and t2_idx >= fl:
-        return None
+        return _rej(funnel, '5_杯底是区间最低收盘')
 
     # 规则 4: 杯身深度
     depth = (p2 - p1) / p2
     if not (params['depth_min'] <= depth <= params['depth_max']):
-        return None
+        return _rej(funnel, '4_深度15~40%')
 
     # 规则 6: 回升段不得被深度回调反复打断。
     # 杯身是「一跌一涨」两段；中途出现自最高收盘的深度回撤，就是多次反弹与下跌
@@ -390,7 +410,7 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
             if dd > worst:
                 worst = dd
     if worst > params['recovery_dd_max']:
-        return None
+        return _rej(funnel, '6_回升段回撤≤15%')
 
     # 规则 9: 杯底区 [B, B×(1+δ)] 内，杯底前后各自的交易日数不得超过上限。
     # 价格在杯底附近磨太久就是平底/箱体，不是杯子。
@@ -407,40 +427,40 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
         n_after += 1
         k += 1
     if n_before > zmax or n_after > zmax:
-        return None
+        return _rej(funnel, '9a_杯底区前后≤10日')
     # 前侧下限：杯底之前若几乎没有停留（V 形尖底），样本实测每笔 +2.74%/胜 52%，
     # 而前侧停留 2~4 天为 +5.10%/胜 62%、4~7 天为 +8.48%/胜 81%，单调递增。
     # 后侧不设下限——标的从杯底起来后往往次日就离开杯底区，设了下限样本只剩十几条。
     if n_before < params['bottom_zone_before_min']:
-        return None
+        return _rej(funnel, '9b_杯底区前侧≥2日')
 
     # 柄部区间 = (杯口日, 突破日)，不含杯口当日、不含突破日
     if bar - 1 < t2_idx:
-        return None
+        return _rej(funnel, 'x_柄部为空')
     handle = closes[t2_idx + 1: bar]
     if not handle:
-        return None
+        return _rej(funnel, 'x_柄部为空')
     p3 = min(handle)
 
     # V7: 杯口已回落确认（否则 P2 不是顶，而是半山腰）
     if p3 > p2 * (1 - params['mouth_lock_pullback']):
-        return None
+        return _rej(funnel, 'V7_杯口已回落')
 
     handle_days = bar - 1 - t2_idx
 
     # 规则 7b: 柄部交易日数下限。柄部是「小幅回调 + 缩量整理」，一天的回撤不构成柄部
     # （001289 实测：杯口 04-01 → 柄低 04-02 → 04-03 就突破，柄部仅 1 日）
     if handle_days < params['handle_days_min']:
-        return None
+        return _rej(funnel, '7b_柄部≥3日')
 
     # 规则 7: 柄部回撤上限（P/M ≥ handle_pm_min）
     hdd = (p2 - p3) / p2
     if p3 < p2 * params['handle_pm_min']:
-        return None
+        return _rej(funnel, '7_柄撤≤20%')
 
     # 规则 8: 柄低须在杯身上半部
     if p3 < p1 + (p2 - p1) * params['handle_position_ratio']:
-        return None
+        return _rej(funnel, '8_柄低在杯身上半部')
 
     # ── 分类 ──────────────────────────────────────────
     buy_point = p2 + params['buy_point_buffer']
@@ -463,13 +483,13 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
             base['breakout_vol_ratio'] = (
                 round(daily[bar]['volume'] / ma20v, 3) if ma20v else None)
             return base
-        return None
+        return _rej(funnel, '12/13_突破失败(收盘或放量)')
 
     # 规则 11: 候选须仍在跟踪窗口内，且未跌破杯底
     if bar - t2_idx > params['mouth_to_signal_max']:
-        return None
+        return _rej(funnel, '11_候选超跟踪窗口')
     if daily[t_idx]['close'] < p1 * (1 - params['cup_invalidate_tolerance']):
-        return None
+        return _rej(funnel, 'W3_跌破杯底失效')
     base['record_type'] = 'CANDIDATE'
     return base
 
@@ -660,6 +680,8 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
 
     stats = {'points': 0, 'no_d1': 0, 'v_fail': 0, 'passed_v': 0,
              'SIGNAL': 0, 'CANDIDATE': 0, 'other': 0}
+    funnel: Dict[str, int] = {}          # 每条规则各否决了多少候选（diagnose 时输出）
+    stats['funnel'] = funnel
 
     # as_of：只站在 as_of 这一天看。K线截断到当日，笔快照随之取当日快照，
     # 返回的记录也只保留当日新出现的那一条。实盘当时判断不出，就永远判断不出，
@@ -734,7 +756,7 @@ def detect(daily: List[Dict], params: Optional[Dict] = None,
         for t_idx in range(t1, hi + 1):
             if t_idx >= lo:
                 stats['points'] += 1
-                rec = _evaluate(daily, ctx, d1, t_idx, p2, t2, params)
+                rec = _evaluate(daily, ctx, d1, t_idx, p2, t2, params, funnel)
                 if rec is None:
                     stats['v_fail'] += 1
                 else:
