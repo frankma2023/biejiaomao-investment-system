@@ -119,7 +119,7 @@ def _validate_geometry(p: Dict) -> None:
     if not p['depth_min'] < p['depth_max']:
         errs.append("depth_min 必须小于 depth_max")
     if p['mouth_vs_high_max'] > 1:
-        errs.append("mouth_vs_high_max 不应大于 1（前高必须高于杯口）")
+        errs.append("mouth_vs_high_max 不应大于 1（杯口不得高于前高，即 H ≥ M）")
     if p['mouth_span_max'] < 1:
         errs.append("mouth_span_max 至少为 1")
     if p['mouth_to_signal_max'] < 1:
@@ -337,13 +337,13 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     """
     在检测日 t_idx 上，对给定 D1 与杯口执行形态校验与分类。
 
-    精简后的规则集（14 条，**一律收盘价口径**）：
+    精简后的规则集（15 条编号 + 1 条前提约束 `+`，**一律收盘价口径**）：
 
         结构点  L0 上涨起点 | H 前高 | B 杯底 | M 杯口 | P 柄低
         ─────────────────────────────────────────────────────────
          1  (H−L0)/L0 ≥ min_prior_advance      前置涨幅       [_build_d1_candidates]
          2  B > L0×(1−advance_origin_tolerance) 杯底不破起点    [同上]
-         3  M < H                               前高高于杯口
+         3  M ≤ H×(mouth_vs_high_max=1)         前高不低于杯口
          4  depth ∈ [depth_min, depth_max]      杯身深度
          5  B 是 [B,M] 区间最低收盘              杯底唯一
          6  回升段最大回撤 ≤ recovery_dd_max      「一跌一涨」两段
@@ -378,13 +378,13 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     t1_idx = d1['t1_idx']
     bar = t_idx
 
-    # 规则 3: 前高必须高于杯口
+    # 规则 3: 前高不低于杯口（mouth_vs_high_max = 1 时即 M ≤ H，允许二者相等）
     if p2 > p0 * params['mouth_vs_high_max']:
-        return _rej(funnel, '3_前高>杯口')
+        return _rej(funnel, '3_前高≥杯口')
 
     # 规则 10: 前高→杯口 的时长上限
     if t2_idx - d1['t0_idx'] > params['mouth_span_max']:
-        return _rej(funnel, '10_前高→杯口≤100日')
+        return _rej(funnel, '10_前高→杯口跨度')
 
     # 规则 5: 杯底必须是杯身区间的最低收盘
     fl = d1.get('first_lower_idx')
@@ -394,12 +394,15 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     # 规则 4: 杯身深度
     depth = (p2 - p1) / p2
     if not (params['depth_min'] <= depth <= params['depth_max']):
-        return _rej(funnel, '4_深度15~40%')
+        return _rej(funnel, '4_杯身深度')
 
     # 规则 6: 回升段不得被深度回调反复打断。
     # 杯身是「一跌一涨」两段；中途出现自最高收盘的深度回撤，就是多次反弹与下跌
     # 交替，已不是欧奈尔定义的杯子。003030：先到 25.25 跌回 19.92（−21.1%）、
     # 再到 26.15 又跌回 18.98（−27.4%），最大回撤 27.4% > 15% → 否决。
+    # 注：规则 5 已排除杯口前跌破 B，故 worst ≤ depth；当 depth ≤ recovery_dd_max 时
+    # 本规则恒不成立（几何必然，不是缺陷）。深度放宽到 [0.12, 0.40] 后，
+    # depth < 0.15 的杯身不受本规则约束。
     run_max = closes[t1_idx]
     worst = 0.0
     for k in range(t1_idx + 1, t2_idx + 1):
@@ -410,7 +413,7 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
             if dd > worst:
                 worst = dd
     if worst > params['recovery_dd_max']:
-        return _rej(funnel, '6_回升段回撤≤15%')
+        return _rej(funnel, '6_回升段回撤')
 
     # 规则 9: 杯底区 [B, B×(1+δ)] 内，杯底前后各自的交易日数不得超过上限。
     # 价格在杯底附近磨太久就是平底/箱体，不是杯子。
@@ -427,12 +430,15 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
         n_after += 1
         k += 1
     if n_before > zmax or n_after > zmax:
-        return _rej(funnel, '9a_杯底区前后≤10日')
-    # 前侧下限：杯底之前若几乎没有停留（V 形尖底），样本实测每笔 +2.74%/胜 52%，
-    # 而前侧停留 2~4 天为 +5.10%/胜 62%、4~7 天为 +8.48%/胜 81%，单调递增。
-    # 后侧不设下限——标的从杯底起来后往往次日就离开杯底区，设了下限样本只剩十几条。
+        return _rej(funnel, '9a_杯底区天数上限')
+    # 前侧下限 bottom_zone_before_min：0 = 关闭（允许 V 形尖底，2026-09-26 用户决定）。
+    # 关闭前的标定：前侧 =0 → 每笔 +2.74%/胜 52%，2~3 天 → +5.03%/胜 62%，
+    # 4~6 天 → +8.48%/胜 81%（PRD §6.6，单调递增）。即本次放宽正是文档标为期望
+    # 最低的那一档，属主动取舍，待重跑回放复核。后侧始终不设下限——标的从杯底
+    # 起来后往往次日就离开杯底区，设了下限样本只剩十几条。
+    # n_before 仍会算，即使阈值取 0：它同时被 zone_before_days 输出字段使用。
     if n_before < params['bottom_zone_before_min']:
-        return _rej(funnel, '9b_杯底区前侧≥2日')
+        return _rej(funnel, '9b_杯底区前侧下限')
 
     # 柄部区间 = (杯口日, 突破日)，不含杯口当日、不含突破日
     if bar - 1 < t2_idx:
@@ -451,12 +457,15 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     # 规则 7b: 柄部交易日数下限。柄部是「小幅回调 + 缩量整理」，一天的回撤不构成柄部
     # （001289 实测：杯口 04-01 → 柄低 04-02 → 04-03 就突破，柄部仅 1 日）
     if handle_days < params['handle_days_min']:
-        return _rej(funnel, '7b_柄部≥3日')
+        return _rej(funnel, '7b_柄部交易日下限')
 
     # 规则 7: 柄部回撤上限（P/M ≥ handle_pm_min）
+    # 注：规则 8 的门槛是 M×(1−depth/2)，而规则 4 保证 depth ≤ depth_max；
+    # 只要 1 − depth_max/2 ≥ handle_pm_min（当前 0.80 ≥ 0.80），规则 7 的否决集合
+    # 就完全被规则 8 包含，无独立约束力。两条并列为独立规则，实测只有规则 8 在起作用。
     hdd = (p2 - p3) / p2
     if p3 < p2 * params['handle_pm_min']:
-        return _rej(funnel, '7_柄撤≤20%')
+        return _rej(funnel, '7_柄部回撤上限')
 
     # 规则 8: 柄低须在杯身上半部
     if p3 < p1 + (p2 - p1) * params['handle_position_ratio']:
@@ -476,14 +485,16 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
 
     # 规则 12/13: 突破日放量收上买点
     if daily[bar]['close'] > buy_point:
-        if _is_signal(daily, ctx, bar, t2_idx, p2, params):
+        reason = _signal_reject(daily, ctx, bar, t2_idx, params)
+        if reason is None:
             base['record_type'] = 'SIGNAL'
             base['breakout_close'] = round(daily[bar]['close'], 3)
             ma20v = ctx['vol_ma'][bar]
             base['breakout_vol_ratio'] = (
                 round(daily[bar]['volume'] / ma20v, 3) if ma20v else None)
             return base
-        return _rej(funnel, '12/13_突破失败(收盘或放量)')
+        # 收上买点但未成信号：按真实原因归因，不并入 12/13（规则 11 是间隔问题）
+        return _rej(funnel, reason)
 
     # 规则 11: 候选须仍在跟踪窗口内，且未跌破杯底
     if bar - t2_idx > params['mouth_to_signal_max']:
@@ -494,10 +505,41 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     return base
 
 
+def _signal_reject(daily: List[Dict], ctx: Dict, t_idx: int, t2_idx: int,
+                   params: Dict) -> Optional[str]:
+    """
+    突破日不成立的规则编号（规则 12 的收盘突破由调用方判定）。
+
+    Args:
+        daily: 日K列表。
+        ctx: 预计算上下文。
+        t_idx: 突破日索引。
+        t2_idx: 杯口索引。
+        params: 参数字典。
+
+    Returns:
+        漏斗键名；全部通过时返回 None。
+    """
+    t = daily[t_idx]
+
+    # 规则 11: 杯口→突破 的间隔。口径修正后的逐日回放样本上各档 +2.24%~+2.57%
+    # （平坦、无区分度）；v2 的「★最强判据 50.9%→20.3%」来自笔的极值口径一次性
+    # 扫描样本，不成立。本规则作为「杯口确认后须尽快突破」的定义性约束保留。
+    if t_idx - t2_idx > params['mouth_to_signal_max']:
+        return '11_候选超跟踪窗口'
+
+    # 规则 13: 放量（欧奈尔对「突破」的定义就是放量；只判价格会让缩量假突破全通过）
+    ma_v = ctx['vol_ma'][t_idx]
+    if not ma_v or ma_v <= 0 or t['volume'] < ma_v * params['breakout_vol_ratio']:
+        return '13_突破未放量'
+
+    return None
+
+
 def _is_signal(daily: List[Dict], ctx: Dict, t_idx: int, t2_idx: int,
                p2: float, params: Dict) -> bool:
     """
-    突破日判定（规则 11 间隔 + 规则 13 放量；规则 12 的收盘突破由调用方判定）。
+    突破日是否成立。
 
     Args:
         daily: 日K列表。
@@ -510,18 +552,7 @@ def _is_signal(daily: List[Dict], ctx: Dict, t_idx: int, t2_idx: int,
     Returns:
         是否构成突破。
     """
-    t = daily[t_idx]
-
-    # 规则 11: 杯口→突破 的间隔（★ 最强判据，实测 5~9 日档 50.9% → 33~37 日档 20.3%）
-    if t_idx - t2_idx > params['mouth_to_signal_max']:
-        return False
-
-    # 规则 13: 放量（欧奈尔对「突破」的定义就是放量；只判价格会让缩量假突破全通过）
-    ma_v = ctx['vol_ma'][t_idx]
-    if not ma_v or ma_v <= 0 or t['volume'] < ma_v * params['breakout_vol_ratio']:
-        return False
-
-    return True
+    return _signal_reject(daily, ctx, t_idx, t2_idx, params) is None
 
 
 def _build_record(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int, p2: float,
@@ -865,7 +896,11 @@ def main():
     if args.diagnose:
         print("\n=== 漏斗 ===")
         for k, v in stats.items():
+            if isinstance(v, dict):
+                continue
             print(f"  {k:<12} {v:,}")
+        for rule, cnt in sorted(stats['funnel'].items(), key=lambda kv: -kv[1]):
+            print(f"  {rule:<20} {cnt:,}")
     sig = [r for r in records if r['record_type'] == 'SIGNAL']
     cand = [r for r in records if r['record_type'] == 'CANDIDATE']
     print(f"\nSIGNAL {len(sig)} 条   CANDIDATE {len(cand)} 条")

@@ -47,8 +47,9 @@ L0 = 10.00                # 前置上涨起点
 P0 = 14.00                # 前高
 P1 = 10.50                # 杯底
 P2 = 13.80                # 杯口
-P3 = 12.75                # 柄低（回撤 7.6%，须 <= handle_pm_min 隐含的 8%）
-BUY = P2 * 1.01           # 买点（引擎 S1 用 P2 + buy_point_buffer）
+P3 = 12.75                # 柄低（回撤 7.6%，须 >= handle_pm_min 隐含的 20% 以内）
+# 买点在 params 载入后按 P2 + buy_point_buffer 计算（见 BUY 赋值处）：
+# 引擎的缓冲单位是元，写成 P2×1.01 会得到 13.938，与引擎的 13.810 差 0.93%。
 BRK = 14.10               # 突破日收盘
 CONF = 13.95              # 确认日收盘（> 杯口 13.80 → 突破成立）
 
@@ -108,6 +109,7 @@ bi = [
 ]
 
 params = ch.load_params()
+BUY = P2 + params['buy_point_buffer']      # 与引擎 _evaluate 完全一致
 records, stats = ch.detect(daily, params, bi_list=bi, stock_code='SYN001',
                            record_types=('SIGNAL', 'CONFIRM'), diagnose=True)
 print('=== 引擎判定（K线 %d 根）===' % N)
@@ -153,7 +155,8 @@ vma = ch._rolling_mean(vols, params['vol_ma_window'])
 axv.plot(x, [v / 1e6 if v else float('nan') for v in vma], color='#f59e0b', lw=1.0,
          label='MA20(量)')
 axv.plot(x, [v * params['breakout_vol_ratio'] / 1e6 if v else float('nan') for v in vma],
-         color='#FFD700', lw=1.0, ls='--', label='MA20×1.5（S2 门槛）')
+         color='#FFD700', lw=1.0, ls='--',
+         label='MA20(量)×%.2f（规则 13 门槛）' % params['breakout_vol_ratio'])
 
 bands = [(TL0, T0, '#ef4444', '① 前置上涨', 0),
          (T0, T1, '#10b981', '② 杯左侧', 1),
@@ -174,11 +177,12 @@ for a_, b_, col, lab, row in bands:
 
 for y, lab, col, ls, va in (
         (P0, '前高 P0 = %.2f' % P0, '#ef4444', (0, (5, 4)), 'bottom'),
-        (P2, '杯口 P2 = %.2f    买点 = %.2f（P2×1.01，S1 触发价）' % (P2, BUY),
+        (P2, '杯口 P2 = %.2f    买点 = %.2f（P2 + %.2f，规则 12）'
+         % (P2, BUY, params['buy_point_buffer']),
          '#00E5FF', (0, (5, 4)), 'top'),
         (P3, '柄低 P3 = %.2f' % P3, '#a78bfa', (0, (5, 4)), 'bottom'),
         (P1, '杯底 P1 = %.2f' % P1, '#10b981', (0, (5, 4)), 'bottom'),
-        (L0, '上涨起点 L0 = %.2f（V13 底线，杯底不得跌破）' % L0,
+        (L0, '上涨起点 L0 = %.2f（规则 2 已关闭：require_bottom_above_origin=false）' % L0,
          '#f97316', (0, (1, 3)), 'top')):
     ax.axhline(y, color=col, lw=1.05, ls=ls, alpha=.7, zorder=2)
     ax.annotate(lab, (TL0 - 58, y), color=col, fontsize=9, va=va, ha='left',
@@ -220,20 +224,29 @@ ax.legend(loc='lower right', facecolor='#181822', edgecolor='#2a2a38',
 lines = [
     '引擎实参（config/market/cup_handle_v2.yaml）与本次合成样本实测',
     '',
-    'V2   前置上涨 %.1f%%    ≥ min_prior_advance 25%%' % ((P0 - L0) / L0 * 100),
-    'V3   下跌K线 %d 根      ≥ min_descent_bars 10' % (T1 - T0),
-    'V4   杯底距今 %d 日      ∈ [cup_min_age 35, 325]' % (T_SIG - T1),
-    'V5   杯身深度 %.1f%%    ∈ [depth_min 15%%, 40%%]' % ((P2 - P1) / P2 * 100),
-    'V6   杯口/前高 %.3f    ≤ mouth_vs_high_max 1.10' % (P2 / P0),
-    'V8   柄部回撤 %.2f%%    ∈ [handle_dd_min 5%%, 15%%]' % ((P2 - P3) / P2 * 100),
-    'V9   柄部时长 %d 日      ≤ handle_days_max 15' % (T_SIG - 1 - T2),
-    'V10  柄低 %.2f       ≥ 杯底+50%%杯深 = %.2f' % (P3, P1 + .5 * (P2 - P1)),
-    'V13  杯底 %.2f       > 上涨起点 L0 = %.2f' % (P1, L0),
-    'S1   收盘 %.2f       > 买点 %.3f' % (BRK, BUY),
-    'S2   突破量比 %.2f     ≥ breakout_vol_ratio 1.50' % r['breakout_vol_ratio'],
-    'S5   杯口→突破 %d 日     ≤ mouth_to_signal_max 12' % (T_BRK - T2),
-    'S7   次日确认：确认日收 %.2f > 杯口 %.2f  → 补 CONFIRM（加仓点）'
-    % (CONF, P2),
+    'R1   前置上涨 %.1f%%    ≥ min_prior_advance %.0f%%'
+    % ((P0 - L0) / L0 * 100, params['min_prior_advance'] * 100),
+    'R2   杯底不得跌破上涨起点：%s（require_bottom_above_origin）'
+    % ('开启' if params['require_bottom_above_origin'] else '已关闭'),
+    'R3   杯口/前高 %.3f    ≤ mouth_vs_high_max %.2f' % (P2 / P0, params['mouth_vs_high_max']),
+    'R4   杯身深度 %.1f%%    ∈ [depth_min %.0f%%, depth_max %.0f%%]'
+    % ((P2 - P1) / P2 * 100, params['depth_min'] * 100, params['depth_max'] * 100),
+    'R5   杯底是 [B, M] 区间最低收盘（本合成形态按构造满足）',
+    'R6   回升段最大回撤 %.2f%%  ≤ recovery_dd_max %.0f%%'
+    % (r['recovery_dd_pct'], params['recovery_dd_max'] * 100),
+    'R7b  柄部交易日 %d 日     ≥ handle_days_min %d'
+    % (T_SIG - 1 - T2, params['handle_days_min']),
+    'R7   柄部回撤 %.2f%%    ≤ %.0f%%（handle_pm_min %.2f）'
+    % ((P2 - P3) / P2 * 100, (1 - params['handle_pm_min']) * 100, params['handle_pm_min']),
+    'R8   柄低 %.2f        ≥ 杯底 + %.2f×杯深 = %.2f'
+    % (P3, params['handle_position_ratio'], P1 + params['handle_position_ratio'] * (P2 - P1)),
+    'R11  杯口→突破 %d 日    ≤ mouth_to_signal_max %d'
+    % (T_BRK - T2, params['mouth_to_signal_max']),
+    'R12  收盘 %.2f        > 买点 %.3f（杯口 + %.2f）'
+    % (BRK, BUY, params['buy_point_buffer']),
+    'R13  突破量比 %.2f      ≥ breakout_vol_ratio %.2f'
+    % (r['breakout_vol_ratio'], params['breakout_vol_ratio']),
+    'R14  次日确认：确认日收 %.2f > 杯口 %.2f  → 补 CONFIRM（加仓点）' % (CONF, P2),
     '',
     'SIGNAL  突破日 %s（轻仓，买点 %.3f）' % (r['date'], r['buy_point']),
     'CONFIRM 确认日 %s（加仓）' % conf['date'],

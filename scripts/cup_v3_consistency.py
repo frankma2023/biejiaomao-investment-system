@@ -68,13 +68,17 @@ print('')
 
 print('④ PRD v3 参数表 vs YAML')
 prd_rows = {}
+unparsed = []
 for line in prd.splitlines():
     if not line.startswith('|'):
         continue
-    cells = [c.strip() for c in line.strip('|').split('|')]
+    # 先剥离 Markdown 强调：PRD 会把本次改动的值写成 **0.12**，不剥离就会
+    # 匹配失败并被静默跳过——「把新值加粗」这个动作本身会关掉校验。
+    cells = [c.strip().replace('**', '').replace('`', '') for c in line.strip('|').split('|')]
     if len(cells) < 2:
         continue
-    names = re.findall(r"`([a-z_]+)`", cells[0])
+    names = re.findall(r"`?([a-z_]{4,})`?", cells[0])
+    names = [n for n in names if n in ykeys]
     if not names:
         continue
     vals = re.findall(r"^([0-9.]+)$", cells[1])          # 单值：0.25
@@ -87,6 +91,7 @@ for line in prd.splitlines():
             prd_rows[nm] = vals[i]
         else:
             prd_rows.setdefault(nm, None)
+            unparsed.append((nm, cells[1]))
 prd_keys = set(prd_rows)
 for k in sorted(prd_keys - ykeys):
     bad('PRD 列了但 YAML 没有: %s' % k)
@@ -106,6 +111,10 @@ for k, v in sorted(ycfg.items()):
     n_checked += 1
     if float(prd_rows[k]) != float(v):
         bad('%s: PRD 写 %s，YAML 是 %s' % (k, prd_rows[k], v))
+# 数值型参数在 PRD 里解析不出数字 = 覆盖缺口，必须报错而非跳过
+for k, cell in unparsed:
+    if isinstance(ycfg.get(k), (int, float)) and not isinstance(ycfg.get(k), bool):
+        bad('%s: PRD 单元格 %r 解析不出数值，该键未被校验' % (k, cell))
 print('  （已核对 %d 个数值型默认值）' % n_checked)
 print('')
 
