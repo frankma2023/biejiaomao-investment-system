@@ -467,11 +467,11 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
 
     # 规则 11b: 杯口→突破 的**最小**间隔（= 柄部整理时长下限）。
     # 口径与规则 11 完全一致：bar − t2_idx，单位是交易日，突破日当天计入。
-    # 柄部整理一般 1~4 周（5~20 个交易日），少于 1 周说明还没形成柄部就冲出去了。
+    # 「没有柄部就不叫杯柄形态」——柄部 0/1/2 日会被挡在这里（bar−t2 ≥ 4 ⇒ 柄部 ≥ 3 日）。
     # 与规则 11（上限）对称，和 handle_days_min 一样在 SIGNAL/CANDIDATE 分流**之前**
-    # 判定 —— 否则「间隔不足」的结构会先被当成候选发出去。
-    # 注：本项比 handle_days_min 更严（要求 bar−t2 ≥ 5，而 handle_days_min=3 只要求
-    # ≥ 4），故 handle_days_min 在现行配置下不再起作用。
+    # 判定——否则「间隔不足」的结构会先被当成候选发出去。
+    # 注：本项与 handle_days_min 在现行配置下**完全等价**（都要求 bar−t2 ≥ 4），
+    # 同一个约束写了两遍。去留待定，见 PRD §9。
     if bar - t2_idx < params['mouth_to_signal_min']:
         return _rej(funnel, '11b_杯口→突破过短')
 
