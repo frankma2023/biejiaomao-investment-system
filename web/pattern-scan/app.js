@@ -326,9 +326,12 @@ function renderChart() {
         style = { color: '#FF2D95', symbol: 'diamond', size: 15 };
         name = '加仓 · ' + name;
       } else if (sig.source === 'cup_handle_v2' && sig.record_type === 'CANDIDATE') {
-        // 观察候选：形态已成立但尚未放量收上买点。画成空心小圈并压暗，
-        // 避免与已成立的突破信号混淆。
-        style = { color: '#5E8FA3', symbol: 'emptyCircle', size: 9 };
+        // 观察候选：形态已成立但尚未放量收上买点。用小尺寸、半透明的圆点，
+        // 视觉权重低于已成立的突破信号（青色 pin / 洋红菱形）。
+        // 不用 emptyCircle：它在 ECharts 里把 itemStyle.color 当描边、borderColor
+        // 当填充，会继承下方 pt 的 borderColor='#FFF'，渲染成「蓝环白心」——
+        // 白色填充反而比真信号更抢眼。改用语义明确的 circle（color=填充）。
+        style = { color: '#5E8FA3', symbol: 'circle', size: 9, subdued: true };
         name = '候选 · ' + name;
       }
       var y = k.low - gap * (i + 1);
@@ -338,7 +341,9 @@ function renderChart() {
         symbol: style.symbol,
         symbolSize: style.size,
         symbolRotate: style.symbol === 'triangle' ? 180 : 0,
-        itemStyle: { color: style.color, borderColor: '#FFF', borderWidth: 0.8 }
+        itemStyle: style.subdued
+          ? { color: 'rgba(94,143,163,0.30)', borderColor: '#5E8FA3', borderWidth: 1 }
+          : { color: style.color, borderColor: '#FFF', borderWidth: 0.8 }
       };
       // 箱体突破/跌破信号：附加箱体信息，供 hover 画上下轨虚线
       if ((sig.source === 'box_breakout' || sig.source === 'box_breakdown') && sig.details) {
