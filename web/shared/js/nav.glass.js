@@ -2,9 +2,18 @@
  * Nav.js — 欧奈尔投资系统全站导航栏 (Dark Glass Edition for web4)
  */
 
-// API 走同源相对路径 /api/ —— 由 scripts/serve_dev.py 反代到 Flask(:8788)。
-// 不要再改成 `http://主机名:8788`：那样在 https 隧道下会被浏览器按「混合内容」拦掉，
-// 隧道也只映射一个端口。
+// API 走同源相对路径 —— 与 nav.js 同一处理：把 `http://<任意主机>:8788/...`
+// 改写成相对路径，交给 scripts/serve_dev.py 反代。理由见 nav.js 的注释。
+(function () {
+  var ABS_API = /^https?:\/\/[^/]+:8788(\/|$)/;
+  var _fetch = window.fetch;
+  window.fetch = function (input, init) {
+    if (typeof input === 'string' && ABS_API.test(input)) {
+      input = input.replace(ABS_API, '/');
+    }
+    return _fetch.call(this, input, init);
+  };
+})();
 
 (function (global) {
   'use strict';

@@ -5,9 +5,23 @@
 // 全站 favicon（所有页面统一）
 (function(){var l=document.createElement('link');l.rel='icon';l.type='image/svg+xml';l.href=(function(){var s=document.querySelector('script[src$=\"nav.js\"]');return s?s.src.replace(/\/shared\/js\/nav\.js.*/,'')+'/images/favicon.svg':'../images/favicon.svg'})();document.head.appendChild(l)})();
 
-// API 走同源相对路径 /api/ —— 由 scripts/serve_dev.py 反代到 Flask(:8788)。
-// 不要再改成 `http://主机名:8788`：那样在 https 隧道下会被浏览器按「混合内容」拦掉，
-// 隧道也只映射一个端口。
+// API 走同源相对路径 —— 全站有 40+ 处在页面里把 API 写成绝对地址
+// `http://<当前主机>:8788/...`。本机没问题，但**走隧道时那个 `主机名:8788` 并不存在**
+// （Pinggy/Cloudflare 只映射一个端口），而且 https 页面调 http 会被浏览器按
+// 「混合内容」直接拦掉 —— 表现就是页面能开、接口全部 failed to fetch。
+//
+// 这里统一拦截 fetch，把这类地址改写成同源相对路径，交给 scripts/serve_dev.py
+// 反代到 Flask(:8788)。一处生效，全站无需逐个改。
+(function () {
+  var ABS_API = /^https?:\/\/[^/]+:8788(\/|$)/;
+  var _fetch = window.fetch;
+  window.fetch = function (input, init) {
+    if (typeof input === 'string' && ABS_API.test(input)) {
+      input = input.replace(ABS_API, '/');
+    }
+    return _fetch.call(this, input, init);
+  };
+})();
 
 (function (global) {
   'use strict';
