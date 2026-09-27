@@ -20,9 +20,9 @@
 
 用法:
     python scripts/cup_v2_oos.py [CSV]      # CSV 缺省为 data/cup_v2_replay.csv
-    # 正式口径：跑放宽版再喂进来
+    # 正式口径：跑放宽版再喂进来。**放宽值必须小于当前发货值**，否则跑出来与基线相同。
     #   python scripts/cup_v2_replay.py --out data/cup_v2_replay_loose.csv \
-    #       --param breakout_vol_ratio=1.5 --param mouth_to_signal_max=999
+    #       --param breakout_vol_ratio=1.0 --param mouth_to_signal_max=999
     #   python scripts/cup_v2_oos.py data/cup_v2_replay_loose.csv
 """
 import csv
@@ -38,18 +38,18 @@ SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     PROJECT_DIR, 'data', 'cup_v2_replay.csv')
 SPLIT = '2024-01-01'
 
-# 发货值：从 YAML 读，保证「保留组」就是当前线上配置
+# 发货值：从 YAML 读，用于判断「保留组」是否等于当前线上配置
 _yml = yaml.safe_load(open(os.path.join(PROJECT_DIR, 'config/market/cup_handle_v2.yaml'),
                            encoding='utf-8'))['cup_handle_v2']
 VOL_KEEP = float(_yml['breakout_vol_ratio'])
 MTS_KEEP = int(_yml['mouth_to_signal_max'])
-# 「拟」值（§6.5 的待检验项）
-VOL_CUT, MTS_CUT = 1.5, 999
+MTS_MIN = int(_yml['mouth_to_signal_min'])
+# 「拟」值（§6.5 的待检验项）：收紧方向
 HDD_KEEP, DEPTH_KEEP = 8.0, 25.0
 
 print('样本: %s' % SRC)
-print('发货值: 量比 ≥ %.2f、杯口→突破 ≤ %d 日   「拟」值: 量比 ≥ %.1f、不限日数\n'
-      % (VOL_KEEP, MTS_KEEP, VOL_CUT))
+print('当前发货值: 量比 ≥ %.2f、杯口→突破 ∈ [%d, %d] 日'
+      % (VOL_KEEP, MTS_MIN, MTS_KEEP))
 
 conn = sqlite3.connect(DB)
 conn.row_factory = sqlite3.Row
@@ -98,13 +98,38 @@ for s in sigs:
                  else int(s['mouth_to_days']),
                  'vr': float(s['vol_ratio'] or 0)})
 
-# 发货口径下 A 口径可成交的样本 = 基线信号集
+# 只有当 CSV 确实是按当前发货值跑出来的，「发货口径子集」这个说法才成立。
+# 引擎在第一条不满足的规则上否决，所以若 CSV 生成于更严的配置，它的特征范围
+# 会明显窄于发货值 —— 此时 regime == rows 是**假象**，不能声称「这就是现行配置的信号集」。
+_CSV_MATCHES = True
+if rows:
+    vmin, mmax = min(x['vr'] for x in rows), max(x['mts'] for x in rows)
+    mmin = min(x['mts'] for x in rows)
+    print('本 CSV 特征范围: vr %.2f~%.2f / mts %d~%d'
+          % (vmin, max(x['vr'] for x in rows), mmin, mmax))
+    if vmin > VOL_KEEP + 1e-9:
+        _CSV_MATCHES = False
+        print('  [WARN] CSV 最小量比 %.2f > 发货值 %.2f —— 该 CSV 生成于更严的配置，'
+              '「量比」方向不可用，请先按当前 YAML 重跑回放' % (vmin, VOL_KEEP))
+    if mmax < MTS_KEEP:
+        _CSV_MATCHES = False
+        print('  [WARN] CSV 最大间隔 %d < 发货上限 %d —— 同上，「上限」方向不可用'
+              % (mmax, MTS_KEEP))
+    if mmin < MTS_MIN:
+        _CSV_MATCHES = False
+        print('  [WARN] CSV 最小间隔 %d < 发货下限 %d —— 该 CSV 尚未应用 '
+              'mouth_to_signal_min' % (mmin, MTS_MIN))
+print('')
+
+# A 口径可成交的样本。CSV 与发货值一致时它就是基线信号集；否则只是「CSV 覆盖的那部分」。
 regime = [x for x in rows if x['vr'] >= VOL_KEEP and x['mts'] <= MTS_KEEP]
-print('A 口径可成交 %d 条；其中「发货口径」子集（量比 ≥ %.2f 且 ≤ %d 日）n=%d'
-      % (len(rows), VOL_KEEP, MTS_KEEP, len(regime)))
-if len(rows) > len(regime):
-    print('  放宽额外引入 %d 条（量比 < %.2f 或间隔 > %d 日）'
-          % (len(rows) - len(regime), VOL_KEEP, MTS_KEEP))
+if _CSV_MATCHES:
+    print('A 口径可成交 %d 条，与当前发货口径一致（量比 ≥ %.2f 且间隔 ≤ %d 日）'
+          % (len(regime), VOL_KEEP, MTS_KEEP))
+else:
+    print('A 口径可成交 %d 条；⚠️ 该 CSV **不是**当前发货配置的信号集，'
+          '下列数字只描述该 CSV 覆盖的子集（这是历史样本，不是现行配置的样本外表现）'
+          % len(regime))
 
 IS = [x for x in regime if x['date'] < SPLIT]
 OOS = [x for x in regime if x['date'] >= SPLIT]
@@ -140,9 +165,15 @@ def check(label, keep, cut):
     print('')
 
 
-print('切分点 %s   发货口径：样本内 n=%d   样本外 n=%d\n' % (SPLIT, len(IS), len(OOS)))
+print('切分点 %s   样本 %d 条：样本内 n=%d   样本外 n=%d\n' % (SPLIT, len(regime), len(IS), len(OOS)))
 
-check('① 突破量比：%.1f（现）→ %.1f（拟）' % (VOL_KEEP, VOL_CUT),
+# 本脚本是「§6.5 四项待检验改动」的检验器，不是当前发货口径的业绩报告。
+# 它不取「拟改值」常量：cut 组用「比发货值更严」的固定门（<8% / 25% / >上限），
+# 保留组用发货值本身。量比与间隔这两项要放宽才能形成 cut 组，必须换 CSV（见 docstring）。
+if not _CSV_MATCHES:
+    print('⛔ 本 CSV 与当前发货值不符，下面的 ①④ 两项必然得到无意义的对比，'
+          '仅 ②③ 可用（它们不依赖发货阈值）。\n')
+check('① 突破量比：≥%.2f（发货）vs <.%.2f' % (VOL_KEEP, VOL_KEEP),
       lambda x: x['vr'] >= VOL_KEEP, lambda x: x['vr'] < VOL_KEEP)
 check('② 柄部回撤：≤20%%（现）→ <%g%%（拟）' % HDD_KEEP,
       lambda x: x['hdd'] < HDD_KEEP, lambda x: x['hdd'] >= HDD_KEEP)

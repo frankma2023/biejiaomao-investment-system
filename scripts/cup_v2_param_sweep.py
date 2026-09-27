@@ -13,6 +13,9 @@
 
 用法:
     python scripts/cup_v2_param_sweep.py [CSV]
+
+耗时: 每只股票各载一次 K 线，1000+ 只约 10 分钟量级（不是秒级）。
+      CSV 缺省为 data/cup_v2_replay.csv；若该 CSV 与当前 YAML 不符，脚本会先 WARN。
 """
 import csv
 import os
@@ -26,8 +29,7 @@ DB = os.path.join(PROJECT_DIR, 'data', 'lixinger.db')
 SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     PROJECT_DIR, 'data', 'cup_v2_replay.csv')
 SPLIT = '2024-01-01'
-MIN_N = 50          # cut 组在两段上的最小样本量
-MIN_EDGE = 0.50     # 两段各自的最小改善幅度（pp），防止选中噪声
+MIN_N = 50          # 四个分组（内/外 × 保留/剔除）各自的最小样本量
 
 # 发货值：从 YAML 读，用于（a）标签（b）判断传入的 CSV 是否与当前配置匹配
 YML = yaml.safe_load(open(os.path.join(PROJECT_DIR, 'config/market/cup_handle_v2.yaml'),
@@ -120,8 +122,6 @@ CANDS = [
      lambda x: x['vr'] >= 2.5, lambda x: x['vr'] < 2.5),
     ('breakout_vol_ratio  量比', '%.2f' % SHIP_VOL, '3.0',
      lambda x: x['vr'] >= 3.0, lambda x: x['vr'] < 3.0),
-    ('mouth_to_signal_max 杯口→突破上限', str(SHIP_MTS_MAX), '12',
-     lambda x: x['mts'] <= 12, lambda x: x['mts'] > 12),
     ('mouth_to_signal_max 杯口→突破上限', str(SHIP_MTS_MAX), '9',
      lambda x: x['mts'] <= 9, lambda x: x['mts'] > 9),
     ('mouth_to_signal_min 杯口→突破下限', str(SHIP_MTS_MIN), '6',
@@ -142,9 +142,6 @@ CANDS = [
      lambda x: x['rdd'] < 8.0, lambda x: x['rdd'] >= 8.0),
     ('bottom_zone_before_min 前侧下限', '0', '2',
      lambda x: x['zb'] >= 2, lambda x: x['zb'] < 2),
-    ('bottom_zone_days_max 杯底区上限', '10', '7',
-     lambda x: x['zb'] <= 7 and x['za'] <= 7,
-     lambda x: x['zb'] > 7 or x['za'] > 7),
     ('mouth_span_max      前高→杯口上限', '100', '60',
      lambda x: x['mspan'] <= 60, lambda x: x['mspan'] > 60),
 ]

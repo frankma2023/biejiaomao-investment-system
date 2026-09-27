@@ -7,6 +7,9 @@
 *.sqlite
 data/*.csv
 data/*.json
+# 分析脚本的中间产物（_s6_stats.txt / _sweep.txt 等）：本机工作区证据，不入库。
+# 它们含当时参数的文字，参数一改就过期 —— 别让它们进仓库。
+data/_*
 
 # Python
 __pycache__/
