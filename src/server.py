@@ -26,7 +26,8 @@ from detectors.divergence import (
     detect_macd_divergence, detect_breadth_divergence,
     confirm_divergence, compute_resonance
 )
-from engine_registry import discover_engines, get_engine_list, run_all_engines
+from engine_registry import (discover_engines, get_engine_list, run_all_engines,
+                             get_run_failures, get_import_failures)
 from scanners.recommend import generate as generate_recommendation
 from scanners.canslim_score import score_stock as canslim_score_stock, load_params as canslim_load_params
 from discipline.trades_api import discipline_bp
@@ -5701,6 +5702,9 @@ def api_pattern_scan():
     end = request.args.get('end', datetime.now().strftime('%Y-%m-%d'))
     period = request.args.get('period', 'daily')
     mode = request.args.get('mode', '')  # 'stock' | 'index' | ''=auto
+    # 观察候选（杯柄 CANDIDATE 等）：默认不返回，避免淹没已成立信号；
+    # 复盘/人工复核时用 &candidates=1 显式索取。
+    include_candidates = request.args.get('candidates', '') in ('1', 'true', 'yes')
 
     db = get_db()
 
@@ -5765,8 +5769,20 @@ def api_pattern_scan():
         k['stock_code'] = code
 
     # ── 运行全部引擎 ──
+    record_types = (('SIGNAL', 'CONFIRM', 'CANDIDATE') if include_candidates
+                    else ('SIGNAL', 'CONFIRM'))
     signals = run_all_engines(klines=klines_full, indicators=indicators,
-                              record_types=('SIGNAL', 'CONFIRM'))
+                              record_types=record_types)
+
+    # 引擎失败必须回传：run_all_engines 对每个引擎都吞异常（一个引擎坏掉不该
+    # 拖垮整页），结果是「注册了但每次都返回 0 条」在页面上表现为「这个形态今天
+    # 没信号」。2026-09-27 就出现过：Flask 进程锁着旧版 cup_handle_v2，其
+    # REQUIRED_PARAMS 与精简后的 YAML 对不上，load_params() 抛 KeyError，
+    # 而页面上看不出任何异常。
+    engine_errors = get_import_failures() + get_run_failures()
+    for _f in engine_errors:
+        print(f"[pattern-scan] [FAIL] 引擎 {_f['name']} 在 {_f['stage']} 阶段失败: "
+              f"{_f['error']}", flush=True)
 
     # ── 过滤到请求的日期范围 ──
     if start:
@@ -5837,6 +5853,7 @@ def api_pattern_scan():
         'klines': klines_out,
         'indicators': _sanitize_indicators(indicators, len(klines_out)),
         'engines': engine_list,
+        'engine_errors': engine_errors,
         'signals': signals_out,
         'signal_stats': {
             'by_source': by_source,

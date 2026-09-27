@@ -80,6 +80,22 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // ── API 调用 ──
+// 引擎失败横幅：run_all_engines 会吞掉单个引擎的异常，页面上「某类形态永远没
+// 图标」和「今天确实没信号」长得一模一样。有失败就在这里明说。
+function showEngineErrors(errors) {
+  var box = document.getElementById('engine-errors');
+  if (!box) return;
+  if (!errors || !errors.length) {
+    box.style.display = 'none';
+    box.textContent = '';
+    return;
+  }
+  box.style.display = 'block';
+  box.textContent = '⚠ ' + errors.length + ' 个引擎本轮未产出（其余引擎不受影响）：'
+    + errors.map(function (e) { return e.name + ' [' + e.stage + ']'; }).join('，')
+    + ' —— 详见 Flask 控制台。引擎代码改动后必须重启 Flask 才会生效（发现结果在进程内缓存）。';
+}
+
 async function scan() {
   var btn = document.querySelector('.btn-scan');
   btn.disabled = true;
@@ -90,7 +106,8 @@ async function scan() {
     start: document.getElementById('date-start').value,
     end: document.getElementById('date-end').value,
     period: state.period,
-    mode: state.mode
+    mode: state.mode,
+    candidates: '1'
   });
 
   // 查询股票名称
@@ -115,7 +132,8 @@ async function scan() {
       return;
     }
     state.data = data;
-    
+
+    showEngineErrors(data.engine_errors);
     buildMaps(data.engines);
     renderAll();
   } catch (e) {
@@ -307,6 +325,11 @@ function renderChart() {
       if (sig.source === 'cup_handle_v2' && sig.record_type === 'CONFIRM') {
         style = { color: '#FF2D95', symbol: 'diamond', size: 15 };
         name = '加仓 · ' + name;
+      } else if (sig.source === 'cup_handle_v2' && sig.record_type === 'CANDIDATE') {
+        // 观察候选：形态已成立但尚未放量收上买点。画成空心小圈并压暗，
+        // 避免与已成立的突破信号混淆。
+        style = { color: '#5E8FA3', symbol: 'emptyCircle', size: 9 };
+        name = '候选 · ' + name;
       }
       var y = k.low - gap * (i + 1);
       var pt = {
