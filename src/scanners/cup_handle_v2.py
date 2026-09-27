@@ -343,15 +343,15 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
         ─────────────────────────────────────────────────────────
          1  (H−L0)/L0 ≥ min_prior_advance      前置涨幅       [_build_d1_candidates]
          2  B > L0×(1−advance_origin_tolerance) 杯底不破起点    [同上]
-         3  M ≤ H×(mouth_vs_high_max=1)         前高不低于杯口
+         3  M ≤ H  (mouth_vs_high_max=1.00)     前高不低于杯口
          4  depth ∈ [depth_min, depth_max]      杯身深度
          5  B 是 [B,M] 区间最低收盘              杯底唯一
          6  回升段最大回撤 ≤ recovery_dd_max      「一跌一涨」两段
          7  P/M ≥ handle_pm_min                 柄部回撤上限
          8  P ≥ B + handle_position_ratio×(M−B) 柄低在杯身上半部
-         9  杯底区 [B,B×(1+δ)]：前侧 N_min~N_max 日、后侧 ≤N_max 日
+         9  杯底区 [B,B×(1+δ)]：前后各 ≤N_max 日（前侧下限已关闭=0）
         10  M 日 − H 日 ≤ mouth_span_max         调整不过长
-        11  bar − M 日 ≤ mouth_to_signal_max     ★ 最强判据
+        11  bar − M 日 ≤ mouth_to_signal_max     杯口确认后须尽快突破
         12  bar 收 > M + buy_point_buffer        S1 突破
         13  bar 量 ≥ MA20(量)×breakout_vol_ratio  S2 放量
         14  bar 次日收 > M → 补 CONFIRM           次日确认（在 detect 里补）
