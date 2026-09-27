@@ -310,7 +310,7 @@ function renderCup(){
 
   document.getElementById('cnt-cup').textContent=nSig;
 
-  var hint='☕ 杯柄形态 → 柄部缩量小幅回调 → 放量突破杯口当日轻仓（买点=杯口价×1.01，不突破不买入）→ 次日仍站稳杯口之上则加仓';
+  var hint='☕ 杯柄形态 → 柄部缩量小幅回调 → 放量突破杯口当日轻仓（买点 = 杯口 + 0.01 元，不是百分比；不突破不买入）→ 次日仍站稳杯口之上则加仓';
   if(cupData.fallback){
     hint='⚠️ '+currentDate+' 无杯柄记录，已回退显示最近交易日 '+cupData.date;
   }else if(cupData.date){
