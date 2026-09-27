@@ -2,9 +2,10 @@
 """
 用逐日回放的可信样本，回头检验那几条「拍出来」的参数有没有区分度。
 
-样本：data/cup_v2_replay.csv（1,668 条，2020-02 ~ 2026-09）
-口径：A 口径（突破日按杯口买点成交）；结局用 TP15/SL10/H20 的每笔收益，
-      并附 20 日内最大涨幅（冲高口径）作为对照。
+样本：data/cup_v2_replay.csv（由 cup_v2_replay.py 逐日回放产出；
+      条数随参数变化，运行时打印，不要在这里写死）
+口径：A 口径（突破日按买点 = 杯口 + buy_point_buffer 挂单成交）；
+      结局用 TP15/SL10/H20 的每笔收益，并附 20 日内最大涨幅（冲高口径）作对照。
 """
 import csv
 import os
@@ -104,12 +105,13 @@ def bucket(key, edges, label, fmt='%.0f'):
 
 
 bucket('mts', [5, 9, 12, 16, 25], '杯口→突破 间隔（mouth_to_signal_max=12）')
-bucket('depth', [15, 20, 25, 30, 35, 40], '杯身深度 pct（depth 15~40）')
-bucket('hdd', [5, 8, 10, 12, 15, 20], '柄部回撤 pct（handle_dd_max=15 / P/M>=0.8）')
-bucket('vr', [1.5, 2.0, 2.5, 3.5, 5.0], '突破量比（breakout_vol_ratio=1.5）')
-bucket('zsum', [1, 2, 4, 7, 11], '杯底区停留总天数（规则 9，现值无下限、上限10）')
-bucket('zb', [1, 2, 4, 7], '杯底区 前侧 天数（规则 9）')
-bucket('za', [1, 2, 4, 7], '杯底区 后侧 天数（规则 9）')
-bucket('rdd', [2, 5, 8, 12, 16], '回升段最大回撤 pct（规则 6 上限 = 杯深x50%）')
+bucket('depth', [15, 20, 25, 30, 35, 40], '杯身深度 pct（depth ∈ [12, 40]）')
+bucket('hdd', [5, 8, 10, 12, 15, 20], '柄部回撤 pct（handle_pm_min=0.80，即 ≤20%）')
+bucket('vr', [1.5, 2.0, 2.5, 3.5, 5.0], '突破量比（breakout_vol_ratio=2.0）')
+bucket('zsum', [1, 2, 4, 7, 11], '杯底区停留总天数（规则 9：前侧下限已关闭、前后各上限 10）')
+bucket('zb', [1, 2, 4, 7], '杯底区 前侧 天数（规则 9，下限 bottom_zone_before_min=0）')
+bucket('za', [1, 2, 4, 7], '杯底区 后侧 天数（规则 9，无下限、上限 10）')
+bucket('rdd', [2, 5, 8, 12, 16], '回升段最大回撤 pct（规则 6，绝对上限 recovery_dd_max=15%）')
 bucket('mspan', [30, 60, 100, 150], '前高→杯口 交易日（规则 10 上限 100）')
-bucket('hd', [5, 10, 15, 20], '柄部交易日数（原 handle_days_max=15，已删）')
+bucket('hd', [5, 10, 15, 20],
+       '柄部交易日数（下限 handle_days_min=3；上限由 mouth_to_signal_max 隐含）')
