@@ -103,7 +103,7 @@ for tp in (0.05, 0.08, 0.10, 0.15, 0.20):
         cells.append(100.0 * sum(v) / len(v) if v else 0)
     print('%-8s%9.1f%%%9.1f%%%9.1f%%' % ('+%d%%' % (tp * 100), *cells))
 
-entriesA = []       # A 口径：突破日按买点（杯口×1.01）挂单成交
+entriesA = []       # A 口径：突破日按买点（杯口 + buy_point_buffer，单位元）挂单成交
 for s in sigs:
     bars = by_code.get(s['code']) or []
     di = (idx.get(s['code']) or {}).get(s['date'])

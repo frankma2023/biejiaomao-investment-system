@@ -1,21 +1,55 @@
 # -*- coding: utf-8 -*-
 """
-样本外验证：把逐日回放样本按时间切分，检验四条待改参数在**两段上都成立**。
+样本外验证：把逐日回放样本按时间切分，检验待改参数在**样本内 / 样本外两段上都成立**。
 
 切分：样本内 2020-02 ~ 2023-12-31；样本外 2024-01-01 ~ 2026-09
-口径：A 口径（突破日按杯口买点成交），结局 TP15/SL10/H20。
+口径：A 口径（突破日按买点 = 杯口 + buy_point_buffer 挂单成交），结局 TP15/SL10/H20。
+判据：一条改动算「成立」，必须两段的每笔均值朝**同一方向**改善。
 
-判据：一条改动算「成立」，必须**两段的每笔均值都朝同一方向改善**，且样本外的
-改善幅度不能远小于样本内（否则就是拟合噪声）。
+为什么要「放宽跑一遍」再切分（而不是每个阈值都重跑全市场）
+--------------------------------------------------------
+引擎在第一条不满足的规则上就否决，所以**已发货阈值以下的信号根本不在基线 CSV 里**
+（例如 `breakout_vol_ratio = 2.0` 时没有 `vol_ratio < 2.0` 的行），
+「剔除组 n=0」会让这项检查静默失去意义（历史缺陷 M9）。
+
+因此改为：用 `cup_v2_replay.py --param` 把**待检验的那两个阈值**一并放宽跑一遍
+（量比 → `--vol-cut`，杯口→突破 → `--mts-cut`），得到超集；再在超集里按特征列
+切「保留组 / 剔除组」。放宽只影响 `_signal_reject` 的出口与回放的 D1 窗口上界，
+不会改变结构的判定路径，故超集里 `vr ≥ 发货值 且 mts ≤ 发货值` 的那部分
+**恰好等于**基线信号集。
+
+用法:
+    python scripts/cup_v2_oos.py [CSV]      # CSV 缺省为 data/cup_v2_replay.csv
+    # 正式口径：跑放宽版再喂进来
+    #   python scripts/cup_v2_replay.py --out data/cup_v2_replay_loose.csv \
+    #       --param breakout_vol_ratio=1.5 --param mouth_to_signal_max=999
+    #   python scripts/cup_v2_oos.py data/cup_v2_replay_loose.csv
 """
 import csv
 import os
 import sqlite3
+import sys
+
+import yaml
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = os.path.join(PROJECT_DIR, 'data', 'lixinger.db')
-SRC = os.path.join(PROJECT_DIR, 'data', 'cup_v2_replay.csv')
+SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
+    PROJECT_DIR, 'data', 'cup_v2_replay.csv')
 SPLIT = '2024-01-01'
+
+# 发货值：从 YAML 读，保证「保留组」就是当前线上配置
+_yml = yaml.safe_load(open(os.path.join(PROJECT_DIR, 'config/market/cup_handle_v2.yaml'),
+                           encoding='utf-8'))['cup_handle_v2']
+VOL_KEEP = float(_yml['breakout_vol_ratio'])
+MTS_KEEP = int(_yml['mouth_to_signal_max'])
+# 「拟」值（§6.5 的待检验项）
+VOL_CUT, MTS_CUT = 1.5, 999
+HDD_KEEP, DEPTH_KEEP = 8.0, 25.0
+
+print('样本: %s' % SRC)
+print('发货值: 量比 ≥ %.2f、杯口→突破 ≤ %d 日   「拟」值: 量比 ≥ %.1f、不限日数\n'
+      % (VOL_KEEP, MTS_KEEP, VOL_CUT))
 
 conn = sqlite3.connect(DB)
 conn.row_factory = sqlite3.Row
@@ -64,50 +98,72 @@ for s in sigs:
                  else int(s['mouth_to_days']),
                  'vr': float(s['vol_ratio'] or 0)})
 
-IS = [x for x in rows if x['date'] < SPLIT]
-OOS = [x for x in rows if x['date'] >= SPLIT]
+# 发货口径下 A 口径可成交的样本 = 基线信号集
+regime = [x for x in rows if x['vr'] >= VOL_KEEP and x['mts'] <= MTS_KEEP]
+print('A 口径可成交 %d 条；其中「发货口径」子集（量比 ≥ %.2f 且 ≤ %d 日）n=%d'
+      % (len(rows), VOL_KEEP, MTS_KEEP, len(regime)))
+if len(rows) > len(regime):
+    print('  放宽额外引入 %d 条（量比 < %.2f 或间隔 > %d 日）'
+          % (len(rows) - len(regime), VOL_KEEP, MTS_KEEP))
+
+IS = [x for x in regime if x['date'] < SPLIT]
+OOS = [x for x in regime if x['date'] >= SPLIT]
 
 
 def stat(g):
-    if not g:
+    """g 里窗口不足的样本 r 为 None，必须剔除后再统计（否则 sum 会撞 NoneType）。"""
+    rs = [x['r'] for x in g if x['r'] is not None]
+    if not rs:
         return (0, 0.0, 0.0)
-    rs = [x['r'] for x in g]
-    return (len(g), sum(rs) / len(rs) * 100,
+    return (len(rs), sum(rs) / len(rs) * 100,
             sum(1 for v in rs if v > 0) / len(rs) * 100)
 
 
-print('切分点 %s   样本内 n=%d   样本外 n=%d\n' % (SPLIT, len(IS), len(OOS)))
-
-
 def check(label, keep, cut):
+    """keep / cut 都在「发货口径」子集内选取，保证除待检验项外其余条件一致。"""
+    kIS = [x for x in IS if keep(x)]
+    kOOS = [x for x in OOS if keep(x)]
+    cIS = [x for x in IS if cut(x)]
+    cOOS = [x for x in OOS if cut(x)]
     print('=== %s ===' % label)
-    for name, sel in (('保留（新规则）', keep), ('剔除', cut)):
-        a = stat([x for x in IS if sel(x)])
-        b = stat([x for x in OOS if sel(x)])
-        print('  %-12s 样本内 n=%4d %+6.2f%% 胜%4.1f%%   样本外 n=%4d %+6.2f%% 胜%4.1f%%'
-              % (name, a[0], a[1], a[2], b[0], b[1], b[2]))
+    for name, a, b in (('保留（拟收紧）', kIS, kOOS), ('剔除（被砍掉）', cIS, cOOS)):
+        sa, sb = stat(a), stat(b)
+        print('  %-14s 样本内 n=%4d %+6.2f%% 胜%4.1f%%   样本外 n=%4d %+6.2f%% 胜%4.1f%%'
+              % (name, sa[0], sa[1], sa[2], sb[0], sb[1], sb[2]))
+    if not cIS or not cOOS:
+        print('  [WARN] 剔除组为空 —— 该阈值无从检验（请用 --param 放宽后重跑回放）')
+    else:
+        d1 = stat(kIS)[1] - stat(cIS)[1]
+        d2 = stat(kOOS)[1] - stat(cOOS)[1]
+        print('  改善：样本内 %+.2fpp，样本外 %+.2fpp  →  %s'
+              % (d1, d2, '同向成立' if d1 > 0 and d2 > 0 else '未两段同向'))
     print('')
 
 
-check('① 突破量比：1.5（现）→ 2.0（拟）',
-      lambda x: x['vr'] >= 2.0, lambda x: x['vr'] < 2.0)
-check('② 柄部回撤：<=20%（现）→ <=8%（拟）',
-      lambda x: x['hdd'] < 8.0, lambda x: x['hdd'] >= 8.0)
-check('③ 杯身深度：<=40%（现）→ <=25%（拟）',
-      lambda x: x['depth'] < 25.0, lambda x: x['depth'] >= 25.0)
-check('④ 杯口→突破：<=12 日（现）→ 不限制（拟去掉）',
-      lambda x: x['mts'] <= 12, lambda x: x['mts'] > 12)
+print('切分点 %s   发货口径：样本内 n=%d   样本外 n=%d\n' % (SPLIT, len(IS), len(OOS)))
 
-print('=== 合并 ① + ②（量比>=2.0 且 柄部回撤<8%）===')
-for name, sel in (('保留', lambda x: x['vr'] >= 2.0 and x['hdd'] < 8.0),
-                  ('剔除', lambda x: not (x['vr'] >= 2.0 and x['hdd'] < 8.0))):
-    a = stat([x for x in IS if sel(x)])
-    b = stat([x for x in OOS if sel(x)])
+check('① 突破量比：%.1f（现）→ %.1f（拟）' % (VOL_KEEP, VOL_CUT),
+      lambda x: x['vr'] >= VOL_KEEP, lambda x: x['vr'] < VOL_KEEP)
+check('② 柄部回撤：≤20%%（现）→ <%g%%（拟）' % HDD_KEEP,
+      lambda x: x['hdd'] < HDD_KEEP, lambda x: x['hdd'] >= HDD_KEEP)
+check('③ 杯身深度：≤40%%（现）→ <%g%%（拟）' % DEPTH_KEEP,
+      lambda x: x['depth'] < DEPTH_KEEP, lambda x: x['depth'] >= DEPTH_KEEP)
+check('④ 杯口→突破：≤%d 日（现）→ 不限制（拟去掉）' % MTS_KEEP,
+      lambda x: x['mts'] <= MTS_KEEP, lambda x: x['mts'] > MTS_KEEP)
+
+print('=== 合并 ① + ②（量比 ≥ %.1f 且 柄部回撤 < %g%%）==='
+      % (VOL_KEEP, HDD_KEEP))
+for name, sel in (('保留', lambda x: x['vr'] >= VOL_KEEP and x['hdd'] < HDD_KEEP),
+                  ('剔除', lambda x: not (x['vr'] >= VOL_KEEP
+                                          and x['hdd'] < HDD_KEEP))):
+    a, b = stat([x for x in IS if sel(x)]), stat([x for x in OOS if sel(x)])
     print('  %-6s 样本内 n=%4d %+6.2f%% 胜%4.1f%%   样本外 n=%4d %+6.2f%% 胜%4.1f%%'
           % (name, a[0], a[1], a[2], b[0], b[1], b[2]))
-print('\n=== 对照：全部信号 ===')
+
+print('\n=== 对照：发货口径全部信号 ===')
 a, b = stat(IS), stat(OOS)
 print('  全样本 样本内 n=%4d %+6.2f%% 胜%4.1f%%   样本外 n=%4d %+6.2f%% 胜%4.1f%%'
       % (a[0], a[1], a[2], b[0], b[1], b[2]))
-print('\nmts 最大值 = %d（引擎把杯口→突破封顶在 12，故样本里没有 >12 的，④ 无法验证）'
-      % max(x['mts'] for x in rows))
+print('\nmts 最大值 = %d' % max(x['mts'] for x in rows))
+print('vr  最小/最大 = %.2f / %.2f' % (min(x['vr'] for x in rows),
+                                       max(x['vr'] for x in rows)))

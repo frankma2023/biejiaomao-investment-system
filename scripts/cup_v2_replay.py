@@ -57,9 +57,28 @@ def main():
     ap.add_argument('--start', default=None)
     ap.add_argument('--end', default=None)
     ap.add_argument('--lookback', type=int, default=2500, help='每只股票载入的日历天数')
+    ap.add_argument('--out', default=OUT, help='输出 CSV 路径（默认 data/cup_v2_replay.csv）')
+    ap.add_argument('--param', action='append', default=[],
+                    metavar='KEY=VALUE',
+                    help='临时覆盖某个引擎参数（可重复），如 --param breakout_vol_ratio=1.5。'
+                         '用于 §6.5 样本外验证：把待检验的阈值放宽跑一遍，'
+                         '再在结果里按特征列切出「保留组 / 剔除组」，'
+                         '避免每个候选阈值都重跑一次全市场。')
     args = ap.parse_args()
 
     params = ch.load_params()
+    for kv in args.param:
+        if '=' not in kv:
+            raise SystemExit('--param 需为 KEY=VALUE: %s' % kv)
+        key, val = kv.split('=', 1)
+        if key not in params:
+            raise SystemExit('未知参数: %s' % key)
+        old = params[key]
+        params[key] = (val if isinstance(old, bool)
+                       else (int(val) if isinstance(old, int) else float(val)))
+        print('  参数覆盖: %s = %r -> %r' % (key, old, params[key]), flush=True)
+    ch._validate_geometry(params)
+    out_path = args.out
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
 
@@ -154,7 +173,7 @@ def main():
                   % (ci, len(codes), n_day, len(rows), time.time() - t0), flush=True)
 
     conn.close()
-    with open(OUT, 'w', encoding='utf-8') as f:
+    with open(out_path, 'w', encoding='utf-8') as f:
         f.write('code,date,buy_point,mouth_price,bottom_price,prior_high,'
                 'depth_pct,handle_dd_pct,mouth_to_days,breakout_close,vol_ratio,'
                 'zone_before,zone_after,recovery_dd_pct,mouth_span_days,handle_days\n')
@@ -162,7 +181,7 @@ def main():
             f.write(','.join(str(x) for x in r) + '\n')
     print('逐日回放：%d 只有笔快照  判定 %d 个(股票,交易日)  SIGNAL %d 条  耗时 %.0fs'
           % (n_snap, n_day, len(rows), time.time() - t0))
-    print('明细:', OUT)
+    print('明细:', out_path)
 
 
 if __name__ == '__main__':
