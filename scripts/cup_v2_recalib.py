@@ -114,4 +114,4 @@ bucket('za', [1, 2, 4, 7], '杯底区 后侧 天数（规则 9，无下限、上
 bucket('rdd', [2, 5, 8, 12, 16], '回升段最大回撤 pct（规则 6，绝对上限 recovery_dd_max=15%）')
 bucket('mspan', [30, 60, 100, 150], '前高→杯口 交易日（规则 10 上限 100）')
 bucket('hd', [5, 10, 15, 20],
-       '柄部交易日数（下限 handle_days_min=3；上限由 mouth_to_signal_max 隐含）')
+       '柄部交易日数（下限由 mouth_to_signal_min 隐含；上限由 mouth_to_signal_max 隐含）')

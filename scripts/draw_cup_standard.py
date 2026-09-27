@@ -234,8 +234,8 @@ lines = [
     'R5   杯底是 [B, M] 区间最低收盘（本合成形态按构造满足）',
     'R6   回升段最大回撤 %.2f%%  ≤ recovery_dd_max %.0f%%'
     % (r['recovery_dd_pct'], params['recovery_dd_max'] * 100),
-    'R7b  柄部交易日 %d 日     ≥ handle_days_min %d'
-    % (T_SIG - 1 - T2, params['handle_days_min']),
+    'R11b 杯口→突破 %d 日     ≥ mouth_to_signal_min %d（柄部 ≥ %d 日）'
+    % (T_BRK - T2, params['mouth_to_signal_min'], params['mouth_to_signal_min'] - 1),
     'R7   柄部回撤 %.2f%%    ≤ %.0f%%（handle_pm_min %.2f）'
     % ((P2 - P3) / P2 * 100, (1 - params['handle_pm_min']) * 100, params['handle_pm_min']),
     'R8   柄低 %.2f        ≥ 杯底 + %.2f×杯深 = %.2f'

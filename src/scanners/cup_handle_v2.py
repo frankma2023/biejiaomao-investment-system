@@ -53,7 +53,7 @@ REQUIRED_PARAMS = (
     'recovery_dd_max', 'bottom_zone_pct', 'bottom_zone_days_max',
     'bottom_zone_before_min',
     # ── 柄部 ──
-    'handle_pm_min', 'handle_days_min', 'handle_position_ratio',
+    'handle_pm_min', 'handle_position_ratio',
     # ── 突破 ──
     'buy_point_buffer', 'breakout_vol_ratio', 'vol_ma_window',
     'require_breakout_confirm',
@@ -144,8 +144,6 @@ def _validate_geometry(p: Dict) -> None:
         errs.append("bottom_zone_days_max 至少为 1")
     if not 0 < p['handle_pm_min'] < 1:
         errs.append("handle_pm_min 必须在 (0, 1) 内")
-    if p['handle_days_min'] < 1:
-        errs.append("handle_days_min 至少为 1")
     if p['handle_position_ratio'] < 0:
         errs.append("handle_position_ratio 不应为负")
     if p['handle_position_ratio'] >= 1:
@@ -343,7 +341,7 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     """
     在检测日 t_idx 上，对给定 D1 与杯口执行形态校验与分类。
 
-    精简后的规则集（15 条编号 + 1 条前提约束 `+`，**一律收盘价口径**）：
+    精简后的规则集（14 条编号 + 1 条前提约束 `+`，**一律收盘价口径**）：
 
         结构点  L0 上涨起点 | H 前高 | B 杯底 | M 杯口 | P 柄低
         ─────────────────────────────────────────────────────────
@@ -357,12 +355,16 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
          8  P ≥ B + handle_position_ratio×(M−B) 柄低在杯身上半部
          9  杯底区 [B,B×(1+δ)]：前后各 ≤N_max 日（前侧下限已关闭=0）
         10  M 日 − H 日 ≤ mouth_span_max         调整不过长
-        11  bar − M 日 ∈ [mouth_to_signal_min, mouth_to_signal_max]  杯口确认后尽快突破
+        11  bar − M 日 ∈ [mouth_to_signal_min, mouth_to_signal_max]
+                                                杯口确认后尽快突破；下限即柄部时长下限
         12  bar 收 > M + buy_point_buffer        S1 突破
         13  bar 量 ≥ MA20(量)×breakout_vol_ratio  S2 放量
         14  bar 次日收 > M → 补 CONFIRM           次日确认（在 detect 里补）
         ─────────────────────────────────────────────────────────
         +   P ≤ M×(1−mouth_lock_pullback)       杯口确实是顶（柄部定义的前提）
+
+    （原规则 7b「柄部交易日数 ≥ handle_days_min」已删除：它与规则 11 的下限
+      `mouth_to_signal_min` 判定条件完全相同，两者重复，保留区间口径。）
 
     已删除的旧规则：杯龄区间、最小下跌K线数、最小上升段根数、柄部时长上限、
     柄部放量长阴、阳线、收盘位置、MA50、跳涨日、笔数限制、柄部回撤下限。
@@ -460,18 +462,13 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
 
     handle_days = bar - 1 - t2_idx
 
-    # 规则 7b: 柄部交易日数下限。柄部是「小幅回调 + 缩量整理」，一天的回撤不构成柄部
-    # （001289 实测：杯口 04-01 → 柄低 04-02 → 04-03 就突破，柄部仅 1 日）
-    if handle_days < params['handle_days_min']:
-        return _rej(funnel, '7b_柄部交易日下限')
-
     # 规则 11b: 杯口→突破 的**最小**间隔（= 柄部整理时长下限）。
     # 口径与规则 11 完全一致：bar − t2_idx，单位是交易日，突破日当天计入。
     # 「没有柄部就不叫杯柄形态」——柄部 0/1/2 日会被挡在这里（bar−t2 ≥ 4 ⇒ 柄部 ≥ 3 日）。
-    # 与规则 11（上限）对称，和 handle_days_min 一样在 SIGNAL/CANDIDATE 分流**之前**
-    # 判定——否则「间隔不足」的结构会先被当成候选发出去。
-    # 注：本项与 handle_days_min 在现行配置下**完全等价**（都要求 bar−t2 ≥ 4），
-    # 同一个约束写了两遍。去留待定，见 PRD §9。
+    # 与规则 11（上限）对称，且在 SIGNAL/CANDIDATE 分流**之前**判定——
+    # 否则「间隔不足」的结构会先被当成候选发出去。
+    # 本条取代了原规则 7b「柄部交易日数 ≥ handle_days_min」：两者判定条件完全相同
+    # （都是 bar−t2 < 4），7b 排在前面会让本条永远不可达，故删除 7b、口径统一到区间。
     if bar - t2_idx < params['mouth_to_signal_min']:
         return _rej(funnel, '11b_杯口→突破过短')
 

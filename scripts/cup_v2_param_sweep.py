@@ -140,8 +140,6 @@ CANDS = [
      lambda x: x['rdd'] < 12.0, lambda x: x['rdd'] >= 12.0),
     ('recovery_dd_max     回升段回撤', '0.15', '0.08',
      lambda x: x['rdd'] < 8.0, lambda x: x['rdd'] >= 8.0),
-    ('handle_days_min     柄部日数下限', '3', '5',
-     lambda x: x['hd'] >= 5, lambda x: x['hd'] < 5),
     ('bottom_zone_before_min 前侧下限', '0', '2',
      lambda x: x['zb'] >= 2, lambda x: x['zb'] < 2),
     ('bottom_zone_days_max 杯底区上限', '10', '7',
