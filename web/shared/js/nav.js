@@ -5,8 +5,10 @@
 // 全站 favicon（所有页面统一）
 (function(){var l=document.createElement('link');l.rel='icon';l.type='image/svg+xml';l.href=(function(){var s=document.querySelector('script[src$=\"nav.js\"]');return s?s.src.replace(/\/shared\/js\/nav\.js.*/,'')+'/images/favicon.svg':'../images/favicon.svg'})();document.head.appendChild(l)})();
 
-// API Proxy: forward /api/ requests to Flask
-(function(){var B='http://localhost:8788',_f=window.fetch;window.fetch=function(u,o){if(typeof u==='string'&&u.indexOf('/api/')===0)u=B+u;return _f.call(window,u,o)}})();
+// API Proxy: forward /api/ requests to Flask.
+// Host 必须取 window.location.hostname（与 shared/js/api-client.js 一致），
+// 写死 localhost 会让手机等局域网设备把请求发到设备自己身上。
+(function(){var B='http://'+window.location.hostname+':8788',_f=window.fetch;window.fetch=function(u,o){if(typeof u==='string'&&u.indexOf('/api/')===0)u=B+u;return _f.call(window,u,o)}})();
 
 (function (global) {
   'use strict';

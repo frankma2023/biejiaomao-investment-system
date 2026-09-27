@@ -29,6 +29,10 @@ from detectors.divergence import (
 from engine_registry import (discover_engines, get_engine_list, run_all_engines,
                              get_run_failures, get_import_failures)
 from scanners.recommend import generate as generate_recommendation
+
+import contextlib
+import socket
+from werkzeug.serving import ThreadedWSGIServer
 from scanners.canslim_score import score_stock as canslim_score_stock, load_params as canslim_load_params
 from discipline.trades_api import discipline_bp
 import numpy as np
@@ -7909,6 +7913,23 @@ def api_microcap_watertemp():
         return jsonify({'error': str(e)}), 500
 
 
+class DualStackWSGIServer(ThreadedWSGIServer):
+    """绑定 :: 但同时接受 IPv4 —— 让手机能走公网 IPv6 直连（零中转）。
+
+    Windows 上 ``IPV6_V6ONLY`` 默认是 **1**，所以裸绑 ``::`` 会变成"仅 IPv6"，
+    反而让 PC 自己的 ``localhost``（IPv4）连不上。必须在 ``bind`` **之前**显式设 0
+    才能双栈。Python 自带的 ``http.server`` 就是这么做的（``DualStackServer``）。
+
+    静态服务器（``python -m http.server`` / ``scripts/serve_dev.py``）已经是双栈；
+    这里补上 API 侧，否则手机打开页面后所有 ``:8788`` 的接口调用都会失败。
+    """
+
+    def server_bind(self):
+        with contextlib.suppress(Exception):
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        super().server_bind()
+
+
 if __name__ == '__main__':
     import sys, io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -7916,4 +7937,4 @@ if __name__ == '__main__':
     print("O'Neil Backtest API Server starting on http://localhost:8788")
     print(f"   Config dir: {CONFIG_DIR}")
     print(f"   Detectors: distribution_day, follow_through_day, accumulation, index_rs")
-    app.run(host='0.0.0.0', port=8788, debug=False)
+    DualStackWSGIServer('::', 8788, app).serve_forever()
