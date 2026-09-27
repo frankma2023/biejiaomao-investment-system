@@ -19,6 +19,8 @@ import os
 import sqlite3
 import sys
 
+import yaml
+
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = os.path.join(PROJECT_DIR, 'data', 'lixinger.db')
 SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
@@ -26,6 +28,13 @@ SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
 SPLIT = '2024-01-01'
 MIN_N = 50          # cut 组在两段上的最小样本量
 MIN_EDGE = 0.50     # 两段各自的最小改善幅度（pp），防止选中噪声
+
+# 发货值：从 YAML 读，用于（a）标签（b）判断传入的 CSV 是否与当前配置匹配
+YML = yaml.safe_load(open(os.path.join(PROJECT_DIR, 'config/market/cup_handle_v2.yaml'),
+                          encoding='utf-8'))['cup_handle_v2']
+SHIP_VOL = float(YML['breakout_vol_ratio'])
+SHIP_MTS_MAX = int(YML['mouth_to_signal_max'])
+SHIP_MTS_MIN = int(YML['mouth_to_signal_min'])
 
 conn = sqlite3.connect(DB)
 conn.row_factory = sqlite3.Row
@@ -105,15 +114,20 @@ def edge(keep, cut):
 
 
 # 候选收紧：名称 / 现行值 / 拟收紧值 / 保留谓词 / 剔除谓词
+# 「现行值」取自 YAML，改配置后标签自动跟随
 CANDS = [
-    ('breakout_vol_ratio  量比', '2.0', '2.5',
+    ('breakout_vol_ratio  量比', '%.2f' % SHIP_VOL, '2.5',
      lambda x: x['vr'] >= 2.5, lambda x: x['vr'] < 2.5),
-    ('breakout_vol_ratio  量比', '2.0', '3.0',
+    ('breakout_vol_ratio  量比', '%.2f' % SHIP_VOL, '3.0',
      lambda x: x['vr'] >= 3.0, lambda x: x['vr'] < 3.0),
-    ('mouth_to_signal_max 杯口→突破', '12', '9',
+    ('mouth_to_signal_max 杯口→突破上限', str(SHIP_MTS_MAX), '12',
+     lambda x: x['mts'] <= 12, lambda x: x['mts'] > 12),
+    ('mouth_to_signal_max 杯口→突破上限', str(SHIP_MTS_MAX), '9',
      lambda x: x['mts'] <= 9, lambda x: x['mts'] > 9),
-    ('mouth_to_signal_max 杯口→突破', '12', '6',
-     lambda x: x['mts'] <= 6, lambda x: x['mts'] > 6),
+    ('mouth_to_signal_min 杯口→突破下限', str(SHIP_MTS_MIN), '6',
+     lambda x: x['mts'] >= 6, lambda x: x['mts'] < 6),
+    ('mouth_to_signal_min 杯口→突破下限', str(SHIP_MTS_MIN), '8',
+     lambda x: x['mts'] >= 8, lambda x: x['mts'] < 8),
     ('handle_pm_min       柄撤上限', '0.80', '0.92',
      lambda x: x['hdd'] < 8.0, lambda x: x['hdd'] >= 8.0),
     ('handle_pm_min       柄撤上限', '0.80', '0.90',
@@ -138,6 +152,23 @@ CANDS = [
 ]
 
 print('样本: %s' % SRC)
+print('发货值: 量比 ≥ %.2f / 间隔 ∈ [%d, %d] / 深度 ≤ %.2f / 柄撤 ≥ %.2f'
+      % (SHIP_VOL, SHIP_MTS_MIN, SHIP_MTS_MAX,
+         float(YML['depth_max']), float(YML['handle_pm_min'])))
+if rows:
+    vmin, vmax = min(x['vr'] for x in rows), max(x['vr'] for x in rows)
+    mmin, mmax = min(x['mts'] for x in rows), max(x['mts'] for x in rows)
+    print('本 CSV 特征范围: vr %.2f~%.2f / mts %d~%d' % (vmin, vmax, mmin, mmax))
+    if vmin > SHIP_VOL + 1e-9:
+        print('  [WARN] CSV 的最小量比 %.2f > 发货值 %.2f —— 该 CSV 生成于更严的配置，'
+              '「量比」方向不可用，请先按当前 YAML 重跑回放' % (vmin, SHIP_VOL))
+    if mmax < SHIP_MTS_MAX:
+        print('  [WARN] CSV 的最大间隔 %d < 发货上限 %d —— 同上，'
+              '「上限」方向不可用' % (mmax, SHIP_MTS_MAX))
+    if mmin < SHIP_MTS_MIN:
+        print('  [WARN] CSV 的最小间隔 %d < 发货下限 %d —— 该 CSV 尚未应用'
+              ' mouth_to_signal_min，其边际效果会被高估' % (mmin, SHIP_MTS_MIN))
+print('')
 print('A 口径 %d 条（样本内 %d / 样本外 %d）；基准 %+.2f%%\n'
       % (len(rows), len(IS), len(OOS), stat(rows)[1]))
 print('%-32s %-6s %-6s %-7s %-7s %-7s %-7s %s'

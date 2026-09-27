@@ -47,7 +47,8 @@ REQUIRED_PARAMS = (
     # ── 结构（前高 / 杯底 / 杯口 的准入）──
     'min_prior_advance', 'advance_origin_tolerance',
     'require_bottom_above_origin',
-    'mouth_vs_high_max', 'mouth_span_max', 'mouth_to_signal_max',
+    'mouth_vs_high_max', 'mouth_span_max',
+    'mouth_to_signal_min', 'mouth_to_signal_max',
     'mouth_lock_pullback', 'depth_min', 'depth_max',
     'recovery_dd_max', 'bottom_zone_pct', 'bottom_zone_days_max',
     'bottom_zone_before_min',
@@ -124,6 +125,11 @@ def _validate_geometry(p: Dict) -> None:
         errs.append("mouth_span_max 至少为 1")
     if p['mouth_to_signal_max'] < 1:
         errs.append("mouth_to_signal_max 至少为 1")
+    if p['mouth_to_signal_min'] < 1:
+        errs.append("mouth_to_signal_min 至少为 1")
+    if p['mouth_to_signal_min'] > p['mouth_to_signal_max']:
+        errs.append("mouth_to_signal_min 不应大于 mouth_to_signal_max"
+                    "（否则杯口→突破的间隔要求自相矛盾）")
     if not 0 < p['mouth_lock_pullback'] < 1:
         errs.append("mouth_lock_pullback 必须在 (0, 1) 内")
     if not 0 < p['recovery_dd_max'] < 1:
@@ -351,7 +357,7 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
          8  P ≥ B + handle_position_ratio×(M−B) 柄低在杯身上半部
          9  杯底区 [B,B×(1+δ)]：前后各 ≤N_max 日（前侧下限已关闭=0）
         10  M 日 − H 日 ≤ mouth_span_max         调整不过长
-        11  bar − M 日 ≤ mouth_to_signal_max     杯口确认后须尽快突破
+        11  bar − M 日 ∈ [mouth_to_signal_min, mouth_to_signal_max]  杯口确认后尽快突破
         12  bar 收 > M + buy_point_buffer        S1 突破
         13  bar 量 ≥ MA20(量)×breakout_vol_ratio  S2 放量
         14  bar 次日收 > M → 补 CONFIRM           次日确认（在 detect 里补）
@@ -458,6 +464,16 @@ def _evaluate(daily: List[Dict], ctx: Dict, d1: Dict, t_idx: int,
     # （001289 实测：杯口 04-01 → 柄低 04-02 → 04-03 就突破，柄部仅 1 日）
     if handle_days < params['handle_days_min']:
         return _rej(funnel, '7b_柄部交易日下限')
+
+    # 规则 11b: 杯口→突破 的**最小**间隔（= 柄部整理时长下限）。
+    # 口径与规则 11 完全一致：bar − t2_idx，单位是交易日，突破日当天计入。
+    # 柄部整理一般 1~4 周（5~20 个交易日），少于 1 周说明还没形成柄部就冲出去了。
+    # 与规则 11（上限）对称，和 handle_days_min 一样在 SIGNAL/CANDIDATE 分流**之前**
+    # 判定 —— 否则「间隔不足」的结构会先被当成候选发出去。
+    # 注：本项比 handle_days_min 更严（要求 bar−t2 ≥ 5，而 handle_days_min=3 只要求
+    # ≥ 4），故 handle_days_min 在现行配置下不再起作用。
+    if bar - t2_idx < params['mouth_to_signal_min']:
+        return _rej(funnel, '11b_杯口→突破过短')
 
     # 规则 7: 柄部回撤上限（P/M ≥ handle_pm_min）
     # 注：规则 8 的门槛是 M×(1−depth/2)，而规则 4 保证 depth ≤ depth_max；
