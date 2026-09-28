@@ -77,8 +77,27 @@ const upC = '#ef4444', dnC = '#10b981', midC = '#f59e0b', bluC = '#539BF5';
 (function(){const s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
 
+// 单张图失败只影响它自己：同一页其余图与下方表格必须照常渲染
+function runChart(id, fn){
+  try { fn(); }
+  catch (e) {
+    console.error('[chart] ' + id, e);
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<div class="cs" style="padding:40px 0;text-align:center">该图暂不可用（' + ((e && e.message) || '数据缺失') + '）</div>';
+  }
+}
+
 async function load(){
-  const d = await (await fetch(API_BASE + '/api/market-scan/hk-advice-detail?code=' + code)).json();
+  // 接口失败要在页面上说出原因，不能让页面停在空白
+  let d;
+  try {
+    const r = await fetch(API_BASE + '/api/market-scan/hk-advice-detail?code=' + code);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    d = await r.json();
+  } catch (e) {
+    document.getElementById('advice').innerHTML = '<div class="lv">加载失败</div><div class="tx">' + ((e && e.message) || e) + '</div>';
+    return;
+  }
   if (d.error) { document.getElementById('advice').innerHTML = '<div class="lv">无数据</div><div class="tx">' + d.error + '</div>'; return; }
   document.getElementById('title').textContent = d.name + '（' + d.code + '）详情';
   document.getElementById('sub').textContent = '数据截至 ' + d.date + ' · 全收益 2016 起 · 估值 2018 起 · 信号回测 2018-2026';
@@ -117,7 +136,8 @@ async function load(){
   // 数据存全局，tab 懒渲染（pane-val 隐藏时 init 会 0 尺寸）
   window._hkData = d;
   // 操作建议 tab 图（默认可见）
-  buildDd(d); buildBt(d.signals_bt);
+  runChart('chart-dd', function(){ buildDd(d); });
+  try { buildBt(d.signals_bt); } catch (e) { console.error('[chart] buildBt', e); }
   // 若当前在估值 tab，也渲染
   if (window._hkTab === 'val') renderValTab(d);
 }
@@ -131,7 +151,10 @@ function switchHkTab(tab){
 }
 function renderValTab(d){
   if (!d) return;
-  buildPx(d); buildVal(d); buildAbs(d); buildSpread(d);
+  runChart('chart-px', function(){ buildPx(d); });
+  runChart('chart-val', function(){ buildVal(d); });
+  runChart('chart-abs', function(){ buildAbs(d); });
+  runChart('chart-spread', function(){ buildSpread(d); });
 }
 function buildAbs(d){
   const el = document.getElementById('chart-abs'); if (!el) return;
