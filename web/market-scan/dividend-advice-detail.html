@@ -97,12 +97,38 @@ const tx = isDark ? '#999' : '#6E6E6E';
 const sp = isDark ? 'rgba(200,200,200,0.08)' : 'rgba(128,128,128,0.1)';
 const chartBg = isDark ? 'rgba(26,26,31,.6)' : 'rgba(255,255,255,.75)';
 
+// 红利温度计走独立接口，不依赖详情数据；抽成函数是为了详情拿不到时它仍然能渲染
+function loadTemp() {
+  const api = API_BASE + '/api/market-scan/red-metrics?code=' + code + (date ? '&date=' + date : '');
+  const box = document.getElementById('temp-box');
+  fetch(api)
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+    .then(m => {
+      if (m && m.spread) renderTemp(m);
+      else box.innerHTML = '<div class="chart-card"><div class="ct">🌡 红利温度计</div><div class="cs">数据不足或接口异常</div></div>';
+    })
+    .catch(e => {
+      box.innerHTML = '<div class="chart-card"><div class="ct">🌡 红利温度计</div><div class="cs">接口异常：' + (e && e.message ? e.message : '未知') + '</div></div>';
+    });
+}
+
 async function load() {
-  const [d, a] = await Promise.all([
-    fetch(DETAIL_API).then(r => r.json()),
-    fetch(ADVICE_API).then(r => r.json()).catch(() => null)
+  // allSettled + 单独判断：任一接口失败都不能让整页空白。
+  // 原来 Promise.all 里详情接口 500 会让 r.json() 抛错，整个 load() 中断，页面永远停在"加载中"。
+  const [dRes, aRes] = await Promise.allSettled([
+    fetch(DETAIL_API).then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
+    fetch(ADVICE_API).then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
   ]);
-  if (d.error) { document.getElementById('meta').textContent = '无数据'; return; }
+  const d = dRes.status === 'fulfilled' ? dRes.value : null;
+  const a = aRes.status === 'fulfilled' ? aRes.value : null;
+  if (!d || d.error) {
+    // 详情数据缺失：只提示这一块，温度计等独立区块照常渲染，不留白页
+    document.getElementById('meta').textContent = (d && d.error)
+      ? '该指数在此日期没有详情数据'
+      : '详情接口加载失败：' + ((dRes.reason && dRes.reason.message) || '未知错误');
+    loadTemp();
+    return;
+  }
 
   document.getElementById('title').textContent = '📌 ' + d.name + ' · 操作建议详情';
   document.getElementById('meta').textContent = d.date + ' · 当前250日回撤 ' + d.current_dd + '%' + (d.dd_source === 'full_return' ? '（全收益口径，理杏仁 total_return 自2016起）' : '（价格指数口径）') + ' · 估值分位为10年滚动口径';
@@ -142,13 +168,7 @@ async function load() {
   document.getElementById('advice-box').innerHTML = advHtml.join('');
 
   // 红利温度计（拥挤度/恐慌贪婪/股债息差）
-  const RED_METRICS_API = API_BASE + '/api/market-scan/red-metrics?code=' + code + (date ? '&date=' + date : '');
-  fetch(RED_METRICS_API).then(r => r.json()).then(m => {
-    if (m && m.spread) renderTemp(m);
-    else document.getElementById('temp-box').innerHTML = '<div class="chart-card"><div class="ct">🌡 红利温度计</div><div class="cs">数据不足或接口异常</div></div>';
-  }).catch(() => {
-    document.getElementById('temp-box').innerHTML = '<div class="chart-card"><div class="ct">🌡 红利温度计</div><div class="cs">接口异常，请稍后重试</div></div>';
-  });
+  loadTemp();
 
   // 历史类似统计
   const st = d.stats || {};
@@ -316,9 +336,20 @@ async function load() {
 
   const chartBox = charts.map(ch => '<div class="chart-card"><div class="ct">' + ch.title + '</div><div id="' + ch.el + '" style="height:' + ch.h + 'px"></div></div>').join('');
   document.getElementById('charts').innerHTML = chartBox;
+  // 单张图渲染失败只影响它自己：后面的图和下面的历史事件表必须照常渲染。
+  // 原来 forEach 里直接 init，一张图抛错会让剩余所有图和整张事件表都不出现。
   const inst = [];
-  charts.forEach(ch => inst.push(ch.init(document.getElementById(ch.el))));
-  window.addEventListener('resize', () => inst.forEach(c => c.resize()));
+  charts.forEach(ch => {
+    const el = document.getElementById(ch.el);
+    if (!el) return;
+    try {
+      inst.push(ch.init(el));
+    } catch (err) {
+      el.innerHTML = '<div class="cs" style="padding:40px 0;text-align:center">该图暂不可用（' + ((err && err.message) || '数据缺失') + '）</div>';
+      console.error('[chart] ' + ch.title, err);
+    }
+  });
+  window.addEventListener('resize', () => inst.forEach(c => { try { c.resize(); } catch (e) { /* 单图 resize 失败不影响其它图 */ } }));
 
   // 4. 信号触发历史表
   const evHtml = ['<div class="chart-card"><div class="ct">📋 历史类似回撤事件（回撤≥当前幅度' + d.current_dd + '%）</div>',
@@ -506,7 +537,12 @@ function genValFsText(id, name, vals, unit, dates) {
   el.innerHTML = h;
 }
 
-load();
+// 兜底：load() 内部任何未捕获异常都要在页面上说清楚，不能只留「加载中...」
+load().catch(e => {
+  const el = document.getElementById('meta');
+  if (el) el.textContent = '加载失败：' + ((e && e.message) || e);
+  console.error('[dividend-detail] load 失败', e);
+});
 
 // ═══ 红利温度计：拥挤度 / 恐慌贪婪 / 股债息差 ═══
 let tempChart = null;

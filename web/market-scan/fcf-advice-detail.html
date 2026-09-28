@@ -206,8 +206,18 @@ async function load() {
   const chartBox = charts.map(ch => '<div class="chart-card"><div class="ct">' + ch.title + '</div><div id="' + ch.el + '" style="height:' + ch.h + 'px"></div>' + (ch.cs ? '<div class="cs">' + ch.cs + '</div>' : '') + '</div>').join('');
   document.getElementById('charts').innerHTML = chartBox;
   const inst = [];
-  charts.forEach(ch => inst.push(ch.init(document.getElementById(ch.el))));
-  window.addEventListener('resize', () => inst.forEach(c => c.resize()));
+  // 单张图失败只影响它自己：后面的图和下面的明细表必须照常渲染
+  charts.forEach(ch => {
+    const el = document.getElementById(ch.el);
+    if (!el) return;
+    try {
+      inst.push(ch.init(el));
+    } catch (err) {
+      el.innerHTML = '<div class="cs" style="padding:40px 0;text-align:center">该图暂不可用（' + ((err && err.message) || '数据缺失') + '）</div>';
+      console.error('[chart] ' + ch.title, err);
+    }
+  });
+  window.addEventListener('resize', () => inst.forEach(c => { try { c.resize(); } catch (e) { /* 单图 resize 失败不影响其它图 */ } }));
 
   // 4. 低估区间历史表
   const evHtml = ['<div class="chart-card"><div class="ct">🔍 历史低估区间明细（满足 估值买点 条件的独立区间）</div>',

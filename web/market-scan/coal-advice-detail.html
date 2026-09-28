@@ -138,7 +138,17 @@ async function load() {
 
     const chartEls = charts.map(x => '<div class="chart-card"><div class="ct">' + x.title + '</div><div id="' + x.el + '" style="height:' + x.h + 'px"></div>' + (x.cs ? '<div class="cs">' + x.cs + '</div>' : '') + '</div>').join('');
     document.getElementById('charts').innerHTML = chartEls;
-    charts.forEach(x => { const c = x.init(document.getElementById(x.el)); window['_c_' + x.el] = c; });
+    // 单张图失败只影响它自己：后面的图和下面的明细表必须照常渲染
+    charts.forEach(x => {
+      const el = document.getElementById(x.el);
+      if (!el) return;
+      try {
+        window['_c_' + x.el] = x.init(el);
+      } catch (err) {
+        el.innerHTML = '<div class="cs" style="padding:40px 0;text-align:center">该图暂不可用（' + ((err && err.message) || '数据缺失') + '）</div>';
+        console.error('[chart] ' + x.title, err);
+      }
+    });
 
     // 表格
     let tbl = '<div class="chart-card"><div class="ct">📋 分年度明细（网格 vs 持有）</div><table><tr><th>年份</th><th>指数涨跌</th><th>网格收益</th><th>持有收益</th><th>超额</th><th>交易次数</th><th>档位穿越</th></tr>';

@@ -273,30 +273,33 @@
       // 渲染缩略图
       setTimeout(function(){
         idxData.forEach(function(idx){
-          var el=document.getElementById('spark-'+idx.code);if(!el)return;
-          var kl=idx.klines.slice(-20);
-          if(kl.length<2)return;
-          if(el._echart)el._echart.dispose();
-          var ch=echarts.init(el);el._echart=ch;
-          var closes=kl.map(function(k){return k.close});
-          var isUp=closes[closes.length-1]>=closes[0];
-          var isDark=document.documentElement.dataset.theme==='dark';
-          var upColor=isDark?'#ef4444':'#dc2626';
-          var downColor=isDark?'#10b981':'#059669';
-          var lineColor=isUp?upColor:downColor;
-          var areaColor=isUp?(isDark?'rgba(239,68,68,.15)':'rgba(220,38,38,.1)'):(isDark?'rgba(16,185,129,.15)':'rgba(5,150,105,.1)');
-          ch.setOption({
-            grid:{left:0,right:0,top:2,bottom:2},
-            xAxis:{show:false,data:kl.map(function(k){return k.date})},
-            yAxis:{show:false,min:Math.min.apply(null,closes)*0.995,max:Math.max.apply(null,closes)*1.005},
-            series:[{type:'line',data:closes,smooth:true,symbol:'none',
-              lineStyle:{color:lineColor,width:1.2},
-              areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
-                {offset:0,color:areaColor},
-                {offset:1,color:'transparent'}
-              ])}
-            }]
-          });
+          // 单个指数数据异常只跳过它自己，不能拖垮其余所有缩略图
+          try{
+            var el=document.getElementById('spark-'+idx.code);if(!el)return;
+            var kl=(idx.klines||[]).slice(-20);
+            if(kl.length<2)return;
+            if(el._echart)el._echart.dispose();
+            var ch=echarts.init(el);el._echart=ch;
+            var closes=kl.map(function(k){return k.close});
+            var isUp=closes[closes.length-1]>=closes[0];
+            var isDark=document.documentElement.dataset.theme==='dark';
+            var upColor=isDark?'#ef4444':'#dc2626';
+            var downColor=isDark?'#10b981':'#059669';
+            var lineColor=isUp?upColor:downColor;
+            var areaColor=isUp?(isDark?'rgba(239,68,68,.15)':'rgba(220,38,38,.1)'):(isDark?'rgba(16,185,129,.15)':'rgba(5,150,105,.1)');
+            ch.setOption({
+              grid:{left:0,right:0,top:2,bottom:2},
+              xAxis:{show:false,data:kl.map(function(k){return k.date})},
+              yAxis:{show:false,min:Math.min.apply(null,closes)*0.995,max:Math.max.apply(null,closes)*1.005},
+              series:[{type:'line',data:closes,smooth:true,symbol:'none',
+                lineStyle:{color:lineColor,width:1.2},
+                areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
+                  {offset:0,color:areaColor},
+                  {offset:1,color:'transparent'}
+                ])}
+              }]
+            });
+          }catch(e){console.error('[spark] '+idx.code,e);}
         });
       },300);
     }

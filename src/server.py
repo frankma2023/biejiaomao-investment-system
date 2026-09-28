@@ -1571,10 +1571,12 @@ def api_market_dividend_detail():
         w = dd_base[max(0, i-249):i+1]
         hi = max(w)
         dd_series.append(round((hi - dd_base[i]) / hi * 100, 2))
-    # 回撤曲线按价格日期对齐（全收益与价格交易日一致；全收益缺失日如 2018 前用 None 占位）
-    if len(dd_dates) != len(dates):
-        dd_map = dict(zip(dd_dates, dd_series))
-        dd_series = [dd_map.get(d) for d in dates]
+    # 回撤曲线按价格日期对齐。始终按日期映射，不只在长度不等时映射：
+    # 港股通/沪港深系列指数跟港股日历（内地节假日仍有行情），两条序列长度相同
+    # 但日期不同是可能的，那时按位置对齐会整体错位。
+    # 全收益缺失的日期（如 2018 前、当日未回填）保留 None，前端画断点。
+    dd_map = dict(zip(dd_dates, dd_series))
+    dd_series = [dd_map.get(d) for d in dates]
 
     # 估值分位（近3年，按K线日期对齐；v1.3 加 dyr 绝对股息率供息差计算）
     val_rows = db.execute("""
@@ -1597,7 +1599,10 @@ def api_market_dividend_detail():
                 last_trig = i
 
     # 历史类似情况统计：当前回撤幅度下的所有事件（全收益优先，回退价格）
-    cur_dd = dd_series[-1] if dd_series and dd_series[-1] is not None else 0
+    # 最新一天缺值（当日全收益未回填 / 口径缺该日）时回退到最近一个有值的交易日，
+    # 不能兜底成 0：0 会让「当前回撤」显示错误，并让下面 similar 的 cur_dd > 0 判断失败，
+    # 整张「历史类似回撤事件」表和 stats 摘要一起变空。
+    cur_dd = next((v for v in reversed(dd_series) if v is not None), 0) if dd_series else 0
     # 全历史回撤序列
     hist_base = hist_tri if hist_tri else hist_closes
     hist_dd = []
@@ -2150,7 +2155,8 @@ def api_market_fcf_detail():
             'fwd60_winrate': round(sum(1 for x in fwd60s if x > 0) / len(fwd60s) * 100, 1) if fwd60s else None,
         }
 
-    current_dd = dd_series[-1] if dd_series else 0
+    # 同 dividend-advice-detail：末日缺值时取最近一个有值日，不返回 null/0
+    current_dd = next((v for v in reversed(dd_series) if v is not None), 0) if dd_series else 0
     return jsonify({
         'code': code, 'name': name, 'date': target_date,
         'dates': dates, 'closes': closes, 'dd_series': dd_series,
@@ -7517,7 +7523,7 @@ def api_market_commodity_detail():
     dyr_v = [round(vmap[d]['dyr'] * 100, 2) if d in vmap and vmap[d]['dyr'] else None for d in dates]
 
     cur = vmap.get(dates[-1]) if dates else None
-    cur_dd = dd_series[-1] if dd_series else None
+    cur_dd = next((v for v in reversed(dd_series) if v is not None), None) if dd_series else None
     return jsonify({
         'code': code, 'name': '大宗商品ETF', 'index': '上证大宗商品(000066)', 'date': dates[-1] if dates else target_date,
         'dates': dates, 'closes': closes, 'dd_series': dd_series, 'dd_buy_events': dd_buy_events,
