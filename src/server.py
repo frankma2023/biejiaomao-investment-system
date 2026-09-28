@@ -1374,9 +1374,14 @@ def _dd_from_full_return(db, code, target_date, days=300, window=250):
 
 
 def _latest_y10(db, target_date):
-    """target_date 之前最近的 10Y 国债收益率（%）"""
-    r = db.execute("SELECT y10 FROM bond_yield_daily WHERE date<=? ORDER BY date DESC LIMIT 1",
-                   (target_date,)).fetchone()
+    """target_date 之前最近一个有值的 10Y 国债收益率（%）
+
+    bond_yield_daily 存在 y10 IS NULL 的行：节假日按日历落行但无报价，
+    以及数据源当日未回填（如 2026-09-25 是交易日却无值）。不加过滤会取到
+    这类空行，让息差静默变成 None。
+    """
+    r = db.execute("SELECT y10 FROM bond_yield_daily WHERE date<=? AND y10 IS NOT NULL "
+                   "ORDER BY date DESC LIMIT 1", (target_date,)).fetchone()
     return r['y10'] if r else None
 
 
@@ -1716,17 +1721,23 @@ def api_market_dividend_detail():
         print(f'[dividend-detail] index_style 名称查找失败 {code}: {type(_e).__name__}: {_e}', flush=True)
 
     # ── 价格 vs 全收益 对比线（PRD Ticket 03）──
-    # 归一化：近3年起点=100（dates/closes 为价格，tri_rows 为全收益，日期对齐）
+    # 归一化：近3年起点=100（dates/closes 为价格，tri_rows 为全收益）
+    # 按日期对齐，不要求两条序列等长：全收益表常比价格表晚一天（当日未回填），
+    # 原本的 len(...)==len(dates) 会让这两天图在每天回填前整块消失。
     price_norm = None
     tri_norm = None
     tri_diff = None
-    if tri_rows and len(tri_rows) >= 2 and len(tri_rows) == len(dates):
-        tri_closes = [r['close'] for r in tri_rows]
-        base_p = closes[0] if closes[0] else 1
-        base_t = tri_closes[0] if tri_closes[0] else 1
-        price_norm = [round(c / base_p * 100, 1) for c in closes]
-        tri_norm = [round(c / base_t * 100, 1) for c in tri_closes]
-        tri_diff = [round(t - p, 1) for p, t in zip(price_norm, tri_norm)]
+    if tri_rows and len(tri_rows) >= 2:
+        tri_win_map = {r['date']: r['close'] for r in tri_rows}
+        tri_closes = [tri_win_map.get(d) for d in dates]
+        base_i = next((i for i, v in enumerate(tri_closes) if v is not None), None)
+        if base_i is not None and closes[base_i]:
+            base_p = closes[base_i]
+            base_t = tri_closes[base_i]
+            price_norm = [round(c / base_p * 100, 1) if c else None for c in closes]
+            tri_norm = [round(t / base_t * 100, 1) if t is not None else None for t in tri_closes]
+            tri_diff = [round(t - p, 1) if (p is not None and t is not None) else None
+                        for p, t in zip(price_norm, tri_norm)]
 
     # 沪深300 对比线（近3年，与 dates 对齐，归一化起点=100）
     hs300_norm = None
@@ -1779,9 +1790,11 @@ def api_market_dividend_detail():
             tri_long = [tri_map.get(d) for d in dates_long]
 
     # ── 股债息差序列（股息率 − 10Y国债，近3年，v1.3 新增）──
+    # y10 IS NOT NULL：跳过无报价的行，bisect 自然向前取最近一个有值的交易日（同上函数）
     spread_series = []
     bond_map = dict((r['date'], r['y10']) for r in db.execute(
-        "SELECT date, y10 FROM bond_yield_daily WHERE date>=date(?,'-3 years') AND date<=? ORDER BY date",
+        "SELECT date, y10 FROM bond_yield_daily WHERE date>=date(?,'-3 years') AND date<=? "
+        "AND y10 IS NOT NULL ORDER BY date",
         (target_date, target_date)).fetchall())
     bond_dates_sorted = sorted(bond_map.keys())
     import bisect as _bisect
@@ -1793,7 +1806,8 @@ def api_market_dividend_detail():
         if idx < 0:
             spread_series.append(None)
             continue
-        spread_series.append(round(val_map[d]['dyr'] * 100 - bond_map[bond_dates_sorted[idx]], 2))
+        y10 = bond_map[bond_dates_sorted[idx]]
+        spread_series.append(round(val_map[d]['dyr'] * 100 - y10, 2) if y10 is not None else None)
 
     return jsonify({
         'code': code, 'name': name, 'date': target_date,
@@ -2540,8 +2554,9 @@ def api_market_hk_advice_detail():
         dyr_p.append(round(v['dyr_pct'] * 100) if v and v['dyr_pct'] is not None else None)
         pe_s.append(round(v['pe_ttm'], 1) if v and v['pe_ttm'] is not None else None)
         pb_s.append(round(v['pb'], 2) if v and v['pb'] is not None else None)
-    # 息差（国债对齐）
-    bond = {r['date']: r['y10'] for r in db.execute("SELECT date, y10 FROM bond_yield_daily ORDER BY date").fetchall()}
+    # 息差（国债对齐；y10 IS NOT NULL 跳过无报价行，bisect 向前取最近一个有值的交易日）
+    bond = {r['date']: r['y10'] for r in db.execute(
+        "SELECT date, y10 FROM bond_yield_daily WHERE y10 IS NOT NULL ORDER BY date").fetchall()}
     bdates = sorted(bond.keys())
     import bisect as _b
     spread_s = []
