@@ -58,7 +58,16 @@ def prev_val(dmap, d, look='<='):
     return best
 
 def rsi14(code_dates, code_map, d, n=14):
-    """RSI14（Wilder），用 d 前 60 交易日（含 d 的最近 15+）"""
+    """RSI14，用 d 之前 60 个交易日（含 d 的最近 n+1 个涨跌幅）
+
+    口径说明（2026-09-29 更正）：这里取最近 n 个涨跌幅做**简单平均**，
+    是 **SMA 版 RSI（Cutler's RSI）**，不是 Wilder 版 —— 原 docstring 标「Wilder」有误。
+    两版数值差别不小：以中证红利为例，1197/1198 个交易日与 Wilder 版不一致。
+
+    本脚本的结论（RSI 定投输在资金利用率，而非信号失效）是结构性结论，
+    不依赖用哪一版；但若要与本仓库详情页的 RSI 图对齐口径，
+    应改用 src/detectors/divergence.py: compute_rsi（Wilder，与 talib 逐点一致）。
+    """
     ds = [x for x in code_dates if x <= d][-60:]
     if len(ds) < n + 1:
         return None
