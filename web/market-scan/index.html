@@ -171,6 +171,9 @@
   
   <script src="../shared/js/api-client.js"></script>
   <script>
+    // 空值安全的数值格式化：某个指标缺一天/缺一个字段只让这个数字显示「—」，
+    // 不抛异常。render() 里任何一处抛错都会被 load() 的 catch 吞成全页「数据加载失败」。
+    function nf(v,d){return (v==null||typeof v!=='number'||!isFinite(v))?'—':v.toFixed(d==null?2:d);}
     function rc(s) { if(s>=80)return'#2E7D32';if(s>=65)return'#558B2F';if(s>=50)return'#F9A825';if(s>=35)return'#FF8F00';if(s>=20)return'#E53935';return'#B71C1C'; }
     function rl(s) {
       if(s>=80)return{r:'A',l:'强势市场',a:'可积极选股，仓位70%'};if(s>=65)return{r:'B',l:'偏强市场',a:'可适度选股，仓位50%'};
@@ -209,13 +212,18 @@
       const div=document.getElementById('content');
       try{
         var dateParam = specificDate || 'latest';
-        const[hr,pr,sr,da,fcfa]=await Promise.all([
-          fetch(API_BASE+'/api/market-health?date='+dateParam).then(r=>r.json()),
-          fetch(API_BASE+'/api/market-panorama').then(r=>r.json()),
+        // 逐槽容错：任一接口失败只让它自己为空，不能让整页变成「数据加载失败」。
+        // 原来 market-health / market-panorama 任一 500 或返回非 JSON，Promise.all 整体 reject。
+        const settled=await Promise.allSettled([
+          fetch(API_BASE+'/api/market-health?date='+dateParam).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))),
+          fetch(API_BASE+'/api/market-panorama').then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))),
           fetch(API_BASE+'/api/market-sell-score?date='+dateParam).then(r=>r.json()).catch(()=>({status:'no_data'})),
           fetch(API_BASE+'/api/market-scan/dividend-advice?date='+(dateParam==='latest'?'':dateParam)).then(r=>r.json()).catch(()=>({indices:[]})),
           fetch(API_BASE+'/api/market-scan/fcf-advice?date='+(dateParam==='latest'?'':dateParam)).then(r=>r.json()).catch(()=>({}))
         ]);
+        const pick=(i,dflt)=>(settled[i].status==='fulfilled'&&settled[i].value)?settled[i].value:dflt;
+        const hr=pick(0,null), pr=pick(1,{}), sr=pick(2,{status:'no_data'}), da=pick(3,{indices:[]}), fcfa=pick(4,{});
+        if(!hr){div.innerHTML='<div class="no-data">📡 行情健康度接口加载失败，请稍后重试 (date='+dateParam+')</div>';return;}
         if(hr.status==='no_data'){div.innerHTML='<div class="no-data">📡 暂无健康度数据 (date='+dateParam+')</div>';return;}
         hr.dividend_advice=da;
         hr.fcf_advice=fcfa;
@@ -257,7 +265,7 @@
     function renderIndexCards(){
       var html='<div class="section-hdr">📊 主要指数</div><div class="idx-grid">';
       idxData.forEach(function(idx){
-        var kl=idx.klines;
+        var kl=idx.klines||[];
         var last=kl.length?kl[kl.length-1]:null;
         var prev=kl.length>1?kl[kl.length-2]:null;
         var price=last?last.close:'—';
@@ -329,7 +337,7 @@
       html+='<div class="sc-chart" id="chart-volume-trend"></div></div>';
       // 卡片3: 新高新低比趋势
       html+='<div class="score-card"><div class="sc-title">新高新低比趋势</div>';
-      html+='<div class="sc-val">'+(hlInd?hlInd.value.toFixed(2):'—')+'</div>';
+      html+='<div class="sc-val">'+(hlInd?nf(hlInd.value):'—')+'</div>';
       html+='<div class="sc-sub">>2 多方主导 | <0.5 空方主导</div>';
       html+='<div class="sc-chart" id="chart-hl-trend"></div></div>';
       html+='</div>';
@@ -351,7 +359,7 @@
         const m=meta[ind.key]||{n:ind.key,u:'',t:'',max:15,hi:100,lo:0};
         const bw=m.u==='%'?Math.min(100,Math.max(0,(ind.value-m.lo)/(m.hi-m.lo)*100)):Math.min(100,Math.max(0,ind.value/m.hi*100));
         const bc=ind.value>=m.hi*.7?'#4CAF50':ind.value>=m.hi*.4?'#F9A825':'#E53935';
-        const vv=ind.key==='vol_breakout'?`<span class="clickable" onclick="window.open('breakouts.html')">${ind.value}</span>`:ind.key==='ad_ratio'?`${ind.value.toFixed(2)}<span style="font-size:0.55rem;color:var(--muted)">(5日)/${(ind.today||ind.value).toFixed(2)}<span style="font-size:0.55rem;color:var(--muted)">(当日)</span></span>`:ind.key==='limit_up_down'?`<span style="color:#ef4444">${ind.limit_up}↑</span> / <span style="color:#10b981">${ind.limit_down}↓</span>`:(Number.isInteger(ind.value)?ind.value:ind.value.toFixed(2));
+        const vv=ind.key==='vol_breakout'?`<span class="clickable" onclick="window.open('breakouts.html')">${ind.value}</span>`:ind.key==='ad_ratio'?`${nf(ind.value)}<span style="font-size:0.55rem;color:var(--muted)">(5日)/${nf(ind.today!=null?ind.today:ind.value)}<span style="font-size:0.55rem;color:var(--muted)">(当日)</span></span>`:ind.key==='limit_up_down'?`<span style="color:#ef4444">${ind.limit_up}↑</span> / <span style="color:#10b981">${ind.limit_down}↓</span>`:(Number.isInteger(ind.value)?ind.value:nf(ind.value));
         html+=`<div class="ind-card"><div class="ih"><span class="in">${m.n}</span><span class="it">${m.t}</span></div>
           <div class="iv">${vv}<span class="iu"> ${m.u}</span></div>
           <div class="ibar"><div class="ibar-fill" style="width:${bw}%;background:${bc}"></div></div>
@@ -431,7 +439,7 @@
           html+='<div class="sector-card" style="background:'+dBg.bg+';border:1px solid '+dBg.bd+'" onclick="window.open(\'sector-detail.html?group='+dg.group_name+'&date='+curDate+'\')">';
           html+='<div class="sc-title">'+dg.group_label+'</div>';
           html+='<div style="display:flex;align-items:baseline;gap:6px;margin:4px 0">';
-          html+='<span style="font-family:var(--font-display);font-size:1.8rem;font-weight:400;color:'+chgCls+'">'+chgSign+dg.avg_change.toFixed(2)+'%</span>';
+          html+='<span style="font-family:var(--font-display);font-size:1.8rem;font-weight:400;color:'+chgCls+'">'+chgSign+nf(dg.avg_change)+'%</span>';
           html+='</div>';
           html+='<div style="font-size:10px;color:var(--muted)">'+dg.indices_count+'指数</div>';
           if(dg.tech){
@@ -593,7 +601,7 @@
         html+='</div>';
 
         // 7个子卡片
-        function sigScore(name){return (sr.signals.find(function(x){return x.name===name})||{}).score||0}
+        function sigScore(name){return ((sr.signals||[]).find(function(x){return x.name===name})||{}).score||0}
         html+='<div class="ind-grid">';
         const sellMeta=[
           {key:'leader',n:'龙头股见顶',icon:'🏔️',t:'领先',s:sigScore('龙头股见顶'),max:25,desc:'RS≥99龙头股>50%回落>10%'},
@@ -681,7 +689,7 @@
           if(isS){mc=mv>=.7?'#4CAF50':mv>=.3?'#F9A825':'#E53935';ml=mv>=.7?'格局稳定':mv>=.3?'正常轮动':'无序洗牌';}
           else{mc=mv>=4?'#4CAF50':mv>=2?'#F9A825':'#E53935';ml=mv>=4?'板块稳定':mv>=2?'正常轮动':'快速轮动';}
           html+=`<div class="rot-card"><h4>${rot.icon||'📦'} ${rot.name} <span style="font-size:0.5rem;color:var(--muted);font-weight:400">${rot.count||''}个 · ${isS?'Spearman':'Top5重叠'}</span></h4>
-            <div class="rm" style="color:${mc}">${isS?mv.toFixed(3):mv}<span style="font-size:0.55rem;color:var(--muted);font-weight:400">${isS?' (ρ)':' 个重叠'}</span></div>
+            <div class="rm" style="color:${mc}">${isS?nf(mv,3):mv}<span style="font-size:0.55rem;color:var(--muted);font-weight:400">${isS?' (ρ)':' 个重叠'}</span></div>
             <div class="rd">${ml}${rot.participates?' · 参与评分':' · 仅展示'}</div>`;
           if(rot.top5_current&&rot.top5_current.length){
             const both=rot.top5_overlap||[];
@@ -928,7 +936,7 @@ function renderMarginChart(){
   var c1=echarts.init(el1);
   var nbData=tr.map(function(x){return x.net_buy});
   c1.setOption({
-    backgroundColor:'transparent',tooltip:{trigger:'axis',formatter:function(p){return p[0].name+'<br/>净买入: '+p[0].value.toFixed(0)+'亿'}},
+    backgroundColor:'transparent',tooltip:{trigger:'axis',formatter:function(p){return p[0].name+'<br/>净买入: '+nf(p[0].value,0)+'亿'}},
     grid:{left:'8%',right:'4%',top:8,bottom:24},
     xAxis:{type:'category',data:tr.map(function(x){return x.date}),axisLabel:{color:tx,fontSize:8,rotate:45},axisLine:{lineStyle:{color:sp}}},
     yAxis:{type:'value',axisLabel:{color:tx,fontSize:9,formatter:function(v){return v.toFixed(0)+'亿'}},splitLine:{lineStyle:{color:sp}}},

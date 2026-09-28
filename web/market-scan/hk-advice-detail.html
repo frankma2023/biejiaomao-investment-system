@@ -130,7 +130,7 @@ async function load(){
     ['息差', (c.spread||0) + 'pp', c.spread >= 4 ? upC : '#8b8b90'],
     ['PE分位', (c.pe_pct||0) + '%', c.pe_pct > 80 ? dnC : '#8b8b90'],
     ['PB分位', (c.pb_pct||0) + '%', '#8b8b90'],
-    ['全收益收盘', d.tri_close[d.tri_close.length-1], '#8b8b90'],
+    ['全收益收盘', (d.tri_close&&d.tri_close.length)?d.tri_close[d.tri_close.length-1]:'—', '#8b8b90'],
   ];
   document.getElementById('stats').innerHTML = stats.map(s => '<div class="stat-box"><div class="n" style="color:' + s[2] + '">' + s[1] + '</div><div class="l">' + s[0] + '</div></div>').join('');
   // 数据存全局，tab 懒渲染（pane-val 隐藏时 init 会 0 尺寸）

@@ -1726,20 +1726,25 @@ def api_market_dividend_detail():
         print(f'[dividend-detail] index_style 名称查找失败 {code}: {type(_e).__name__}: {_e}', flush=True)
 
     # ── 价格 vs 全收益 对比线（PRD Ticket 03）──
-    # 归一化：近3年起点=100（dates/closes 为价格，tri_rows 为全收益）
-    # 按日期对齐，不要求两条序列等长：全收益表常比价格表晚一天（当日未回填），
-    # 原本的 len(...)==len(dates) 会让这两天图在每天回填前整块消失。
+    # 价格线只要有 K 线就算得出来，不依赖全收益表；全收益线单独算。
+    # 两条线互不拖累：没有全收益口径（如 980092 不在 FULL_RETURN_MAP）或当日未回填时，
+    # 价格线照常出图，不能因为少一条线就整块图不画。
+    # 按日期对齐，不要求两条序列等长（全收益表常比价格表晚一天）。
     price_norm = None
     tri_norm = None
     tri_diff = None
+    if closes:
+        base_p = closes[0] or 1
+        price_norm = [round(c / base_p * 100, 1) if c else None for c in closes]
     if tri_rows and len(tri_rows) >= 2:
         tri_win_map = {r['date']: r['close'] for r in tri_rows}
         tri_closes = [tri_win_map.get(d) for d in dates]
         base_i = next((i for i, v in enumerate(tri_closes) if v is not None), None)
         if base_i is not None and closes[base_i]:
-            base_p = closes[base_i]
+            # 有全收益时两条线共用同一基准日，保证可以直接比较
+            base_p2 = closes[base_i]
             base_t = tri_closes[base_i]
-            price_norm = [round(c / base_p * 100, 1) if c else None for c in closes]
+            price_norm = [round(c / base_p2 * 100, 1) if c else None for c in closes]
             tri_norm = [round(t / base_t * 100, 1) if t is not None else None for t in tri_closes]
             tri_diff = [round(t - p, 1) if (p is not None and t is not None) else None
                         for p, t in zip(price_norm, tri_norm)]
