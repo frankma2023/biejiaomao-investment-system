@@ -323,20 +323,29 @@ async function load() {
     const PCOL = {6:'#f59e0b', 14:'#539BF5', 20:'#a855f7'};
     const pcol = p => PCOL[p] || '#f59e0b';
     const defP = d.rsi_default_period;
-    // 标题给出各周期各档的 60 日胜率/中位（状态口径）
-    const summ = per.map(p => 'RSI' + p.period + ' ' + (p.tier_stats || []).map(t => {
+    // 标题给出各周期各档的 60 日胜率/中位（状态口径）；买点六档 + 卖点六档
+    // 样本 <20 天加 * —— 单只指数的极端档常常只有个位数天，噪声很大，别当结论
+    const fmtStat = t => {
       const s = t.fwd60 || {};
-      return t.short + (s.n ? s.win + '/' + (s.med > 0 ? '+' : '') + s.med + '%' : '—');
-    }).join(' ')).join(' · ');
+      if (!s.n) return t.short + '—';
+      return t.short + s.win + '/' + (s.med > 0 ? '+' : '') + s.med + '%' + (s.n < 20 ? '*' : '');
+    };
+    const summ = per.map(p => 'RSI' + p.period
+      + ' 买[' + (p.tier_stats || []).map(fmtStat).join(' ') + ']'
+      + ' 卖[' + (p.sell_tier_stats || []).map(fmtStat).join(' ') + ']').join(' · ');
     const rsiTitle = '📉 RSI 买卖点（点图例切换 RSI' + per.map(p => p.period).join('/') + '，默认只显示 RSI' + defP
-      + '；圆点=买点 · 图钉=强/极值买点（标在每段超卖的最低点，事后确认）· 绿三角=卖点）'
-      + ' · 60日胜率/中位：' + summ + ' · 收益按全收益口径';
+      + '；买点：圆点/图钉=每段超卖最低点 · 卖点：倒三角=每段超买最高点，按档位放大加标签，均事后确认）'
+      + ' · 60日胜率/中位 ' + summ + '（* = 该档样本 <20 天，单只指数噪声大，仅供参考）'
+      + ' · 收益按全收益口径';
     charts.push({title: rsiTitle, el:'chart-rsi', h:350, init: el => {
       const c = echarts.init(el);
       const sel = {};
+      // 卖点档配色：越极端越深
+      const SELLC = ['#6ee7b7', '#10b981', '#047857'];
       const series = per.map(p => {
         const col = pcol(p.period);
         const tiers = p.buy_tiers || [];
+        const stiers = p.sell_tiers || [];
         // 买点：每段超卖的最低点，浅档小圆点、深档带标签的大图钉
         const buys = (p.buy_marks || []).map(m => {
           const deep = (m.tier || 1) >= 2;
@@ -348,22 +357,37 @@ async function load() {
                   itemStyle: {color: col, borderColor:'#fff', borderWidth: m.ongoing ? 1.5 : 0},
                   label: {show: deep || m.ongoing, formatter: lbl, color:'#fff', fontSize: 8}};
         });
-        // 卖点：上穿阈值那天，绿色倒三角
-        const sells = (p.sell_marks || []).map(m => ({
-          name: m.date + ' 卖点', coord: [m.date, m.rsi], value: '卖',
-          symbol: 'triangle', symbolRotate: 180, symbolSize: 11,
-          itemStyle: {color: '#10b981'}, label: {show: false}}));
-        // 档位色带：越深越重。三条同时打开时重叠处更深 = 多周期共振，是有意如此
+        // 卖点：每段超买的最高点，绿色倒三角按档位放大加标签
+        const sells = (p.sell_marks || []).map(m => {
+          const k = Math.min((m.tier || 1) - 1, SELLC.length - 1);
+          const deep = (m.tier || 1) >= 2;
+          const lbl = (m.tier_short || m.tier_label) + (m.ongoing ? '(进行)' : '');
+          return {name: m.date + ' ' + m.tier_label + '（进入日 ' + m.entry_date + '）',
+                  coord: [m.date, m.rsi], value: lbl,
+                  symbol: 'triangle', symbolRotate: 180,
+                  symbolSize: m.ongoing ? 18 : (deep ? (m.tier >= 3 ? 20 : 15) : 9),
+                  itemStyle: {color: SELLC[k], borderColor:'#fff', borderWidth: deep ? 1 : 0},
+                  label: {show: deep || m.ongoing, formatter: lbl, color:'#fff', fontSize: 8}};
+        });
+        // 档位色带：买点侧冷灰/红，卖点侧绿；越深越重。
+        // 三条同时打开时重叠处更深 = 多周期共振，是有意如此。
         const bands = tiers.map((t, k) => [
           {yAxis: t.lo, itemStyle: {color: k === 0 ? 'rgba(148,163,184,.06)' : 'rgba(239,68,68,.05)'}},
-          {yAxis: t.threshold}]);
+          {yAxis: t.threshold}])
+          .concat(stiers.map((t, k) => [
+            {yAxis: t.threshold, itemStyle: {color: k === 0 ? 'rgba(16,185,129,.05)' : 'rgba(4,120,87,.06)'}},
+            {yAxis: t.hi}]));
         const lines = [];
         if (tiers.length) {
           lines.push({yAxis: tiers[0].threshold, lineStyle: {color: col, type: 'dashed', width: 1},
                       label: {formatter: 'RSI' + p.period + ' 买 ' + tiers[0].threshold, color: col, fontSize: 8}});
         }
-        lines.push({yAxis: p.sell, lineStyle: {color: '#10b981', type: 'dotted', width: 1},
-                    label: {formatter: 'RSI' + p.period + ' 卖 ' + p.sell, color: '#10b981', fontSize: 8}});
+        stiers.forEach((t, k) => {
+          if (k === 0) {
+            lines.push({yAxis: t.threshold, lineStyle: {color: '#10b981', type: 'dotted', width: 1},
+                        label: {formatter: 'RSI' + p.period + ' 卖 ' + t.threshold, color: '#10b981', fontSize: 8}});
+          }
+        });
         sel['RSI' + p.period] = (p.period === defP);
         return {
           name: 'RSI' + p.period, type: 'line', data: p.values, smooth: true, showSymbol: false,

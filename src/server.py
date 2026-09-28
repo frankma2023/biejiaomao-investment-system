@@ -1391,42 +1391,61 @@ RSI_CONFIG_PATH = os.path.join(CONFIG_DIR, 'red_dividend_rsi.yaml')
 _RSI_FALLBACK = {
     'default_period': 6,
     'periods': [
-        {'period': 6, 'sell': 81, 'buy_tiers': [
+        {'period': 6, 'buy_tiers': [
             {'threshold': 29, 'label': '买点', 'short': '买'},
             {'threshold': 20, 'label': '强买点', 'short': '强'},
-            {'threshold': 10, 'label': '极值买点', 'short': '极值'}]},
-        {'period': 14, 'sell': 70, 'buy_tiers': [
+            {'threshold': 10, 'label': '极强买点', 'short': '极强'}],
+         'sell_tiers': [
+            {'threshold': 81, 'label': '卖点', 'short': '卖'},
+            {'threshold': 89, 'label': '强卖点', 'short': '强卖'},
+            {'threshold': 93, 'label': '极强卖点', 'short': '极强卖'}]},
+        {'period': 14, 'buy_tiers': [
             {'threshold': 38, 'label': '买点', 'short': '买'},
             {'threshold': 31, 'label': '强买点', 'short': '强'},
-            {'threshold': 24, 'label': '极值买点', 'short': '极值'}]},
-        {'period': 20, 'sell': 66, 'buy_tiers': [
+            {'threshold': 24, 'label': '极强买点', 'short': '极强'}],
+         'sell_tiers': [
+            {'threshold': 70, 'label': '卖点', 'short': '卖'},
+            {'threshold': 78, 'label': '强卖点', 'short': '强卖'},
+            {'threshold': 83, 'label': '极强卖点', 'short': '极强卖'}]},
+        {'period': 20, 'buy_tiers': [
             {'threshold': 40, 'label': '买点', 'short': '买'},
             {'threshold': 35, 'label': '强买点', 'short': '强'},
-            {'threshold': 28, 'label': '极值买点', 'short': '极值'}]},
+            {'threshold': 28, 'label': '极强买点', 'short': '极强'}],
+         'sell_tiers': [
+            {'threshold': 67, 'label': '卖点', 'short': '卖'},
+            {'threshold': 73, 'label': '强卖点', 'short': '强卖'},
+            {'threshold': 78, 'label': '极强卖点', 'short': '极强卖'}]},
     ],
 }
 _rsi_cfg_cache = None
 
 
+def _norm_tiers(raw, reverse):
+    """规范化档位：reverse=True 用于买点（阈值降序，浅->深），False 用于卖点（升序）"""
+    tiers = [t for t in (raw or []) if isinstance(t, dict) and t.get('threshold') is not None]
+    if not tiers:
+        return []
+    return sorted(
+        ({'threshold': float(t['threshold']),
+          'label': str(t.get('label') or ('<' + str(t['threshold']))),
+          'short': str(t.get('short') or t.get('label') or str(t['threshold']))}
+         for t in tiers),
+        key=lambda t: -t['threshold'] if reverse else t['threshold'])
+
+
 def _norm_rsi_periods(periods):
-    """规范化周期配置：周期升序，各档按阈值降序（浅->深）"""
+    """规范化周期配置：周期升序；买点档阈值降序、卖点档阈值升序"""
     out = []
     for p in periods or []:
         if not isinstance(p, dict) or p.get('period') is None:
             continue
-        tiers = [t for t in (p.get('buy_tiers') or [])
-                 if isinstance(t, dict) and t.get('threshold') is not None]
-        if not tiers:
+        buy = _norm_tiers(p.get('buy_tiers'), True)
+        if not buy:
             continue
         out.append({
             'period': int(p['period']),
-            'sell': float(p['sell']) if p.get('sell') is not None else 80.0,
-            'buy_tiers': sorted(
-                ({'threshold': float(t['threshold']),
-                  'label': str(t.get('label') or ('<' + str(t['threshold']))),
-                  'short': str(t.get('short') or t.get('label') or '<' + str(t['threshold']))}
-                 for t in tiers),
-                key=lambda t: -t['threshold']),
+            'buy_tiers': buy,
+            'sell_tiers': _norm_tiers(p.get('sell_tiers'), False) or [{'threshold': 80.0, 'label': '卖点', 'short': '卖'}],
         })
     out.sort(key=lambda p: p['period'])
     return out
@@ -1948,15 +1967,36 @@ def api_market_dividend_detail():
             i = j + 1
         return marks
 
-    def _rsi_sell_marks(values, sell):
-        """上穿卖出阈值那天。卖出是一次动作，用事件口径即可，不必标整段"""
+    def _rsi_sell_marks(values, sell_tiers):
+        """与买点对称：每段连续处于最浅卖档之上，取最高点作标记，并标出它高到第几档"""
         out = []
-        for i in range(1, len(values)):
-            a, b = values[i - 1], values[i]
-            if a is None or b is None or not (a <= sell < b):
+        n = len(values)
+        thr0 = sell_tiers[0]['threshold']
+        i = 0
+        while i < n:
+            v = values[i]
+            if v is None or v <= thr0:
+                i += 1
                 continue
-            out.append({'date': rsi_dates[i], 'rsi': round(b, 1),
-                        'fwd20': _rsi_fwd(i, 20), 'fwd60': _rsi_fwd(i, 60)})
+            j = i
+            while j + 1 < n and values[j + 1] is not None and values[j + 1] > thr0:
+                j += 1
+            seg = [(values[k], k) for k in range(i, j + 1) if values[k] is not None]
+            if seg:
+                hi_v, hi_i = max(seg)
+                depth = 1
+                for k, t in enumerate(sell_tiers):
+                    if hi_v > t['threshold']:
+                        depth = k + 1
+                out.append({
+                    'date': rsi_dates[hi_i], 'rsi': round(hi_v, 1),
+                    'tier': depth, 'tier_label': sell_tiers[depth - 1]['label'],
+                    'tier_short': sell_tiers[depth - 1]['short'],
+                    'entry_date': rsi_dates[i], 'entry_rsi': round(values[i], 1),
+                    'fwd20': _rsi_fwd(hi_i, 20), 'fwd60': _rsi_fwd(hi_i, 60),
+                    'ongoing': j == n - 1,
+                })
+            i = j + 1
         return out
 
     rsi_series = []
@@ -1973,17 +2013,33 @@ def api_market_dividend_detail():
                 'fwd20': _rsi_stat([_rsi_fwd(i, 20) for i in idxs]),
                 'fwd60': _rsi_stat([_rsi_fwd(i, 60) for i in idxs]),
             })
-        sell = pc['sell']
-        sell_idxs = [i for i, v in enumerate(vals) if v is not None and v > sell]
+        # 卖点档：与买点档对称处理。第 k 档覆盖 (threshold_k, threshold_{k+1}]，
+        # 最深一档上界为 100。逐档统计同样是「状态」口径。
+        sell_tiers = pc['sell_tiers']
+        sell_stats = []
+        for k, t in enumerate(sell_tiers):
+            lo = t['threshold']
+            hi = sell_tiers[k + 1]['threshold'] if k + 1 < len(sell_tiers) else 100.0
+            idxs = [i for i, v in enumerate(vals) if v is not None and lo < v <= hi]
+            sell_stats.append({
+                'tier': k + 1, 'label': t['label'], 'short': t['short'],
+                'threshold': t['threshold'], 'lo': lo, 'hi': hi, 'n': len(idxs),
+                'fwd20': _rsi_stat([_rsi_fwd(i, 20) for i in idxs]),
+                'fwd60': _rsi_stat([_rsi_fwd(i, 60) for i in idxs]),
+            })
         rsi_series.append({
-            'period': pc['period'], 'values': vals, 'sell': sell,
+            'period': pc['period'], 'values': vals,
             'buy_tiers': [{'threshold': t['threshold'], 'label': t['label'],
                            'short': t['short'], 'lo': tier_lo[k]}
                           for k, t in enumerate(tiers)],
+            'sell_tiers': [{'threshold': t['threshold'], 'label': t['label'],
+                            'short': t['short'],
+                            'hi': sell_tiers[k + 1]['threshold'] if k + 1 < len(sell_tiers) else 100.0}
+                           for k, t in enumerate(sell_tiers)],
             'tier_stats': tier_stats,
+            'sell_tier_stats': sell_stats,
             'buy_marks': _rsi_buy_marks(vals, tiers),
-            'sell_marks': _rsi_sell_marks(vals, sell),
-            'sell_stat': _rsi_stat([_rsi_fwd(i, 60) for i in sell_idxs]),
+            'sell_marks': _rsi_sell_marks(vals, sell_tiers),
         })
 
     return jsonify({
