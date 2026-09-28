@@ -314,6 +314,50 @@ async function load() {
     });
     return c;
   }});
+  // 2c. RSI 买点（阈值见 config/market/red_dividend_rsi.yaml；买点=主周期 RSI 下穿阈值）
+  if (d.rsi_main && d.rsi_params) {
+    const rp = d.rsi_params, rb = d.rsi_buy || [], rstat = d.rsi_buy_stats || {};
+    const rsiDates = (d.rsi_basis === 'dates_long' && d.dates_long && d.dates_long.length) ? d.dates_long : d.dates;
+    const pctTxt = (med, wr) => (wr != null ? wr + '%（中位 ' + (med != null ? med + '%' : '—') + '）' : '—');
+    const rsiStat = rstat.count
+      ? ' · 近10年触发 ' + rstat.count + ' 次 · 20日胜率 ' + pctTxt(rstat.fwd20_median, rstat.fwd20_winrate)
+        + ' · 60日胜率 ' + pctTxt(rstat.fwd60_median, rstat.fwd60_winrate)
+      : ' · 该区间无买点';
+    const rsiTitle = '📉 RSI' + rp.period + ' 买点（下穿 ' + rp.buy + ' 买入 / 上穿 ' + rp.sell + ' 卖出'
+      + ' · 副线 RSI' + rp.period2 + ' · 后续收益按全收益口径）' + rsiStat;
+    charts.push({title: rsiTitle, el:'chart-rsi', h:330, init: el => {
+      const c = echarts.init(el);
+      const buys = rb.map(b => ({coord:[b.date, b.rsi], value:b.rsi,
+        itemStyle:{color:'#ef4444'}, symbolSize:5})).filter(Boolean);
+      c.setOption({
+        backgroundColor:chartBg, tooltip:{trigger:'axis'},
+        legend:{data:['RSI'+rp.period, 'RSI'+rp.period2], textStyle:{color:tx,fontSize:9}, bottom:0},
+        grid:{left:'8%',right:'4%',top:14,bottom:66},
+        xAxis:{type:'category',data:rsiDates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
+        yAxis:{type:'value',min:0,max:100,axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
+        dataZoom:[{type:'inside'},{type:'slider',height:10,bottom:26,
+          dataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},
+          selectedDataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},
+          borderColor:'rgba(139,139,144,.25)',fillerColor:'rgba(139,139,144,.12)',handleSize:'80%',showDetail:false}],
+        series:[
+          {name:'RSI'+rp.period, type:'line', data:d.rsi_main, smooth:true, showSymbol:false,
+           lineStyle:{color:'#f59e0b', width:1.6},
+           markArea:{silent:true, data:[
+             [{yAxis:0, itemStyle:{color:'rgba(239,68,68,.09)'}}, {yAxis:rp.buy}],
+             [{yAxis:rp.sell, itemStyle:{color:'rgba(16,185,129,.09)'}}, {yAxis:100}]
+           ]},
+           markLine:{silent:true, symbol:'none', data:[
+             {yAxis:rp.buy, lineStyle:{color:'#ef4444',type:'dashed'}, label:{formatter:'买 '+rp.buy, color:'#ef4444', fontSize:9}},
+             {yAxis:rp.sell, lineStyle:{color:'#10b981',type:'dashed'}, label:{formatter:'卖 '+rp.sell, color:'#10b981', fontSize:9}}
+           ]},
+           markPoint:{data:buys, symbol:'circle', symbolSize:5, label:{show:false}}},
+          {name:'RSI'+rp.period2, type:'line', data:d.rsi_ref, smooth:true, showSymbol:false,
+           lineStyle:{color:'#539BF5', width:1, type:'dotted'}}
+        ]
+      });
+      return c;
+    }});
+  }
   // 3. 价格 + 信号时间线（近10年，Y轴起点=最低价×0.85 留15%差值）
   charts.push({title:'💹 价格走势 + 买点信号时间线（近10年）', el:'chart-px', h:360, init: el => {
     const c = echarts.init(el);

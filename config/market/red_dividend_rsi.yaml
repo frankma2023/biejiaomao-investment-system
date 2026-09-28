@@ -1,0 +1,21 @@
+# 红利指数 RSI 买点参数 —— 详情页【操作建议】tab 的 RSI 图
+#
+# 口径：Wilder RSI，收盘价，日线（src/detectors/divergence.py: compute_rsi）。
+#       买点 = 主周期 RSI 从阈值上方下穿到阈值下方的那一天。
+#
+# 默认值来源：
+#   period=6 / buy=29 / sell=81 —— 来自「红利低波50ETF 用 RSI6 做 50% 资金轮动」的实战记录。
+#   period2=14 / buy2=30 / sell2=70 —— RSI14 通用超卖/超买线（本仓库 recommend.py 同口径）。
+#
+# 不同红利品种的波动幅度不同，RSI 阈值不能通用。要按品种调，写在 overrides 里，
+# 只需给出要覆盖的键，其余继承 defaults：
+#   overrides:
+#     "H30269": {buy: 25, sell: 85}
+defaults:
+  period: 6
+  buy: 29
+  sell: 81
+  period2: 14
+  buy2: 30
+  sell2: 70
+overrides: {}

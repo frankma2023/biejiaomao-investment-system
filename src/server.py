@@ -1385,6 +1385,32 @@ def _latest_y10(db, target_date):
     return r['y10'] if r else None
 
 
+# 红利指数 RSI 买点参数。defaults 打底，overrides 按指数代码覆盖（不同红利品种波动不同，
+# 阈值不能通用）。改配置后按 mtime 自动重载，不必重启 Flask。
+RSI_CONFIG_PATH = os.path.join(CONFIG_DIR, 'red_dividend_rsi.yaml')
+_RSI_FALLBACK = {'period': 6, 'buy': 29, 'sell': 81, 'period2': 14, 'buy2': 30, 'sell2': 70}
+_rsi_cfg_cache = None
+
+
+def _rsi_params(code):
+    """取该指数的 RSI 买点参数（主周期 period/buy/sell，副周期 period2/buy2/sell2）"""
+    global _rsi_cfg_cache
+    cfg = {}
+    try:
+        import yaml as _yaml
+        mtime = os.path.getmtime(RSI_CONFIG_PATH)
+        if _rsi_cfg_cache is None or _rsi_cfg_cache[0] != mtime:
+            with open(RSI_CONFIG_PATH, encoding='utf-8') as f:
+                _rsi_cfg_cache = (mtime, _yaml.safe_load(f) or {})
+        cfg = _rsi_cfg_cache[1]
+    except Exception as _e:
+        print(f'[dividend-detail] RSI 配置读取失败，用内置默认值: {type(_e).__name__}: {_e}', flush=True)
+    p = dict(_RSI_FALLBACK)
+    p.update(cfg.get('defaults') or {})
+    p.update((cfg.get('overrides') or {}).get(code) or {})
+    return {k: p[k] for k in ('period', 'buy', 'sell', 'period2', 'buy2', 'sell2')}
+
+
 @app.route('/api/market-scan/dividend-advice')
 def api_market_dividend_advice():
     """红利指数操作建议：信号检测+建议合成（支持历史回看）"""
@@ -1819,8 +1845,58 @@ def api_market_dividend_detail():
         y10 = bond_map[bond_dates_sorted[idx]]
         spread_series.append(round(val_map[d]['dyr'] * 100 - y10, 2) if y10 is not None else None)
 
+    # ── RSI 买点（Wilder RSI · 收盘价口径；阈值见 config/market/red_dividend_rsi.yaml）──
+    # 买点 = 主周期 RSI 从阈值上方下穿到阈值下方的那一天。天然去重：要先回到阈值上方才会再触发。
+    # 用近10年序列算，一是让近3年窗口起点处 RSI 已预热，二是给出更多买点样本供判断。
+    rsi_p = _rsi_params(code)
+    rsi_dates = dates_long if dates_long else dates
+    rsi_closes = closes_long if dates_long else closes
+    rsi_main = compute_rsi(rsi_closes, rsi_p['period'])
+    rsi_ref = compute_rsi(rsi_closes, rsi_p['period2'])
+    # 买点后续收益用全收益口径（红利指数分红不可忽略），没有全收益就退回价格
+    rsi_fwd_base = tri_long if (tri_long and len(tri_long) == len(rsi_closes)) else rsi_closes
+
+    def _rsi_fwd(i, n):
+        if i + n >= len(rsi_fwd_base):
+            return None
+        a, b = rsi_fwd_base[i], rsi_fwd_base[i + n]
+        return round((b / a - 1) * 100, 1) if a and b else None
+
+    rsi_buy = []
+    for i in range(1, len(rsi_dates)):
+        prev, cur = rsi_main[i - 1], rsi_main[i]
+        if prev is None or cur is None:
+            continue
+        if prev >= rsi_p['buy'] and cur < rsi_p['buy']:
+            rsi_buy.append({'date': rsi_dates[i], 'rsi': round(cur, 1),
+                            'fwd20': _rsi_fwd(i, 20), 'fwd60': _rsi_fwd(i, 60)})
+
+    rsi_buy_stats = {}
+    if rsi_buy:
+        f20 = [b['fwd20'] for b in rsi_buy if b['fwd20'] is not None]
+        f60 = [b['fwd60'] for b in rsi_buy if b['fwd60'] is not None]
+
+        def _rmd(xs):
+            s = sorted(xs)
+            n = len(s)
+            return s[n // 2] if n % 2 else round((s[n // 2 - 1] + s[n // 2]) / 2, 1)
+
+        rsi_buy_stats = {
+            'count': len(rsi_buy),
+            'fwd20_n': len(f20),
+            'fwd20_median': _rmd(f20) if f20 else None,
+            'fwd20_winrate': round(sum(1 for x in f20 if x > 0) / len(f20) * 100, 1) if f20 else None,
+            'fwd60_n': len(f60),
+            'fwd60_median': _rmd(f60) if f60 else None,
+            'fwd60_winrate': round(sum(1 for x in f60 if x > 0) / len(f60) * 100, 1) if f60 else None,
+        }
+
     return jsonify({
         'code': code, 'name': name, 'date': target_date,
+        'rsi_main': rsi_main, 'rsi_ref': rsi_ref,
+        'rsi_basis': 'dates_long' if dates_long else 'dates',
+        'rsi_params': rsi_p,
+        'rsi_buy': rsi_buy, 'rsi_buy_stats': rsi_buy_stats,
         'spread_series': spread_series,
         'spread_cur': spread_series[-1] if spread_series else None,
         'spread_ref': {'danger': 1.0, 'good': (1.5, 3.0),
