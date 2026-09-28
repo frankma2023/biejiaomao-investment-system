@@ -34,6 +34,27 @@ Write-Host ('-' * 62) -ForegroundColor DarkGray
 Write-Host '  停止投资系统' -ForegroundColor Cyan
 Write-Host ('-' * 62) -ForegroundColor DarkGray
 
+# 必须先结束 start_all.ps1 本身：它在隧道断开后 5 秒自动重连，
+# 若先杀 ssh，那个循环会立刻把隧道拉回来，停止按钮就失效了。
+$PidFile = Join-Path (Split-Path -Parent $PSScriptRoot) 'data\start_all.pid'
+$oldPid = 0
+if ((Test-Path $PidFile) -and [int]::TryParse((Get-Content $PidFile -Raw -ErrorAction SilentlyContinue).Trim(), [ref]$oldPid)) {
+    $scriptProc = Get-Process -Id $oldPid -ErrorAction SilentlyContinue
+    if ($scriptProc -and $oldPid -ne $PID -and $scriptProc.ProcessName -match '^(powershell|pwsh)$') {
+        $scriptCmd = (Get-CimInstance Win32_Process -Filter "ProcessId=$oldPid" -ErrorAction SilentlyContinue).CommandLine
+        if ($scriptCmd -like '*start_all.ps1*') {
+            try {
+                Stop-Process -Id $oldPid -Force -ErrorAction Stop
+                Write-Host "  [已停] 启动脚本（含隧道重连循环）  pid=$oldPid" -ForegroundColor Green
+                Start-Sleep -Milliseconds 800
+            } catch {
+                Write-Host "  [失败] 启动脚本  pid=$oldPid  $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+    }
+    Remove-Item $PidFile -Force -ErrorAction SilentlyContinue
+}
+
 Stop-Port $WebPort 'Web 前门'
 Stop-Port $ApiPort 'Flask API'
 

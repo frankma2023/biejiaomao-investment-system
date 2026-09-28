@@ -10,6 +10,10 @@ data/*.json
 # 分析脚本的中间产物（_s6_stats.txt / _sweep.txt 等）：本机工作区证据，不入库。
 # 它们含当时参数的文字，参数一改就过期 —— 别让它们进仓库。
 data/_*
+# 一键启动脚本的运行时产物：隧道地址每次都变，pid 是本机进程号，都不该入库。
+# （data/logs/ 已由下面的 logs/ 规则覆盖）
+data/pinggy_url.txt
+data/start_all.pid
 
 # Python
 __pycache__/
