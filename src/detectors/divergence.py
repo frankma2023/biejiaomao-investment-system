@@ -27,35 +27,48 @@ def compute_ema(values, period):
 
 
 def compute_rsi(closes, period=14):
-    """RSI指标"""
-    if len(closes) < period + 1:
-        return [None] * len(closes)
+    """RSI（Wilder 平滑，与 talib.RSI 同口径）
 
-    rsi = [None] * len(closes)
-    gains, losses = [], []
-    for i in range(1, len(closes)):
+    记 delta[i] = closes[i] - closes[i-1]，则 RSI[i] 用 delta[i-period+1 .. i] 的
+    Wilder 均值。种子是前 period 个 delta 的简单均值，之后每步只折入**一个新** delta[i]。
+
+    原实现从种子之后的每一步折入的是 delta[i]（已包含在种子里）而不是 delta[i+1]，
+    即把旧值重复折入、永不纳入新值，第二个 RSI 值起就全错（period=3、
+    closes=[10,11,10.5,12,11,13] 时给出 90.476/63.333，标准是 55.556/77.778）。
+    """
+    n = len(closes)
+    if n < period + 1:
+        return [None] * n
+
+    rsi = [None] * n
+    gains = [0.0] * n
+    losses = [0.0] * n
+    for i in range(1, n):
         diff = closes[i] - closes[i - 1]
-        gains.append(max(diff, 0))
-        losses.append(max(-diff, 0))
+        gains[i] = diff if diff > 0 else 0.0
+        losses[i] = -diff if diff < 0 else 0.0
 
-    avg_gain = sum(gains[:period]) / period
-    avg_loss = sum(losses[:period]) / period
+    avg_gain = sum(gains[1:period + 1]) / period
+    avg_loss = sum(losses[1:period + 1]) / period
+    rsi[period] = _rsi_from(avg_gain, avg_loss)
 
-    for i in range(period, len(closes)):
-        if avg_loss == 0:
-            rsi[i] = 100.0
-        else:
-            rs = avg_gain / avg_loss
-            rsi[i] = 100.0 - 100.0 / (1.0 + rs)
-
-        if i + 1 < len(closes):
-            diff = closes[i] - closes[i - 1]
-            gain = max(diff, 0)
-            loss = max(-diff, 0)
-            avg_gain = (avg_gain * (period - 1) + gain) / period
-            avg_loss = (avg_loss * (period - 1) + loss) / period
+    for i in range(period + 1, n):
+        avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+        avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+        rsi[i] = _rsi_from(avg_gain, avg_loss)
 
     return rsi
+
+
+def _rsi_from(avg_gain, avg_loss):
+    """由 Wilder 均值算 RSI 值。
+
+    无跌幅给 100。完全走平（涨跌均值都为 0）是退化分支：talib.RSI 此时给 0，
+    这里保持同样的取值，便于与参考实现逐点对齐；指数不会连续 period 天完全走平。
+    """
+    if avg_loss == 0:
+        return 100.0 if avg_gain > 0 else 0.0
+    return 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
 
 
 def compute_macd(closes, fast=12, slow=26, signal=9):
