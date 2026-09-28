@@ -140,12 +140,21 @@ async function loadDate(){
   currentDate=d;
   document.getElementById('meta-info').textContent='加载中...';
   
-  // 加载 B1 和 B2 信号
-  var [b1r,b2r,cupr]=await Promise.all([
-    fetch(API+'/api/mw/signals?type=b1&start='+d+'&end='+d).then(r=>r.json()),
-    fetch(API+'/api/mw/signals?type=b2&start='+d+'&end='+d).then(r=>r.json()),
-    fetch(API+'/api/cockpit/cup-handle?date='+d).then(r=>r.json()).catch(()=>({signals:[],candidates:[]}))
+  // 加载 B1 / B2 信号与杯柄数据
+  // 三个接口各自容错：原来只有杯柄有 .catch，B1/B2 任一失败会让 Promise.all 整体 reject，
+  // loadDate 后续全部不执行——计数停在 0、meta 停在「加载中...」，
+  // 连已经取到数据的杯柄 tab 也不会渲染。
+  var settled=await Promise.allSettled([
+    fetch(API+'/api/mw/signals?type=b1&start='+d+'&end='+d).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))),
+    fetch(API+'/api/mw/signals?type=b2&start='+d+'&end='+d).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))),
+    fetch(API+'/api/cockpit/cup-handle?date='+d).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status)))
   ]);
+  function slot(i,name){
+    if(settled[i].status==='fulfilled'&&settled[i].value) return settled[i].value;
+    console.error('[cockpit] '+name+' 接口失败', settled[i].reason);
+    return {};
+  }
+  var b1r=slot(0,'b1'), b2r=slot(1,'b2'), cupr=slot(2,'杯柄');
 
   allSignals=(b1r.signals||[]).map(function(s){s._tab='b1';return s;})
     .concat((b2r.signals||[]).map(function(s){s._tab='b2';return s;}));

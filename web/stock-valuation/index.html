@@ -171,10 +171,15 @@ async function loadAll(){
   var ey=document.getElementById('year-end').value;
   var endDate=ey+'-12-31';
   var startDate=sy+'-01-01';
-  await loadValuation(code,startDate,endDate);
-  await loadFinancials(code);
-  loadEval(code);
-  loadShareholders(code);  // W2：切股票后股东人数同步刷新（轻量）
+  // 四段各自隔离：原来 loadValuation 一 reject，后面的财务/评估/股东数据都不会加载，
+  // 除了导航和搜索框整页都是空的。
+  var steps=[['估值',function(){return loadValuation(code,startDate,endDate)}],
+             ['财务',function(){return loadFinancials(code)}],
+             ['评估',function(){return loadEval(code)}],
+             ['股东',function(){return loadShareholders(code)}]];
+  for (var i=0;i<steps.length;i++){
+    try{ await steps[i][1](); }catch(e){ console.error('[stock-valuation] '+steps[i][0]+' 加载失败', e); }
+  }
 }
 
 // ══════ 估值 ══════
@@ -191,16 +196,21 @@ async function loadValuation(code,start,end){
   genVText('text-pb','PB',d.pb,'倍',d.pb_pct);
   buildLine('chart-ps','PS-TTM',d.dates,d.ps,psC,'倍',d.ps_pct);
   genVText('text-ps','PS-TTM',d.ps,'倍',d.ps_pct);
-  buildLine('chart-dyr','股息率%',d.dates,d.dyr.map(function(v){return v!=null?(v*100).toFixed(2):null}),dnC,'%',d.dyr_pct);
-  genVText('text-dyr','股息率',d.dyr.map(function(v){return v!=null?(v*100):null}),'%');
+  buildLine('chart-dyr','股息率%',d.dates,(d.dyr||[]).map(function(v){return v!=null?(v*100).toFixed(2):null}),dnC,'%',d.dyr_pct);
+  genVText('text-dyr','股息率',(d.dyr||[]).map(function(v){return v!=null?(v*100):null}),'%');
   buildBigLine('chart-mc','总市值',d.dates,d.mc,'亿');
 }
 
 function buildLine(id,name,dates,vals,color,unit,pctVals){
-  var dom=document.getElementById(id);if(dom._echart)dom._echart.dispose();
+  var dom=document.getElementById(id);if(!dom)return;
+  // 序列缺失只让这条线为空，不能让 buildLine 抛错把后面的图一起带掉
+  dates=dates||[];vals=vals||[];pctVals=pctVals||[];
+  if(dom._echart)dom._echart.dispose();
   var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark';
   var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
-  var vv=vals.filter(function(v){return v!=null}),avg=vv.reduce(function(a,b){return a+b},0)/vv.length;
+  var vv=vals.filter(function(v){return v!=null});
+  if(!vv.length){dom.innerHTML='<div style="padding:40px 0;text-align:center;color:var(--muted);font-size:0.66rem">暂无数据</div>';return;}
+  var avg=vv.reduce(function(a,b){return a+b},0)/vv.length;
   var series=[{name:name,type:'line',data:vals,smooth:true,symbol:'none',lineStyle:{color:color,width:1.5},
       markLine:{silent:true,symbol:'none',label:{color:tx,fontSize:9,formatter:'均值 {c}'},data:[{yAxis:avg,name:'均值',lineStyle:{color:'#E8A838',type:'dashed',width:1}}]}}];
   var yAxis=[{type:'value',name:unit,axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}}];
@@ -219,11 +229,15 @@ function buildLine(id,name,dates,vals,color,unit,pctVals){
   });dom._echart=ch;
 }
 function buildBigLine(id,name,dates,vals,unit){
-  var dom=document.getElementById(id);if(dom._echart)dom._echart.dispose();
+  var dom=document.getElementById(id);if(!dom)return;
+  dates=dates||[];vals=vals||[];
+  if(dom._echart)dom._echart.dispose();
   var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark';
   var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
   var dd=vals.map(function(v){return v!=null?(v/1e8).toFixed(1):null});
-  var vv=vals.filter(function(v){return v!=null}),avg=vv.reduce(function(a,b){return a+b},0)/vv.length;
+  var vv=vals.filter(function(v){return v!=null});
+  if(!vv.length){dom.innerHTML='<div style="padding:40px 0;text-align:center;color:var(--muted);font-size:0.66rem">暂无数据</div>';return;}
+  var avg=vv.reduce(function(a,b){return a+b},0)/vv.length;
   ch.setOption({
     backgroundColor:'transparent',tooltip:{trigger:'axis',formatter:function(p){return p[0].name+'<br/>'+p[0].marker+name+': '+(p[0].value||'—')+unit}},
     grid:{left:'10%',right:'4%',top:8,bottom:36},
@@ -235,7 +249,8 @@ function buildBigLine(id,name,dates,vals,unit){
   });dom._echart=ch;
 }
 function genVText(id,name,vals,unit,pctVals){
-  var vv=vals.filter(function(v){return v!=null});if(!vv.length){document.getElementById(id).innerHTML='';return}
+  var el=document.getElementById(id); if(!el) return;
+  var vv=(vals||[]).filter(function(v){return v!=null});if(!vv.length){el.innerHTML='';return}
   var cur=vv[vv.length-1],avg=vv.reduce(function(a,b){return a+b},0)/vv.length;
   var mx=Math.max.apply(null,vv),mn=Math.min.apply(null,vv);
   var cd=unit==='亿'?(cur/1e8).toFixed(1):cur.toFixed(2);

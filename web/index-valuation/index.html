@@ -102,13 +102,24 @@ async function loadData(){
   var code=document.getElementById('idx-select').value;
   var sy=document.getElementById('year-start').value,ey=document.getElementById('year-end').value;
   var endDate=ey+'-12-31';
-  var resp=await fetch(API+'/api/valuation?code='+code+'&start='+sy+'-01-01&end='+endDate);
-  var data=await resp.json();
-  var hsResp=await fetch(API+'/api/valuation?code=000300&start='+sy+'-01-01&end='+endDate);
-  var hs=await hsResp.json();
-  if(!data.dates||!data.dates.length){document.getElementById('stats').innerHTML='<div class="stat-card"><div class="val">—</div><div class="lbl">无数据</div></div>';return}
+  // 本函数由 onchange 直接调用，抛出未处理 rejection 会让页面停在「加载中」且毫无提示；
+  // 两个接口各自容错，任一失败只让它自己的序列为空。
+  var data={},hs={};
+  try{
+    var resp=await fetch(API+'/api/valuation?code='+code+'&start='+sy+'-01-01&end='+endDate);
+    if(resp.ok) data=(await resp.json())||{};
+    var hsResp=await fetch(API+'/api/valuation?code=000300&start='+sy+'-01-01&end='+endDate);
+    if(hsResp.ok) hs=(await hsResp.json())||{};
+  }catch(e){console.error('[index-valuation] 接口异常',e);}
+  if(!data.dates||!data.dates.length){
+    document.getElementById('stats').innerHTML='<div class="stat-card"><div class="val">—</div><div class="lbl">无数据</div></div>';
+    // 估值没数据也要继续拉财务数据：loadFS 打的是另一个接口，
+    // 原来这里的 return 会把 8 张财务图一起带掉。
+    loadFS(code);
+    return;
+  }
 
-  var last=data.dates.length-1,pe=data.pe[last],pePct=data.pe_pct[last],pb=data.pb[last],pbPct=data.pb_pct[last],dyr=data.dyr[last],dyrPct=data.dyr_pct[last];
+  var last=data.dates.length-1,pe=(data.pe||[])[last],pePct=(data.pe_pct||[])[last],pb=(data.pb||[])[last],pbPct=(data.pb_pct||[])[last],dyr=(data.dyr||[])[last],dyrPct=(data.dyr_pct||[])[last];
 
   function clr(p){if(p==null)return'var(--muted)';if(p>=0.8)return'var(--rise)';if(p>=0.6)return'var(--muted)';if(p<=0.3)return'var(--fall)';return'var(--text-secondary)'}
   document.getElementById('stats').innerHTML=
@@ -165,7 +176,10 @@ async function loadFS(code){
 }
 
 function buildChart(id,name,dates,vals,pcts,hsVals,lineColor){
-  var dom=document.getElementById(id);if(dom._echart)dom._echart.dispose();
+  var dom=document.getElementById(id);if(!dom)return;
+  // 任一序列缺失只让对应那条线为空，不能让 buildChart 抛错拖垮后面的图和财务数据
+  dates=dates||[];vals=vals||[];pcts=pcts||[];hsVals=hsVals||[];
+  if(dom._echart)dom._echart.dispose();
   var ch=echarts.init(dom),isDark=document.documentElement.dataset.theme==='dark',chartBg=isDark?'rgba(26,26,31,.6)':'rgba(255,255,255,.75)';
   var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.04)';
   var pctVals=pcts.map(function(v){return v!=null?(v*100).toFixed(0):null});
@@ -186,10 +200,15 @@ function buildChart(id,name,dates,vals,pcts,hsVals,lineColor){
 }
 
 function genText(id,name,vals,pcts,hsVals,unit,pctClr){
+  var el=document.getElementById(id); if(!el) return;
+  vals=vals||[];pcts=pcts||[];hsVals=hsVals||[];
+  var vv=vals.filter(function(v){return v!=null});
+  if(!vv.length){el.innerHTML='数据不足';return;}
   var last=vals.length-1,cur=vals[last],curPct=pcts[last];
-  var vv=vals.filter(function(v){return v!=null}),avg=vv.reduce(function(a,b){return a+b},0)/vv.length;
+  var avg=vv.reduce(function(a,b){return a+b},0)/vv.length;
   var mx=Math.max.apply(null,vv),mn=Math.min.apply(null,vv);
-  var hsCur=hsVals[last];
+  // 沪深300 序列可能比本指数短或缺整段，取不到就是「—」而不是 undefined.toFixed 抛错
+  var hsCur=(last>=0&&last<hsVals.length)?hsVals[last]:null;
   var pctText=curPct!=null?(curPct*100).toFixed(0)+'%':'未知',level='',advice='';
   if(curPct==null){level='无法判断';advice='数据不足'}
   else if(curPct>=0.8){level='严重偏高';advice='处于近十年高位区间，安全边际极低。若非趋势强劲的主升浪，应考虑减仓或回避。高估值透支未来多年盈利增长，一旦市场情绪转向或利率上行，估值收缩风险显著'}
@@ -197,12 +216,13 @@ function genText(id,name,vals,pcts,hsVals,unit,pctClr){
   else if(curPct>=0.4){level='中性';advice='估值处于合理区间，无明显高估或低估。可根据趋势策略正常操作，结合个股RS选股'}
   else if(curPct>=0.2){level='偏低';advice='低于历史均值，具备一定安全边际。若RS强度同步拐头向上，是较好的中长期布局窗口，可逐步建仓'}
   else{level='严重低估';advice='处于近十年低位，市场情绪极度悲观，往往是逆向投资的最佳时机。需确认基本面未发生永久性恶化，建议小仓位试探'}
-  var vsHS=hsCur?((cur/hsCur-1)*100).toFixed(1)+'%':'—';
-  var h='<b>当前'+name+'：</b>'+cur.toFixed(2)+unit+'，十年分位 <b style="color:'+pctClr+'">'+pctText+'</b>（'+level+'）。';
+  var hsOk=(hsCur!=null&&hsCur!==0&&cur!=null&&Number.isFinite(cur));
+  var vsHS=hsOk?((cur/hsCur-1)*100).toFixed(1)+'%':'—';
+  var h='<b>当前'+name+'：</b>'+(cur!=null?cur.toFixed(2):'—')+unit+'，十年分位 <b style="color:'+pctClr+'">'+pctText+'</b>（'+level+'）。';
   h+='近十年均值 '+avg.toFixed(2)+unit+'，最高 '+mx.toFixed(2)+unit+'，最低 '+mn.toFixed(2)+unit+'。';
-  h+='沪深300当前为 '+hsCur.toFixed(2)+unit+'，该指数相对沪深300 '+(cur>hsCur?'高':'低')+vsHS+'。';
+  h+='沪深300当前为 '+(hsCur!=null?hsCur.toFixed(2):'—')+unit+'，该指数相对沪深300 '+(hsOk?(cur>hsCur?'高':'低')+vsHS:'—')+'。';
   h+='<b>建议：</b>'+advice+'。';
-  document.getElementById(id).innerHTML=h;
+  el.innerHTML=h;
 }
 
 init();

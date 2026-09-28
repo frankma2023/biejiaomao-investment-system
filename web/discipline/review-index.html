@@ -97,16 +97,26 @@
 
     async function load() {
       if (!code) { document.getElementById('idx-name').textContent = '未指定指数'; return; }
-      const [btResp, psResp] = await Promise.all([
-        fetch('/api/discipline/screening-backtest-index' + (date ? '?date=' + date : '')),
+      // 两个接口各自容错：原来 Promise.all 无 try/catch，任一失败就是未处理的 rejection，
+      // 标题停在「—」、评分卡停在「加载中...」、K 线图永不初始化。
+      let btData = {}, psData = {};
+      const [btResp, psResp] = await Promise.allSettled([
+        fetch('/api/discipline/screening-backtest-index' + (date ? '?date=' + date : ''))
+          .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
         fetch('/api/pattern-scan?code=' + code + '&mode=index' + (date ? '&end=' + date : ''))
+          .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
       ]);
-      const btData = await btResp.json();
-      const psData = await psResp.json();
+      if (btResp.status === 'fulfilled') btData = btResp.value || {};
+      else console.error('[review-index] 精选回测接口失败', btResp.reason);
+      if (psResp.status === 'fulfilled') psData = psResp.value || {};
+      else console.error('[review-index] K线接口失败', psResp.reason);
+
       const item = (btData.items || []).find(i => i.index_code === code);
-      if (!item) { document.getElementById('idx-name').textContent = code + ' (无精选数据)'; return; }
-      document.getElementById('idx-name').textContent = item.index_name + ' ' + code;
-      renderScore(item);
+      // 精选数据缺失不再 return：K 线来自另一个接口，拿到了就照常画
+      document.getElementById('idx-name').textContent = item
+        ? (item.index_name + ' ' + code)
+        : (code + ' (无精选数据)');
+      if (item) renderScore(item);
       if (psData.klines && psData.klines.length) renderChart(psData);
       else document.getElementById('kline-chart').innerHTML = '<div class="loading">无K线数据</div>';
     }
@@ -277,7 +287,11 @@
       mainChart.setOption(option);
       window.addEventListener('resize', () => mainChart.resize());
     }
-    load();
+    load().catch(e => {
+      const el = document.getElementById('idx-name');
+      if (el) el.textContent = '加载失败: ' + ((e && e.message) || e);
+      console.error('[review-index] load 失败', e);
+    });
   
 function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
 (function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();

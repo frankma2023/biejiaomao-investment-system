@@ -678,6 +678,9 @@
         </div>
     </div>
     
+    <!-- ECharts：app.js 的 initCharts() 依赖它。原先这页没加载，导致
+         initCharts() 抛 ReferenceError，后续 initTooltips/initDateRangePicker 都不执行 -->
+    <script src="shared/js/echarts.min.js"></script>
     <!-- 主JavaScript -->
     <script src="js/app.js"></script>
     

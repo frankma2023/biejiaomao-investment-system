@@ -12,11 +12,12 @@ let echartsInstance = null;
 
 // ====== DOM 加载完成 ======
 document.addEventListener('DOMContentLoaded', function() {
-  initTheme();
-  initThemeToggle();
-  initCharts();
-  initTooltips();
-  initDateRangePicker();
+  // 逐个初始化并互相隔离：任一模块失败不能让后面的模块都不执行。
+  // 原先 initCharts() 在 echarts 未加载时抛错，initTooltips / initDateRangePicker 从不运行。
+  [['theme', initTheme], ['themeToggle', initThemeToggle], ['charts', initCharts],
+   ['tooltips', initTooltips], ['dateRangePicker', initDateRangePicker]].forEach(function(pair){
+    try { pair[1](); } catch (e) { console.error('[init] ' + pair[0] + ' 失败', e); }
+  });
 });
 
 // ====== 主题功能 ======
@@ -75,17 +76,11 @@ function updateThemeToggleIcon() {
 
 // ====== ECharts图表初始化 ======
 function initCharts() {
-  // 初始化K线图
-  initKLineChart();
-  
-  // 初始化行业强度热力图
-  initIndustryHeatmap();
-  
-  // 初始化相对强度图
-  initRSChart();
-  
-  // 初始化成交量图
-  initVolumeChart();
+  // 四张图互相隔离：任一张失败不能让其余三张都不画
+  [['KLineChart', initKLineChart], ['IndustryHeatmap', initIndustryHeatmap],
+   ['RSChart', initRSChart], ['VolumeChart', initVolumeChart]].forEach(function(pair){
+    try { pair[1](); } catch (e) { console.error('[init] ' + pair[0] + ' 失败', e); }
+  });
 }
 
 function initKLineChart() {

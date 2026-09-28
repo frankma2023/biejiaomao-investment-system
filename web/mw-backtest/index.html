@@ -135,20 +135,22 @@ function rerender(){
 }
 
 function renderAll(d){
-  renderStats(d);
-  renderConfidence(d);
-  renderDimensions(d);
-  renderMarket(d);
-  renderCap(d);
-  renderTraits(d);
-  renderBaseline(d);
+  // 逐块隔离：任一区块失败不能让后面所有区块都不渲染
+  [['stats', renderStats], ['confidence', renderConfidence], ['dimensions', renderDimensions],
+   ['market', renderMarket], ['cap', renderCap], ['traits', renderTraits],
+   ['baseline', renderBaseline]].forEach(function(pair){
+    try { pair[1](d); } catch (e) { console.error('[render] ' + pair[0] + ' 失败', e); }
+  });
 }
 
-function loadAnalysis(){
-
+// 这三个辅助函数原先声明在 loadAnalysis() 内部，而 renderConfidence() 在顶层调用
+// byConf()，作用域不可见 -> 每次渲染都 ReferenceError，renderAll 从第二项起全部不执行，
+// 页面上只剩 KPI 行。提到顶层。
 function confKey(){ return SYS==='v2'?'confidence_v2':'confidence'; }
 function scoreKey(){ return SYS==='v2'?'score_v2':'score'; }
 function byConf(){ return SYS==='v2'?(DATA.by_confidence_v2||{}):(DATA.by_confidence||{}); }
+
+function loadAnalysis(){
   var s=document.getElementById('d-start').value;
   var e=document.getElementById('d-end').value;
   document.getElementById('meta-info').textContent='加载中...';
@@ -156,7 +158,7 @@ function byConf(){ return SYS==='v2'?(DATA.by_confidence_v2||{}):(DATA.by_confid
     .then(function(r){return r.json()})
     .then(function(d){
       DATA=d;
-      document.getElementById('meta-info').textContent='B2日期 '+d.start+' ~ '+d.end+' · '+d.total_signals+'个信号';
+      document.getElementById('meta-info').textContent='B2日期 '+(d.start||'—')+' ~ '+(d.end||'—')+' · '+(d.total_signals!=null?d.total_signals:'—')+'个信号';
       renderAll(d);
     })
     .catch(function(e){
@@ -167,7 +169,7 @@ function byConf(){ return SYS==='v2'?(DATA.by_confidence_v2||{}):(DATA.by_confid
 function renderStats(d){
   var h='';
   HORIZONS.forEach(function(hz){
-    var o=d.overall[hz];
+    var o=(d.overall||{})[hz];
     if(!o) return;
     h+='<div class="stat-card"><div class="val">'+fmtWin(o.win_rate)+'</div><div class="lbl">'+hz+'胜率(>2%)</div></div>';
     h+='<div class="stat-card"><div class="val'+(o.median_return<0?' down':'')+'">'+fmtPct(o.median_return)+'</div><div class="lbl">'+hz+'中位收益率</div></div>';

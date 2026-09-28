@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN" class="dark">
 <head>
 <meta charset="UTF-8">
@@ -124,15 +124,23 @@ function switchTab(type){
 }
 
 async function loadLatest(){
-  var r=await fetch(API+'/api/mw/signals?type='+currentType);
-  var d=await r.json();
-  if(d.dates&&d.dates.length){
-    var latest=d.dates[0];
-    document.getElementById('date-start').value=latest;
-    document.getElementById('date-end').value=latest;
-    await loadData('start='+latest+'&end='+latest+'&type='+currentType);
-  }else{
-    document.getElementById('signals').innerHTML='<div class="empty-state">暂无'+(currentType==='b1'?'B1':'B2')+'信号数据</div>';
+  // 原来没有 try/catch 也不查 r.ok：一次失败就是未处理 rejection，
+  // #signals 永远空着、#meta-info 停在「加载中...」，页面上什么都不说。
+  try{
+    var r=await fetch(API+'/api/mw/signals?type='+currentType);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    var d=await r.json();
+    if(d.dates&&d.dates.length){
+      var latest=d.dates[0];
+      document.getElementById('date-start').value=latest;
+      document.getElementById('date-end').value=latest;
+      await loadData('start='+latest+'&end='+latest+'&type='+currentType);
+    }else{
+      document.getElementById('signals').innerHTML='<div class="empty-state">暂无'+(currentType==='b1'?'B1':'B2')+'信号数据</div>';
+    }
+  }catch(e){
+    document.getElementById('signals').innerHTML='<div class="empty-state">加载失败：'+((e&&e.message)||e)+'</div>';
+    console.error('[mw-signals] loadLatest 失败',e);
   }
 }
 

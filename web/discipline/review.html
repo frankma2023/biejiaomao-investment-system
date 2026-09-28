@@ -146,7 +146,10 @@
         reviewData = await resp.json();
         render();
       } catch (e) {
-        document.body.innerHTML = '<div class="loading">加载失败: ' + e.message + '</div>';
+        // 只把错误写到标题上，不能替换整个 body——那会把已经渲染好的各区块一起抹掉
+        const el = document.getElementById('review-title');
+        if (el) el.textContent = '加载失败: ' + ((e && e.message) || e);
+        console.error('[review] load 失败', e);
       }
     }
 
@@ -267,17 +270,20 @@
       const d = reviewData;
       const klines = d.klines || [];
       const ib = d.ideal_buy || {};
-      const lastClose = klines.length > 0 ? klines[klines.length - 1].close : 0;
+      // 最新一根 K 线缺 close 时不能直接 .toFixed：会抛错并让整个 render() 中断
+      const lastCloseRaw = klines.length > 0 ? klines[klines.length - 1].close : 0;
+      const lastClose = Number.isFinite(+lastCloseRaw) ? +lastCloseRaw : 0;
 
       // 理想买点
-      const idealBuyPrice = ib.price || lastClose;
+      const idealBuyPrice = (ib.price != null && Number.isFinite(+ib.price)) ? +ib.price : lastClose;
 
       // 止损价 = 买入价 × 0.92 (默认用当前价估算)
       const stopLossPrice = (idealBuyPrice * 0.92).toFixed(2);
 
-      // 前高距离（200日最高）
+      // 前高距离（200日最高）；high 可能为 null，先过滤再取最大
       const lookback = Math.min(200, klines.length);
-      const highs200 = klines.slice(-lookback).map(k => k.high);
+      const highs200 = klines.slice(-lookback).map(k => k.high)
+        .filter(v => Number.isFinite(+v)).map(Number);
       const high200 = highs200.length > 0 ? Math.max(...highs200) : lastClose * 1.1;
 
       // 潜在收益空间

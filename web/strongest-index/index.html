@@ -256,7 +256,10 @@
       html+='<div class="pool-section glass-card">';
       html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">';
       html+='<span style="font-family:var(--font-display);font-size:14px;font-weight:400;color:#d4d4d8">'+m.icon+' '+m.n+' '+relaxed+'</span>';
-      html+='<span style="font-size:10px;color:var(--muted);font-family:var(--font-body)">Top '+pd.top_n+' · '+pd.indices.length+'/'+pd.total+' 达标</span>';
+      // 先算再判空：原来这行直接 pd.indices.length，判空在下面三行之后，
+      // 任一池缺 indices 就会在循环里抛错，整个结果区都不渲染。
+      const nIdx=(pd.indices||[]).length;
+      html+='<span style="font-size:10px;color:var(--muted);font-family:var(--font-body)">Top '+(pd.top_n!=null?pd.top_n:'—')+' · '+nIdx+'/'+(pd.total!=null?pd.total:'—')+' 达标</span>';
       html+='</div>';
 
       if(!pd.indices||!pd.indices.length){
