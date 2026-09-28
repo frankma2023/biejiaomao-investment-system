@@ -1917,11 +1917,18 @@ def api_market_dividend_detail():
     # 后续收益用全收益口径（红利指数分红不可忽略），没有全收益就退回价格
     rsi_fwd_base = tri_long if (tri_long and len(tri_long) == len(rsi_closes)) else rsi_closes
 
-    def _rsi_fwd(i, n):
+    def _rsi_fwd_raw(i, n):
+        """未取整的后续收益（%）。判胜负必须用它 —— 先 round 到 1 位再比 >0，
+        会把 (0, 0.05%) 之间的小幅正收益当成 0，系统性低估胜率。"""
         if i + n >= len(rsi_fwd_base):
             return None
         a, b = rsi_fwd_base[i], rsi_fwd_base[i + n]
-        return round((b / a - 1) * 100, 1) if a and b else None
+        return (b / a - 1) * 100 if a and b else None
+
+    def _rsi_fwd(i, n):
+        """标记展示用的后续收益（保留 1 位）"""
+        v = _rsi_fwd_raw(i, n)
+        return round(v, 1) if v is not None else None
 
     def _rsi_stat(vals):
         v = [x for x in vals if x is not None]
@@ -1929,9 +1936,10 @@ def api_market_dividend_detail():
             return {'n': 0, 'win': None, 'med': None, 'avg': None}
         s = sorted(v)
         n = len(s)
+        med = s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
         return {'n': len(v),
                 'win': round(sum(1 for x in v if x > 0) / len(v) * 100, 1),
-                'med': s[n // 2] if n % 2 else round((s[n // 2 - 1] + s[n // 2]) / 2, 1),
+                'med': round(med, 1),
                 'avg': round(sum(v) / len(v), 1)}
 
     def _rsi_buy_marks(values, tiers):
@@ -2010,8 +2018,8 @@ def api_market_dividend_detail():
             tier_stats.append({
                 'tier': k + 1, 'label': t['label'], 'short': t['short'],
                 'threshold': t['threshold'], 'lo': tier_lo[k], 'n': len(idxs),
-                'fwd20': _rsi_stat([_rsi_fwd(i, 20) for i in idxs]),
-                'fwd60': _rsi_stat([_rsi_fwd(i, 60) for i in idxs]),
+                'fwd20': _rsi_stat([_rsi_fwd_raw(i, 20) for i in idxs]),
+                'fwd60': _rsi_stat([_rsi_fwd_raw(i, 60) for i in idxs]),
             })
         # 卖点档：与买点档对称处理。第 k 档覆盖 (threshold_k, threshold_{k+1}]，
         # 最深一档上界为 100。逐档统计同样是「状态」口径。
@@ -2024,8 +2032,8 @@ def api_market_dividend_detail():
             sell_stats.append({
                 'tier': k + 1, 'label': t['label'], 'short': t['short'],
                 'threshold': t['threshold'], 'lo': lo, 'hi': hi, 'n': len(idxs),
-                'fwd20': _rsi_stat([_rsi_fwd(i, 20) for i in idxs]),
-                'fwd60': _rsi_stat([_rsi_fwd(i, 60) for i in idxs]),
+                'fwd20': _rsi_stat([_rsi_fwd_raw(i, 20) for i in idxs]),
+                'fwd60': _rsi_stat([_rsi_fwd_raw(i, 60) for i in idxs]),
             })
         rsi_series.append({
             'period': pc['period'], 'values': vals,
