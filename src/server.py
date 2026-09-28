@@ -1389,16 +1389,51 @@ def _latest_y10(db, target_date):
 # 阈值不能通用）。改配置后按 mtime 自动重载，不必重启 Flask。
 RSI_CONFIG_PATH = os.path.join(CONFIG_DIR, 'red_dividend_rsi.yaml')
 _RSI_FALLBACK = {
-    'period': 6, 'buy': 29, 'sell': 81, 'period2': 14, 'buy2': 30, 'sell2': 70,
-    'tiers': [{'threshold': 29, 'label': '买点'},
-              {'threshold': 20, 'label': '强买点'},
-              {'threshold': 10, 'label': '极值买点'}],
+    'default_period': 6,
+    'periods': [
+        {'period': 6, 'sell': 81, 'buy_tiers': [
+            {'threshold': 29, 'label': '买点', 'short': '买'},
+            {'threshold': 20, 'label': '强买点', 'short': '强'},
+            {'threshold': 10, 'label': '极值买点', 'short': '极值'}]},
+        {'period': 14, 'sell': 70, 'buy_tiers': [
+            {'threshold': 38, 'label': '买点', 'short': '买'},
+            {'threshold': 31, 'label': '强买点', 'short': '强'},
+            {'threshold': 24, 'label': '极值买点', 'short': '极值'}]},
+        {'period': 20, 'sell': 66, 'buy_tiers': [
+            {'threshold': 40, 'label': '买点', 'short': '买'},
+            {'threshold': 35, 'label': '强买点', 'short': '强'},
+            {'threshold': 28, 'label': '极值买点', 'short': '极值'}]},
+    ],
 }
 _rsi_cfg_cache = None
 
 
+def _norm_rsi_periods(periods):
+    """规范化周期配置：周期升序，各档按阈值降序（浅->深）"""
+    out = []
+    for p in periods or []:
+        if not isinstance(p, dict) or p.get('period') is None:
+            continue
+        tiers = [t for t in (p.get('buy_tiers') or [])
+                 if isinstance(t, dict) and t.get('threshold') is not None]
+        if not tiers:
+            continue
+        out.append({
+            'period': int(p['period']),
+            'sell': float(p['sell']) if p.get('sell') is not None else 80.0,
+            'buy_tiers': sorted(
+                ({'threshold': float(t['threshold']),
+                  'label': str(t.get('label') or ('<' + str(t['threshold']))),
+                  'short': str(t.get('short') or t.get('label') or '<' + str(t['threshold']))}
+                 for t in tiers),
+                key=lambda t: -t['threshold']),
+        })
+    out.sort(key=lambda p: p['period'])
+    return out
+
+
 def _rsi_params(code):
-    """取该指数的 RSI 买点参数（主/副周期与阈值、超卖深度分档 tiers）"""
+    """取该指数的 RSI 周期与买卖阈值配置（多周期；可按指数代码整体覆盖 periods）"""
     global _rsi_cfg_cache
     cfg = {}
     try:
@@ -1410,18 +1445,13 @@ def _rsi_params(code):
         cfg = _rsi_cfg_cache[1]
     except Exception as _e:
         print(f'[dividend-detail] RSI 配置读取失败，用内置默认值: {type(_e).__name__}: {_e}', flush=True)
-    p = dict(_RSI_FALLBACK)
-    p.update(cfg.get('defaults') or {})
-    p.update((cfg.get('overrides') or {}).get(code) or {})
-    out = {k: p[k] for k in ('period', 'buy', 'sell', 'period2', 'buy2', 'sell2')}
-    tiers = [t for t in (p.get('tiers') or []) if isinstance(t, dict) and t.get('threshold') is not None]
-    if not tiers:
-        tiers = _RSI_FALLBACK['tiers']
-    out['tiers'] = sorted(
-        ({'threshold': float(t['threshold']), 'label': str(t.get('label') or ('<' + str(t['threshold'])))}
-         for t in tiers),
-        key=lambda t: -t['threshold'])
-    return out
+    d = dict(_RSI_FALLBACK)
+    d.update(cfg.get('defaults') or {})
+    d.update((cfg.get('overrides') or {}).get(code) or {})
+    periods = _norm_rsi_periods(d.get('periods')) or _norm_rsi_periods(_RSI_FALLBACK['periods'])
+    want = d.get('default_period')
+    avail = [p['period'] for p in periods]
+    return {'default_period': int(want) if want in avail else avail[0], 'periods': periods}
 
 
 @app.route('/api/market-scan/dividend-advice')
@@ -1858,15 +1888,14 @@ def api_market_dividend_detail():
         y10 = bond_map[bond_dates_sorted[idx]]
         spread_series.append(round(val_map[d]['dyr'] * 100 - y10, 2) if y10 is not None else None)
 
-    # ── RSI 买点（Wilder RSI · 收盘价口径；阈值见 config/market/red_dividend_rsi.yaml）──
-    # 买点 = 主周期 RSI 从阈值上方下穿到阈值下方的那一天。天然去重：要先回到阈值上方才会再触发。
-    # 用近10年序列算，一是让近3年窗口起点处 RSI 已预热，二是给出更多买点样本供判断。
+    # ── RSI 买卖点（Wilder RSI · 收盘价口径；周期与阈值见 config/market/red_dividend_rsi.yaml）──
+    # 买点口径是「状态 + 深度分档」：只要 RSI 落在某档区间内，那些天都算该档窗口；
+    # 图上每段连续超卖标出最低点。用近10年序列算，一是让近3年窗口起点处 RSI 已预热，
+    # 二是给出更多买点样本供判断。
     rsi_p = _rsi_params(code)
     rsi_dates = dates_long if dates_long else dates
     rsi_closes = closes_long if dates_long else closes
-    rsi_main = compute_rsi(rsi_closes, rsi_p['period'])
-    rsi_ref = compute_rsi(rsi_closes, rsi_p['period2'])
-    # 买点后续收益用全收益口径（红利指数分红不可忽略），没有全收益就退回价格
+    # 后续收益用全收益口径（红利指数分红不可忽略），没有全收益就退回价格
     rsi_fwd_base = tri_long if (tri_long and len(tri_long) == len(rsi_closes)) else rsi_closes
 
     def _rsi_fwd(i, n):
@@ -1874,12 +1903,6 @@ def api_market_dividend_detail():
             return None
         a, b = rsi_fwd_base[i], rsi_fwd_base[i + n]
         return round((b / a - 1) * 100, 1) if a and b else None
-
-    # 超卖分档：由浅到深；tier_lo[k] 是第 k 档的下界（更深一档的 threshold），最深档下界为 0。
-    # 口径已从「下穿事件」改为「状态」—— 见 config/market/red_dividend_rsi.yaml 的说明：
-    # 事件口径会漏掉每段超卖里最深的那几天，而那些天的后续收益恰恰更好。
-    tiers = rsi_p['tiers']
-    tier_lo = [t['threshold'] for t in tiers[1:]] + [0.0]
 
     def _rsi_stat(vals):
         v = [x for x in vals if x is not None]
@@ -1892,51 +1915,82 @@ def api_market_dividend_detail():
                 'med': s[n // 2] if n % 2 else round((s[n // 2 - 1] + s[n // 2]) / 2, 1),
                 'avg': round(sum(v) / len(v), 1)}
 
-    rsi_tier_stats = []
-    for k, t in enumerate(tiers):
-        idxs = [i for i, v in enumerate(rsi_main) if v is not None and tier_lo[k] <= v < t['threshold']]
-        rsi_tier_stats.append({
-            'tier': k + 1, 'label': t['label'], 'threshold': t['threshold'], 'lo': tier_lo[k],
-            'n': len(idxs), 'fwd20': _rsi_stat([_rsi_fwd(i, 20) for i in idxs]),
-            'fwd60': _rsi_stat([_rsi_fwd(i, 60) for i in idxs]),
-        })
+    def _rsi_buy_marks(values, tiers):
+        """每段连续处于最浅档之内，取最低点作标记，并标出它深到第几档"""
+        marks = []
+        n = len(values)
+        thr0 = tiers[0]['threshold']
+        i = 0
+        while i < n:
+            v = values[i]
+            if v is None or v >= thr0:
+                i += 1
+                continue
+            j = i
+            while j + 1 < n and values[j + 1] is not None and values[j + 1] < thr0:
+                j += 1
+            seg = [(values[k], k) for k in range(i, j + 1) if values[k] is not None]
+            if seg:
+                lo_v, lo_i = min(seg)
+                depth = 1
+                for k, t in enumerate(tiers):
+                    if lo_v < t['threshold']:
+                        depth = k + 1
+                marks.append({
+                    'date': rsi_dates[lo_i], 'rsi': round(lo_v, 1),
+                    'tier': depth, 'tier_label': tiers[depth - 1]['label'],
+                    'tier_short': tiers[depth - 1]['short'],
+                    'entry_date': rsi_dates[i], 'entry_rsi': round(values[i], 1),
+                    'fwd20': _rsi_fwd(lo_i, 20), 'fwd60': _rsi_fwd(lo_i, 60),
+                    # 序列末尾仍在超卖的这段还没走完，最低点是暂定的，前端要区别显示
+                    'ongoing': j == n - 1,
+                })
+            i = j + 1
+        return marks
 
-    # 每段连续超卖标出最低点（图上按深度分色），并附该段的进入日与进入后收益，
-    # 便于区分「事后看的最低点」与「实时可知的进入日」。
-    rsi_marks = []
-    i = 0
-    thr0 = tiers[0]['threshold']
-    while i < len(rsi_dates):
-        v = rsi_main[i]
-        if v is None or v >= thr0:
-            i += 1
-            continue
-        j = i
-        while j + 1 < len(rsi_dates) and rsi_main[j + 1] is not None and rsi_main[j + 1] < thr0:
-            j += 1
-        seg = [(rsi_main[k], k) for k in range(i, j + 1) if rsi_main[k] is not None]
-        if seg:
-            lo_v, lo_i = min(seg)
-            depth = 1
-            for k, t in enumerate(tiers):
-                if lo_v < t['threshold']:
-                    depth = k + 1
-            rsi_marks.append({
-                'date': rsi_dates[lo_i], 'rsi': round(lo_v, 1),
-                'tier': depth, 'tier_label': tiers[depth - 1]['label'],
-                'entry_date': rsi_dates[i], 'entry_rsi': round(rsi_main[i], 1),
-                'fwd20': _rsi_fwd(lo_i, 20), 'fwd60': _rsi_fwd(lo_i, 60),
-                # 序列末尾仍在超卖的这段还没走完，最低点是暂定的，前端要区别显示
-                'ongoing': j == len(rsi_dates) - 1,
+    def _rsi_sell_marks(values, sell):
+        """上穿卖出阈值那天。卖出是一次动作，用事件口径即可，不必标整段"""
+        out = []
+        for i in range(1, len(values)):
+            a, b = values[i - 1], values[i]
+            if a is None or b is None or not (a <= sell < b):
+                continue
+            out.append({'date': rsi_dates[i], 'rsi': round(b, 1),
+                        'fwd20': _rsi_fwd(i, 20), 'fwd60': _rsi_fwd(i, 60)})
+        return out
+
+    rsi_series = []
+    for pc in rsi_p['periods']:
+        vals = compute_rsi(rsi_closes, pc['period'])
+        tiers = pc['buy_tiers']
+        tier_lo = [t['threshold'] for t in tiers[1:]] + [0.0]
+        tier_stats = []
+        for k, t in enumerate(tiers):
+            idxs = [i for i, v in enumerate(vals) if v is not None and tier_lo[k] <= v < t['threshold']]
+            tier_stats.append({
+                'tier': k + 1, 'label': t['label'], 'short': t['short'],
+                'threshold': t['threshold'], 'lo': tier_lo[k], 'n': len(idxs),
+                'fwd20': _rsi_stat([_rsi_fwd(i, 20) for i in idxs]),
+                'fwd60': _rsi_stat([_rsi_fwd(i, 60) for i in idxs]),
             })
-        i = j + 1
+        sell = pc['sell']
+        sell_idxs = [i for i, v in enumerate(vals) if v is not None and v > sell]
+        rsi_series.append({
+            'period': pc['period'], 'values': vals, 'sell': sell,
+            'buy_tiers': [{'threshold': t['threshold'], 'label': t['label'],
+                           'short': t['short'], 'lo': tier_lo[k]}
+                          for k, t in enumerate(tiers)],
+            'tier_stats': tier_stats,
+            'buy_marks': _rsi_buy_marks(vals, tiers),
+            'sell_marks': _rsi_sell_marks(vals, sell),
+            'sell_stat': _rsi_stat([_rsi_fwd(i, 60) for i in sell_idxs]),
+        })
 
     return jsonify({
         'code': code, 'name': name, 'date': target_date,
-        'rsi_main': rsi_main, 'rsi_ref': rsi_ref,
         'rsi_basis': 'dates_long' if dates_long else 'dates',
-        'rsi_params': rsi_p,
-        'rsi_marks': rsi_marks, 'rsi_tier_stats': rsi_tier_stats,
+        'rsi_default_period': rsi_p['default_period'],
+        'rsi_series': rsi_series,
         'spread_series': spread_series,
         'spread_cur': spread_series[-1] if spread_series else None,
         'spread_ref': {'danger': 1.0, 'good': (1.5, 3.0),

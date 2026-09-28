@@ -314,69 +314,78 @@ async function load() {
     });
     return c;
   }});
-  // 2c. RSI 买点（阈值见 config/market/red_dividend_rsi.yaml；买点=主周期 RSI 下穿阈值）
-  if (d.rsi_main && d.rsi_params) {
-    const rp = d.rsi_params, marks = d.rsi_marks || [], tierStats = d.rsi_tier_stats || [];
+  // 2c. RSI 买卖点（多周期 RSI6/14/20；周期与阈值见 config/market/red_dividend_rsi.yaml）
+  // 默认只显示 default_period 那一条，其余靠点图例展开——三条的标记全画出来会很乱。
+  // 每条曲线的买点/卖点标记都挂在自己的 series 上，因此随图例显隐一起开关。
+  if (d.rsi_series && d.rsi_series.length) {
+    const per = d.rsi_series;
     const rsiDates = (d.rsi_basis === 'dates_long' && d.dates_long && d.dates_long.length) ? d.dates_long : d.dates;
-    // 档位配色：越深越重
-    const RT = ['#f59e0b', '#ef4444', '#7f1d1d'];
-    const rtColor = k => RT[Math.min(k, RT.length - 1)];
-    const bandColor = k => ['rgba(245,158,11,.06)', 'rgba(239,68,68,.07)', 'rgba(127,29,29,.10)'][Math.min(k, 2)];
-    // 标题里直接给出各档 60 日胜率/中位（状态口径）；样本 <20 天标注"样本少"
-    const tierTxt = tierStats.map(t => {
+    const PCOL = {6:'#f59e0b', 14:'#539BF5', 20:'#a855f7'};
+    const pcol = p => PCOL[p] || '#f59e0b';
+    const defP = d.rsi_default_period;
+    // 标题给出各周期各档的 60 日胜率/中位（状态口径）
+    const summ = per.map(p => 'RSI' + p.period + ' ' + (p.tier_stats || []).map(t => {
       const s = t.fwd60 || {};
-      if (!s.n) return t.label + ' 无样本';
-      const tag = s.n < 20 ? '（样本少，仅供参考）' : '';
-      return t.label + ' ' + t.lo + '~' + t.threshold + '：' + s.win + '% / 中位 ' + s.med + '% (n=' + s.n + ')' + tag;
-    }).join(' · ');
-    const rsiTitle = '📉 RSI' + rp.period + ' 超卖买点（按深度分档，图钉=每段超卖的最低点·事后确认）'
-      + ' · 60日胜率/中位：' + (tierTxt || '无') + ' · 副线 RSI' + rp.period2 + ' · 收益按全收益口径';
-    charts.push({title: rsiTitle, el:'chart-rsi', h:340, init: el => {
+      return t.short + (s.n ? s.win + '/' + (s.med > 0 ? '+' : '') + s.med + '%' : '—');
+    }).join(' ')).join(' · ');
+    const rsiTitle = '📉 RSI 买卖点（点图例切换 RSI' + per.map(p => p.period).join('/') + '，默认只显示 RSI' + defP
+      + '；圆点=买点 · 图钉=强/极值买点（标在每段超卖的最低点，事后确认）· 绿三角=卖点）'
+      + ' · 60日胜率/中位：' + summ + ' · 收益按全收益口径';
+    charts.push({title: rsiTitle, el:'chart-rsi', h:350, init: el => {
       const c = echarts.init(el);
-      // 图钉按深度分级：浅档小圆点，深档带标签的大图钉，避免"最深那天反而没标注"
-      const pins = marks.map(m => {
-        const k = (m.tier || 1) - 1;
-        const deep = (m.tier || 1) >= 2;
-        // 仍在进行中的这段超卖，最低点是暂定的，用空心圆 + 文字区分
-        const lbl = m.tier_label + (m.ongoing ? '(进行中)' : '');
-        return {name: m.date + ' ' + lbl + '（进入日 ' + m.entry_date + '）',
-                coord: [m.date, m.rsi], value: lbl,
-                symbol: m.ongoing ? 'pin' : (deep ? 'pin' : 'circle'),
-                symbolSize: m.ongoing ? 34 : (deep ? (m.tier >= 3 ? 38 : 30) : 6),
-                itemStyle: {color: rtColor(k), borderColor: '#fff', borderWidth: m.ongoing ? 1.5 : 0,
-                            borderType: m.ongoing ? 'dashed' : 'solid'},
-                label: {show: deep || m.ongoing, formatter: lbl, color: '#fff', fontSize: 8}};
+      const sel = {};
+      const series = per.map(p => {
+        const col = pcol(p.period);
+        const tiers = p.buy_tiers || [];
+        // 买点：每段超卖的最低点，浅档小圆点、深档带标签的大图钉
+        const buys = (p.buy_marks || []).map(m => {
+          const deep = (m.tier || 1) >= 2;
+          const lbl = (m.tier_short || m.tier_label) + (m.ongoing ? '(进行)' : '');
+          return {name: m.date + ' ' + m.tier_label + '（进入日 ' + m.entry_date + '）',
+                  coord: [m.date, m.rsi], value: lbl,
+                  symbol: (deep || m.ongoing) ? 'pin' : 'circle',
+                  symbolSize: m.ongoing ? 34 : (deep ? (m.tier >= 3 ? 38 : 30) : 5),
+                  itemStyle: {color: col, borderColor:'#fff', borderWidth: m.ongoing ? 1.5 : 0},
+                  label: {show: deep || m.ongoing, formatter: lbl, color:'#fff', fontSize: 8}};
+        });
+        // 卖点：上穿阈值那天，绿色倒三角
+        const sells = (p.sell_marks || []).map(m => ({
+          name: m.date + ' 卖点', coord: [m.date, m.rsi], value: '卖',
+          symbol: 'triangle', symbolRotate: 180, symbolSize: 11,
+          itemStyle: {color: '#10b981'}, label: {show: false}}));
+        // 档位色带：越深越重。三条同时打开时重叠处更深 = 多周期共振，是有意如此
+        const bands = tiers.map((t, k) => [
+          {yAxis: t.lo, itemStyle: {color: k === 0 ? 'rgba(148,163,184,.06)' : 'rgba(239,68,68,.05)'}},
+          {yAxis: t.threshold}]);
+        const lines = [];
+        if (tiers.length) {
+          lines.push({yAxis: tiers[0].threshold, lineStyle: {color: col, type: 'dashed', width: 1},
+                      label: {formatter: 'RSI' + p.period + ' 买 ' + tiers[0].threshold, color: col, fontSize: 8}});
+        }
+        lines.push({yAxis: p.sell, lineStyle: {color: '#10b981', type: 'dotted', width: 1},
+                    label: {formatter: 'RSI' + p.period + ' 卖 ' + p.sell, color: '#10b981', fontSize: 8}});
+        sel['RSI' + p.period] = (p.period === defP);
+        return {
+          name: 'RSI' + p.period, type: 'line', data: p.values, smooth: true, showSymbol: false,
+          lineStyle: {color: col, width: p.period === defP ? 1.8 : 1.2},
+          markArea: {silent: true, data: bands},
+          markLine: {silent: true, symbol: 'none', data: lines},
+          markPoint: {data: buys.concat(sells), label: {show: false}}
+        };
       });
-      const bands = tierStats.map((t, k) => [
-        {yAxis: t.lo, itemStyle: {color: bandColor(k)}}, {yAxis: t.threshold}
-      ]);
       c.setOption({
-        backgroundColor:chartBg, tooltip:{trigger:'axis'},
-        legend:{data:['RSI'+rp.period, 'RSI'+rp.period2], textStyle:{color:tx,fontSize:9}, bottom:0},
-        grid:{left:'8%',right:'4%',top:14,bottom:66},
-        xAxis:{type:'category',data:rsiDates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
-        yAxis:{type:'value',min:0,max:100,axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
-        dataZoom:[{type:'inside'},{type:'slider',height:10,bottom:26,
-          dataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},
-          selectedDataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},
-          borderColor:'rgba(139,139,144,.25)',fillerColor:'rgba(139,139,144,.12)',handleSize:'80%',showDetail:false}],
-        series:[
-          {name:'RSI'+rp.period, type:'line', data:d.rsi_main, smooth:true, showSymbol:false,
-           lineStyle:{color:'#f59e0b', width:1.6},
-           markArea:{silent:true, data: bands.concat([[
-             {yAxis:rp.sell, itemStyle:{color:'rgba(16,185,129,.09)'}}, {yAxis:100}]])},
-           markLine:{silent:true, symbol:'none', data:
-             tierStats.slice(0, 1).map(t => ({yAxis:t.threshold, lineStyle:{color:'#ef4444',type:'dashed'},
-               label:{formatter:'买 '+t.threshold, color:'#ef4444', fontSize:9}}))
-             .concat(tierStats.slice(1).map((t, k) => ({yAxis:t.threshold,
-               lineStyle:{color:rtColor(k + 1), type:'dotted'},
-               label:{formatter:t.label + ' ' + t.threshold, color:rtColor(k + 1), fontSize:9}})))
-             .concat([{yAxis:rp.sell, lineStyle:{color:'#10b981',type:'dashed'},
-               label:{formatter:'卖 '+rp.sell, color:'#10b981', fontSize:9}}])},
-           markPoint:{data:pins, label:{show:false}}},
-          {name:'RSI'+rp.period2, type:'line', data:d.rsi_ref, smooth:true, showSymbol:false,
-           lineStyle:{color:'#539BF5', width:1, type:'dotted'}}
-        ]
+        backgroundColor: chartBg, tooltip: {trigger: 'axis'},
+        legend: {data: per.map(p => 'RSI' + p.period), selected: sel,
+                 textStyle: {color: tx, fontSize: 9}, bottom: 0},
+        grid: {left: '8%', right: '4%', top: 14, bottom: 66},
+        xAxis: {type: 'category', data: rsiDates, axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp}}},
+        yAxis: {type: 'value', min: 0, max: 100, axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
+        dataZoom: [{type: 'inside'}, {type: 'slider', height: 10, bottom: 26,
+          dataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},
+          selectedDataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},
+          borderColor: 'rgba(139,139,144,.25)', fillerColor: 'rgba(139,139,144,.12)',
+          handleSize: '80%', showDetail: false}],
+        series: series
       });
       return c;
     }});
