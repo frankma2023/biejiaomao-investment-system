@@ -1388,12 +1388,17 @@ def _latest_y10(db, target_date):
 # 红利指数 RSI 买点参数。defaults 打底，overrides 按指数代码覆盖（不同红利品种波动不同，
 # 阈值不能通用）。改配置后按 mtime 自动重载，不必重启 Flask。
 RSI_CONFIG_PATH = os.path.join(CONFIG_DIR, 'red_dividend_rsi.yaml')
-_RSI_FALLBACK = {'period': 6, 'buy': 29, 'sell': 81, 'period2': 14, 'buy2': 30, 'sell2': 70}
+_RSI_FALLBACK = {
+    'period': 6, 'buy': 29, 'sell': 81, 'period2': 14, 'buy2': 30, 'sell2': 70,
+    'tiers': [{'threshold': 29, 'label': '买点'},
+              {'threshold': 20, 'label': '强买点'},
+              {'threshold': 10, 'label': '极值买点'}],
+}
 _rsi_cfg_cache = None
 
 
 def _rsi_params(code):
-    """取该指数的 RSI 买点参数（主周期 period/buy/sell，副周期 period2/buy2/sell2）"""
+    """取该指数的 RSI 买点参数（主/副周期与阈值、超卖深度分档 tiers）"""
     global _rsi_cfg_cache
     cfg = {}
     try:
@@ -1408,7 +1413,15 @@ def _rsi_params(code):
     p = dict(_RSI_FALLBACK)
     p.update(cfg.get('defaults') or {})
     p.update((cfg.get('overrides') or {}).get(code) or {})
-    return {k: p[k] for k in ('period', 'buy', 'sell', 'period2', 'buy2', 'sell2')}
+    out = {k: p[k] for k in ('period', 'buy', 'sell', 'period2', 'buy2', 'sell2')}
+    tiers = [t for t in (p.get('tiers') or []) if isinstance(t, dict) and t.get('threshold') is not None]
+    if not tiers:
+        tiers = _RSI_FALLBACK['tiers']
+    out['tiers'] = sorted(
+        ({'threshold': float(t['threshold']), 'label': str(t.get('label') or ('<' + str(t['threshold'])))}
+         for t in tiers),
+        key=lambda t: -t['threshold'])
+    return out
 
 
 @app.route('/api/market-scan/dividend-advice')
@@ -1862,41 +1875,68 @@ def api_market_dividend_detail():
         a, b = rsi_fwd_base[i], rsi_fwd_base[i + n]
         return round((b / a - 1) * 100, 1) if a and b else None
 
-    rsi_buy = []
-    for i in range(1, len(rsi_dates)):
-        prev, cur = rsi_main[i - 1], rsi_main[i]
-        if prev is None or cur is None:
+    # 超卖分档：由浅到深；tier_lo[k] 是第 k 档的下界（更深一档的 threshold），最深档下界为 0。
+    # 口径已从「下穿事件」改为「状态」—— 见 config/market/red_dividend_rsi.yaml 的说明：
+    # 事件口径会漏掉每段超卖里最深的那几天，而那些天的后续收益恰恰更好。
+    tiers = rsi_p['tiers']
+    tier_lo = [t['threshold'] for t in tiers[1:]] + [0.0]
+
+    def _rsi_stat(vals):
+        v = [x for x in vals if x is not None]
+        if not v:
+            return {'n': 0, 'win': None, 'med': None, 'avg': None}
+        s = sorted(v)
+        n = len(s)
+        return {'n': len(v),
+                'win': round(sum(1 for x in v if x > 0) / len(v) * 100, 1),
+                'med': s[n // 2] if n % 2 else round((s[n // 2 - 1] + s[n // 2]) / 2, 1),
+                'avg': round(sum(v) / len(v), 1)}
+
+    rsi_tier_stats = []
+    for k, t in enumerate(tiers):
+        idxs = [i for i, v in enumerate(rsi_main) if v is not None and tier_lo[k] <= v < t['threshold']]
+        rsi_tier_stats.append({
+            'tier': k + 1, 'label': t['label'], 'threshold': t['threshold'], 'lo': tier_lo[k],
+            'n': len(idxs), 'fwd20': _rsi_stat([_rsi_fwd(i, 20) for i in idxs]),
+            'fwd60': _rsi_stat([_rsi_fwd(i, 60) for i in idxs]),
+        })
+
+    # 每段连续超卖标出最低点（图上按深度分色），并附该段的进入日与进入后收益，
+    # 便于区分「事后看的最低点」与「实时可知的进入日」。
+    rsi_marks = []
+    i = 0
+    thr0 = tiers[0]['threshold']
+    while i < len(rsi_dates):
+        v = rsi_main[i]
+        if v is None or v >= thr0:
+            i += 1
             continue
-        if prev >= rsi_p['buy'] and cur < rsi_p['buy']:
-            rsi_buy.append({'date': rsi_dates[i], 'rsi': round(cur, 1),
-                            'fwd20': _rsi_fwd(i, 20), 'fwd60': _rsi_fwd(i, 60)})
-
-    rsi_buy_stats = {}
-    if rsi_buy:
-        f20 = [b['fwd20'] for b in rsi_buy if b['fwd20'] is not None]
-        f60 = [b['fwd60'] for b in rsi_buy if b['fwd60'] is not None]
-
-        def _rmd(xs):
-            s = sorted(xs)
-            n = len(s)
-            return s[n // 2] if n % 2 else round((s[n // 2 - 1] + s[n // 2]) / 2, 1)
-
-        rsi_buy_stats = {
-            'count': len(rsi_buy),
-            'fwd20_n': len(f20),
-            'fwd20_median': _rmd(f20) if f20 else None,
-            'fwd20_winrate': round(sum(1 for x in f20 if x > 0) / len(f20) * 100, 1) if f20 else None,
-            'fwd60_n': len(f60),
-            'fwd60_median': _rmd(f60) if f60 else None,
-            'fwd60_winrate': round(sum(1 for x in f60 if x > 0) / len(f60) * 100, 1) if f60 else None,
-        }
+        j = i
+        while j + 1 < len(rsi_dates) and rsi_main[j + 1] is not None and rsi_main[j + 1] < thr0:
+            j += 1
+        seg = [(rsi_main[k], k) for k in range(i, j + 1) if rsi_main[k] is not None]
+        if seg:
+            lo_v, lo_i = min(seg)
+            depth = 1
+            for k, t in enumerate(tiers):
+                if lo_v < t['threshold']:
+                    depth = k + 1
+            rsi_marks.append({
+                'date': rsi_dates[lo_i], 'rsi': round(lo_v, 1),
+                'tier': depth, 'tier_label': tiers[depth - 1]['label'],
+                'entry_date': rsi_dates[i], 'entry_rsi': round(rsi_main[i], 1),
+                'fwd20': _rsi_fwd(lo_i, 20), 'fwd60': _rsi_fwd(lo_i, 60),
+                # 序列末尾仍在超卖的这段还没走完，最低点是暂定的，前端要区别显示
+                'ongoing': j == len(rsi_dates) - 1,
+            })
+        i = j + 1
 
     return jsonify({
         'code': code, 'name': name, 'date': target_date,
         'rsi_main': rsi_main, 'rsi_ref': rsi_ref,
         'rsi_basis': 'dates_long' if dates_long else 'dates',
         'rsi_params': rsi_p,
-        'rsi_buy': rsi_buy, 'rsi_buy_stats': rsi_buy_stats,
+        'rsi_marks': rsi_marks, 'rsi_tier_stats': rsi_tier_stats,
         'spread_series': spread_series,
         'spread_cur': spread_series[-1] if spread_series else None,
         'spread_ref': {'danger': 1.0, 'good': (1.5, 3.0),

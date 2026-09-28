@@ -316,19 +316,40 @@ async function load() {
   }});
   // 2c. RSI 买点（阈值见 config/market/red_dividend_rsi.yaml；买点=主周期 RSI 下穿阈值）
   if (d.rsi_main && d.rsi_params) {
-    const rp = d.rsi_params, rb = d.rsi_buy || [], rstat = d.rsi_buy_stats || {};
+    const rp = d.rsi_params, marks = d.rsi_marks || [], tierStats = d.rsi_tier_stats || [];
     const rsiDates = (d.rsi_basis === 'dates_long' && d.dates_long && d.dates_long.length) ? d.dates_long : d.dates;
-    const pctTxt = (med, wr) => (wr != null ? wr + '%（中位 ' + (med != null ? med + '%' : '—') + '）' : '—');
-    const rsiStat = rstat.count
-      ? ' · 近10年触发 ' + rstat.count + ' 次 · 20日胜率 ' + pctTxt(rstat.fwd20_median, rstat.fwd20_winrate)
-        + ' · 60日胜率 ' + pctTxt(rstat.fwd60_median, rstat.fwd60_winrate)
-      : ' · 该区间无买点';
-    const rsiTitle = '📉 RSI' + rp.period + ' 买点（下穿 ' + rp.buy + ' 买入 / 上穿 ' + rp.sell + ' 卖出'
-      + ' · 副线 RSI' + rp.period2 + ' · 后续收益按全收益口径）' + rsiStat;
-    charts.push({title: rsiTitle, el:'chart-rsi', h:330, init: el => {
+    // 档位配色：越深越重
+    const RT = ['#f59e0b', '#ef4444', '#7f1d1d'];
+    const rtColor = k => RT[Math.min(k, RT.length - 1)];
+    const bandColor = k => ['rgba(245,158,11,.06)', 'rgba(239,68,68,.07)', 'rgba(127,29,29,.10)'][Math.min(k, 2)];
+    // 标题里直接给出各档 60 日胜率/中位（状态口径）；样本 <20 天标注"样本少"
+    const tierTxt = tierStats.map(t => {
+      const s = t.fwd60 || {};
+      if (!s.n) return t.label + ' 无样本';
+      const tag = s.n < 20 ? '（样本少，仅供参考）' : '';
+      return t.label + ' ' + t.lo + '~' + t.threshold + '：' + s.win + '% / 中位 ' + s.med + '% (n=' + s.n + ')' + tag;
+    }).join(' · ');
+    const rsiTitle = '📉 RSI' + rp.period + ' 超卖买点（按深度分档，图钉=每段超卖的最低点·事后确认）'
+      + ' · 60日胜率/中位：' + (tierTxt || '无') + ' · 副线 RSI' + rp.period2 + ' · 收益按全收益口径';
+    charts.push({title: rsiTitle, el:'chart-rsi', h:340, init: el => {
       const c = echarts.init(el);
-      const buys = rb.map(b => ({coord:[b.date, b.rsi], value:b.rsi,
-        itemStyle:{color:'#ef4444'}, symbolSize:5})).filter(Boolean);
+      // 图钉按深度分级：浅档小圆点，深档带标签的大图钉，避免"最深那天反而没标注"
+      const pins = marks.map(m => {
+        const k = (m.tier || 1) - 1;
+        const deep = (m.tier || 1) >= 2;
+        // 仍在进行中的这段超卖，最低点是暂定的，用空心圆 + 文字区分
+        const lbl = m.tier_label + (m.ongoing ? '(进行中)' : '');
+        return {name: m.date + ' ' + lbl + '（进入日 ' + m.entry_date + '）',
+                coord: [m.date, m.rsi], value: lbl,
+                symbol: m.ongoing ? 'pin' : (deep ? 'pin' : 'circle'),
+                symbolSize: m.ongoing ? 34 : (deep ? (m.tier >= 3 ? 38 : 30) : 6),
+                itemStyle: {color: rtColor(k), borderColor: '#fff', borderWidth: m.ongoing ? 1.5 : 0,
+                            borderType: m.ongoing ? 'dashed' : 'solid'},
+                label: {show: deep || m.ongoing, formatter: lbl, color: '#fff', fontSize: 8}};
+      });
+      const bands = tierStats.map((t, k) => [
+        {yAxis: t.lo, itemStyle: {color: bandColor(k)}}, {yAxis: t.threshold}
+      ]);
       c.setOption({
         backgroundColor:chartBg, tooltip:{trigger:'axis'},
         legend:{data:['RSI'+rp.period, 'RSI'+rp.period2], textStyle:{color:tx,fontSize:9}, bottom:0},
@@ -342,15 +363,17 @@ async function load() {
         series:[
           {name:'RSI'+rp.period, type:'line', data:d.rsi_main, smooth:true, showSymbol:false,
            lineStyle:{color:'#f59e0b', width:1.6},
-           markArea:{silent:true, data:[
-             [{yAxis:0, itemStyle:{color:'rgba(239,68,68,.09)'}}, {yAxis:rp.buy}],
-             [{yAxis:rp.sell, itemStyle:{color:'rgba(16,185,129,.09)'}}, {yAxis:100}]
-           ]},
-           markLine:{silent:true, symbol:'none', data:[
-             {yAxis:rp.buy, lineStyle:{color:'#ef4444',type:'dashed'}, label:{formatter:'买 '+rp.buy, color:'#ef4444', fontSize:9}},
-             {yAxis:rp.sell, lineStyle:{color:'#10b981',type:'dashed'}, label:{formatter:'卖 '+rp.sell, color:'#10b981', fontSize:9}}
-           ]},
-           markPoint:{data:buys, symbol:'circle', symbolSize:5, label:{show:false}}},
+           markArea:{silent:true, data: bands.concat([[
+             {yAxis:rp.sell, itemStyle:{color:'rgba(16,185,129,.09)'}}, {yAxis:100}]])},
+           markLine:{silent:true, symbol:'none', data:
+             tierStats.slice(0, 1).map(t => ({yAxis:t.threshold, lineStyle:{color:'#ef4444',type:'dashed'},
+               label:{formatter:'买 '+t.threshold, color:'#ef4444', fontSize:9}}))
+             .concat(tierStats.slice(1).map((t, k) => ({yAxis:t.threshold,
+               lineStyle:{color:rtColor(k + 1), type:'dotted'},
+               label:{formatter:t.label + ' ' + t.threshold, color:rtColor(k + 1), fontSize:9}})))
+             .concat([{yAxis:rp.sell, lineStyle:{color:'#10b981',type:'dashed'},
+               label:{formatter:'卖 '+rp.sell, color:'#10b981', fontSize:9}}])},
+           markPoint:{data:pins, label:{show:false}}},
           {name:'RSI'+rp.period2, type:'line', data:d.rsi_ref, smooth:true, showSymbol:false,
            lineStyle:{color:'#539BF5', width:1, type:'dotted'}}
         ]
