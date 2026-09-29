@@ -235,6 +235,31 @@ def show_results(results):
               f'{r["trades"]["sell"]:>4}{r["trades"]["buyback"]:>5}{r["trades"]["reserve"]:>6}')
 
 
+def dca_lump(rows, n=10, per_year=None):
+    """100 万在起点承诺，分 n 年等额投入（不看信号）；未投出的部分按货币基金计息。
+
+    与 backtest() 同为「100 万起点承诺」，所以总收益率与年化可直接对比。
+    """
+    per = per_year if per_year is not None else CAPITAL / n
+    units, cash, bought = 0.0, CAPITAL, 0
+    peak, max_dd = CAPITAL, 0.0
+    for r in rows:
+        cash *= (1 + r['rate'] / 252.0)
+        if bought < n and r['date'] >= f'{2016 + bought}-09-28':
+            amt = min(per, cash)
+            units += amt / r['price']
+            cash -= amt
+            bought += 1
+        value = units * r['price'] + cash
+        peak = max(peak, value)
+        max_dd = max(max_dd, 1 - value / peak)
+    final = units * rows[-1]['price'] + cash
+    years = len(rows) / 244.0
+    return {'final': final, 'ret': final / CAPITAL - 1,
+            'cagr': (final / CAPITAL) ** (1 / years) - 1, 'maxdd': max_dd,
+            'injected': per * bought, 'cash_end': cash}
+
+
 def main():
     rows = load_data()
     years = len(rows) / 244.0
@@ -380,6 +405,26 @@ def main():
           f'（{rec["units_end"] / bh_u - 1:+.1%}），另有期末现金 {rec["cash_end"]:,.0f} 元')
     print('   反向操作（RSI20>73 买入、<35 卖出）会把这个折价变成溢价：'
           '每次"回补"都少买份额，累计份额净减少，必然跑输满仓持有。')
+
+    print('\n' + '=' * 96)
+    print('与无脑定投对比（三者都是 100 万在起点承诺，年化可直接比）')
+    dca = dca_lump(rows, n=10)
+    dca5 = dca_lump(rows, n=5)
+    cmp_hdr = (f'{"方案":<30}{"期末资产":>12}{"总收益率":>10}{"年化":>9}{"最大回撤":>10}')
+    print(cmp_hdr)
+    print('-' * 76)
+    print(f'{"建议规则（RSI20 择时增强）":<30}{rec["final"]:>12,.0f}{rec["ret"] * 100:>9.1f}%'
+          f'{rec["cagr"] * 100:>8.2f}%{rec["maxdd"] * 100:>9.1f}%')
+    print(f'{"无脑定投（每年 10 万 × 10 年）":<30}{dca["final"]:>12,.0f}{dca["ret"] * 100:>9.1f}%'
+          f'{dca["cagr"] * 100:>8.2f}%{dca["maxdd"] * 100:>9.1f}%')
+    print(f'{"无脑定投（每年 20 万 × 5 年）":<30}{dca5["final"]:>12,.0f}{dca5["ret"] * 100:>9.1f}%'
+          f'{dca5["cagr"] * 100:>8.2f}%{dca5["maxdd"] * 100:>9.1f}%')
+    print(f'{"一次性满仓持有":<30}{rs[0]["final"]:>12,.0f}{rs[0]["ret"] * 100:>9.1f}%'
+          f'{rs[0]["cagr"] * 100:>8.2f}%{rs[0]["maxdd"] * 100:>9.1f}%')
+    print(f'\n   建议规则 vs 无脑定投（每年 10 万）：期末多 '
+          f'{rec["final"] - dca["final"]:,.0f} 元，年化高 '
+          f'{(rec["cagr"] - dca["cagr"]) * 100:+.2f} 个百分点，'
+          f'回撤低 {(dca["maxdd"] - rec["maxdd"]) * 100:+.1f} 个百分点')
     for a, b, tag in (('2016-09-28', '2021-09-28', '前 5 年'),
                       ('2021-09-28', '2026-09-28', '后 5 年')):
         sub = load_data(a, b)
