@@ -246,6 +246,18 @@
         </table>
       </div>
 
+      <div class="pg-card">
+        <h3>💰 红利观察 · RSI 买卖点 <span class="badge" style="background:#E8F5E9;color:#2E7D32">新</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>Wilder RSI 引擎（RSI6/14/20，与 talib 逐点一致）</td><td>src/detectors/divergence.py</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>买/卖点各三档：状态 + 深度分档（非下穿事件）</td><td>config/market/red_dividend_rsi.yaml</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>分档胜率回测（9 红利指数合并池 + 单指数）</td><td>/api/market-scan/dividend-advice-detail</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>【操作建议】tab RSI 买点图（价格轴 + 买卖点标注）</td><td>dividend-advice-detail.html</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>备选图：价格/全收益归一化 + RSI6/14/20 图例开关</td><td>dividend-advice-detail.html</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>产品需求书 v1.4（§10 RSI / §11 双版式）</td><td>docs/product/红利观察买卖点模块_产品需求书.md</td></tr>
+        </table>
+      </div>
+
     </div>
 
             <table style="margin-top:6px">
@@ -595,6 +607,15 @@
 <div class="lesson-card"><div class="ln">128. 快照领先才重算，是增量的正确幂等语义</div><div class="ld">周线 CPA 增量第一版判据是「快照周落后于市场周」，有漏洞：CPA 行为空的股票永远不会被补上。改成「快照 max(scan_date) > CPA max(date) 才重算」后与数据层产出严格衔接，实测二次运行 0 行重写。增量判据要比较「上游产出 vs 下游落库」，不能只看上游与日历的关系。</div></div>
 <div class="lesson-card"><div class="ln">129. 参数化验收必须配回归基线，而不是靠自信</div><div class="ld">T2 把 21 个硬编码窗口改读 CFG，宣称「日线行为零变化」的证据是：改前先拍 5507 行基线，改后复跑逐字节一致。中途还抓到交接文档漏掉的 atr_series/ema_series 写死窗口（周线 atr_win=8 不参数化就是哑巴覆盖）。改造类任务的验收标准是可机检的（快照比对），不是「我确认没改行为」。</div></div>
 <div class="lesson-card"><div class="ln">130. 无上游证据的下游产物是定时炸弹</div><div class="ld">笔顶快照只回了 2 只时就跑了全市场 CPA，写出 238 万行 ⑥w/收敛判据恒 False 的半残数据，还混着旧引擎 dow==0 口径残留（日期键不同，REPLACE 覆盖不掉）。上游没就绪时跑下游，能跑通≠有效——下游管道要么前置预检（覆盖率<90% 拒跑），要么明标「半残、待 purge 重算」。</div></div>
+<div class="lesson-card"><div class="ln">131. 自写指标必须配外部基准逐点比对</div><div class="ld">compute_rsi 把已在种子里的 delta[i] 又折了一次，RSI6/14/20 从第二个值起全错，但函数不报错、曲线照样像模像样，肉眼完全看不出，手算 6 个收盘价才暴露。自己实现经典指标时，验收标准是「与 talib/手算逐点一致」，不是「看着对」。</div></div>
+<div class="lesson-card"><div class="ln">132. 缺一天数据不该让整张图消失</div><div class="ld">红利详情页在债券收益率最新行 y10 为 NULL 时抛 TypeError 直接 500；全收益滞后又让价格线与全收益线同时空白。前端健壮性问题的根因都是「单点失败拖垮整页」——一张图、一个字段的缺失必须局部降级，而不是整页交白卷。</div></div>
+<div class="lesson-card"><div class="ln">133. 静态图有数据量上限，压缩即失信息</div><div class="ld">10 年 RSI 画进静态图是密不透风的一团线，等于没画；默认窗口收到最近 2 年才有判读价值。图表默认范围应按「人眼可分辨」定，不是按「数据有多少」定。</div></div>
+<div class="lesson-card"><div class="ln">134. 用日计数做信号统计会把时间聚集当成独立样本</div><div class="ld">「深档更差」的结论来自按天计数 + 只用 4 个指数：超卖日天然成串，同一段行情被重复计入，相关性被这种伪重复拖负。改成按「段」取极值 + 9 指数合并后，深档是单调更好的。事件型信号做统计前必须先去掉时间聚集。</div></div>
+<div class="lesson-card"><div class="ln">135. 归一化基点不写在图上就是误导</div><div class="ld">价格与全收益都归一到 100，但可见窗口左边界不是 100（基点在默认窗口之外的 2016-09-28），用户拉到最早会以为算错了。图上有相对量纲时，必须把基点日期与数值写进标题或注释。</div></div>
+<div class="lesson-card"><div class="ln">136. 不能用取整后的数值做胜负判定</div><div class="ld">前瞻收益先 round 到 1 位小数再判 x&gt;0，于是 (0, 0.05%) 的微幅盈利全被算成亏损，胜率系统性低估（000922 买点 74.7%→75.8%）。判定用原始值，只有展示才取整。</div></div>
+<div class="lesson-card"><div class="ln">137. 重建脚本必须幂等，否则输出会被自己污染</div><div class="ld">regen_schema_summary.py 把自己的汇总行读回来当「旧说明」再拼一遍标记，于是每跑一次多一层「尚无独立章节」，库里已累积 33 行重复。凡是「读旧文件→写回」的脚本，都要能重复执行而结果不变。</div></div>
+<div class="lesson-card"><div class="ln">138. 同一张表有多章节时，索引不能取「最后出现」的那一节</div><div class="ld">汇总表的章节号取到最后匹配的标题，于是现役的 index_full_return_daily 被标成已废弃的 §18。出现同名多章节时要跳过标题含「已废弃」的那一节，否则索引会把读者指到历史存档。</div></div>
+<div class="lesson-card"><div class="ln">139. 写在别处的唤起词等于不存在</div><div class="ld">「收尾」这套六件套一直只写在 Hanako 的 pinned memory 里，DSH 会话读不到它，于是连续多轮收尾只 commit、不更新 progress/教训/待办，DATABASE_SCHEMA 也停更。跨 agent 复用的流程必须落成仓库里的 skill 文件（.agents/skills/shouwei/SKILL.md），不能只存在某个 agent 的记忆里。</div></div>
 
 </div>
 <script>
@@ -603,6 +624,29 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 </script>
 <script src="shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
+
+<div class="pg-section">
+<div class="section-title">📌 2026-09-29 收尾 · 红利 RSI 买卖点 + 前端健壮性</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-done"></span></td><td>红利详情页 500 修复：<code>bond_yield_daily</code> 最新行 y10 为 NULL，导致三序列相减 TypeError；3 处读取加 <code>y10 IS NOT NULL</code></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>全收益滞后修复：dd_series 改为按日期对齐 + 末值兜底，价格线计算与 tri_rows 解耦（此前两张图会同时消失）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>前端健壮性 A 级 11 处：单张图失败 / 单字段缺失不再白整页（c7f930b / a961766 / bc567b9 / a35a340 / dcc456b）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>RSI 引擎纠错</b>：<code>compute_rsi</code> 差一错误（种子内的 delta[i] 被重复折入），修复后 RSI6/14/20 与 talib 逐点一致（最大偏差 2.8e-14）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>红利 RSI 买卖点上线</b>：Wilder RSI6/14/20 + 买/卖点各三档；口径为「状态 + 深度分档」，档位区间互不重叠，标注取每段行情的极值点</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>分档阈值定稿：RSI6 买 29/20/10、卖 81/89/93；RSI14 买 38/31/24、卖 70/78/83；RSI20 买 40/35/28、卖 67/73/78（慢周期用更高阈值，按出现频率对齐）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>胜率口径修复：前瞻收益先取整再判正负，导致 (0, 0.05%) 被计为亏损；改用未取整值（000922 买点 74.7%→<b>75.8%</b>）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>合并回测（9 红利指数 / 60 日全收益 / 基准 62.3%）：买点三档 <b>69.9 / 74.3 / 81.4%</b>，卖点三档 56.4 / 46.7 / 25.3%</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>深度分档结论修正：按段去重 + 9 指数合并后深档单调更优；此前「深≠越该重仓」源自按天计数与 4 指数样本（伪相关）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>【操作建议】tab 新增 RSI 买点图；另有备选版式（价格+全收益归一化到基点 100、RSI6/14/20 图例开关），两张图都保留</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>图表可读性：静态图默认窗口改最近 2 年（10 年数据压成一团线）；RSI6 线宽降到 1.2，不再遮挡价格线与档位带</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>小红书文章《RSI 找红利买卖点》成稿 + 配图脚本（docs/article/，docs 不入库）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>DATABASE_SCHEMA.md：新增 <b>§84 index_fundamental_daily</b>（83.8 万行，此前无章节）、<b>§85 红利 RSI 买卖点</b>（说明不落库）；两节自动汇总重建至 110 表 / 4.04 亿行</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>regen_schema_summary.py 修复：重建幂等（标记不再累积，清掉 33 行重复）、废弃章节不再认领现役表行号（§18→§13）</td></tr>
+<tr><td><span class="pg-dot dot-todo"></span></td><td>review Spec 轴未做（Standards 轴此前覆盖过 dividend-advice-detail.html，但早于 RSI 图）——按收尾铁律本轮视为未完成</td></tr>
+<tr><td><span class="pg-dot dot-todo"></span></td><td>RSI 回测结果尚未落 <code>config/strategy/red-dividend-rsi.yaml</code>（现只在 config/market/ 下，仓位管理模块读不到）</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td>用户已明确不做：背离检测重跑（修复后 26/250 只有信号变化）、daily_update 5.5/5.6 执行时刻、前端 B/C 级约 19 组</td></tr>
+</table>
+</div>
 
 <div class="pg-section">
 <div class="section-title">📌 2026-09-18 收尾 · 周K线 CPA 判定引擎全链路上线</div>
