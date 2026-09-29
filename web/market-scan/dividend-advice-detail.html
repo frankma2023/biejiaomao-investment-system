@@ -456,114 +456,113 @@ async function load() {
       return t ? t.threshold : '?';
     };
 
-    // 主图（grid 0）：价格 + 默认周期的买卖点标在价格上
-    const d0 = per2.find(p => p.period === defP2) || per2[0];
-    const pxMarks = (d0.buy_marks || []).map(m => {
-      const i = altDates.indexOf(m.date);
-      if (i < 0) return null;
-      const deep = (m.tier || 1) >= 2;
-      return {name: m.date + ' ' + m.tier_label, coord: [m.date, altPrice[i]], value: m.tier_short,
-              symbol: deep ? 'pin' : 'circle', symbolSize: deep ? 26 : 7,
-              itemStyle: {color: '#ef4444', borderColor: '#fff', borderWidth: deep ? 1 : 0},
-              label: {show: deep, color: '#fff', fontSize: 8}};
-    }).filter(Boolean).concat((d0.sell_marks || []).map(m => {
-      const i = altDates.indexOf(m.date);
-      if (i < 0) return null;
-      const deep = (m.tier || 1) >= 2;
-      return {name: m.date + ' ' + m.tier_label, coord: [m.date, altPrice[i]], value: m.tier_short,
-              symbol: 'triangle', symbolRotate: 180, symbolSize: deep ? 16 : 9,
-              itemStyle: {color: '#10b981', borderColor: '#fff', borderWidth: deep ? 1 : 0},
-              label: {show: deep, color: '#fff', fontSize: 8}};
-    }).filter(Boolean));
+    // 主图（grid 0）：价格与全收益都归一到共同起点=100。
+    // 不能叠原值：价格约 4~6k、全收益约 9~13k，量纲差一倍，同轴会把价格线压扁。
+    // 起点取两者都有值的第一天，保证归一化基准一致。
+    let bi = 0;
+    while (bi < altPrice.length && (altPrice[bi] == null || !altTri || altTri[bi] == null)) bi++;
+    const baseP = altPrice[bi] || 1;
+    const baseT = (altTri && altTri[bi]) || 1;
+    const norm = (arr, base) => arr ? arr.map(v => v == null ? null : Math.round(v / base * 1000) / 10) : null;
+    const priceNorm = norm(altPrice, baseP);
+    const triNorm = altTri ? norm(altTri, baseT) : null;
+    const baseDate = altDates[bi] || '';
 
     const altSeries = [{
-      name: '价格', type: 'line', data: altPrice, xAxisIndex: 0, yAxisIndex: 0,
-      smooth: true, showSymbol: false, lineStyle: {color: '#c8c8cc', width: 1.1},
-      markPoint: {data: pxMarks, label: {show: false}}
+      name: '价格', type: 'line', data: priceNorm, xAxisIndex: 0, yAxisIndex: 0,
+      smooth: true, showSymbol: false, lineStyle: {color: '#c8c8cc', width: 1.2}
     }];
-    // 不放全收益线：价格指数（约 4~6k）与全收益指数（约 9~13k）量纲差一倍，
-    // 同轴会把价格线压扁在下方。主图只留价格，与上面那张图口径一致。
-    // 副图（grid 1/2/3）：每个周期一个面板，各自阈值线与档位色带
-    per2.forEach((p, k) => {
-      const gi = k + 1;
+    if (triNorm) {
+      altSeries.push({name: '全收益', type: 'line', data: triNorm, xAxisIndex: 0, yAxisIndex: 0,
+                      smooth: true, showSymbol: false, lineStyle: {color: '#f59e0b', width: 1.2}});
+    }
+    // 副图（grid 1）：三条 RSI 同处一格，各带自己的阈值线与档位色带，靠图例开关切换。
+    // 买卖点仍然标在 RSI 上，不标到价格上。
+    per2.forEach(p => {
       const col = PCOL2[p.period] || '#f59e0b';
       const tiers = p.buy_tiers || [], stiers = p.sell_tiers || [];
       const buys = (p.buy_marks || []).map(m => {
         const deep = (m.tier || 1) >= 2;
-        return {name: m.date + ' ' + m.tier_label, coord: [m.date, m.rsi], value: m.tier_short,
-                symbol: deep ? 'circle' : 'circle', symbolSize: deep ? 6 : 3,
-                itemStyle: {color: '#ef4444'}, label: {show: false}};
+        return {name: m.date + ' ' + m.tier_label + '（进入日 ' + m.entry_date + '）',
+                coord: [m.date, m.rsi], value: (m.tier_short || m.tier_label),
+                symbol: deep ? 'pin' : 'circle', symbolSize: deep ? 22 : 5,
+                itemStyle: {color: '#ef4444', borderColor: '#fff', borderWidth: deep ? 1 : 0},
+                label: {show: deep, formatter: m.tier_short, color: '#fff', fontSize: 8}};
       });
-      const sells = (p.sell_marks || []).map(m => ({
-        name: m.date + ' ' + m.tier_label, coord: [m.date, m.rsi], value: m.tier_short,
-        symbol: 'triangle', symbolRotate: 180, symbolSize: (m.tier || 1) >= 2 ? 6 : 3,
-        itemStyle: {color: '#10b981'}, label: {show: false}}));
+      const sells = (p.sell_marks || []).map(m => {
+        const deep = (m.tier || 1) >= 2;
+        return {name: m.date + ' ' + m.tier_label + '（进入日 ' + m.entry_date + '）',
+                coord: [m.date, m.rsi], value: (m.tier_short || m.tier_label),
+                symbol: 'triangle', symbolRotate: 180, symbolSize: deep ? 14 : 8,
+                itemStyle: {color: '#10b981', borderColor: '#fff', borderWidth: deep ? 1 : 0},
+                label: {show: deep, formatter: m.tier_short, color: '#fff', fontSize: 8}};
+      });
       altSeries.push({
         name: 'RSI' + p.period, type: 'line',
         data: p.values.map(v => v == null ? null : Math.round(v * 100) / 100),
-        xAxisIndex: gi, yAxisIndex: gi,
-        smooth: true, showSymbol: false, lineStyle: {color: col, width: 1.1},
+        xAxisIndex: 1, yAxisIndex: 1,
+        smooth: true, showSymbol: false, lineStyle: {color: col, width: 1.2},
         markArea: {silent: true, data: tiers.map((t, kk) => [
-          {yAxis: t.lo, itemStyle: {color: kk === 0 ? 'rgba(239,68,68,.08)' : 'rgba(239,68,68,.06)'}},
+          {yAxis: t.lo, itemStyle: {color: kk === 0 ? 'rgba(239,68,68,.07)' : 'rgba(239,68,68,.05)'}},
           {yAxis: t.threshold}]).concat(stiers.map(t => [
-          {yAxis: t.threshold, itemStyle: {color: 'rgba(16,185,129,.07)'}}, {yAxis: t.hi}]))},
+          {yAxis: t.threshold, itemStyle: {color: 'rgba(16,185,129,.06)'}}, {yAxis: t.hi}]))},
         markLine: {silent: true, symbol: 'none', data: (tiers.length ? [
           {yAxis: tiers[0].threshold, lineStyle: {color: '#ef4444', type: 'dashed', width: 0.8},
-           label: {formatter: String(tiers[0].threshold), color: '#ef4444', fontSize: 8, position: 'insideStartTop'}}] : [])
+           label: {formatter: 'RSI' + p.period + ' 买 ' + tiers[0].threshold, color: '#ef4444',
+                   fontSize: 8, position: 'insideStartTop'}}] : [])
           .concat(stiers.length ? [{yAxis: stiers[0].threshold, lineStyle: {color: '#10b981', type: 'dashed', width: 0.8},
-           label: {formatter: String(stiers[0].threshold), color: '#10b981', fontSize: 8, position: 'insideStartBottom'}}] : [])},
+           label: {formatter: 'RSI' + p.period + ' 卖 ' + stiers[0].threshold, color: '#10b981',
+                   fontSize: 8, position: 'insideStartBottom'}}] : [])},
         markPoint: {data: buys.concat(sells), label: {show: false}}
       });
     });
 
-    const altTitle = '📐 备选版式：价格主图 + RSI6/14/20 副图（十字线贯穿全部面板 · 默认近 2 年）'
-      + ' · 灰色圆点/图钉=RSI' + defP2 + ' 买点（标在价格上）· 绿色倒三角=卖点';
-    charts.push({title: altTitle, el:'chart-rsi-alt', h:780, init: el => {
+    // 默认：价格与全收益开、三条 RSI 只开默认周期（其余由用户点图例选）
+    const selAlt = {'价格': true, '全收益': true};
+    per2.forEach(p => { selAlt['RSI' + p.period] = (p.period === defP2); });
+
+    const altTitle = '📐 备选版式：价格/全收益主图（归一化·' + baseDate + '=100）+ RSI 单副图'
+      + '（点图例开关 RSI' + per2.map(p => p.period).join('/') + '，默认只开 RSI' + defP2
+      + ' · 十字线贯穿两个面板 · 拖滑块看更长）· 买卖点标在 RSI 上';
+    charts.push({title: altTitle, el:'chart-rsi-alt', h:640, init: el => {
       const c = echarts.init(el);
       const gridL = {left: '9%', right: '4%'};
+      const rsiThr = per2.map(p => 'RSI' + p.period + ' ' + thrOf(p.period, false) + '/' + thrOf(p.period, true)).join('　');
       c.setOption({
         backgroundColor: chartBg,
-        // 十字线联动：axisPointer.link 让所有面板的 x 轴指示线一起移动
+        // 十字线联动：axisPointer.link 让两个面板的 x 轴指示线一起移动
         axisPointer: {link: [{xAxisIndex: 'all'}], label: {backgroundColor: '#3a3a42', fontSize: 9}},
         tooltip: {trigger: 'axis', axisPointer: {type: 'cross', crossStyle: {color: '#8b8b90'}},
                   textStyle: {fontSize: 11}},
         title: [
-          {text: '价格（价格指数）', left: '9%', top: 2,
+          {text: '价格 / 全收益（归一化 · 起点=100）', left: '9%', top: 2,
            textStyle: {color: tx, fontSize: 10, fontWeight: 'normal'}},
-          {text: 'RSI6　买<' + thrOf(6, false) + ' / 卖>' + thrOf(6, true), left: '9%', top: '37%',
-           textStyle: {color: '#f59e0b', fontSize: 10, fontWeight: 'normal'}},
-          {text: 'RSI14　买<' + thrOf(14, false) + ' / 卖>' + thrOf(14, true), left: '9%', top: '54%',
-           textStyle: {color: '#539BF5', fontSize: 10, fontWeight: 'normal'}},
-          {text: 'RSI20　买<' + thrOf(20, false) + ' / 卖>' + thrOf(20, true), left: '9%', top: '71%',
-           textStyle: {color: '#a855f7', fontSize: 10, fontWeight: 'normal'}}
+          {text: 'RSI（阈值 ' + rsiThr + '）', left: '9%', top: '60%',
+           textStyle: {color: tx, fontSize: 10, fontWeight: 'normal'}}
         ],
-        legend: {data: ['价格', 'RSI6', 'RSI14', 'RSI20'],
-                 textStyle: {color: tx, fontSize: 9}, bottom: 0},
+        legend: {data: ['价格', '全收益'].concat(per2.map(p => 'RSI' + p.period)),
+                 selected: selAlt, textStyle: {color: tx, fontSize: 9}, bottom: 0},
         grid: [
-          Object.assign({top: 16, height: '30%'}, gridL),
-          Object.assign({top: '41%', height: '15%'}, gridL),
-          Object.assign({top: '58%', height: '15%'}, gridL),
-          Object.assign({top: '75%', height: '15%'}, gridL)
+          Object.assign({top: 18, height: '55%'}, gridL),
+          Object.assign({top: '66%', height: '26%'}, gridL)
         ],
-        xAxis: [0, 1, 2, 3].map(i => ({
+        xAxis: [0, 1].map(i => ({
           type: 'category', gridIndex: i, data: altDates, boundaryGap: false,
           axisLine: {lineStyle: {color: sp}},
-          axisLabel: {show: i === 3, color: tx, fontSize: 9},
+          axisLabel: {show: i === 1, color: tx, fontSize: 9},
           axisTick: {show: false},
-          axisPointer: {label: {show: i === 3}}
+          axisPointer: {label: {show: i === 1}}
         })),
         yAxis: [
-          {gridIndex: 0, type: 'value', scale: true, name: '价格', nameTextStyle: {color: tx, fontSize: 9},
-           axisLabel: {color: tx, fontSize: 9, formatter: v => (v / 1000).toFixed(1) + 'k'},
-           splitLine: {lineStyle: {color: sp}}},
-          ...[1, 2, 3].map(i => ({
-            gridIndex: i, type: 'value', min: 0, max: 100,
-            axisLabel: {color: tx, fontSize: 8}, splitNumber: 2,
-            splitLine: {lineStyle: {color: sp}}
-          }))
+          {gridIndex: 0, type: 'value', scale: true, name: '归一化',
+           nameTextStyle: {color: tx, fontSize: 9},
+           axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
+          {gridIndex: 1, type: 'value', min: 0, max: 100,
+           axisLabel: {color: tx, fontSize: 8}, splitNumber: 2,
+           splitLine: {lineStyle: {color: sp}}}
         ],
-        dataZoom: [{type: 'inside', xAxisIndex: [0, 1, 2, 3], start: 80, end: 100},
-                   {type: 'slider', xAxisIndex: [0, 1, 2, 3], start: 80, end: 100,
+        dataZoom: [{type: 'inside', xAxisIndex: [0, 1], start: 80, end: 100},
+                   {type: 'slider', xAxisIndex: [0, 1], start: 80, end: 100,
                     height: 10, bottom: 22,
           dataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},
           selectedDataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},
