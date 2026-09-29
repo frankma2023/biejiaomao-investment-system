@@ -18,6 +18,7 @@ PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOC = os.path.join(PROJECT_DIR, 'docs', 'DATABASE_SCHEMA.md')
 INV = os.path.join(PROJECT_DIR, 'data', 'db_inventory.json')
 DB_FILE = os.path.join(PROJECT_DIR, 'data', 'lixinger.db')
+MISSING_SECTION = '**尚无独立章节**'
 
 
 def human(n):
@@ -40,18 +41,24 @@ def build_summary(doc, rows):
     sections = {}
     for m in re.finditer(r'(?m)^## (\d+)\.\s*(.+?)\s*$', doc):
         num, title = m.groups()
+        # 同一张表可能既有现役章节又有「已废弃」章节（如 §13/§18）。废弃章节只是历史
+        # 存档，不该在汇总索引里认领这张表，否则行号会指向被替代的那一节。
+        if '已废弃' in title:
+            continue
         names_part, _, desc = title.partition(' — ')
         desc = strip_parens(desc)
         for ident in re.findall(r'[a-z][a-z0-9_]{2,}', names_part):
             if ident in rows:
                 sections[ident] = (num, desc)
 
-    # 旧汇总里的说明文案作为兜底
+    # 旧汇总里的说明文案作为兜底。必须先摘掉旧标记：本脚本的输出会被自己读回来，
+    # 不清洗就会每重建一次多拼一遍「尚无独立章节」。
     old_desc = {}
     for line in doc.split('\n'):
         m = re.match(r'^\|\s*(?:\d+[a-z]?|—)\s*\|\s*([a-z_0-9]+)\s*\|[^|]*\|\s*(.+?)\s*\|\s*$', line)
         if m:
-            old_desc.setdefault(m.group(1), strip_parens(m.group(2)))
+            note = strip_parens(m.group(2)).replace(MISSING_SECTION, '').strip()
+            old_desc.setdefault(m.group(1), note)
 
     documented = sorted(
         ((t, sections[t]) for t in sections if t in rows),
@@ -64,7 +71,7 @@ def build_summary(doc, rows):
         out.append(f'| {num} | {table} | {human(rows[table])} | {old_desc.get(table) or desc} |')
     for table in undocumented:
         note = old_desc.get(table, '')
-        out.append(f'| — | {table} | {human(rows[table])} | {note + " " if note else ""}**尚无独立章节** |')
+        out.append(f'| — | {table} | {human(rows[table])} | {note + " " if note else ""}{MISSING_SECTION} |')
     return out, documented, undocumented
 
 
