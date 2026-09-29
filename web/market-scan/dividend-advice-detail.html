@@ -320,6 +320,9 @@ async function load() {
   if (d.rsi_series && d.rsi_series.length) {
     const per = d.rsi_series;
     const rsiDates = (d.rsi_basis === 'dates_long' && d.dates_long && d.dates_long.length) ? d.dates_long : d.dates;
+    // 价格线：叠在 RSI 上，用来判断买点是否真的落在价格低点。走右轴，与 RSI 共用 x 轴。
+    // 长度必须与 rsiDates 一致才能逐点对齐（dates_long/closes_long 同源等长）。
+    const rsiPrice = (d.closes_long && d.closes_long.length === rsiDates.length) ? d.closes_long : d.closes;
     const PCOL = {6:'#f59e0b', 14:'#539BF5', 20:'#a855f7'};
     const pcol = p => PCOL[p] || '#f59e0b';
     const defP = d.rsi_default_period;
@@ -333,11 +336,11 @@ async function load() {
     const summ = per.map(p => 'RSI' + p.period
       + ' 买[' + (p.tier_stats || []).map(fmtStat).join(' ') + ']'
       + ' 卖[' + (p.sell_tier_stats || []).map(fmtStat).join(' ') + ']').join(' · ');
-    const rsiTitle = '📉 RSI 买卖点（点图例切换 RSI' + per.map(p => p.period).join('/') + '，默认只显示 RSI' + defP
+    const rsiTitle = '📉 RSI 买卖点（默认近 2 年·拖滑块看更长；灰线=价格·右轴；点图例切换 RSI' + per.map(p => p.period).join('/') + '，默认只显示 RSI' + defP
       + '；买点：圆点/图钉=每段超卖最低点 · 卖点：倒三角=每段超买最高点，按档位放大加标签，均事后确认）'
       + ' · 60日胜率/中位 ' + summ + '（* = 该档样本 <20 天，单只指数噪声大，仅供参考）'
       + ' · 收益按全收益口径';
-    charts.push({title: rsiTitle, el:'chart-rsi', h:350, init: el => {
+    charts.push({title: rsiTitle, el:'chart-rsi', h:380, init: el => {
       const c = echarts.init(el);
       const sel = {};
       // 卖点档配色：越极端越深
@@ -397,19 +400,37 @@ async function load() {
           markPoint: {data: buys.concat(sells), label: {show: false}}
         };
       });
+      // 价格线放最前（z 最低）→ 画在 RSI 与色带之下，但亮度足够仍可辨
+      const priceSeries = {
+        name: '价格', type: 'line', data: rsiPrice, yAxisIndex: 1, z: 1,
+        smooth: true, showSymbol: false,
+        lineStyle: {color: '#d4d4d8', width: 1.1, opacity: 0.9}
+      };
+      sel['价格'] = true;
       c.setOption({
         backgroundColor: chartBg, tooltip: {trigger: 'axis'},
-        legend: {data: per.map(p => 'RSI' + p.period), selected: sel,
+        legend: {data: ['价格'].concat(per.map(p => 'RSI' + p.period)), selected: sel,
                  textStyle: {color: tx, fontSize: 9}, bottom: 0},
-        grid: {left: '8%', right: '4%', top: 14, bottom: 66},
+        grid: {left: '8%', right: '9%', top: 14, bottom: 66},
         xAxis: {type: 'category', data: rsiDates, axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp}}},
-        yAxis: {type: 'value', min: 0, max: 100, axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
-        dataZoom: [{type: 'inside'}, {type: 'slider', height: 10, bottom: 26,
+        yAxis: [
+          {type: 'value', min: 0, max: 100, name: 'RSI',
+           nameTextStyle: {color: tx, fontSize: 9},
+           axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
+          {type: 'value', scale: true, name: '价格',
+           nameTextStyle: {color: tx, fontSize: 9},
+           axisLabel: {color: tx, fontSize: 9, formatter: v => (v / 1000).toFixed(1) + 'k'},
+           splitLine: {show: false}, axisLine: {lineStyle: {color: sp}}}
+        ],
+        // 默认只显示近 2 年：10 年 × 日线会把 RSI6 挤成一团，看不了细节。
+        // 想看更长历史拖下面的滑块即可（start=80 约等于最近 486 个交易日）。
+        dataZoom: [{type: 'inside', start: 80, end: 100},
+                   {type: 'slider', start: 80, end: 100, height: 10, bottom: 26,
           dataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},
           selectedDataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},
           borderColor: 'rgba(139,139,144,.25)', fillerColor: 'rgba(139,139,144,.12)',
           handleSize: '80%', showDetail: false}],
-        series: series
+        series: [priceSeries].concat(series)
       });
       return c;
     }});
