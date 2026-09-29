@@ -535,17 +535,19 @@ async function load() {
         tooltip: {trigger: 'axis', axisPointer: {type: 'cross', crossStyle: {color: '#8b8b90'}},
                   textStyle: {fontSize: 11}},
         title: [
-          {text: '价格 / 全收益（均以 ' + baseDate + ' = 100 归一化；默认视图左边缘不等于 100）',
+          {text: '价格 / 全收益（均以 ' + baseDate + ' = 100 归一化；默认视图左边缘不等于 100）\n'
+               + '两线间距 = 累计分红再投贡献，主要在每个 5~7 月台阶式拉开（A股除息集中期，6+7 月占十年分红约 68%）',
            left: '9%', top: 2,
-           textStyle: {color: tx, fontSize: 10, fontWeight: 'normal'}},
-          {text: 'RSI（阈值 ' + rsiThr + '）', left: '9%', top: '60%',
+           textStyle: {color: tx, fontSize: 10, fontWeight: 'normal', lineHeight: 14}},
+          {text: 'RSI（阈值 ' + rsiThr + '）', left: '9%', top: '62%',
            textStyle: {color: tx, fontSize: 10, fontWeight: 'normal'}}
         ],
         legend: {data: ['价格', '全收益'].concat(per2.map(p => 'RSI' + p.period)),
                  selected: selAlt, textStyle: {color: tx, fontSize: 9}, bottom: 0},
         grid: [
-          Object.assign({top: 18, height: '55%'}, gridL),
-          Object.assign({top: '66%', height: '26%'}, gridL)
+          // 顶标题占两行，主图上边距相应下移
+          Object.assign({top: 42, height: '50%'}, gridL),
+          Object.assign({top: '68%', height: '24%'}, gridL)
         ],
         xAxis: [0, 1].map(i => ({
           type: 'category', gridIndex: i, data: altDates, boundaryGap: false,
