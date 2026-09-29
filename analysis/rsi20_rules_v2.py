@@ -189,6 +189,78 @@ def rule2(series, events, exec_lag=1, annual=10000.0):
     }
 
 
+def rule2_v2(series, events, exec_lag=1, size_strong=10000.0, size_extreme=20000.0,
+             cap=30000.0, annual_min=10000.0, year_mode='rolling'):
+    """修订规则2：每年至少 1 万；强买 1 万、极强买 2 万；年度上限 3 万；零信号年补 1 万。
+
+    year_mode='rolling'：从 2016-09-28 起每满 12 个月为一个额度年（10 个）。
+    year_mode='calendar'：自然年（2016 为 09-28 起的残年，2026 为至 09-28 的残年）。
+    因为单次强买就是 1 万，任何有信号的额度年投入必然 >= 1 万，所以「至少 1 万」只在零信号年生效。
+    """
+    prices = [r[2] for r in series]
+    dates = [r[0] for r in series]
+
+    def ykey(d):
+        y, m, day = int(d[:4]), int(d[5:7]), int(d[8:10])
+        if year_mode == 'calendar':
+            return y - 2016
+        return max(0, min(y - 2016 - (1 if (m, day) < (9, 28) else 0), 9))
+
+    n_buckets = 11 if year_mode == 'calendar' else 10
+    units, injected = 0.0, 0.0
+    spent, skipped = {}, 0
+    flows, log = [], []
+    signalled = set()
+
+    for i, kind, t in events:
+        if kind != 'B':
+            continue
+        want = size_strong if t == 2 else (size_extreme if t == 3 else 0.0)
+        if want <= 0:
+            continue
+        j = i + exec_lag
+        if j >= len(series):
+            continue
+        d, _v, p = series[j]
+        b = ykey(d)
+        signalled.add(b)
+        if spent.get(b, 0.0) + want > cap + 1e-9:
+            skipped += 1
+            log.append((d, f'{"极强" if t == 3 else "强"}买 {want:,.0f}', 0.0, 'skip', b))
+            continue
+        spent[b] = spent.get(b, 0.0) + want
+        units += want / p
+        injected += want
+        flows.append((d, -want))
+        log.append((d, f'{"极强" if t == 3 else "强"}买 {want:,.0f}', want, 'buy', b))
+
+    filled = []
+    for b in range(n_buckets):
+        if b in signalled:
+            continue
+        idxs = [k for k, d in enumerate(dates) if ykey(d) == b]
+        if not idxs:
+            continue
+        k = idxs[-1]
+        d, p = dates[k], prices[k]
+        units += annual_min / p
+        injected += annual_min
+        flows.append((d, -annual_min))
+        spent[b] = annual_min
+        filled.append((d, b))
+        log.append((d, f'零信号年补 {annual_min:,.0f}', annual_min, 'fallback', b))
+
+    hold = units * prices[-1]
+    committed = annual_min * n_buckets
+    return {
+        'hold': hold, 'total': hold, 'injected': injected, 'committed': committed,
+        'ret': hold / injected - 1.0 if injected else None,
+        'irr': xirr(flows + [(dates[-1], hold)]) if flows else None,
+        'skipped': skipped, 'spent': spent, 'log': log, 'filled': filled,
+        'n_buckets': n_buckets,
+    }
+
+
 def dca_benchmark(series, annual=10000.0, n_years=10):
     """基准：不看信号，每年在周年日固定投入 annual，共 n_years 次。"""
     prices = {r[0]: r[2] for r in series}
@@ -228,9 +300,10 @@ def robustness(codes):
     print('\n' + '=' * 108)
     print('稳健性检验：同一套规则换红利指数（窗口 2016-09-28 ~ 2026-09-28）')
     hdr = (f'{"指数":<9}{"区间涨幅":>9}{"买入持有XIRR":>13}'
-           f'{"规则1收益":>10}{"规则1 XIRR":>12}{"规则2收益":>10}{"规则2 XIRR":>12}{"定投XIRR":>10}')
+           f'{"规则1收益":>10}{"规则1 XIRR":>12}{"旧规则2 XIRR":>13}'
+           f'{"新规则2投入":>12}{"新规则2收益":>12}{"新规则2 XIRR":>14}{"定投XIRR":>10}')
     print(hdr)
-    print('-' * 106)
+    print('-' * 126)
     for c in codes:
         base.CODE = c
         try:
@@ -247,11 +320,13 @@ def robustness(codes):
         ev = base.events_by_episode(series)
         r1 = rule1(series, ev)
         r2 = rule2(series, ev)
+        r3 = rule2_v2(series, ev)
         d = dca_benchmark(series)
         print(f'{c:<9}{bh * 100:>8.1f}%{bh_ann * 100:>12.2f}%'
-              f'{r1["ret"] * 100:>9.1f}%{r1["irr"] * 100:>11.2f}%'
-              f'{r2["ret"] * 100:>9.1f}%{r2["irr"] * 100:>11.2f}%{d["irr"] * 100:>9.2f}%')
-    print('   规则1收益＝期末总资产/累计外部投入-1；规则2收益＝期末持仓/累计投入-1（两者投入额不同，跨行别比收益，比 XIRR）')
+              f'{r1["ret"] * 100:>9.1f}%{r1["irr"] * 100:>11.2f}%{r2["irr"] * 100:>12.2f}%'
+              f'{r3["injected"]:>12,.0f}{r3["ret"] * 100:>11.1f}%{r3["irr"] * 100:>13.2f}%'
+              f'{d["irr"] * 100:>9.2f}%')
+    print('   新规则2投入＝实际投出金额；其收益＝期末持仓/实际投入-1，跨行别比 XIRR')
 
 
 def main():
@@ -305,6 +380,31 @@ def main():
     show('基准：不看信号，每年周年日固定投 1 万（共 10 次）', b)
     print(f'   对比：规则2 段口径 XIRR {r2["irr"] * 100:+.2f}%  vs  无脑定投 {b["irr"] * 100:+.2f}%'
           f'  →  {(r2["irr"] - b["irr"]) * 100:+.2f} 个百分点')
+
+    print('\n' + '=' * 92)
+    print('规则2 修订版  每年至少 1 万 / 强买 1 万 / 极强买 2 万 / 年度上限 3 万 / 零信号年补 1 万')
+    for mode, label in (('rolling', '额度年＝滚动 12 个月（自 2016-09-28 起）'),
+                        ('calendar', '额度年＝自然年')):
+        r = rule2_v2(series, ev_ep, year_mode=mode)
+        show(label, r)
+        used = '  '.join(f'{2016 + k}:{r["spent"].get(k, 0):,.0f}' for k in range(r['n_buckets']))
+        print(f'   各额度年投入 {used}')
+        print(f'   零信号年补投 {len(r["filled"])} 次    因超额度放弃 {r["skipped"]} 次')
+        if mode == 'rolling':
+            rnew = r
+    print(f'\n   对比：修订版 XIRR {rnew["irr"] * 100:+.2f}%  vs  旧版(每年1万/强买5千/极强买1万) '
+          f'{r2["irr"] * 100:+.2f}%  vs  无脑定投1万/年 {b["irr"] * 100:+.2f}%')
+
+    per_year = rnew['injected'] / 10.0
+    bsame = dca_benchmark(series, annual=per_year)
+    print(f'\n-- 基准：等额无脑定投（每年 {per_year:,.0f} 元 × 10 年 = {bsame["injected"]:,.0f} 元，不看信号）')
+    print(f'   期末 {bsame["hold"]:,.0f}   总收益率 {bsame["ret"] * 100:+.1f}%   XIRR {bsame["irr"] * 100:+.2f}%')
+    print(f'   等额对比：修订版 {rnew["ret"] * 100:+.1f}% / XIRR {rnew["irr"] * 100:+.2f}%'
+          f'  vs  等额无脑定投 {bsame["ret"] * 100:+.1f}% / XIRR {bsame["irr"] * 100:+.2f}%')
+
+    print('\n-- 规则2 修订版（滚动额度年）逐笔明细')
+    for d, what, amt, act, bk in rnew['log']:
+        print(f'   {d}  第{bk + 1}额度年  {what:<18}{"（放弃）" if act == "skip" else f"{amt:>9,.0f} 元"}')
     lr, la = (100000.0 * (1 + bh)), bh_ann
     print(f'\n-- 基准：10 万在 2016-09-28 一次性投入')
     print(f'   期末 {lr:,.0f}   总收益率 {bh * 100:+.1f}%   XIRR {la * 100:+.2f}%')
