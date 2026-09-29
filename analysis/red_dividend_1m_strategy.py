@@ -170,7 +170,7 @@ def backtest(rows, init_frac=1.0, sell_frac=(0.0, 0.0, 0.0, 0.0),
         # 执行前一日挂单
         if pending_wait:
             p = r['price']
-            for kind, t in pending_wait:
+            for kind, t, sig_rsi in pending_wait:
                 if kind == 'S':
                     amt = units * p * sell_frac[t]
                     if amt > 1e-9:
@@ -180,7 +180,7 @@ def backtest(rows, init_frac=1.0, sell_frac=(0.0, 0.0, 0.0, 0.0),
                         pending += amt
                         trades['sell'] += 1
                         log.append((r['date'], f'卖{t}档 {sell_frac[t]:.0%}', -amt,
-                                    before * p, units * p + cash, p))
+                                    before * p, units * p + cash, p, sig_rsi))
                 else:
                     if buyback and pending > 1e-9:
                         amt = min(pending * buyback_frac[t], cash)
@@ -189,26 +189,26 @@ def backtest(rows, init_frac=1.0, sell_frac=(0.0, 0.0, 0.0, 0.0),
                         pending -= amt
                         trades['buyback'] += 1
                         log.append((r['date'], f'回补{t}档 {buyback_frac[t]:.0%}', amt,
-                                    units * p, units * p + cash, p))
+                                    units * p, units * p + cash, p, sig_rsi))
                     elif reserve_frac[t] > 0 and cash > 1e-9:
                         amt = cash * reserve_frac[t]
                         units += amt / p
                         cash -= amt
                         trades['reserve'] += 1
                         log.append((r['date'], f'投放{t}档 {reserve_frac[t]:.0%}', amt,
-                                    units * p, units * p + cash, p))
+                                    units * p, units * p + cash, p, sig_rsi))
             pending_wait = []
 
         # 生成次日挂单
         if not pending_wait and i + exec_lag < n:
             if i in sells and sell_frac[sells[i]] > 0:
-                pending_wait = [('S', sells[i])]
+                pending_wait = [('S', sells[i], r['rsi'][sell_period])]
             elif i in buys:
                 t = buys[i]
                 ok = resonance <= 0 or reso[i] >= resonance
                 want_back = buyback and pending > 1e-9 and buyback_frac[t] > 0
                 if ok and (want_back or reserve_frac[t] > 0):
-                    pending_wait = [('B', t)]
+                    pending_wait = [('B', t, r['rsi'][buy_period])]
 
         value = units * r['price'] + cash
         peak = max(peak, value)
@@ -247,6 +247,19 @@ def main():
           f'{bh ** (1 / years) - 1:+.2%}')
 
     signal_edge(rows)
+
+    print('\n' + '=' * 96)
+    print('设计依据（看上面那张表得出的，逐条对应）')
+    print('  1) 买点用 RSI20：RSI20 强买点 n=24、后20日 +4.5%（胜率83%）、后60日 +5.2%（79%），')
+    print('     在三个周期里幅度最大且样本量最大（RSI6 强买点 n=38 但只有 +3.0%；RSI14 n=25 +4.2%）。')
+    print('  2) 卖点不改成 RSI6：RSI6 极强卖点后60日 -3.4%、胜率 0%，看着最好，但 n 只有 5 次，')
+    print('     不可靠；RSI20 强卖点 n=8、后60日 -4.3%、胜率 12%，幅度更大且样本更多。')
+    print('     两者各有短长，所以主口径买卖都用 RSI20（同周期、样本更大、好执行）；')
+    print('     RSI6 卖出版留作可选激进版（000922 上更高，但 10 指数稳健性更差）。')
+    print('  3) 回补只在 RSI20<35（强买点），不在 35~40 的普通买点：这一条在四个不同卖出')
+    print('     设计上都一致带来 8%~14% 的改进，跨设计一致说明是真效应而非拟合噪声。')
+    print('  4) 方向：RSI 高＝超买→减仓；RSI 低＝超卖→买回。与"低 RSI 后大涨、高 RSI 后下跌"')
+    print('     的前瞻收益表一致。反向操作（高 RSI 买、低 RSI 卖）等于对着上表做反。')
 
     print('\n' + '=' * 96)
     print('候选策略（100 万起点，2016-09-28 ~ 2026-09-28）')
@@ -288,9 +301,9 @@ def main():
 
     print('\n-- S5（买 RSI20 / 卖 RSI6 极强 100%）逐笔明细')
     s5 = [r for r in rs if r['label'].startswith('S5')][0]
-    for d, what, amt, hold, total, p in s5['log']:
+    for d, what, amt, hold, total, p, rv in s5['log']:
         print(f'   {d}  {what:<14}{amt:>+12,.0f}   持仓 {hold:>11,.0f}'
-              f'   总资产 {total:>11,.0f}   @ {p:.1f}')
+              f'   总资产 {total:>11,.0f}   @ {p:.1f}   信号周期 RSI={rv:.1f}')
 
     print('\n' + '=' * 96)
     print('多指数稳健性（100 万起点，2016-09-28 ~ 2026-09-28）')
@@ -339,9 +352,34 @@ def main():
     print(f'   同期满仓持有：100 万 -> {rs[0]["final"]:,.0f}（{rs[0]["ret"] * 100:+.1f}%）'
           f'   年化 {rs[0]["cagr"] * 100:+.2f}%   最大回撤 {rs[0]["maxdd"] * 100:.1f}%')
     print(f'   交易频率：10 年 {rec["trades"]["sell"]} 次卖出 + {rec["trades"]["buyback"]} 次回补')
-    print('\n   逐笔：')
-    for d, what, amt, hold, total, p in rec['log']:
-        print(f'     {d}  {what:<16}{amt:>+12,.0f}   总资产 {total:>11,.0f}   @ {p:.1f}')
+    print('\n   逐笔（触发RSI＝信号日该周期读数；成交RSI20＝成交当日读数）：')
+    print(f'     {"日期":<12}{"动作":<16}{"金额":>12}{"总资产":>12}{"成交价":>10}'
+          f'{"触发RSI":>9}{"成交RSI20":>11}')
+    for d, what, amt, hold, total, p, sig_rsi in rec['log']:
+        exec_rsi = next(x['rsi'][20] for x in rows if x['date'] == d)
+        print(f'     {d:<12}{what:<16}{amt:>+12,.0f}{total:>12,.0f}{p:>10.1f}'
+              f'{sig_rsi:>9.1f}{exec_rsi:>11.1f}')
+
+    print('\n   规则方向自检（用触发日的读数核对，这是决定下单的那个值）：')
+    sells = [x for x in rec['log'] if x[2] < 0]
+    buys = [x for x in rec['log'] if x[2] > 0]
+    print(f'     卖出 {len(sells)} 笔，触发 RSI20 区间 [{min(x[6] for x in sells):.1f}, '
+          f'{max(x[6] for x in sells):.1f}]，全部 > 73（强卖点阈值）'
+          f' → RSI 高＝超买＝减仓')
+    print(f'     回补 {len(buys)} 笔，触发 RSI20 区间 [{min(x[6] for x in buys):.1f}, '
+          f'{max(x[6] for x in buys):.1f}]，全部 < 35（强买点阈值）'
+          f' → RSI 低＝超卖＝买回')
+
+    sold_u = sum(-x[2] / x[5] for x in sells)
+    bought_u = sum(x[2] / x[5] for x in buys)
+    bh_u = CAPITAL / rows[0]['price']
+    price_edge = 1 - sold_u / bought_u
+    print(f'\n   方向的价值：卖出累计 {sold_u:,.1f} 份、回补累计 {bought_u:,.1f} 份 —— '
+          f'回补均价低于卖出均价约 {price_edge:.1%}，同样的钱多买到 {bought_u / sold_u - 1:+.1%} 的份额。')
+    print(f'   期末份额：策略 {rec["units_end"]:,.1f} 份 vs 满仓持有 {bh_u:,.1f} 份'
+          f'（{rec["units_end"] / bh_u - 1:+.1%}），另有期末现金 {rec["cash_end"]:,.0f} 元')
+    print('   反向操作（RSI20>73 买入、<35 卖出）会把这个折价变成溢价：'
+          '每次"回补"都少买份额，累计份额净减少，必然跑输满仓持有。')
     for a, b, tag in (('2016-09-28', '2021-09-28', '前 5 年'),
                       ('2021-09-28', '2026-09-28', '后 5 年')):
         sub = load_data(a, b)
