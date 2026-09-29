@@ -535,7 +535,8 @@ async function load() {
         tooltip: {trigger: 'axis', axisPointer: {type: 'cross', crossStyle: {color: '#8b8b90'}},
                   textStyle: {fontSize: 11}},
         title: [
-          {text: '价格 / 全收益（归一化 · 起点=100）', left: '9%', top: 2,
+          {text: '价格 / 全收益（均以 ' + baseDate + ' = 100 归一化；默认视图左边缘不等于 100）',
+           left: '9%', top: 2,
            textStyle: {color: tx, fontSize: 10, fontWeight: 'normal'}},
           {text: 'RSI（阈值 ' + rsiThr + '）', left: '9%', top: '60%',
            textStyle: {color: tx, fontSize: 10, fontWeight: 'normal'}}
