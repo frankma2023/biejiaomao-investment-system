@@ -393,8 +393,12 @@ async function load() {
         });
         sel['RSI' + p.period] = (p.period === defP);
         return {
-          name: 'RSI' + p.period, type: 'line', data: p.values, smooth: true, showSymbol: false,
-          lineStyle: {color: col, width: p.period === defP ? 1.8 : 1.2},
+          name: 'RSI' + p.period, type: 'line',
+          // 展示用取整到 2 位：接口返回的是未取整浮点，tooltip 会显示成 45.920629562019904
+          data: p.values.map(v => v == null ? null : Math.round(v * 100) / 100),
+          smooth: true, showSymbol: false,
+          // 三条线宽一致：默认周期不再加粗，避免遮挡价格线与色带
+          lineStyle: {color: col, width: 1.2},
           markArea: {silent: true, data: bands},
           markLine: {silent: true, symbol: 'none', data: lines},
           markPoint: {data: buys.concat(sells), label: {show: false}}
@@ -431,6 +435,141 @@ async function load() {
           borderColor: 'rgba(139,139,144,.25)', fillerColor: 'rgba(139,139,144,.12)',
           handleSize: '80%', showDetail: false}],
         series: [priceSeries].concat(series)
+      });
+      return c;
+    }});
+  }
+  // 2d. 备选版式：价格主图 + RSI6/14/20 三个副图，十字线贯穿主副图（类似成交量图）
+  // 与上面的 chart-rsi 是同一份数据、两种呈现，供对比取舍。
+  if (d.rsi_series && d.rsi_series.length) {
+    const per2 = d.rsi_series;
+    const defP2 = d.rsi_default_period;
+    const altDates = (d.rsi_basis === 'dates_long' && d.dates_long && d.dates_long.length) ? d.dates_long : d.dates;
+    const altPrice = (d.closes_long && d.closes_long.length === altDates.length) ? d.closes_long : d.closes;
+    const altTri = (d.tri_long && d.tri_long.length === altDates.length) ? d.tri_long : null;
+    const PCOL2 = {6:'#f59e0b', 14:'#539BF5', 20:'#a855f7'};
+    const SELLC2 = ['#6ee7b7', '#10b981', '#047857'];
+    // 面板标题里显示该周期的买/卖阈值
+    const thrOf = (pd, sell) => {
+      const q = per2.find(x => x.period === pd);
+      const t = q && (sell ? (q.sell_tiers || [])[0] : (q.buy_tiers || [])[0]);
+      return t ? t.threshold : '?';
+    };
+
+    // 主图（grid 0）：价格 + 默认周期的买卖点标在价格上
+    const d0 = per2.find(p => p.period === defP2) || per2[0];
+    const pxMarks = (d0.buy_marks || []).map(m => {
+      const i = altDates.indexOf(m.date);
+      if (i < 0) return null;
+      const deep = (m.tier || 1) >= 2;
+      return {name: m.date + ' ' + m.tier_label, coord: [m.date, altPrice[i]], value: m.tier_short,
+              symbol: deep ? 'pin' : 'circle', symbolSize: deep ? 26 : 7,
+              itemStyle: {color: '#ef4444', borderColor: '#fff', borderWidth: deep ? 1 : 0},
+              label: {show: deep, color: '#fff', fontSize: 8}};
+    }).filter(Boolean).concat((d0.sell_marks || []).map(m => {
+      const i = altDates.indexOf(m.date);
+      if (i < 0) return null;
+      const deep = (m.tier || 1) >= 2;
+      return {name: m.date + ' ' + m.tier_label, coord: [m.date, altPrice[i]], value: m.tier_short,
+              symbol: 'triangle', symbolRotate: 180, symbolSize: deep ? 16 : 9,
+              itemStyle: {color: '#10b981', borderColor: '#fff', borderWidth: deep ? 1 : 0},
+              label: {show: deep, color: '#fff', fontSize: 8}};
+    }).filter(Boolean));
+
+    const altSeries = [{
+      name: '价格', type: 'line', data: altPrice, xAxisIndex: 0, yAxisIndex: 0,
+      smooth: true, showSymbol: false, lineStyle: {color: '#c8c8cc', width: 1.1},
+      markPoint: {data: pxMarks, label: {show: false}}
+    }];
+    // 不放全收益线：价格指数（约 4~6k）与全收益指数（约 9~13k）量纲差一倍，
+    // 同轴会把价格线压扁在下方。主图只留价格，与上面那张图口径一致。
+    // 副图（grid 1/2/3）：每个周期一个面板，各自阈值线与档位色带
+    per2.forEach((p, k) => {
+      const gi = k + 1;
+      const col = PCOL2[p.period] || '#f59e0b';
+      const tiers = p.buy_tiers || [], stiers = p.sell_tiers || [];
+      const buys = (p.buy_marks || []).map(m => {
+        const deep = (m.tier || 1) >= 2;
+        return {name: m.date + ' ' + m.tier_label, coord: [m.date, m.rsi], value: m.tier_short,
+                symbol: deep ? 'circle' : 'circle', symbolSize: deep ? 6 : 3,
+                itemStyle: {color: '#ef4444'}, label: {show: false}};
+      });
+      const sells = (p.sell_marks || []).map(m => ({
+        name: m.date + ' ' + m.tier_label, coord: [m.date, m.rsi], value: m.tier_short,
+        symbol: 'triangle', symbolRotate: 180, symbolSize: (m.tier || 1) >= 2 ? 6 : 3,
+        itemStyle: {color: '#10b981'}, label: {show: false}}));
+      altSeries.push({
+        name: 'RSI' + p.period, type: 'line',
+        data: p.values.map(v => v == null ? null : Math.round(v * 100) / 100),
+        xAxisIndex: gi, yAxisIndex: gi,
+        smooth: true, showSymbol: false, lineStyle: {color: col, width: 1.1},
+        markArea: {silent: true, data: tiers.map((t, kk) => [
+          {yAxis: t.lo, itemStyle: {color: kk === 0 ? 'rgba(239,68,68,.08)' : 'rgba(239,68,68,.06)'}},
+          {yAxis: t.threshold}]).concat(stiers.map(t => [
+          {yAxis: t.threshold, itemStyle: {color: 'rgba(16,185,129,.07)'}}, {yAxis: t.hi}]))},
+        markLine: {silent: true, symbol: 'none', data: (tiers.length ? [
+          {yAxis: tiers[0].threshold, lineStyle: {color: '#ef4444', type: 'dashed', width: 0.8},
+           label: {formatter: String(tiers[0].threshold), color: '#ef4444', fontSize: 8, position: 'insideStartTop'}}] : [])
+          .concat(stiers.length ? [{yAxis: stiers[0].threshold, lineStyle: {color: '#10b981', type: 'dashed', width: 0.8},
+           label: {formatter: String(stiers[0].threshold), color: '#10b981', fontSize: 8, position: 'insideStartBottom'}}] : [])},
+        markPoint: {data: buys.concat(sells), label: {show: false}}
+      });
+    });
+
+    const altTitle = '📐 备选版式：价格主图 + RSI6/14/20 副图（十字线贯穿全部面板 · 默认近 2 年）'
+      + ' · 灰色圆点/图钉=RSI' + defP2 + ' 买点（标在价格上）· 绿色倒三角=卖点';
+    charts.push({title: altTitle, el:'chart-rsi-alt', h:780, init: el => {
+      const c = echarts.init(el);
+      const gridL = {left: '9%', right: '4%'};
+      c.setOption({
+        backgroundColor: chartBg,
+        // 十字线联动：axisPointer.link 让所有面板的 x 轴指示线一起移动
+        axisPointer: {link: [{xAxisIndex: 'all'}], label: {backgroundColor: '#3a3a42', fontSize: 9}},
+        tooltip: {trigger: 'axis', axisPointer: {type: 'cross', crossStyle: {color: '#8b8b90'}},
+                  textStyle: {fontSize: 11}},
+        title: [
+          {text: '价格（价格指数）', left: '9%', top: 2,
+           textStyle: {color: tx, fontSize: 10, fontWeight: 'normal'}},
+          {text: 'RSI6　买<' + thrOf(6, false) + ' / 卖>' + thrOf(6, true), left: '9%', top: '37%',
+           textStyle: {color: '#f59e0b', fontSize: 10, fontWeight: 'normal'}},
+          {text: 'RSI14　买<' + thrOf(14, false) + ' / 卖>' + thrOf(14, true), left: '9%', top: '54%',
+           textStyle: {color: '#539BF5', fontSize: 10, fontWeight: 'normal'}},
+          {text: 'RSI20　买<' + thrOf(20, false) + ' / 卖>' + thrOf(20, true), left: '9%', top: '71%',
+           textStyle: {color: '#a855f7', fontSize: 10, fontWeight: 'normal'}}
+        ],
+        legend: {data: ['价格', 'RSI6', 'RSI14', 'RSI20'],
+                 textStyle: {color: tx, fontSize: 9}, bottom: 0},
+        grid: [
+          Object.assign({top: 16, height: '30%'}, gridL),
+          Object.assign({top: '41%', height: '15%'}, gridL),
+          Object.assign({top: '58%', height: '15%'}, gridL),
+          Object.assign({top: '75%', height: '15%'}, gridL)
+        ],
+        xAxis: [0, 1, 2, 3].map(i => ({
+          type: 'category', gridIndex: i, data: altDates, boundaryGap: false,
+          axisLine: {lineStyle: {color: sp}},
+          axisLabel: {show: i === 3, color: tx, fontSize: 9},
+          axisTick: {show: false},
+          axisPointer: {label: {show: i === 3}}
+        })),
+        yAxis: [
+          {gridIndex: 0, type: 'value', scale: true, name: '价格', nameTextStyle: {color: tx, fontSize: 9},
+           axisLabel: {color: tx, fontSize: 9, formatter: v => (v / 1000).toFixed(1) + 'k'},
+           splitLine: {lineStyle: {color: sp}}},
+          ...[1, 2, 3].map(i => ({
+            gridIndex: i, type: 'value', min: 0, max: 100,
+            axisLabel: {color: tx, fontSize: 8}, splitNumber: 2,
+            splitLine: {lineStyle: {color: sp}}
+          }))
+        ],
+        dataZoom: [{type: 'inside', xAxisIndex: [0, 1, 2, 3], start: 80, end: 100},
+                   {type: 'slider', xAxisIndex: [0, 1, 2, 3], start: 80, end: 100,
+                    height: 10, bottom: 22,
+          dataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},
+          selectedDataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},
+          borderColor: 'rgba(139,139,144,.25)', fillerColor: 'rgba(139,139,144,.12)',
+          handleSize: '80%', showDetail: false}],
+        series: altSeries
       });
       return c;
     }});
