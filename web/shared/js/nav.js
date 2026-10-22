@@ -57,8 +57,8 @@
 ];
 
   var PATTERN_ITEMS = [
-    { href: '../discipline/cpa-stages.html', label: 'CPA阶段', page: 'cpa-stages' },
-    { href: '../discipline/cpa-stock-weekly.html', label: 'CPA周K详情', page: 'cpa-stock-weekly' },
+    { href: '../discipline/cpa-stages.html', label: '个股CPA', page: 'cpa-stages' },
+    { href: '../market-scan/index-cpa.html', label: '指数CPA',      page: 'index-cpa' },
     { href: '../pattern-structure/',    label: 'MW分析',           page: 'pattern-structure' },
     { href: '../pattern-scan/',         label: '形态识别',         page: 'pattern-scan' },
     { href: '../daily-pattern-scan/',   label: '形态扫描',         page: 'daily-pattern-scan' },

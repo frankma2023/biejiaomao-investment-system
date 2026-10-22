@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>指数CPA · 八阶段判定</title>
+<link rel="stylesheet" href="/shared/css/hanako-glass.css">
+<link rel="stylesheet" href="/shared/css/advice-card.css">
+<script src="/shared/js/api-client.js"></script>
+<script src="/shared/js/nav.js"></script>
+<script src="/shared/js/echarts.min.js"></script>
+<style>
+:root{--bg:#0e0e12;--card:#1b1b21;--line:#2a2a33;--txt:#e9e9ec;--mut:#8f8f97;
+      --amber:#f59e0b;--risk:#ef4444;--good:#10b981;--blue:#539BF5}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);
+     font:14px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 18px 70px}
+.back{display:inline-block;font-size:13px;color:var(--mut);text-decoration:none;margin:0 0 14px}
+.back:hover{color:var(--amber)}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--mut);font-size:13px;margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+      padding:14px 16px;margin:0 0 14px}
+.card h3{margin:0 0 10px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{display:inline-block;font-size:11px;color:var(--mut);border:1px solid var(--line);
+     border-radius:99px;padding:2px 9px}
+.stage-badge{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.sb-stage{font-size:26px;font-weight:800;line-height:1.15}
+.sb-action{font-size:15px;font-weight:600;padding:4px 14px;border-radius:99px}
+.sb-meta{color:var(--mut);font-size:12.5px}
+.warn{background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.35);
+      border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.8;margin-top:12px}
+.warn b{color:var(--amber)}
+.chart{width:100%}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-weight:600;font-size:12px}
+.ok{color:var(--good)}.bad{color:var(--risk)}.mid{color:var(--amber)}
+.err{color:var(--risk);padding:30px;text-align:center}
+/* 搜索与筛选 */
+.search-wrap{position:relative;margin:0 0 12px}
+.search-wrap input{width:100%;padding:11px 14px;border-radius:10px;
+  background:#16161c;border:1px solid var(--line);color:var(--txt);
+  font-size:14px;outline:none}
+.search-wrap input:focus{border-color:var(--amber)}
+.sug{position:absolute;left:0;right:0;top:calc(100% + 4px);background:#1b1b21;
+  border:1px solid var(--line);border-radius:10px;max-height:280px;overflow-y:auto;
+  z-index:50;display:none}
+.sug.on{display:block}
+.sug a{display:flex;justify-content:space-between;gap:10px;padding:9px 14px;
+  color:var(--txt);text-decoration:none;font-size:13.5px}
+.sug a:hover,.sug a.hl{background:rgba(245,158,11,.12)}
+.sug .c{color:var(--mut);font-size:12px}
+.filters{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 14px}
+.fb{padding:6px 12px;border-radius:99px;border:1px solid var(--line);
+  background:#16161c;color:var(--mut);font-size:12.5px;cursor:pointer;
+  transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.fb:hover{border-color:var(--amber);color:var(--txt)}
+.fb.on{background:rgba(245,158,11,.14);border-color:var(--amber);color:var(--amber)}
+.fb i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.fb b{font-weight:600;font-size:11.5px;opacity:.85}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));
+  gap:9px;margin:0 0 14px}
+.gi{display:block;padding:10px 12px;border-radius:10px;background:#16161c;
+  border:1px solid var(--line);text-decoration:none;color:var(--txt);
+  transition:all .15s}
+.gi:hover{border-color:var(--amber);transform:translateY(-1px)}
+.gi .n{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.gi .m{font-size:11.5px;color:var(--mut);margin-top:3px}
+.panel-h{display:flex;justify-content:space-between;align-items:center;
+  margin:0 0 10px;font-size:14px;font-weight:600}
+.panel-h .cnt{color:var(--mut);font-weight:400;font-size:12.5px}
+
+@media(max-width:760px){h1{font-size:19px}.sb-stage{font-size:21px}
+  .wrap{padding:16px 12px 50px}table{font-size:12px}th,td{padding:5px 6px}}
+</style>
+</head>
+<body>
+<nav id="top-nav"></nav>
+<div class="wrap">
+  <a class="back" href="/market-scan/">← 返回指数投资</a>
+  <h1>指数CPA · 八阶段判定</h1>
+  <p class="sub" id="sub">加载中…</p>
+
+  <div class="search-wrap">
+    <input id="q" type="text" placeholder="输入指数代码或名称搜索（如 000985 / 中证全指 / 红利）"
+           autocomplete="off">
+    <div class="sug" id="sug"></div>
+  </div>
+  <div class="filters" id="filters"></div>
+  <div id="listPanel" style="display:none" class="card">
+    <div class="panel-h"><span id="panelTitle"></span><span class="cnt" id="panelCnt"></span></div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div id="badge"></div>
+
+  <div class="card">
+    <h3>K 线与阶段<span class="tag">颜色 = 当日所属阶段</span></h3>
+    <div id="c-price" class="chart" style="height:420px"></div>
+    <div id="legend-stages" style="display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;color:#8f8f97;margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <h3>阶段色带<span class="tag">逐日，鼠标悬停看日期</span></h3>
+    <div id="c-ribbon" class="chart" style="height:120px"></div>
+  </div>
+
+  <div class="card">
+    <h3>各阶段有效性<span class="tag">全样本 vs 样本外（2020 起）</span></h3>
+    <div class="tw"><table id="validity">
+      <thead><tr><th>阶段</th><th>区间中位</th><th>区间胜率</th><th>中位时长</th><th>2020起胜率</th><th>样本</th></tr></thead>
+      <tbody></tbody></table></div>
+    <div style="color:#8f8f97;font-size:12.5px;margin-top:10px;line-height:1.8">
+      区间胜率 = 进入该阶段后、离开它之前，价格是否上涨。<br>
+      <b>不使用固定持有期</b>——固定 20/60/120/250 日会跨越阶段边界，收益被下一个阶段污染。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>当前阶段判据<span class="tag">可核对的原始数值</span></h3>
+    <div class="tw"><table id="detail">
+      <thead><tr><th>指标</th><th>当日值</th></tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="warn" id="ooswarn"></div>
+</div>
+
+<script>
+const q = new URLSearchParams(location.search);
+const CODE = q.get('code') || '980092';
+
+// 八阶段配色：上行暖色、下行冷色、观察灰
+const STAGE_COLOR = {
+  1: '#6b7280', 2: '#10b981', 3: '#539BF5', 4: '#a855f7',
+  5: '#f59e0b', 6: '#ef4444', 7: '#f97316', 8: '#be123c'
+};
+
+let STAGE_NAME_MAP_INIT = null;
+function render(d) {
+  window.__STAGE_NAMES = d.stage_names || {}; STAGE_NAME_MAP = window.__STAGE_NAMES;
+  renderFilters();
+  const cur = d.current;
+  const col = STAGE_COLOR[cur.stage] || '#8f8f97';
+  const actColor = /买入/.test(cur.action) ? '#10b981'
+                 : /离场/.test(cur.action) ? '#ef4444'
+                 : /持有/.test(cur.action) ? '#f59e0b' : '#8f8f97';
+
+  document.getElementById('sub').textContent =
+    `${d.code} · 数据至 ${d.date} · 已判定 ${d.dates.length} 个交易日 · 阶段切换 ${d.transitions} 次`;
+
+  document.getElementById('badge').innerHTML = `<div class="card">
+    <div class="stage-badge">
+      <div class="sb-stage" style="color:${col}">阶段${cur.stage} · ${cur.name}</div>
+      <div class="sb-action" style="color:${actColor};background:${actColor}18;
+           border:1px solid ${actColor}55">${cur.action}</div>
+      <div class="sb-meta">自 ${cur.since} 起，已持续 ${cur.days} 个交易日</div>
+    </div></div>`;
+
+  // 判据明细
+  const dl = cur.detail;
+  const rows = [
+    ['收盘', dl.close], ['EMA10', dl.ema10], ['EMA20', dl.ema20],
+    ['EMA50', dl.ema50], ['ATR20', dl.atr20], ['量比 VR', dl.vr]
+  ].map(([k, v]) => `<tr><td>${k}</td><td>${v == null ? '—' : v}</td></tr>`).join('');
+  document.getElementById('detail').querySelector('tbody').innerHTML = rows;
+
+  // 有效性面板
+  const v = d.validity || {};
+  const vrows = Object.keys(v).map(k => {
+    const x = v[k];
+    const nm = (d.stage_names && d.stage_names[k]) || '';
+    const short = nm.replace(/^[A-Za-z ']+/, '') || nm;
+    const pos = (x.med || 0) > 0;
+    return `<tr><td>${k} ${short}</td>
+      <td class="${pos ? 'ok' : 'bad'}">${(x.med || 0).toFixed(2)}%</td>
+      <td class="${(x.win || 0) >= 50 ? 'ok' : 'bad'}">${(x.win || 0).toFixed(1)}%</td>
+      <td>${(x.dur || 0).toFixed(0)} 日</td>
+      <td>${(x.oos_win || 0).toFixed(1)}%</td>
+      <td>${(x.n || 0).toLocaleString()}</td></tr>`;
+  }).join('');
+  document.getElementById('validity').querySelector('tbody').innerHTML = vrows;
+
+  // 样本外警告
+  document.getElementById('ooswarn').innerHTML =
+    `<b>⚠ 出场规则比入场重要得多（394 个指数实算，买入统一为阶段②/④首次进入）</b><br>
+     · 出场在 <b>⑥ 破位</b>：胜率 31.3%、单笔中位 <b>−4.30%</b>、期望 −0.03%/笔 —— <b>亏损</b><br>
+     · 出场在 <b>⑤ 衰竭延伸</b>：胜率 <b>69.6%</b>、单笔中位 <b>+3.79%</b>（已计入未平仓按期末价的亏损单）；
+       样本外 72.9% / +4.46% —— <b>唯一稳健为正的规则</b><br>
+     <b>原因：⑥ 要等创出 10 日新低才触发，等于卖在地板上；⑤ 是在价格偏离 EMA20 超过 2 个 ATR 时卖出，卖在强势里。</b><br>
+     与 Kell 原意一致——⑤ 的动作本就是「保护利润」。`;
+
+  // 阶段配色图例（让「颜色 = 阶段」可读）
+  const lg = document.getElementById('legend-stages');
+  if (lg && d.stage_names) {
+    lg.innerHTML = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(function (k) {
+      const nm = (d.stage_names[k] || '').replace(/^[A-Za-z ']+/, '') || k;
+      return `<span style="display:inline-flex;align-items:center;gap:4px">
+        <i style="width:9px;height:9px;border-radius:2px;background:${STAGE_COLOR[k]};
+           display:inline-block"></i>${k} ${nm}</span>`;
+    }).join('');
+  }
+
+  drawPrice(d);
+  drawRibbon(d);
+}
+
+function gopt(b) { return {left: '8%', right: '5%', top: 16, bottom: b || 26}; }
+
+function drawPrice(d) {
+  const el = document.getElementById('c-price');
+  const c = echarts.init(el);
+  const ema = (arr, col, nm) => ({
+    name: nm, type: 'line', data: arr, smooth: true, showSymbol: false,
+    lineStyle: {color: col, width: 1.2, opacity: .85}, z: 2
+  });
+
+  // 按阶段着色 K 线
+  // candlestick 的逐项样式必须同时给出阳线/阴线四色，否则会被默认涨跌色覆盖。
+  const kdata = d.ohlc.map(function (o, i) {
+    const s = d.stage[i];
+    const col = s ? STAGE_COLOR[s] : '#6b7280';
+    return {value: o, itemStyle: {
+      color: col, color0: col, borderColor: col, borderColor0: col,
+      opacity: s ? 1 : .3
+    }};
+  });
+
+  c.setOption({
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis', axisPointer: {type: 'cross'},
+      formatter: function (ps) {
+        const i = ps[0].dataIndex;
+        const s = d.stage[i];
+        const nm = s ? (d.stage_names[s] || '') : '—';
+        const act = s ? (d.actions[s] || '') : '';
+        const col = s ? STAGE_COLOR[s] : '#8f8f97';
+        // ECharts 蜡烛图的 params.value = [dataIndex, open, close, low, high]
+        // 第 0 位是索引，不是开盘价。之前直接取 [0] 导致显示「开946 收4927」。
+        const v = ps[0].value;
+        return `<b>${d.dates[i]}</b><br>
+          <span style="color:${col}">阶段${s || '—'} ${nm}</span><br>
+          动作：${act}<br>
+          开 ${v[1]} · 收 ${v[2]}<br>
+          低 ${v[3]} · 高 ${v[4]}`;
+      }
+    },
+    legend: {data: ['K线', 'EMA10', 'EMA20', 'EMA50'], top: 0, right: 8,
+             textStyle: {color: '#8f8f97', fontSize: 11}},
+    grid: gopt(40),
+    xAxis: {type: 'category', data: d.dates,
+            axisLabel: {color: '#8f8f97', fontSize: 10},
+            axisLine: {lineStyle: {color: '#2a2a33'}}},
+    yAxis: {type: 'value', scale: true, axisLabel: {color: '#8f8f97', fontSize: 10},
+            splitLine: {lineStyle: {color: '#2a2a33'}}},
+    dataZoom: [{type: 'inside'}, {type: 'slider', height: 14, bottom: 6}],
+    series: [
+      {name: 'K线', type: 'candlestick', data: kdata, z: 3},
+      ema(d.ema10, '#f59e0b', 'EMA10'),
+      ema(d.ema20, '#539BF5', 'EMA20'),
+      ema(d.ema50, '#a855f7', 'EMA50')
+    ]
+  });
+}
+
+function drawRibbon(d) {
+  const el = document.getElementById('c-ribbon');
+  const c = echarts.init(el);
+  // 每个阶段一段，用 heatmap 表达「当天属于哪个阶段」
+  const data = d.dates.map(function (dt, i) {
+    const s = d.stage[i];
+    return [i, 0, s || 0];
+  });
+  c.setOption({
+    backgroundColor: 'transparent',
+    tooltip: {
+      formatter: function (p) {
+        const i = p.dataIndex;
+        const s = d.stage[i];
+        return `${d.dates[i]}<br>阶段${s || '—'} ${s ? (d.stage_names[s] || '') : ''}`;
+      }
+    },
+    grid: {left: '8%', right: '5%', top: 8, bottom: 34},
+    xAxis: {type: 'category', data: d.dates, show: true,
+            axisLabel: {color: '#8f8f97', fontSize: 10},
+            axisLine: {lineStyle: {color: '#2a2a33'}}, axisTick: {show: false}},
+    yAxis: {type: 'category', data: [''], show: false},
+    visualMap: {show: false, dimension: 2, min: 1, max: 8,
+                inRange: {color: ['#6b7280', '#10b981', '#539BF5', '#a855f7',
+                                  '#f59e0b', '#ef4444', '#f97316', '#be123c']}},
+    dataZoom: [{type: 'inside'}, {type: 'slider', height: 12, bottom: 4}],
+    series: [{type: 'heatmap', data: data, itemStyle: {borderWidth: 0}}]
+  });
+}
+
+fetch(`${API_BASE}/api/market-scan/index-cpa?code=${CODE}`)
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) throw new Error(d.error);
+    render(d);
+  })
+  .catch(e => {
+    document.getElementById('badge').innerHTML =
+      `<div class="err">加载失败：${e.message}<br><br>
+       请确认后端已启动（python src/server.py，端口 8788）</div>`;
+  });
+
+
+// ══════ 搜索 ══════
+const qEl = document.getElementById('q');
+const sugEl = document.getElementById('sug');
+let sugTimer = null;
+
+qEl.addEventListener('input', function () {
+  const v = qEl.value.trim();
+  clearTimeout(sugTimer);
+  if (!v) { sugEl.classList.remove('on'); return; }
+  sugTimer = setTimeout(function () {
+    fetch(`${API_BASE}/api/market-scan/index-search?q=${encodeURIComponent(v)}`)
+      .then(r => r.json())
+      .then(d => {
+        const items = d.items || [];
+        if (!items.length) { sugEl.classList.remove('on'); return; }
+        sugEl.innerHTML = items.map(x =>
+          `<a href="?code=${x.code}"><span>${x.name || '(无名称)'}</span>
+           <span class="c">${x.code}</span></a>`).join('');
+        sugEl.classList.add('on');
+      }).catch(() => sugEl.classList.remove('on'));
+  }, 220);
+});
+
+qEl.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') sugEl.classList.remove('on');
+  if (e.key === 'Enter') {
+    const first = sugEl.querySelector('a');
+    if (first) location.href = first.getAttribute('href');
+  }
+});
+
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('.search-wrap')) sugEl.classList.remove('on');
+});
+
+// ══════ 八阶段筛选 ══════
+const filtersEl = document.getElementById('filters');
+let counts = {};
+
+function renderFilters() {
+  filtersEl.innerHTML = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(k => {
+    const nm = (STAGE_NAME_MAP[k] || '').replace(/^[A-Za-z ']+/, '') || k;
+    const n = counts[k] || 0;
+    return `<button class="fb" data-stage="${k}">
+      <i style="background:${STAGE_COLOR[k]}"></i>${k} ${nm} <b>${n}</b></button>`;
+  }).join('');
+  filtersEl.querySelectorAll('.fb').forEach(b => {
+    b.addEventListener('click', function () {
+      const st = this.getAttribute('data-stage');
+      const already = this.classList.contains('on');
+      filtersEl.querySelectorAll('.fb').forEach(x => x.classList.remove('on'));
+      if (already) { document.getElementById('listPanel').style.display = 'none'; return; }
+      this.classList.add('on');
+      loadStage(st);
+    });
+  });
+}
+
+function loadStage(st) {
+  const panel = document.getElementById('listPanel');
+  panel.style.display = 'block';
+  document.getElementById('panelTitle').textContent = `阶段 ${st} ${(STAGE_NAME_MAP[st] || '')}`;
+  document.getElementById('panelCnt').textContent = '加载中…';
+  document.getElementById('grid').innerHTML = '';
+  fetch(`${API_BASE}/api/market-scan/index-cpa-list?stage=${st}`)
+    .then(r => r.json())
+    .then(d => {
+      const items = d.items || [];
+      document.getElementById('panelCnt').textContent = `${items.length} 个（按已持续天数排序）`;
+      document.getElementById('grid').innerHTML = items.map(x =>
+        `<a class="gi" href="?code=${x.code}">
+          <div class="n">${x.name || x.code}</div>
+          <div class="m">${x.code} · ${x.days} 日 · ${x.regime || ''}</div>
+        </a>`).join('');
+    })
+    .catch(() => {
+      document.getElementById('panelCnt').textContent = '加载失败';
+    });
+}
+
+// 阶段名映射（供筛选按钮用），由主请求填充
+let STAGE_NAME_MAP = {};
+
+fetch(`${API_BASE}/api/market-scan/index-cpa-list`)
+  .then(r => r.json())
+  .then(d => {
+    counts = d.counts || {};
+    STAGE_NAME_MAP = window.__STAGE_NAMES || STAGE_NAME_MAP;
+    renderFilters();
+  })
+  .catch(() => {});
+
+Nav.init({brandIcon: '🧬', brandText: '指数投资', currentPage: 'index-cpa'});
+</script>
+</body>
+</html>

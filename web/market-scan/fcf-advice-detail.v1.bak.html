@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>自由现金流指数操作建议详情</title>
+<link rel="stylesheet" href="/shared/css/hanako-glass.css">
+<script src="/shared/js/api-client.js"></script>
+<script src="/shared/js/echarts.min.js"></script>
+<style>
+body{background:var(--bg);color:var(--text-primary);font-family:var(--font-body);font-size:13px;margin:0;padding:24px}
+.wrap{max-width:1200px;margin:0 auto}
+h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--accent);margin:0 0 4px}
+.sub{font-size:0.68rem;color:var(--muted);margin-bottom:20px}
+.back{font-size:0.68rem;color:var(--muted);cursor:pointer;margin-bottom:12px;display:inline-block}
+.back:hover{color:var(--accent)}
+.note-banner{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:10px 14px;font-size:0.66rem;color:#f59e0b;margin-bottom:14px;line-height:1.7}
+.advice-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.advice-card .lv{font-size:1.1rem;font-weight:700}
+.advice-card .tx{font-size:0.75rem;color:var(--text-secondary);flex:1}
+.advice-card .st{font-size:0.68rem;color:var(--muted)}
+.stat-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.stat-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;flex:1;min-width:110px;text-align:center}
+.stat-box .n{font-family:var(--font-display);font-size:1.2rem;font-weight:600}
+.stat-box .l{font-size:0.58rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.04em}
+.chart-card .ct{font-size:0.75rem;font-weight:600;color:var(--accent);margin-bottom:8px}
+.chart-card .cs{font-size:0.6rem;color:var(--muted);margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:0.68rem}
+th{padding:6px 8px;border-bottom:2px solid var(--border);font-weight:600;color:var(--muted);font-size:0.56rem;text-transform:uppercase;text-align:right;background:var(--card)}
+th:first-child,td:first-child{text-align:left}
+td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono)}
+td:first-child{font-family:var(--font-body)}
+.up{color:#ef4444;font-weight:600}
+.dn{color:#10b981;font-weight:600}
+.mid{color:#f59e0b;font-weight:600}
+.muted{color:var(--muted)}
+.tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.tab{padding:7px 16px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--muted);cursor:pointer;font-family:var(--font-display);font-size:0.72rem;font-weight:600;transition:all .2s}
+.tab:hover{color:#d4d4d8;border-color:var(--border-hover)}
+.tab.active{background:var(--accent-subtle);color:var(--accent);border-color:var(--accent-border)}
+html[data-theme="light"] .tab{background:rgba(255,255,255,.7);border-color:var(--divider)}
+html[data-theme="light"] .tab.active{background:var(--accent-subtle);color:var(--accent)}
+.analysis-text{font-size:0.66rem;color:var(--text-secondary);line-height:1.8;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.analysis-text b{color:var(--text-primary)}
+.val-stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;flex:1;min-width:110px;text-align:center}
+.val-stat .n{font-family:var(--font-display);font-size:1.15rem;font-weight:600}
+.val-stat .l{font-size:0.58rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.04em}
+</style>
+</head>
+<body>
+<nav id="top-nav"></nav>
+<div class="wrap">
+  <a class="back" href="red-dividend/">← 返回指数投资</a>
+  <h1 id="title">🧲 自由现金流指数操作建议详情</h1>
+  <div class="sub" id="meta">加载中...</div>
+  <div class="note-banner" id="note-banner">⚠️ 数据声明：估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考。净值回撤仅展示，不触发信号（2年窗口未验证出统计规律，供人工判断参考）。</div>
+
+  <div class="tabs">
+    <div class="tab active" id="tab-advice" onclick="switchTab('advice')">📌 操作建议</div>
+    <div class="tab" id="tab-valuation" onclick="switchTab('valuation')">📊 估值全景</div>
+  </div>
+
+  <div id="pane-advice">
+    <div id="advice-box"></div>
+    <div id="stats-row"></div>
+    <div id="charts"></div>
+    <div id="events-table"></div>
+  </div>
+  <div id="pane-valuation" style="display:none">
+    <div id="val-stats" class="stat-row"></div>
+    <div class="chart-card"><div class="ct">📊 PE-TTM 走势与十年分位</div><div id="val-chart-pe" style="height:480px"></div><div id="val-text-pe" class="analysis-text"></div></div>
+    <div class="chart-card"><div class="ct">📊 PB 走势与十年分位</div><div id="val-chart-pb" style="height:480px"></div><div id="val-text-pb" class="analysis-text"></div></div>
+    <div class="chart-card"><div class="ct">📊 股息率 走势与十年分位</div><div id="val-chart-dyr" style="height:420px"></div><div id="val-text-dyr" class="analysis-text"></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="chart-card"><div class="ct">📊 ROE（%）</div><div id="val-chart-roe" style="height:360px"></div><div id="val-text-roe" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 EPS（元/股）</div><div id="val-chart-eps" style="height:360px"></div><div id="val-text-eps" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 营业收入（亿）</div><div id="val-chart-revenue" style="height:360px"></div><div id="val-text-revenue" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 净利润（亿）</div><div id="val-chart-np" style="height:360px"></div><div id="val-text-np" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 净利润率（%）</div><div id="val-chart-npm" style="height:360px"></div><div id="val-text-npm" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 营业利润率（%）</div><div id="val-chart-opm" style="height:360px"></div><div id="val-text-opm" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 A股分红金额（亿）</div><div id="val-chart-div" style="height:360px"></div><div id="val-text-div" class="analysis-text"></div></div>
+      <div class="chart-card"><div class="ct">📊 税金及附加（亿）</div><div id="val-chart-tax" style="height:360px"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+const params = new URLSearchParams(window.location.search);
+const date = params.get('date') || '';
+const code = params.get('code') || '980092';
+const DETAIL_API = API_BASE + '/api/market-scan/fcf-advice-detail?code=' + code + (date ? '&date=' + date : '');
+const ADVICE_API = API_BASE + '/api/market-scan/fcf-advice' + (date ? '?date=' + date : '');
+
+let isDark = document.documentElement.dataset.theme === 'dark';
+const tx = isDark ? '#999' : '#6E6E6E';
+const sp = isDark ? 'rgba(200,200,200,0.08)' : 'rgba(128,128,128,0.1)';
+const chartBg = isDark ? 'rgba(26,26,31,.6)' : 'rgba(255,255,255,.75)';
+
+async function load() {
+  const [d, a] = await Promise.all([
+    fetch(DETAIL_API).then(r => r.json()).catch(() => null),
+    fetch(ADVICE_API).then(r => r.json()).catch(() => null)
+  ]);
+  if (!d || d.error) { document.getElementById('meta').textContent = '无数据或加载失败'; document.getElementById('meta').style.color = '#ef4444'; return; }
+
+  document.getElementById('title').textContent = '🧲 ' + d.name + ' · 操作建议详情';
+  document.getElementById('meta').textContent = d.date + ' · 当前250日回撤 ' + d.current_dd + '%';
+
+  // 数据声明：优先用 API 返回的 data_note（诚实铁律，与后端文案单一来源）
+  const advItem = a && a.indices && a.indices.length ? (a.indices.find(x => x.code === code) || a.indices[0]) : a;
+  const note = d.data_note || (advItem && advItem.data_note) || '估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考';
+  document.getElementById('note-banner').textContent = '⚠️ 数据声明：' + note + '。净值回撤仅展示，不触发信号（2年窗口未验证出统计规律，供人工判断参考）。估值分位为理杏仁10年滚动口径（y10.cvpos）。';
+
+  // 当前建议
+  const advHtml = [];
+  if (advItem && advItem.advice_level) {
+    const lvMap = {strong_buy:['强买入','#ef4444'],buy:['买入','#ef4444'],caution:['谨慎','#f59e0b'],hold:['观望','#8b8b90']};
+    const lv = lvMap[advItem.advice_level] || ['观望','#8b8b90'];
+    const v = advItem.valuation || {};
+    const st = d.stats || {};
+    let evidence = [];
+    if (st.count) {
+      evidence.push('<b>估值买点历史统计</b>：' + st.count + '次独立低估区间，20日胜率<b style="color:#ef4444">' + st.fwd20_winrate + '%</b>，中位收益<b>' + (st.fwd20_median>0?'+':'') + st.fwd20_median + '%</b>；60日胜率' + st.fwd60_winrate + '%');
+    }
+    evidence.push('当前估值：PE ' + (v.pe!=null?v.pe:'—') + '（分位' + (v.pe_pct!=null?v.pe_pct+'%':'—') + '）· PB ' + (v.pb!=null?v.pb:'—') + '（分位' + (v.pb_pct!=null?v.pb_pct+'%':'—') + '）· 股息率 ' + (v.dyr!=null?v.dyr+'%':'—') + '（分位' + (v.dyr_pct!=null?v.dyr_pct+'%':'—') + '）');
+    advHtml.push('<div class="advice-card">');
+    advHtml.push('<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span><span class="tx">' + advItem.advice + '</span><span class="st">' + (advItem.signals && advItem.signals.length ? advItem.signals.join(' · ') : '无信号') + '</span></div>');
+    if (evidence.length) {
+      advHtml.push('<div style="font-size:0.68rem;color:var(--text-secondary);line-height:1.8;border-top:1px solid var(--border);padding-top:8px">📊 依据：<br/>' + evidence.join('<br/>') + '</div>');
+    }
+    advHtml.push('</div>');
+  }
+  document.getElementById('advice-box').innerHTML = advHtml.join('');
+
+  // 统计数字行
+  const st = d.stats || {};
+  const statsHtml = [
+    ['<div class="n" style="color:#ef4444">' + (st.count || 0) + '</div><div class="l">低估区间次数</div>'],
+    ['<div class="n" style="color:#ef4444">' + (st.fwd20_median != null ? st.fwd20_median + '%' : '—') + '</div><div class="l">20日收益中位</div>'],
+    ['<div class="n" style="color:#ef4444">' + (st.fwd20_winrate != null ? st.fwd20_winrate + '%' : '—') + '</div><div class="l">20日胜率</div>'],
+    ['<div class="n" style="color:#ef4444">' + (st.fwd60_median != null ? st.fwd60_median + '%' : '—') + '</div><div class="l">60日收益中位</div>'],
+    ['<div class="n" style="color:#ef4444">' + (st.fwd60_winrate != null ? st.fwd60_winrate + '%' : '—') + '</div><div class="l">60日胜率</div>']
+  ].map(h => '<div class="stat-box">' + h + '</div>').join('');
+  document.getElementById('stats-row').innerHTML = '<div class="stat-row">' + statsHtml + '</div>';
+
+  // 图表
+  // 数据默认展示最近 3 年（约 750 个交易日），可通过缩放回看全历史
+function around3y(dates, days){
+  if (!dates || !dates.length) return {start:0, end:100};
+  const want = days || 750;
+  if (dates.length <= want) return {start:0, end:100};
+  return {start: +((dates.length - want) / dates.length * 100).toFixed(2), end:100};
+}
+const charts = [];
+  // 1. 回撤曲线（仅展示）
+  charts.push({title:'📉 净值回撤曲线（锚定口径 · 2012-12-31 起全历史 · 价格与全收益两条 · 仅展示，不触发信号）', el:'chart-dd', h:320, init: el => {
+    const c = echarts.init(el);
+    const z = around3y(d.dates);
+    c.setOption({
+      backgroundColor:chartBg,
+      tooltip:{trigger:'axis', formatter: ps => ps[0].name + ps.map(x => '<br/>' + x.marker + x.seriesName + ': ' + (x.value==null?'—':x.value + '%')).join('')},
+      legend:{data:['价格指数回撤','全收益指数回撤'],textStyle:{color:tx,fontSize:10},top:0,right:6},
+      grid:{left:'8%',right:'4%',top:26,bottom:44},
+      xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
+      yAxis:{type:'value',name:'回撤%',axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
+      dataZoom:[{type:'inside',start:z.start,end:100},{type:'slider',start:z.start,end:100,height:12,bottom:6,
+        borderColor:'rgba(139,139,144,.25)',fillerColor:'rgba(139,139,144,.12)',handleSize:'80%',showDetail:false}],
+      series:[
+        {name:'价格指数回撤',type:'line',data:d.dd_series,smooth:true,showSymbol:false,
+          lineStyle:{color:'#f59e0b',width:1.5},areaStyle:{color:'rgba(245,158,11,.07)'},
+          markLine:{silent:true,symbol:'none',data:[{yAxis:15,lineStyle:{color:'#8b8b90',type:'dashed'},label:{formatter:'回撤15%(参考)',color:'#8b8b90',fontSize:9}}]}},
+        {name:'全收益指数回撤',type:'line',data:(d.dd_series_tr||[]),smooth:true,showSymbol:false,
+          lineStyle:{color:'#539BF5',width:1.5},areaStyle:{color:'rgba(83,155,245,.06)'}}
+      ]
+    });
+    return c;
+  }});
+  // 2. 估值分位走势（核心）
+  charts.push({title:'📊 估值分位走势（PE/PB/股息率 · 默认近3年，可缩放 · 数据自2024-09起）', el:'chart-val', h:330, init: el => {
+    const c = echarts.init(el); const z = around3y(d.dates);
+    c.setOption({
+      backgroundColor:chartBg, tooltip:{trigger:'axis'},
+      legend:{data:['PE分位','PB分位','股息率分位'],textStyle:{color:tx,fontSize:10},top:0,right:6},
+      grid:{left:'8%',right:'4%',top:26,bottom:52},
+      xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
+      yAxis:{type:'value',max:100,axisLabel:{color:tx,fontSize:9,formatter:'{value}%'},splitLine:{lineStyle:{color:sp}}},
+      dataZoom:[{type:'inside',start:z.start,end:100},{type:'slider',start:z.start,end:100,height:12,bottom:8,borderColor:'rgba(139,139,144,.25)',fillerColor:'rgba(139,139,144,.12)',handleSize:'80%',showDetail:false}],
+      series:[
+        {name:'PE分位',type:'line',data:d.pe_pct_series,smooth:true,showSymbol:false,lineStyle:{color:'#f59e0b',width:1.5}},
+        {name:'PB分位',type:'line',data:d.pb_pct_series,smooth:true,showSymbol:false,lineStyle:{color:'#539BF5',width:1.5}},
+        {name:'股息率分位',type:'line',data:d.dyr_pct_series,smooth:true,showSymbol:false,lineStyle:{color:'#10b981',width:1.5}},
+        {name:'33%阈值',type:'line',data:d.dates.map(()=>33),showSymbol:false,silent:true,lineStyle:{color:'rgba(139,139,144,.5)',type:'dashed',width:1},tooltip:{show:false},legendHoverLink:false},
+        {name:'66%阈值',type:'line',data:d.dates.map(()=>66),showSymbol:false,silent:true,lineStyle:{color:'rgba(139,139,144,.5)',type:'dashed',width:1},tooltip:{show:false},legendHoverLink:false}
+      ]
+    });
+    return c;
+  }});
+  // 3. 价格 + 信号时间线
+  charts.push({title:'💹 价格走势 + 估值买点信号时间线（默认近3年，可缩放）', el:'chart-px', h:360, cs:'<b>图例：</b>🔴 红色⚡ = 强买点（估值双确认）｜🟠 橙色🔶 = 普通买点（单信号触发）<br>判断逻辑：PE分位&lt;33% 或 PB分位&lt;33% 或 股息率分位&gt;66% 任一满足 → 触发橙色买点；其中 ≥2 个同向满足 → 升级红色强买点。数据自 2024-09 起（短窗口，仅供参考）', init: el => {
+    const c = echarts.init(el); const z = around3y(d.dates);
+    c.setOption({
+      backgroundColor:chartBg, tooltip:{trigger:'axis'},
+      grid:{left:'8%',right:'4%',top:26,bottom:52},
+      legend:{data:['价格指数','全收益指数'],textStyle:{color:tx,fontSize:10},top:0,right:6},
+      xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9},axisLine:{lineStyle:{color:sp}}},
+      yAxis:{type:'value',min:function(v){return Math.round(v.min*0.7)},axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
+      dataZoom:[{type:'inside',start:z.start,end:100},{type:'slider',start:z.start,end:100,height:12,bottom:8,borderColor:'rgba(139,139,144,.25)',fillerColor:'rgba(139,139,144,.12)',handleSize:'80%',showDetail:false}],
+      series:[{name:'价格指数',type:'line',data:d.closes,smooth:true,showSymbol:false,
+        lineStyle:{color:'#539BF5',width:1.5},
+        markPoint:{data:(d.events||[]).map(e => {
+            const idx = d.dates.indexOf(e.date);
+            if (idx === -1) return null;
+            return {coord:[e.date, d.closes[idx]], value:e.signal==='fcf_strong'?'⚡':'🔶', itemStyle:{color:e.signal==='fcf_strong'?'#ef4444':'#f59e0b'}};
+          }).filter(Boolean),symbol:'pin',symbolSize:30,label:{color:'#fff',fontSize:8}}
+      },
+      {name:'全收益指数',type:'line',data:(d.closes_tr||[]),smooth:true,showSymbol:false,
+        lineStyle:{color:'#f59e0b',width:1.5}}]
+    });
+    return c;
+  }});
+
+  const chartBox = charts.map(ch => '<div class="chart-card"><div class="ct">' + ch.title + '</div><div id="' + ch.el + '" style="height:' + ch.h + 'px"></div>' + (ch.cs ? '<div class="cs">' + ch.cs + '</div>' : '') + '</div>').join('');
+  document.getElementById('charts').innerHTML = chartBox;
+  const inst = [];
+  // 单张图失败只影响它自己：后面的图和下面的明细表必须照常渲染
+  charts.forEach(ch => {
+    const el = document.getElementById(ch.el);
+    if (!el) return;
+    try {
+      inst.push(ch.init(el));
+    } catch (err) {
+      el.innerHTML = '<div class="cs" style="padding:40px 0;text-align:center">该图暂不可用（' + ((err && err.message) || '数据缺失') + '）</div>';
+      console.error('[chart] ' + ch.title, err);
+    }
+  });
+  window.addEventListener('resize', () => inst.forEach(c => { try { c.resize(); } catch (e) { /* 单图 resize 失败不影响其它图 */ } }));
+
+  // 4. 低估区间历史表
+  const evHtml = ['<div class="chart-card"><div class="ct">🔍 历史低估区间明细（满足 估值买点 条件的独立区间）</div>',
+    '<table><thead><tr><th>起始日期</th><th>PE分位</th><th>PB分位</th><th>股息率分位</th><th>20日收益</th><th>60日收益</th></tr></thead><tbody>'];
+  (d.similar || []).slice().reverse().forEach(e => {
+    const c20 = e.fwd20 != null ? (e.fwd20 >= 0 ? '<span class="up">' + e.fwd20 + '%</span>' : '<span class="dn">' + e.fwd20 + '%</span>') : '—';
+    const c60 = e.fwd60 != null ? (e.fwd60 >= 0 ? '<span class="up">' + e.fwd60 + '%</span>' : '<span class="dn">' + e.fwd60 + '%</span>') : '—';
+    evHtml.push('<tr><td>' + e.date + '</td><td>' + (e.pe_pct!=null?e.pe_pct+'%':'—') + '</td><td>' + (e.pb_pct!=null?e.pb_pct+'%':'—') + '</td><td>' + (e.dyr_pct!=null?e.dyr_pct+'%':'—') + '</td><td>' + c20 + '</td><td>' + c60 + '</td></tr>');
+  });
+  evHtml.push('</tbody><div class="cs">20日去重合并的独立低估区间 · 次日收盘买入口径 · 数据窗口 2024-09 起</div></div>');
+  document.getElementById('events-table').innerHTML = evHtml.join('');
+}
+
+// ═══ 估值全景 Tab（移植自 index-valuation，980092 数据 2024-09 起）═══
+let valLoaded = false;
+function switchTab(tab) {
+  document.getElementById('tab-advice').classList.toggle('active', tab === 'advice');
+  document.getElementById('tab-valuation').classList.toggle('active', tab === 'valuation');
+  document.getElementById('pane-advice').style.display = tab === 'advice' ? '' : 'none';
+  document.getElementById('pane-valuation').style.display = tab === 'valuation' ? '' : 'none';
+  if (tab === 'valuation' && !valLoaded) { valLoaded = true; loadValuation(); }
+}
+
+async function loadValuation() {
+  const vcode = code;
+  const sy = '2024', ey = new Date().getFullYear();
+  const endDate = ey + '-12-31';
+  try {
+    const data = await fetch(API_BASE + '/api/valuation?code=' + vcode + '&start=' + sy + '-01-01&end=' + endDate).then(r => r.json());
+    if (!data.dates || !data.dates.length) { document.getElementById('val-stats').innerHTML = '<div class="val-stat"><div class="n">—</div><div class="l">无数据</div></div>'; return; }
+
+    const last = data.dates.length - 1;
+    const pe = data.pe[last], pePct = data.pe_pct[last], pb = data.pb[last], pbPct = data.pb_pct[last], dyr = data.dyr[last], dyrPct = data.dyr_pct[last];
+    function clr(p) { if (p == null) return 'var(--muted)'; if (p >= 0.8) return '#ef4444'; if (p >= 0.6) return 'var(--muted)'; if (p <= 0.3) return '#10b981'; return 'var(--text-secondary)'; }
+    document.getElementById('val-stats').innerHTML =
+      '<div class="val-stat"><div class="n">' + (pe ? pe.toFixed(1) : '—') + '</div><div class="l">PE-TTM</div></div>' +
+      '<div class="val-stat"><div class="n" style="color:' + clr(pePct) + '">' + (pePct != null ? (pePct * 100).toFixed(0) + '%' : '—') + '</div><div class="l">PE 十年分位</div></div>' +
+      '<div class="val-stat"><div class="n">' + (pb ? pb.toFixed(2) : '—') + '</div><div class="l">PB</div></div>' +
+      '<div class="val-stat"><div class="n" style="color:' + clr(pbPct) + '">' + (pbPct != null ? (pbPct * 100).toFixed(0) + '%' : '—') + '</div><div class="l">PB 十年分位</div></div>' +
+      '<div class="val-stat"><div class="n">' + (dyr ? (dyr * 100).toFixed(2) + '%' : '—') + '</div><div class="l">股息率</div></div>' +
+      '<div class="val-stat"><div class="n" style="color:' + clr(dyrPct) + '">' + (dyrPct != null ? (dyrPct * 100).toFixed(0) + '%' : '—') + '</div><div class="l">股息率 十年分位</div></div>';
+
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    const peColor = isDark ? '#FF6B6B' : '#E8553D', pbColor = isDark ? '#539BF5' : '#3568B8', dyrColor = isDark ? '#4ECDC4' : '#2D9D5A';
+    const tx2 = isDark ? '#999' : '#6E6E6E', sp2 = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
+
+    buildValChart('val-chart-pe', 'PE-TTM', data.dates, data.pe, data.pe_pct, null, peColor, tx2, sp2);
+    buildValChart('val-chart-pb', 'PB', data.dates, data.pb, data.pb_pct, null, pbColor, tx2, sp2);
+    buildValChart('val-chart-dyr', '股息率%', data.dates,
+      data.dyr && data.dyr.map(v => v != null ? (v * 100).toFixed(2) : null),
+      data.dyr_pct, null, dyrColor, tx2, sp2);
+    genValText('val-text-pe', 'PE-TTM', data.pe, data.pe_pct, null, '倍', clr(pePct));
+    genValText('val-text-pb', 'PB', data.pb, data.pb_pct, null, '倍', clr(pbPct));
+    const dyrPctInv = data.dyr_pct && data.dyr_pct.map(v => v != null ? (1 - v) : null);
+    const dyrPctInvLast = dyrPctInv && dyrPctInv.length ? dyrPctInv[dyrPctInv.length - 1] : null;
+    if (data.dyr && data.dyr.length) genValText('val-text-dyr', '股息率', data.dyr.map(v => v != null ? v * 100 : null), dyrPctInv, null, '%', clr(dyrPctInvLast));
+    loadValFS(vcode);
+  } catch (e) { document.getElementById('val-stats').innerHTML = '<div class="val-stat"><div class="n">—</div><div class="l">加载失败</div></div>'; }
+}
+
+async function loadValFS(c) {
+  try {
+    const resp = await fetch(API_BASE + '/api/valuation/fs?code=' + c);
+    const fs = await resp.json();
+    if (!fs.dates || !fs.dates.length) {
+      // 数据源降级：理杏仁 /index/fs/hybrid 对该指数无年报财务数据（如 980092）
+      const ids = ['roe','eps','revenue','np','npm','opm','div','tax'];
+      ids.forEach(id => {
+        const el = document.getElementById('val-chart-' + id);
+        if (el) el.innerHTML = '<div style="font-size:0.66rem;color:var(--muted);padding:40px 0;text-align:center">该指数暂无理杏仁年报财务数据（数据源限制）</div>';
+      });
+      return;
+    }
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    const up = isDark ? '#FF6B6B' : '#E8553D', dn = isDark ? '#4ECDC4' : '#2D9D5A';
+    buildValBar('val-chart-roe', 'ROE %', fs.dates, fs.roe, dn, false); genValFsText('val-text-roe', 'ROE', fs.roe, '%', fs.dates);
+    buildValBar('val-chart-eps', 'EPS', fs.dates, fs.eps, up, false); genValFsText('val-text-eps', 'EPS', fs.eps, '元', fs.dates);
+    buildValBar('val-chart-revenue', '营业收入', fs.dates, fs.revenue, '#539BF5', true); genValFsText('val-text-revenue', '营业收入', fs.revenue, '亿', fs.dates);
+    buildValBar('val-chart-np', '净利润', fs.dates, fs.net_profit, '#539BF5', true); genValFsText('val-text-np', '净利润', fs.net_profit, '亿', fs.dates);
+    buildValBar('val-chart-npm', '净利润率 %', fs.dates, fs.net_margin, up, false); genValFsText('val-text-npm', '净利润率', fs.net_margin, '%', fs.dates);
+    buildValBar('val-chart-opm', '营业利润率 %', fs.dates, fs.op_margin, dn, false); genValFsText('val-text-opm', '营业利润率', fs.op_margin, '%', fs.dates);
+    buildValBar('val-chart-div', 'A股分红', fs.dates, fs.dividend, '#539BF5', true); genValFsText('val-text-div', 'A股分红金额', fs.dividend, '亿', fs.dates);
+    buildValBar('val-chart-tax', '税金及附加', fs.dates, fs.tax, '#539BF5', true);
+  } catch (e) { /* 财务数据可能不全，静默 */ }
+}
+
+function buildValChart(id, name, dates, vals, pcts, hsVals, lineColor, tx, sp) {
+  const dom = document.getElementById(id); if (!dom) return;
+  if (dom._echart) dom._echart.dispose();
+  const ch = echarts.init(dom);
+  const pctVals = (pcts || []).map(v => v != null ? (v * 100).toFixed(0) : null);
+  ch.setOption({
+    backgroundColor: chartBg, tooltip: {trigger: 'axis'},
+    legend: {data: hsVals ? [name, '沪深300', '十年分位%'] : [name, '十年分位%'], bottom: 0, textStyle: {color: tx, fontSize: 10}},
+    grid: {left: '8%', right: '4%', top: 12, bottom: 92},
+    xAxis: {type: 'category', data: dates, axisLabel: {color: tx, fontSize: 9, formatter: v => v.slice(0, 7)}, axisLine: {lineStyle: {color: sp}}},
+    dataZoom: [{type: 'inside', start: 0, end: 100}, {type: 'slider', start: 0, end: 100, height: 10, bottom: 52,dataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},selectedDataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},borderColor: 'rgba(139,139,144,.25)', fillerColor: 'rgba(139,139,144,.12)',handleSize: '80%', showDetail: false}],
+    yAxis: [
+      {type: 'value', name: name, axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
+      {type: 'value', name: '分位%', min: 0, max: 100, axisLabel: {color: tx, fontSize: 9, formatter: v => v + '%'}, splitLine: {show: false}}
+    ],
+    series: [
+      {name: name, type: 'line', data: vals, smooth: true, symbol: 'none', lineStyle: {color: lineColor, width: 1.5}, yAxisIndex: 0}
+    ].concat(hsVals ? [{name: '沪深300', type: 'line', data: hsVals, smooth: true, symbol: 'none', lineStyle: {color: '#AAA', width: 1, type: 'dotted'}, yAxisIndex: 0}] : []).concat([
+      {name: '十年分位%', type: 'line', data: pctVals, smooth: true, symbol: 'none', lineStyle: {color: '#E8A838', width: 1.5, type: 'dashed'}, yAxisIndex: 1,
+        markLine: {silent: true, data: [{yAxis: 70, label: {formatter: '偏高', color: tx, fontSize: 9}, lineStyle: {color: '#FFB347', type: 'dotted'}}, {yAxis: 30, label: {formatter: '偏低', color: tx, fontSize: 9}, lineStyle: {color: '#26C6DA', type: 'dotted'}}]}}
+    ])
+  });
+  dom._echart = ch;
+}
+
+function genValText(id, name, vals, pcts, hsVals, unit, pctClr) {
+  if (!vals || !vals.length) return;
+  const last = vals.length - 1, cur = vals[last], curPct = pcts && pcts[last];
+  const vv = vals.filter(v => v != null);
+  if (!vv.length) return;
+  const avg = vv.reduce((a, b) => a + b, 0) / vv.length;
+  const mx = Math.max.apply(null, vv), mn = Math.min.apply(null, vv);
+  const hsCur = hsVals && hsVals[last];
+  const pctText = curPct != null ? (curPct * 100).toFixed(0) + '%' : '未知';
+  let level = '', advice = '';
+  if (curPct == null) { level = '无法判断'; advice = '数据不足'; }
+  else if (curPct >= 0.8) { level = '严重偏高'; advice = '处于近十年高位区间，安全边际极低，应考虑减仓或回避'; }
+  else if (curPct >= 0.6) { level = '偏高'; advice = '高于历史中位数，需警惕估值回调风险，不宜追高加仓'; }
+  else if (curPct >= 0.4) { level = '中性'; advice = '估值处于合理区间，可正常操作'; }
+  else if (curPct >= 0.2) { level = '偏低'; advice = '低于历史均值，具备一定安全边际，可逐步建仓'; }
+  else { level = '严重低估'; advice = '处于近十年低位，往往是逆向投资的最佳时机，建议小仓位试探'; }
+  let h = '<b>当前' + name + '：</b>' + cur.toFixed(2) + unit + '，十年分位 <b style="color:' + pctClr + '">' + pctText + '</b>（' + level + '）。';
+  h += '窗口均值 ' + avg.toFixed(2) + unit + '，最高 ' + mx.toFixed(2) + unit + '，最低 ' + mn.toFixed(2) + unit + '。';
+  h += '<b>建议：</b>' + advice + '。';
+  const el = document.getElementById(id); if (el) el.innerHTML = h;
+}
+
+function buildValBar(id, name, dates, vals, color, isBig) {
+  const dom = document.getElementById(id); if (!dom) return;
+  if (dom._echart) dom._echart.dispose();
+  const ch = echarts.init(dom);
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  const tx = isDark ? '#999' : '#6E6E6E', sp = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+  const vv = (vals || []).filter(v => v != null);
+  if (!vv.length) return;
+  const avg = vv.reduce((a, b) => a + b, 0) / vv.length;
+  const isPct = name.indexOf('%') >= 0;
+  // % 单位（ROE/净利率）：小数值 ×100 显示；亿单位：÷1e8
+  const toDisp = v => isPct ? (v * 100).toFixed(1) : (isBig ? (v / 1e8).toFixed(1) : v.toFixed(2));
+  const d1 = vals.map(v => v != null ? toDisp(v) : null);
+  const avgDisp = isPct ? (avg * 100).toFixed(1) : (isBig ? (avg / 1e8).toFixed(1) : avg.toFixed(2));
+  const d2 = vals.map(() => avgDisp);
+  const unit = isBig ? '亿' : (isPct ? '%' : '');
+  ch.setOption({
+    backgroundColor: chartBg, tooltip: {trigger: 'axis'},
+    grid: {left: '10%', right: '4%', top: 12, bottom: 32},
+    xAxis: {type: 'category', data: dates, axisLabel: {color: tx, fontSize: 9}, axisLine: {lineStyle: {color: sp}}},
+    yAxis: {type: 'value', axisLabel: {color: tx, fontSize: 9, formatter: v => v + unit}, splitLine: {lineStyle: {color: sp}}},
+    series: [
+      {name: name, type: 'bar', data: d1, itemStyle: {color: color, borderRadius: [4, 4, 0, 0]}, barWidth: '50%',
+        label: {show: true, position: 'top', fontSize: 9, color: tx, formatter: p => p.value != null ? p.value + unit : ''}},
+      {name: '均值', type: 'line', data: d2, smooth: false, symbol: 'none', lineStyle: {color: '#E8A838', width: 1, type: 'dashed'}}
+    ]
+  });
+  dom._echart = ch;
+}
+
+function genValFsText(id, name, vals, unit, dates) {
+  const vv = (vals || []).filter(v => v != null);
+  const el = document.getElementById(id); if (!el) return;
+  if (!vv.length) { el.innerHTML = '数据不足'; return; }
+  // 显示转换：% 单位（ROE/净利率/营业利润率，小数值 ×100）；亿 单位（营收/净利/分红/税，÷1e8）
+  const disp = v => unit === '亿' ? (v / 1e8).toFixed(1) : unit === '%' ? (v * 100).toFixed(1) : v.toFixed(2);
+  const cur = vv[vv.length - 1], prev = vv.length > 1 ? vv[vv.length - 2] : null;
+  const avg = vv.reduce((a, b) => a + b, 0) / vv.length;
+  const mx = Math.max.apply(null, vv), mn = Math.min.apply(null, vv);
+  const yoy = prev && prev > 0 ? ((cur / prev - 1) * 100).toFixed(1) + '%' : '—';
+  const trend = cur > avg ? '高于' : '低于';
+  const curDisp = disp(cur), avgDisp = disp(avg), mxDisp = disp(mx), mnDisp = disp(mn);
+  const latestYr = dates[dates.length - 1];
+  let h = '<b>' + latestYr + '年：</b>' + name + ' ' + curDisp + unit + '，同比 ' + (yoy.indexOf('-') >= 0 ? '' : '+') + yoy + '。';
+  h += '窗口均值 ' + avgDisp + unit + '，当前' + trend + '均值。最高 ' + mxDisp + unit + '（' + dates[vv.indexOf(mx)] + '年），最低 ' + mnDisp + unit + '（' + dates[vv.indexOf(mn)] + '年）。';
+  el.innerHTML = h;
+}
+
+load();
+
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
+</script>
+<script src="/shared/js/nav.js"></script>
+<script>Nav.init({brandIcon:'🧲',brandText:'自由现金流',currentPage:'market-scan'})</script>
+</body>
+</html>

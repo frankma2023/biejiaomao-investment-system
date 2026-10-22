@@ -1335,8 +1335,262 @@ FULL_RETURN_MAP = {
     '932305': '932305',  # 智选高股息全收益（2024-09 发布起）
 }
 
-# 红利 250日回撤买点阈值（%）：回测 32 次触发/20日胜率75% vs 15% 仅9次小样本假象（PRD §2.1 v1.1）
-DD_BUY_THRESHOLD = 10
+# 红利 250日回撤买点阈值（%）。v1.1 定的是 10%，v1.3 改为 12%：
+# 按天口径下后60日胜率在 12% 才第一次超过全样本基准（≥12% 为 67.4% vs 基准 64.6%），
+# 10% 是 59.5%、9% 是 58.6%，都在基准之下，不构成买点信号。
+DD_BUY_THRESHOLD = 12
+
+# ══════════════════════════════════════════════════════════════════════════
+# 红利指数持仓建议模型 v2.0
+# 需求书：docs/product/红利指数持仓建议模型v2_产品需求书.md
+#
+# 所有阈值来自三份报告在 000922 上的 250 日实测（基准 82.5% / +9.0%）：
+#   锚定回撤 ≥20%        86.7% / +15.3%  （+6.3pp）
+#   锚定回撤 5~10%       93.7% / +10.9%  （+1.9pp）
+#   锚定回撤 10~20%      64.9% /  +6.5%  （-2.5pp）
+#   股息率分位 ≤20%      65.5% /  +3.2%  （-5.8pp）
+#   PE 分位  ≥80%        75.1% /  +5.9%  （-3.1pp）
+#   股债息差 <0pp        23.4% /  -1.5%  （-10.7pp）
+#   股债息差 0~1pp       86.2% / +11.0%  （+2.0pp）
+#   RSI20 强买点+回撤<12%  胜率 90.2%（基准 64.6%，RSI 报告）
+#   RSI20 强买点+回撤≥12%  胜率 60.5%（低于基准，故深回撤时不计入）
+# ══════════════════════════════════════════════════════════════════════════
+
+# 深跌型买点：锚定回撤 → 分值（阈值降序）
+DD_BUY_V2 = [(20.0, 85), (10.0, 25), (5.0, 12), (-1.0, 0)]
+# 急跌型买点：RSI20 → 分值（阈值升序），仅在回撤 < RSI_SHALLOW_DD 时计入
+RSI_BUY_V2 = [(30.0, 80), (35.0, 55), (45.0, 20), (999.0, 0)]
+RSI_SHALLOW_DD = 12.0
+# 风险分
+DIV_RISK_V2 = [(20.0, 70), (40.0, 30), (999.0, 0)]      # 股息率分位（升序）
+PE_RISK_V2 = [(80.0, 30), (999.0, 0)]                   # PE 分位（降序）
+SPREAD_RISK_V2 = [(0.0, 60), (1.0, 10), (999.0, 0)]     # 息差（升序）
+
+
+def _lt_step(v, table):
+    """阈值升序表：返回第一个 v < 阈值的分值。"""
+    for th, sc in table:
+        if v < th:
+            return sc
+    return 0
+
+
+def _ge_step(v, table):
+    """阈值降序表：返回第一个 v >= 阈值的分值。"""
+    for th, sc in table:
+        if v >= th:
+            return sc
+    return 0
+
+
+def _anchored_dd(db, code, target_date):
+    """锚定口径回撤：波段运行最高点（被突破才更新），回看全历史。
+
+    与报告口径一致。返回 dict 或 None。
+    注意与 _dd_from_full_return 的区别——后者用近 250 日滚动最高点。
+    """
+    tri_code = FULL_RETURN_MAP.get(code)
+    source = 'price'
+    rows = None
+    if tri_code:
+        rows = db.execute("""
+            SELECT date, close FROM index_full_return_daily
+            WHERE stock_code=? AND date<=?
+            ORDER BY date ASC
+        """, (tri_code, target_date)).fetchall()
+        if len(rows) >= 250:
+            source = 'full_return'
+        else:
+            rows = None
+    if rows is None:
+        rows = db.execute("""
+            SELECT date, close FROM index_daily_kline
+            WHERE stock_code=? AND kline_type='normal' AND date<=?
+            ORDER BY date ASC
+        """, (code, target_date)).fetchall()
+    if not rows or len(rows) < 250:
+        return None
+    closes = [r['close'] for r in rows]
+    hi, hi_at = -1.0, 0
+    for i, v in enumerate(closes):
+        if v > hi:
+            hi, hi_at = v, i
+    cur = closes[-1]
+    return {'anchored_dd': round((hi - cur) / hi * 100, 1),
+            'high_anchored': round(hi, 2),
+            'high_date': rows[hi_at]['date'],
+            'current': round(cur, 2),
+            'source': source, 'date': rows[-1]['date']}
+
+
+def _rsi20(db, code, target_date):
+    """Wilder RSI(20)，基于全收益收盘（回退价格）。返回 float 或 None。"""
+    tri_code = FULL_RETURN_MAP.get(code)
+    rows = None
+    if tri_code:
+        rows = db.execute("""
+            SELECT close FROM index_full_return_daily
+            WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 60
+        """, (tri_code, target_date)).fetchall()
+    if not rows or len(rows) < 21:
+        rows = db.execute("""
+            SELECT close FROM index_daily_kline
+            WHERE stock_code=? AND kline_type='normal' AND date<=?
+            ORDER BY date DESC LIMIT 60
+        """, (code, target_date)).fetchall()
+    if not rows or len(rows) < 21:
+        return None
+    c = [r['close'] for r in reversed(rows)]
+    per = 20
+    gain = loss = 0.0
+    for i in range(1, per + 1):
+        d = c[i] - c[i - 1]
+        gain += max(d, 0)
+        loss += max(-d, 0)
+    ag, al = gain / per, loss / per
+    for i in range(per + 1, len(c)):
+        d = c[i] - c[i - 1]
+        ag = (ag * (per - 1) + max(d, 0)) / per
+        al = (al * (per - 1) + max(-d, 0)) / per
+    return round(100 - 100 / (1 + ag / al), 1) if al else 100.0
+
+
+def _rolling_pct(db, code, target_date, field, window=750, min_obs=250):
+    """滚动分位（默认 3 年 = 750 交易日），仅用当日及之前的数据。
+
+    报告的阈值全部标定在滚动 3 年分位上，不能用 index_fundamental_daily
+    里预置的 dyr_pct / pe_ttm_pct——那两个字段的取值域被限制在 0.18~1.00，
+    不是同一口径（2026-10-09 实测：接口给 20%，滚动分位是 7%）。
+    """
+    if field == 'dyr':
+        rows = db.execute("""
+            SELECT date, dyr AS v FROM index_fundamental_daily
+            WHERE stock_code=? AND date<=? AND dyr IS NOT NULL
+            ORDER BY date ASC
+        """, (code, target_date)).fetchall()
+    else:
+        rows = db.execute("""
+            SELECT date, pe_ttm AS v FROM index_fundamental_daily
+            WHERE stock_code=? AND date<=? AND pe_ttm IS NOT NULL
+            ORDER BY date ASC
+        """, (code, target_date)).fetchall()
+    if not rows:
+        return None
+    vals = [r['v'] for r in rows]
+    cur = vals[-1]
+    w = vals[-window:]
+    if len(w) < min_obs:
+        return None
+    return round(sum(1 for x in w if x <= cur) / len(w) * 100, 1)
+
+
+def _pct_and_quantiles(db, code, target_date, field):
+    """返回该指标在 3 年 / 10 年窗口内的分位与关键分位点。
+
+    field: 'dyr' | 'pe_ttm' | 'spread'
+    spread 由 dyr − 10 年国债现算，其余直接读表。
+    分位定义与模型一致：窗口内 <= 当前值的占比。
+    """
+    if field == 'spread':
+        rows = db.execute("""
+            SELECT f.date AS date, (f.dyr*100 - b.y10) AS v
+            FROM index_fundamental_daily f
+            JOIN bond_yield_daily b ON b.date = f.date
+            WHERE f.stock_code=? AND f.date<=? AND f.dyr IS NOT NULL
+            ORDER BY f.date ASC
+        """, (code, target_date)).fetchall()
+    else:
+        rows = db.execute(f"""
+            SELECT date, {field} AS v FROM index_fundamental_daily
+            WHERE stock_code=? AND date<=? AND {field} IS NOT NULL
+            ORDER BY date ASC
+        """, (code, target_date)).fetchall()
+    if not rows:
+        return None
+    # dyr 在表里是小数（0.0421），统一换算成百分数便于核对
+    _scale = 100.0 if field == 'dyr' else 1.0
+    vals = [r['v'] * _scale for r in rows]
+    cur = vals[-1]
+    out = {'current': round(cur, 2)}
+
+    def _q(seq, p):
+        s = sorted(seq)
+        i = min(len(s) - 1, max(0, int(round(p / 100 * (len(s) - 1)))))
+        return round(s[i], 2)
+    for label, win in (('3y', 750), ('10y', 2440)):
+        w = vals[-win:]
+        if len(w) < 250:
+            continue
+        out[label + '_pct'] = round(sum(1 for x in w if x <= cur) / len(w) * 100, 1)
+        out[label] = {'n': len(w), 'min': _q(w, 0), 'p25': _q(w, 25),
+                      'p50': _q(w, 50), 'p75': _q(w, 75), 'max': _q(w, 100)}
+    return out
+
+
+def score_advice_v2(anchored_dd, rsi20, div_pct, pe_pct, spread):
+    """双维度评分。返回 (买入分, 风险分, 明细列表)。"""
+    detail = []
+    buy_dd = _ge_step(anchored_dd, DD_BUY_V2)
+    detail.append({'factor': '深跌型买点',
+                   'desc': f'锚定回撤 {anchored_dd:.1f}%', 'value': buy_dd})
+    rsi_buy = 0
+    if rsi20 is not None and anchored_dd < RSI_SHALLOW_DD:
+        rsi_buy = _lt_step(rsi20, RSI_BUY_V2)
+        detail.append({'factor': '急跌型买点',
+                       'desc': f'RSI20 {rsi20:.0f}（回撤<12%）', 'value': rsi_buy})
+    elif rsi20 is not None:
+        detail.append({'factor': '急跌型买点',
+                       'desc': f'RSI20 {rsi20:.0f}（回撤≥12%，该区间无增量信息）',
+                       'value': 0})
+    buy = max(buy_dd, rsi_buy)
+
+    risk = 0
+    r = _lt_step(div_pct, DIV_RISK_V2) if div_pct is not None else 0
+    detail.append({'factor': '股息率分位',
+                   'desc': f'{div_pct:.0f}%' if div_pct is not None else '无数据',
+                   'value': r})
+    risk = max(risk, r)
+    r = _ge_step(pe_pct, PE_RISK_V2) if pe_pct is not None else 0
+    detail.append({'factor': 'PE 分位',
+                   'desc': f'{pe_pct:.0f}%' if pe_pct is not None else '无数据',
+                   'value': r})
+    risk = max(risk, r)
+    r = _lt_step(spread, SPREAD_RISK_V2) if spread is not None else 0
+    detail.append({'factor': '股债息差',
+                   'desc': f'{spread:+.2f}pp' if spread is not None else '无数据',
+                   'value': r})
+    risk = max(risk, r)
+    # 广度：达到 30 分的风险因子个数。max 只表达强度，广度表达共振程度。
+    risk_breadth = sum(1 for d in detail
+                       if d['factor'] in ('股息率分位', 'PE 分位', '股债息差')
+                       and d['value'] >= 30)
+    return buy, risk, detail, risk_breadth
+
+
+def advice_of_v2(buy, risk, breadth):
+    """建议合成。判定顺序：strong_buy → buy → reduce → caution → hold。
+
+    reduce 的条件：风险分 ≥70 且 无买点 且 广度 ≥2。
+    买入条件先于风险条件判定，因此「强买点 + 多重风险」的矛盾态落入 hold。
+    广度 =3 不做特殊处理——样本仅 24 天且全部同期（PRD 12.2.2）。
+    """
+    n_risk = breadth
+    if buy >= 70 and risk < 70:
+        return '强买入区（深跌或急跌信号确认）', 'strong_buy'
+    if buy >= 35 and risk < 70:
+        return '买入区（单信号触发）', 'buy'
+    if risk >= 70 and buy < 20 and n_risk >= 2:
+        return '估值与息差多重不利、且无买点——可考虑减仓', 'reduce'
+    if risk >= 60 and buy < 35:
+        return '风险提示——建议降低加仓意愿，不主动卖出', 'caution'
+    return '持有/观望', 'hold'
+
+
+
+# 回撤买点分档（%）。三档对应「普通 / 强 / 极强」，各自的可执行口径是
+# 「回撤首次达到该档的那一天买入」。注意触发日口径与按天口径差别很大：
+# 首次破线往往在下跌初期，后60日胜率反而低（见 DD_TIERS 备注与图表页脚）。
+DD_TIERS = (10.0, 14.0, 20.0)
 
 
 def _dd_from_full_return(db, code, target_date, days=300, window=250):
@@ -1389,7 +1643,7 @@ def _latest_y10(db, target_date):
 # 阈值不能通用）。改配置后按 mtime 自动重载，不必重启 Flask。
 RSI_CONFIG_PATH = os.path.join(CONFIG_DIR, 'red_dividend_rsi.yaml')
 _RSI_FALLBACK = {
-    'default_period': 6,
+    'default_period': 20,
     'periods': [
         {'period': 6, 'buy_tiers': [
             {'threshold': 29, 'label': '买点', 'short': '买'},
@@ -1468,6 +1722,17 @@ def _rsi_params(code):
     d.update(cfg.get('defaults') or {})
     d.update((cfg.get('overrides') or {}).get(code) or {})
     periods = _norm_rsi_periods(d.get('periods')) or _norm_rsi_periods(_RSI_FALLBACK['periods'])
+    # RSI 改用全收益序列计算，阈值同步换成全收益口径（按触发频率对齐校准）。
+    # 不换阈值会导致「序列已换、阈值仍按价格口径」的错配，信号次数与分层都会偏。
+    _fr = d.get('full_return_tiers') or {}
+    for _p in periods:
+        _spec = _fr.get(_p['period']) or _fr.get(str(_p['period']))
+        if not _spec:
+            continue
+        _p['buy_tiers'] = [dict(x, threshold=v)
+                           for x, v in zip(_p['buy_tiers'], _spec['buy'])]
+        _p['sell_tiers'] = [dict(x, threshold=v)
+                            for x, v in zip(_p['sell_tiers'], _spec['sell'])]
     want = d.get('default_period')
     avail = [p['period'] for p in periods]
     return {'default_period': int(want) if want in avail else avail[0], 'periods': periods}
@@ -1475,7 +1740,16 @@ def _rsi_params(code):
 
 @app.route('/api/market-scan/dividend-advice')
 def api_market_dividend_advice():
-    """红利指数操作建议：信号检测+建议合成（支持历史回看）"""
+    """红利指数操作建议 v2.0：双维度评分（买入分 / 风险分）。
+
+    需求书：docs/product/红利指数持仓建议模型v2_产品需求书.md
+    与 v1.4 的关键差异：
+      - 回撤改用锚定口径（波段运行最高点），不再用 250 日滚动最高点
+      - 引入 RSI20（仅在回撤 < 12% 时计入买点）
+      - 移除 surge_sell；pe_high_sell 降级为风险分；high_div 删除
+      - 息差危险区阈值由 <1pp 改为 <0pp
+      - 「减仓」门槛显著抬高，估值高只输出「风险提示，不主动卖出」
+    """
     target_date = request.args.get('date', '')
     db = get_db()
     if not target_date:
@@ -1484,15 +1758,12 @@ def api_market_dividend_advice():
 
     results = []
     for code, name, cat in DIVIDEND_INDICES:
-        # 250日回撤：优先全收益（理杏仁 total_return），回退价格 —— PRD §3.2
-        ddinfo = _dd_from_full_return(db, code, target_date)
-        if ddinfo is None:
+        ad = _anchored_dd(db, code, target_date)
+        if ad is None:
             continue
-        dd_250 = ddinfo['dd_250']
-        high250 = ddinfo['high_250']
-        current = ddinfo['current']
+        dd250 = _dd_from_full_return(db, code, target_date)
+        rsi20 = _rsi20(db, code, target_date)
 
-        # 估值
         v = db.execute("""
             SELECT pe_ttm, pe_ttm_pct, pb, pb_pct, dyr, dyr_pct
             FROM index_fundamental_daily
@@ -1509,91 +1780,65 @@ def api_market_dividend_advice():
                 'dyr_pct': round(v['dyr_pct'] * 100) if v['dyr_pct'] is not None else None,
             }
 
-        # 信号（v1.1：250日回撤买点阈值 15%→10%；v1.2：卖出警示规则）
-        signals = []
-        if dd_250 >= DD_BUY_THRESHOLD:
-            signals.append('gold_buy')
-        if val and val['dyr_pct'] is not None and val['dyr_pct'] > 90:
-            signals.append('high_div')
-        if dd_250 >= DD_BUY_THRESHOLD and val and val['dyr_pct'] is not None and val['dyr_pct'] > 80:
-            signals.append('double_confirm')
-        if val and val['pe_pct'] is not None and val['pe_pct'] > 80:
-            signals.append('pe_warn')
-        if val and val['dyr_pct'] is not None and val['dyr_pct'] < 10:
-            signals.append('low_div')
-
-        # v1.2 卖出警示信号（卖点研究，PRD §5.4）
-        # 涨幅基于全收益收盘（与回撤同口径）；ddinfo 已含全收益 closes 派生数据，需额外取涨幅
-        chg20 = chg60 = None
-        if ddinfo:
-            # 从全收益表取 20/60 日涨幅（ddinfo 内部数据不可得，直接查）
-            tri_rows_adv = db.execute("""
-                SELECT close FROM index_full_return_daily
-                WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 61
-            """, (FULL_RETURN_MAP.get(code, code), target_date)).fetchall()
-            tri_rows_adv = list(reversed(tri_rows_adv))
-            if len(tri_rows_adv) >= 21:
-                chg20 = (tri_rows_adv[-1]['close'] / tri_rows_adv[-21]['close'] - 1) * 100
-            if len(tri_rows_adv) >= 61:
-                chg60 = (tri_rows_adv[-1]['close'] / tri_rows_adv[-61]['close'] - 1) * 100
-        if (chg20 is not None and chg20 > 10) or (chg60 is not None and chg60 > 15):
-            signals.append('surge_sell')
-        if val and val['pe_pct'] is not None and val['pe_pct'] > 80:
-            signals.append('pe_high_sell')
-
-        # v1.3 股债息差因子（回测 2026-08-26：息差<1pp 为危险区，4指数60日胜率15-33%）
-        # v1.4：卖点信号——息差<1pp 时持仓者应减仓（跌破后60日多数下跌）；仅吃息型启用
-        #   （931468 红利质量为质量型，2020-24 四年危险区却+27%，息差对失效——回测见 docs/analysis）
         y10 = _latest_y10(db, target_date)
         spread = None
         if val and val['dyr'] is not None and y10 is not None:
             spread = round(val['dyr'] - y10, 2)
-            if spread < 1 and cat != 'quality':
-                signals.append('spread_low')
 
-        # 建议（v1.2：卖出警示优先于买入；v1.3：息差危险区降级买入；v1.4：危险区兼作卖出警示）
-        advice, level = '持有/观望', 'hold'
-        spread_low = 'spread_low' in signals
-        if 'pe_high_sell' in signals and 'surge_sell' in signals:
-            advice, level = '估值高位+涨幅过大双确认，建议强减仓', 'strong_reduce'
-        elif 'pe_high_sell' in signals:
-            advice, level = '估值高位（10年PE分位>80%），建议减仓', 'reduce'
-        elif 'surge_sell' in signals:
-            advice, level = '短期涨幅过大（20日>10%/60日>15%），建议减仓', 'reduce'
-        elif 'double_confirm' in signals and not spread_low:
-            advice, level = '分批买入（回撤+高息双确认' + (f'· 息差+{spread}pp' if spread is not None else '') + '）', 'strong_buy'
-        elif ('gold_buy' in signals or 'high_div' in signals) and not spread_low:
-            advice, level = '观察买入（单信号触发' + (f'· 息差+{spread}pp' if spread is not None else '') + '）', 'buy'
-        elif spread_low:
-            advice, level = f'息差危险区（{spread}pp <1pp，吃息不如债）——持币观望，持仓者建议减仓', 'caution'
-        elif 'pe_warn' in signals and dd_250 < 10:
-            advice, level = '估值偏高（PE分位>80%），建议减仓', 'reduce'
-        elif 'low_div' in signals:
-            advice, level = '股息保护不足（股息率分位<10%），谨慎', 'caution'
+        # 滚动 3 年分位（与报告口径一致），不用接口预置的 *_pct
+        div_pct = _rolling_pct(db, code, target_date, 'dyr')
+        pe_pct = _rolling_pct(db, code, target_date, 'pe_ttm')
+        buy, risk, detail, risk_breadth = score_advice_v2(
+            ad['anchored_dd'], rsi20, div_pct, pe_pct, spread)
+        metrics = {
+            'dyr': _pct_and_quantiles(db, code, target_date, 'dyr'),
+            'pe': _pct_and_quantiles(db, code, target_date, 'pe_ttm'),
+            'spread': _pct_and_quantiles(db, code, target_date, 'spread'),
+        }
+        advice, level = advice_of_v2(buy, risk, risk_breadth)
 
         results.append({
             'code': code, 'name': name, 'cat': cat,
-            'close': ddinfo['current'], 'date': ddinfo['date'], 'dd_source': ddinfo['source'],
-            'dd_250': dd_250,
-            'high_250': high250,
+            'close': ad['current'], 'date': ad['date'], 'dd_source': ad['source'],
+            'anchored_dd': ad['anchored_dd'],
+            'high_anchored': ad['high_anchored'],
+            'high_date': ad['high_date'],
+            'dd_ref': {
+                'source': ad['source'],
+                'high_date': ad['high_date'],
+                'high': ad['high_anchored'],
+                'current': ad['current'],
+                'dd': ad['anchored_dd'],
+            },
+            'metrics': metrics,
+            'dd_250': dd250['dd_250'] if dd250 else None,
+            'rsi20': rsi20,
+            'buy_score': buy,
+            'risk_score': risk,
+            'risk_breadth': risk_breadth,
+            'score_detail': detail,
             'valuation': val,
-            'spread': spread, 'y10': round(y10, 2) if y10 is not None else None,
-            'signals': signals,
+            'dyr_pct_rolling': div_pct,
+            'pe_pct_rolling': pe_pct,
+            'spread': spread,
+            'y10': round(y10, 2) if y10 is not None else None,
             'advice': advice,
             'advice_level': level,
         })
 
-    # 整体汇总（v1.2：含 strong_reduce）
     buy_count = sum(1 for r in results if r['advice_level'] in ('strong_buy', 'buy'))
-    reduce_count = sum(1 for r in results if r['advice_level'] in ('reduce', 'strong_reduce'))
+    red_count = sum(1 for r in results if r['advice_level'] == 'reduce')
+    warn_count = sum(1 for r in results if r['advice_level'] == 'caution')
+    n = len(results)
     if buy_count >= 3:
-        summary = f"{buy_count}/5 指数处于买入区，红利整体低估"
-    elif reduce_count >= 3:
-        summary = f"{reduce_count}/5 指数建议减仓，警惕高位回落"
+        summary = f"{buy_count}/{n} 指数处于买入区，红利整体低估"
+    elif red_count >= 3:
+        summary = f"{red_count}/{n} 指数处于高风险区，警惕回落"
     else:
-        summary = f"买入区 {buy_count}/5 · 减仓区 {reduce_count}/5，整体中性"
+        summary = f"买入区 {buy_count}/{n} · 风险提示 {warn_count}/{n}，整体中性"
 
-    return jsonify({'date': target_date, 'summary': summary, 'indices': results})
+    return jsonify({'date': target_date, 'summary': summary,
+                    'model': 'v2.0', 'indices': results})
 
 
 @app.route('/api/market-scan/dividend-advice-detail')
@@ -1653,12 +1898,15 @@ def api_market_dividend_detail():
     hist_dates = [r['date'] for r in hist_rows]
     hist_closes = [r['close'] for r in hist_rows]
 
-    # 回撤曲线（250日滚动最高 · 优先全收益口径，PRD §3.2）
+    # 回撤曲线（距运行最高点 · 锚定口径，优先全收益）。参考高点一被突破即更新，
+    # 否则不变。旧版用 250 日滚动窗口，分母随时间前移，长期磨底时窗口内最高点
+    # 会被逐渐"淘汰"，回撤数字在价格未回升时就自行变小。
     dd_series = []
-    for i in range(len(dd_base)):
-        w = dd_base[max(0, i-249):i+1]
-        hi = max(w)
-        dd_series.append(round((hi - dd_base[i]) / hi * 100, 2))
+    _hi = -1.0
+    for _v in dd_base:
+        if _v > _hi:
+            _hi = _v
+        dd_series.append(round((_hi - _v) / _hi * 100, 2))
     # 回撤曲线按价格日期对齐。始终按日期映射，不只在长度不等时映射：
     # 港股通/沪港深系列指数跟港股日历（内地节假日仍有行情），两条序列长度相同
     # 但日期不同是可能的，那时按位置对齐会整体错位。
@@ -1666,32 +1914,49 @@ def api_market_dividend_detail():
     dd_map = dict(zip(dd_dates, dd_series))
     dd_series = [dd_map.get(d) for d in dates]
 
-    # 估值分位（近3年，按K线日期对齐；v1.3 加 dyr 绝对股息率供息差计算）
+    # 估值分位：滚动 3 年（750 交易日）分位，只用当日及之前的数据。
+    # 不用表里预置的 pe_ttm_pct / pb_pct / dyr_pct——它们的取值域被限制在
+    # 0.18~1.00，不是同一口径（2026-10-09 实测：预置 dyr_pct 给 20%，
+    # 滚动 3 年分位是 2%）。模型阈值标定在滚动分位上，两处必须一致。
     val_rows = db.execute("""
-        SELECT date, pe_ttm_pct, pb_pct, dyr_pct, dyr FROM index_fundamental_daily
-        WHERE stock_code=? AND date>=date(?,'-3 years') AND date<=?
+        SELECT date, pe_ttm, pb, dyr FROM index_fundamental_daily
+        WHERE stock_code=? AND date<=?
         ORDER BY date
-    """, (code, target_date, target_date)).fetchall()
+    """, (code, target_date)).fetchall()
     val_map = {r['date']: r for r in val_rows}
-    pe_series = [round(val_map[d]['pe_ttm_pct']*100) if d in val_map and val_map[d]['pe_ttm_pct'] is not None else None for d in dates]
-    pb_series = [round(val_map[d]['pb_pct']*100) if d in val_map and val_map[d]['pb_pct'] is not None else None for d in dates]
-    dyr_series = [round(val_map[d]['dyr_pct']*100) if d in val_map and val_map[d]['dyr_pct'] is not None else None for d in dates]
 
-    # 信号时间线：历史上 250日回撤>=10% 的事件（合并20日，全收益口径）
+    def _roll_series(field):
+        """按日期算滚动 750 日分位，返回 {date: pct}。"""
+        seq = [(r['date'], r[field]) for r in val_rows if r[field] is not None]
+        out = {}
+        for i, (dt, v) in enumerate(seq):
+            w = [x for _, x in seq[max(0, i - 749):i + 1]]
+            if len(w) >= 250:
+                out[dt] = round(sum(1 for x in w if x <= v) / len(w) * 100)
+        return out
+    pe_pct_map = _roll_series('pe_ttm')
+    pb_pct_map = _roll_series('pb')
+    dyr_pct_map = _roll_series('dyr')
+    pe_series = [pe_pct_map.get(d) for d in dates]
+    pb_series = [pb_pct_map.get(d) for d in dates]
+    dyr_series = [dyr_pct_map.get(d) for d in dates]
+    # 绝对股息率（供息差计算）
+    dyr_abs_series = [round(val_map[d]['dyr'] * 100, 2)
+                      if d in val_map and val_map[d]['dyr'] is not None else None
+                      for d in dates]
+
+    # 信号时间线（见下方 dd_marks_long 之后赋值）：
+    # 改按「轮」分组——一轮 = 参考高点从确立到被更高的高点取代，
+    # 每轮内每一档各取「首次跌破」的那天，同轮同档只记一次。
+    # 旧版是「≥12% 且距上次触发 ≥20 个交易日」的冷却期规则，与图上的分段口径不一致。
     events = []
-    last_trig = -999
-    for i in range(250, len(dd_series)):
-        if dd_series[i] is not None and dd_series[i] >= DD_BUY_THRESHOLD:  # v1.1：买点阈值 15%→10%
-            if i - last_trig >= 20:
-                events.append({'date': dates[i], 'dd': dd_series[i]})
-                last_trig = i
 
     # 历史类似情况统计：当前回撤幅度下的所有事件（全收益优先，回退价格）
     # 最新一天缺值（当日全收益未回填 / 口径缺该日）时回退到最近一个有值的交易日，
     # 不能兜底成 0：0 会让「当前回撤」显示错误，并让下面 similar 的 cur_dd > 0 判断失败，
     # 整张「历史类似回撤事件」表和 stats 摘要一起变空。
     cur_dd = next((v for v in reversed(dd_series) if v is not None), 0) if dd_series else 0
-    # 全历史回撤序列
+    # 全历史回撤序列（防未来截断，与 hist_rows 同理）
     hist_base = hist_tri if hist_tri else hist_closes
     hist_dd = []
     for i in range(len(hist_base)):
@@ -1851,33 +2116,35 @@ def api_market_dividend_detail():
             base_h = hs_closes[0]
             hs300_norm = [round(c / base_h * 100, 1) if c else None for c in hs_closes]
 
-    # ── 年度最大回撤（PRD §2.2 展示用，非规则；全收益口径，理杏仁 2016 起）──
+    # ── 年度最大回撤（展示用，非规则；全收益口径，理杏仁 2016 起）──
+    # 旧版每年初把参考高点重置为当年首个交易日的点位：跨年延续的下跌会被
+    # 系统性低估——1 月 2 日已经跌了 20%，当年却从「1 月 2 日」起算，读数接近 0。
+    # 现改为沿用运行最高点（锚定），再取每年内的最深值。
     annual_dd = []
     if hist_tri and hist_tri_dates:
-        cur_year = None
-        year_hi = None
         year_map = {}
+        _yhi = -1.0
         for i in range(len(hist_tri_dates)):
-            y = hist_tri_dates[i][:4]
-            if y != cur_year:
-                cur_year = y
-                year_hi = hist_tri[i]
-            if hist_tri[i] > year_hi:
-                year_hi = hist_tri[i]
-            dd = (year_hi - hist_tri[i]) / year_hi * 100
-            year_map.setdefault(y, 0)
-            year_map[y] = max(year_map[y], dd)
+            _v = hist_tri[i]
+            if _v > _yhi:
+                _yhi = _v
+            _dd = (_yhi - _v) / _yhi * 100
+            _y = hist_tri_dates[i][:4]
+            year_map[_y] = max(year_map.get(_y, 0), _dd)
         annual_dd = [{'year': y, 'dd': round(d, 1)} for y, d in sorted(year_map.items())]
 
     # ── 近10年K线（价格走势长图用；其他图保持近3年 dates/closes）──
     dates_long = []
     closes_long = []
     tri_long = []
+    # 起点固定 2016-01-01（与 hist_rows 及「2016 起」的图表标题一致）。
+    # 原先用 date(?,'-10 years')，在 2026 年查询时轴从 2016-09-30 才开始，
+    # 2016 年 1 月那轮调整的 3 个买点落在轴外、画不出来。
     rows_long = db.execute("""
         SELECT date, close FROM index_daily_kline
-        WHERE stock_code=? AND kline_type='normal' AND date>=date(?,'-10 years') AND date<=?
+        WHERE stock_code=? AND kline_type='normal' AND date>='2016-01-01' AND date<=?
         ORDER BY date
-    """, (code, target_date, target_date)).fetchall()
+    """, (code, target_date)).fetchall()
     if rows_long:
         dates_long = [r['date'] for r in rows_long]
         closes_long = [r['close'] for r in rows_long]
@@ -1886,6 +2153,50 @@ def api_market_dividend_detail():
                 "SELECT date, close FROM index_full_return_daily WHERE stock_code=? AND date<=?",
                 (tri_code, target_date)).fetchall())
             tri_long = [tri_map.get(d) for d in dates_long]
+
+    # 近10年回撤曲线：与 RSI 图同一条时间轴（dates_long）。
+    # 口径为「距运行最高点」（锚定）：参考高点一旦被突破就更新，否则保持不变。
+    # 旧版用 250 日滚动窗口，分母随时间前移，同一轮下跌的起点与终点
+    # 是相对两个不同高点衡量的、不可比；且长期磨底时窗口内最高点会被
+    # 逐渐"淘汰"，回撤数字在价格未回升时就自行变小。
+    dd_long_vals = hist_tri if (hist_tri and hist_tri_dates) else hist_closes
+    dd_long_dates = hist_tri_dates if (hist_tri and hist_tri_dates) else hist_dates
+    dd_long_raw, _runhi = [], []
+    _hi = -1.0
+    for _v in dd_long_vals:
+        if _v > _hi:
+            _hi = _v
+        _runhi.append(_hi)
+        dd_long_raw.append(round((_hi - _v) / _hi * 100, 2))
+    dd_long_map = dict(zip(dd_long_dates, dd_long_raw))
+    dd_series_long = [dd_long_map.get(d) for d in dates_long]
+
+    # 回撤买点：一轮 = 参考高点从确立到被更高的高点取代。
+    # 每轮内每一档各取「首次达到该档」的那天，同轮同档只记一次。
+    # 不做相邻轮合并：高点被刷新就是新一轮，这是规则本身的结果。
+    dd_marks_long = []
+    _nb = [i for i in range(len(_runhi)) if i == 0 or _runhi[i] > _runhi[i - 1]]
+    _nb.append(len(_runhi))
+    for _b in range(len(_nb) - 1):
+        _i, _j = _nb[_b], _nb[_b + 1] - 1
+        if _j < _i:
+            continue
+        _peak = max(dd_long_raw[_i:_j + 1])
+        if _peak < DD_TIERS[0]:
+            continue
+        for _k, _th in enumerate(DD_TIERS):
+            _hit = next((k for k in range(_i, _j + 1) if dd_long_raw[k] >= _th), None)
+            if _hit is None:
+                continue
+            dd_marks_long.append({
+                'date': dd_long_dates[_hit], 'dd': dd_long_raw[_hit], 'tier': _k + 1,
+                'start': dd_long_dates[_i], 'end': dd_long_dates[_j], 'peak_dd': _peak,
+            })
+
+    # 信号时间线：由按轮首次跌破的买点派生，限定在短轴日期范围内供表格使用。
+    _short = set(dates)
+    events = [{'date': m['date'], 'dd': m['dd'], 'tier': m['tier']}
+              for m in dd_marks_long if m['date'] in _short]
 
     # ── 股债息差序列（股息率 − 10Y国债，近3年，v1.3 新增）──
     # y10 IS NOT NULL：跳过无报价的行，bisect 自然向前取最近一个有值的交易日（同上函数）
@@ -1913,7 +2224,13 @@ def api_market_dividend_detail():
     # 二是给出更多买点样本供判断。
     rsi_p = _rsi_params(code)
     rsi_dates = dates_long if dates_long else dates
-    rsi_closes = closes_long if dates_long else closes
+    # RSI 基于全收益序列（含分红再投资）计算。红利指数股息率 4%~6%，
+    # 用价格序列会把除息计为下跌；缺失全收益数据的日期回退价格指数。
+    if dates_long and tri_long and any(v is not None for v in tri_long):
+        rsi_closes = [tv if tv is not None else cv
+                      for tv, cv in zip(tri_long, closes_long)]
+    else:
+        rsi_closes = closes_long if dates_long else closes
     # 后续收益用全收益口径（红利指数分红不可忽略），没有全收益就退回价格
     rsi_fwd_base = tri_long if (tri_long and len(tri_long) == len(rsi_closes)) else rsi_closes
 
@@ -2068,6 +2385,8 @@ def api_market_dividend_detail():
         'price_norm': price_norm, 'tri_norm': tri_norm, 'tri_diff': tri_diff, 'hs300_norm': hs300_norm,
         'annual_dd': annual_dd,
         'dates_long': dates_long, 'closes_long': closes_long, 'tri_long': tri_long,
+        'dd_series_long': dd_series_long, 'dd_marks_long': dd_marks_long,
+        'dd_tiers': list(DD_TIERS),
         'dd_source': 'full_return' if (tri_rows and len(tri_rows) >= 250) else 'price',
     })
 
@@ -2155,12 +2474,20 @@ def api_market_capital_flow():
 # API: GET /api/market-scan/fcf-advice（自由现金流指数操作建议）
 # ═══════════════════════════════════════════════
 
-FCF_INDICES = [
-    ('980092', '国证自由现金流'),
-    ('932365', '中证现金流'),
-]
 FCF_DATA_NOTE = '估值分位基于 2024-09 以来数据（约2年），短窗口统计仅供参考'
 
+
+# 自由现金流建议：纯逻辑在 calc/index_advice.py（单一实现，日更脚本共用）
+from calc.index_advice import (  # noqa: E402
+    FCF_INDICES_PUBLIC,
+    FCF_INDICES,
+    FCF_BASELINE_ANNUAL, FCF_MEDIAN_ANNUAL, FCF_SAMPLE_DAYS,
+    FCF_DD_BINS, FCF_LABEL, FCF_RSI_SELL, FCF_SELL_THR, FCF_DATA_GAPS,
+    fcf_advice_v2, fcf_advice_from_db, fcf_pct, fcf_rsi,
+    fcf_rsi_multi, fcf_anchored_dd,
+    _fcf_advice_v2, _fcf_advice_from_db, _fcf_pct,
+    _fcf_rsi, _fcf_rsi_multi, _fcf_anchored_dd,
+)
 
 def _fcf_signals_and_advice(val):
     """估值分位三层规则（PRD §5.1）：返回 (signals, advice, level)"""
@@ -2193,6 +2520,145 @@ def _fcf_signals_and_advice(val):
     return signals, advice, level
 
 
+@app.route('/api/market-scan/index-cpa-list')
+def api_index_cpa_list():
+    """按阶段列出指数。stage 为空时返回各阶段计数。"""
+    stage = request.args.get('stage', '').strip()
+    db = get_db()
+    try:
+        if not stage:
+            rows = db.execute(
+                "SELECT stage, COUNT(*) FROM index_cpa_daily "
+                "WHERE date=(SELECT MAX(date) FROM index_cpa_daily) "
+                "GROUP BY stage ORDER BY stage").fetchall()
+            tot = db.execute(
+                "SELECT COUNT(*) FROM index_cpa_daily "
+                "WHERE date=(SELECT MAX(date) FROM index_cpa_daily)").fetchone()[0]
+            d = db.execute("SELECT MAX(date) FROM index_cpa_daily").fetchone()[0]
+            return jsonify({'date': d, 'total': tot,
+                            'counts': {int(r[0]): r[1] for r in rows if r[0] is not None}})
+
+        st = int(stage)
+        rows = db.execute(
+            "SELECT stock_code, index_name, stage, stage_name, action, regime, "
+            "close, days_in_stage, since_date, dev20, date "
+            "FROM index_cpa_daily "
+            "WHERE stage=? AND date=(SELECT MAX(date) FROM index_cpa_daily) "
+            "ORDER BY days_in_stage DESC", (st,)).fetchall()
+        return jsonify({'stage': st, 'items': [
+            {'code': r[0], 'name': r[1], 'stage': r[2], 'stage_name': r[3],
+             'action': r[4], 'regime': r[5], 'close': r[6],
+             'days': r[7], 'since': r[8], 'dev20': r[9], 'date': r[10]}
+            for r in rows]})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/market-scan/index-search')
+def api_index_search():
+    """按代码前缀或名称片段搜索有 CPA 数据的指数。"""
+    q = (request.args.get('q') or '').strip()
+    if not q:
+        return jsonify({'items': []})
+    db = get_db()
+    like = f'%{q}%'
+    try:
+        # stock_index 是「个股→所属指数」的映射表，指数名录须取 DISTINCT index_code
+        rows = db.execute(
+            "SELECT DISTINCT index_code, index_name FROM stock_index "
+            "WHERE index_code LIKE ? OR index_name LIKE ? "
+            "ORDER BY index_code LIMIT 40",
+            (f'{q}%', like)).fetchall()
+        # 只保留有 K 线的
+        have = {r[0] for r in db.execute(
+            "SELECT DISTINCT stock_code FROM index_daily_kline "
+            "WHERE kline_type='normal'").fetchall()}
+        items = [{'code': r[0], 'name': r[1]} for r in rows if r[0] in have]
+        # 补充：代码本身能直接命中但 stock_index 没登记的
+        if q.isdigit() and len(q) == 6 and q in have and \
+                not any(x['code'] == q for x in items):
+            items.insert(0, {'code': q, 'name': ''})
+        return jsonify({'items': items})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/market-scan/index-cpa')
+def api_index_cpa():
+    """指数 CPA 八阶段：返回逐日阶段序列、当前阶段、判据明细与有效性面板。"""
+    code = request.args.get('code', '980092')
+    limit = int(request.args.get('limit', 1200))
+    try:
+        from scanners.cpa_index import (ACTION, CFG, SAMPLE_STATS, STAGE_NAME,
+                                        load, load_bi, run_state_machine)
+    except ImportError:
+        from calc.index_advice import FCF_INDICES_PUBLIC
+        return jsonify({'error': 'cpa_index 模块不可用'}), 500
+
+    db = get_db()
+    rows = load(db, code)
+    if not rows:
+        return jsonify({'error': f'{code} 数据不足（需 ≥400 日）'}), 404
+
+    dates = [r[0] for r in rows]
+    o = [r[1] for r in rows]
+    h = [r[2] for r in rows]
+    l = [r[3] for r in rows]
+    c = [r[4] for r in rows]
+    v = [r[5] if r[5] else 0.0 for r in rows]
+
+    _bis = load_bi(db, code)
+    stage, trans, ind = run_state_machine(o, h, l, c, v, bis=_bis, dates=dates)
+
+    start = max(0, len(dates) - limit)
+    valid = [i for i in range(len(stage)) if stage[i] is not None]
+    if not valid:
+        return jsonify({'error': '无有效判定'}), 404
+
+    cur_i = valid[-1]
+    cur_stage = stage[cur_i]
+    # 当前阶段已持续天数
+    k = cur_i
+    while k - 1 >= 0 and stage[k - 1] == cur_stage:
+        k -= 1
+    since = dates[k]
+
+    # 判据明细（判定当前阶段的当日输入）
+    detail = {
+        'close': round(c[cur_i], 2),
+        'ema10': round(ind['e10'][cur_i], 2) if ind['e10'][cur_i] else None,
+        'ema20': round(ind['e20'][cur_i], 2) if ind['e20'][cur_i] else None,
+        'ema50': round(ind['e50'][cur_i], 2) if ind['e50'][cur_i] else None,
+        'atr20': round(ind['a20'][cur_i], 2) if ind['a20'][cur_i] else None,
+        'vr': round(ind['vr'][cur_i], 2) if ind['vr'][cur_i] else None,
+    }
+
+    return jsonify({
+        'code': code,
+        'date': dates[cur_i],
+        'current': {
+            'stage': cur_stage,
+            'name': STAGE_NAME[cur_stage],
+            'action': ACTION[cur_stage],
+            'since': since,
+            'days': cur_i - k + 1,
+            'detail': detail,
+        },
+        'dates': dates[start:],
+        'ohlc': [[o[i], c[i], l[i], h[i]] for i in range(start, len(dates))],
+        'stage': stage[start:],
+        'ema10': [round(x, 2) if x else None for x in ind['e10'][start:]],
+        'ema20': [round(x, 2) if x else None for x in ind['e20'][start:]],
+        'ema50': [round(x, 2) if x else None for x in ind['e50'][start:]],
+        'stage_names': STAGE_NAME,
+        'actions': ACTION,
+        'validity': SAMPLE_STATS,
+        'transitions': len(trans),
+        'params': {k2: CFG[k2] for k2 in ('ema_fast', 'ema_mid', 'ema_slow',
+                                          'pop_vr_min', 'exh_gain_min')},
+    })
+
+
 @app.route('/api/market-scan/fcf-advice')
 def api_market_fcf_advice():
     """自由现金流指数操作建议：估值分位信号检测+建议合成（支持历史回看，多指数）"""
@@ -2205,7 +2671,7 @@ def api_market_fcf_advice():
         target_date = r[0]
 
     results = []
-    for code, name in FCF_INDICES:
+    for code, name in FCF_INDICES_PUBLIC:
         # K线 300 日窗口
         rows = db.execute("""
             SELECT date, close FROM index_daily_kline
@@ -2219,6 +2685,16 @@ def api_market_fcf_advice():
         current = closes[-1]
         high250 = max(closes[-250:])
         dd_250 = (high250 - current) / high250 * 100
+        # PRD v2.0：用全历史锚定回撤（与研究报告一致），而非 250 日滚动
+        _all = [x['close'] for x in db.execute(
+            "SELECT close FROM index_daily_kline WHERE stock_code=? "
+            "AND kline_type='normal' AND date<=? ORDER BY date",
+            (code, target_date)).fetchall()]
+        _dd_series = _fcf_anchored_dd(_all) if _all else [dd_250]
+        _dd = _dd_series[-1] if _dd_series else dd_250
+        _r60 = _fcf_rsi(_all, 60)[-1] if _all else None
+        _r20s = _fcf_rsi(_all, 20)
+        _cur_r20 = _r20s[-1] if _r20s else None
 
         # 估值
         v = db.execute("""
@@ -2237,13 +2713,43 @@ def api_market_fcf_advice():
                 'dyr_pct': round(v['dyr_pct'] * 100) if v['dyr_pct'] is not None else None,
             }
 
-        signals, advice, level = _fcf_signals_and_advice(val)
+        _adv = _fcf_advice_from_db(db, code, target_date)
+        if _adv:
+            # 日更表只存打分结果；四元信息按当前回撤档补
+            for _lo, _hi, _ann, _exc, _seg, _lv in FCF_DD_BINS:
+                if _lo <= _dd < _hi:
+                    _adv['meta'] = {
+                        'sample_days': len(_all),
+                        'independent_segments': _seg,
+                        'median_annual': _ann,
+                        'baseline_annual': FCF_BASELINE_ANNUAL,
+                        'median_annual_all': FCF_MEDIAN_ANNUAL,
+                        'excess_pp': _exc,
+                    }
+                    _adv['reasons'] = [
+                        f"锚定回撤 {_dd:.1f}% 落在 {_lo}~{_hi}% 档",
+                        f"买入分 {_adv['buy_score']}、风险分 {_adv['risk_score']}"
+                        f"（日更表 {_adv['advice_date']}）",
+                    ]
+                    break
+            else:
+                _adv = _fcf_advice_v2(_dd, _r60, _cur_r20)
+        else:
+            _adv = _fcf_advice_v2(_dd, _r60, _cur_r20)
         results.append({
             'code': code, 'name': name,
-            'close': round(current, 2), 'dd_250': round(dd_250, 1),
+            'close': round(current, 2),
+            'dd_250': round(dd_250, 1),
+            'dd_anchored': round(_dd, 1),
+            'rsi60': round(_r60, 1) if _r60 is not None else None,
             'high_250': round(high250, 2),
             'valuation': val,
-            'signals': signals, 'advice': advice, 'advice_level': level,
+            'advice': _adv,
+            'advice_level': _adv['level'],
+            'advice_label': _adv['label'],
+            'advice_meta': _adv['meta'],
+            'advice_reasons': _adv['reasons'],
+            'data_gaps': FCF_DATA_GAPS,
             'data_note': FCF_DATA_NOTE,
         })
 
@@ -2263,30 +2769,136 @@ def api_market_fcf_detail():
             return jsonify({'error': 'no data', 'date': ''})
         target_date = r[0]
 
-    # 近3年K线
+    # 全部可得K线：自指数基日 2012-12-31 起，与研究报告口径一致，便于人工复核
     rows = db.execute("""
         SELECT date, close FROM index_daily_kline
-        WHERE stock_code=? AND kline_type='normal' AND date>=date(?,'-3 years') AND date<=?
+        WHERE stock_code=? AND kline_type='normal' AND date>='2012-12-31' AND date<=?
         ORDER BY date
-    """, (code, target_date, target_date)).fetchall()
+    """, (code, target_date)).fetchall()
     dates = [r['date'] for r in rows]
     closes = [r['close'] for r in rows]
     if not dates:
         return jsonify({'error': 'no data'})
 
-    # 回撤曲线（250日滚动最高 · 仅展示，不参与信号生成；2年窗口回测无统计规律，供人工参考）
-    dd_series = []
-    for i in range(len(closes)):
-        w = closes[max(0, i-249):i+1]
-        hi = max(w)
-        dd_series.append(round((hi - closes[i]) / hi * 100, 2))
+    # 回撤曲线：锚定口径（距波段运行最高点），与研究报告中「锚定回撤」一致
+    # 口径：(运行最高点 − 当日点位) ÷ 运行最高点；运行最高点只在被突破时更新
+    dd_series, _hi = [], -1.0
+    for _c in closes:
+        if _c > _hi:
+            _hi = _c
+        dd_series.append(round((_hi - _c) / _hi * 100, 2))
+
+    # 同口径的全收益回撤：分红再投资会抬高路径，回撤通常略浅
+    _tr = db.execute("""
+        SELECT date, close FROM index_full_return_daily
+        WHERE stock_code=? AND date>='2012-12-31' AND date<=? ORDER BY date
+    """, (code, target_date)).fetchall()
+    _trmap = {r['date']: r['close'] for r in _tr}
+    closes_tr = [_trmap.get(_d) for _d in dates]
+
+    dd_series_tr, _hitr = [], -1.0
+    for _d in dates:
+        _c = _trmap.get(_d)
+        if _c is None:
+            dd_series_tr.append(None)
+            continue
+        if _c > _hitr:
+            _hitr = _c
+        dd_series_tr.append(round((_hitr - _c) / _hitr * 100, 2))
+
+    # ── PRD v2.0 新增：4 档建议 / 回撤分档 / RSI 序列 / 买点时间线 ──
+    # RSI 基于「全收益」序列计算，与回撤口径一致（参照红利页：RSI 用含分红再投资序列）。
+    _tr_px, _prevp = [], None
+    for _x in closes_tr:
+        if _x is None:
+            _tr_px.append(_prevp)
+        else:
+            _prevp = _x
+            _tr_px.append(_x)
+    _tr_px = [x if x is not None else (closes[i] if i < len(closes) else None)
+              for i, x in enumerate(_tr_px)]
+    _rsi60 = _fcf_rsi(_tr_px, 60)
+    # 口径：建议与分档一律用全收益指数回撤（与研究报告一致）。
+    # 价格指数回撤仅在前端作参考线展示。
+    # 口径：一律用全收益指数回撤（与研究一致）；价格回撤仅作参考线。
+    # 全收益序列可能短于价格序列（末尾若干日缺失）；用前值填充，取最后有效值。
+    _dd_use, _prev = [], None
+    for _x in dd_series_tr:
+        if _x is None:
+            _dd_use.append(_prev if _prev is not None else 0.0)
+        else:
+            _prev = _x
+            _dd_use.append(_x)
+    _tr_valid = [x for x in dd_series_tr if x is not None]
+    _cur_dd = (_tr_valid[-1] if _tr_valid
+               else (dd_series[-1] if dd_series else 0.0))
+    _cur_r60 = _rsi60[-1] if _rsi60 else None
+    _r20_series = _fcf_rsi(_tr_px, 20)
+    _cur_r20 = _r20_series[-1] if _r20_series else None
+    advice_v2 = _fcf_advice_from_db(db, code, target_date) or \
+        _fcf_advice_v2(_cur_dd, _cur_r60, _cur_r20)
+    if advice_v2.get('source') == 'index_advice_daily':
+        # 四元信息按当前回撤档补（分档属性，不随日更表变化）
+        for _lo, _hi, _ann, _exc, _seg, _lv in FCF_DD_BINS:
+            if _lo <= _cur_dd < _hi:
+                advice_v2['meta'] = {
+                    'sample_days': len(dates),
+                    'independent_segments': _seg,
+                    'median_annual': _ann,
+                    'baseline_annual': FCF_BASELINE_ANNUAL,
+                    'median_annual_all': FCF_MEDIAN_ANNUAL,
+                    'excess_pp': _exc,
+                }
+                break
+        advice_v2['reasons'] = [
+            f"锚定回撤 {_cur_dd:.1f}% 落在 {_lo}~{_hi}% 档",
+            f"买入分 {advice_v2['buy_score']}、风险分 {advice_v2['risk_score']}"
+            f"（数据来自日更表 {advice_v2['advice_date']}）",
+        ]
+    advice_v2['meta']['sample_days'] = len(dates)
+
+    dd_bins_v2 = [
+        {'lo': lo, 'hi': hi, 'annual': ann, 'excess_pp': exc,
+         'segments': seg, 'level': lv,
+         'label': f'{lo}~{hi}%' if hi < 101 else f'{lo}% 以上'}
+        for lo, hi, ann, exc, seg, lv in FCF_DD_BINS
+    ]
+
+    rsi_series = [{'date': dates[i], 'rsi60': round(_rsi60[i], 1)
+                   if _rsi60[i] is not None else None}
+                  for i in range(len(dates))]
+
+    # 买点时间线：锚定回撤「每次」进入 >=20% 档的日期（跌破后回升再跌破会重新标记），
+    # 附未来 250 日收益。注意这与研究报告里「每轮首次触发」口径不同，后者按回撤轮次去重。
+    buy_points = []
+    _seen_round, _prev_in = set(), False
+    for i in range(len(dates)):
+        _in = _dd_use[i] >= 20
+        if _in and not _prev_in:
+            _fwd = ((closes[i + 250] / closes[i] - 1) * 100
+                    if i + 250 < len(closes) else None)
+            buy_points.append({'date': dates[i], 'dd': round(_dd_use[i], 1),
+                               'fwd250': round(_fwd, 1) if _fwd is not None else None})
+        _prev_in = _in
+
+    rsi_multi = _fcf_rsi_multi(dates, _tr_px, (6, 14, 20))
+    _rsi_default = 14  # 研究中 RSI14 的 <30 天数 81 天，信号密度适中；
+                       # RSI6 太多(344)、RSI60 永不触发(0)
+
+    RSI_TRIGGERS = []
+    _prev_out = False
+    for i in range(len(dates)):
+        _o = _rsi60[i] is not None and _rsi60[i] >= 65
+        if _o and not _prev_out:
+            RSI_TRIGGERS.append({'date': dates[i], 'rsi60': round(_rsi60[i], 1)})
+        _prev_out = _o
 
     # 估值分位（近2年窗口：数据从 2024-09 起自然截断，与图表标题"数据自2024-09起"一致；Spec O-4）
     val_rows = db.execute("""
         SELECT date, pe_ttm_pct, pb_pct, dyr_pct FROM index_fundamental_daily
-        WHERE stock_code=? AND date>=date(?,'-2 years') AND date<=?
+        WHERE stock_code=? AND date<=?
         ORDER BY date
-    """, (code, target_date, target_date)).fetchall()
+    """, (code, target_date)).fetchall()
     val_map = {r['date']: r for r in val_rows}
     pe_series = [round(val_map[d]['pe_ttm_pct']*100) if d in val_map and val_map[d]['pe_ttm_pct'] is not None else None for d in dates]
     pb_series = [round(val_map[d]['pb_pct']*100) if d in val_map and val_map[d]['pb_pct'] is not None else None for d in dates]
@@ -2398,7 +3010,20 @@ def api_market_fcf_detail():
     current_dd = next((v for v in reversed(dd_series) if v is not None), 0) if dd_series else 0
     return jsonify({
         'code': code, 'name': name, 'date': target_date,
-        'dates': dates, 'closes': closes, 'dd_series': dd_series,
+        'dates': dates, 'closes': closes, 'closes_tr': closes_tr,
+        'pe_series': pe_series, 'pb_series': pb_series,
+        'dyr_series': dyr_series,
+        'val_start': next((dates[i] for i in range(len(dates))
+                           if pe_series[i] is not None), None),
+        'val_days': sum(1 for x in pe_series if x is not None),
+        'dd_series': dd_series, 'dd_series_tr': dd_series_tr,
+            'advice': advice_v2, 'dd_bins': dd_bins_v2,
+            'rsi_series': rsi_series, 'rsi_multi': rsi_multi,
+            'rsi_default_period': _rsi_default, 'buy_points': buy_points,
+            'rsi_triggers': RSI_TRIGGERS,
+            'data_gaps': FCF_DATA_GAPS,
+            'baseline_annual': FCF_BASELINE_ANNUAL,
+            'closes_tr': closes_tr,
         'pe_pct_series': pe_series, 'pb_pct_series': pb_series, 'dyr_pct_series': dyr_series,
         'events': events, 'similar': similar, 'stats': stats,
         'current_dd': current_dd,
@@ -2760,6 +3385,27 @@ def api_market_shareholder_low():
                     'note': '筹码集中度扫描：最新股东人数 ≤ 历史最低×1.05（5%容差）；连续减=连续报告期减少；创新低=当前即历史最低；chg20/60=价格涨幅（启动检测）'})
 
 
+def _wilder_rsi(closes, period=14):
+    """Wilder RSI。前 period 个值为 None。"""
+    n = len(closes)
+    out = [None] * n
+    if n <= period:
+        return out
+    g = l = 0.0
+    for i in range(1, period + 1):
+        ch = closes[i] - closes[i - 1]
+        g += max(ch, 0.0)
+        l += max(-ch, 0.0)
+    ag, al = g / period, l / period
+    out[period] = 100.0 if al == 0 else 100 - 100 / (1 + ag / al)
+    for i in range(period + 1, n):
+        ch = closes[i] - closes[i - 1]
+        ag = (ag * (period - 1) + max(ch, 0.0)) / period
+        al = (al * (period - 1) + max(-ch, 0.0)) / period
+        out[i] = 100.0 if al == 0 else 100 - 100 / (1 + ag / al)
+    return [round(x, 1) if x is not None else None for x in out]
+
+
 @app.route('/api/market-scan/hk-advice-detail')
 def api_market_hk_advice_detail():
     """港股红利指数详情：全收益/回撤/估值分位/息差/信号有效性（仿 dividend-advice-detail，港股规则）"""
@@ -2779,14 +3425,39 @@ def api_market_hk_advice_detail():
     # 价格对齐（tri 日期上取价格收盘）
     price_map = {r['date']: r['close'] for r in price}
     price_close = [price_map.get(d) for d in dates]
-    # 250 日回撤（全收益）
-    dd = []
-    for i in range(len(tri_close)):
-        if i < 250:
-            dd.append(None)
+    # 回撤：距运行最高点（锚定口径）。旧版用 250 日滚动窗口，分母随时间前移，
+    # 同一轮下跌的起点与终点相对两个不同高点衡量，不可比。
+    dd, _hi, _rh = [], -1.0, []
+    for v in tri_close:
+        if v > _hi:
+            _hi = v
+        _rh.append(_hi)
+        dd.append(round((_hi - v) / _hi * 100, 2))
+    # 买点：一轮 = 参考高点从确立到被更高的高点取代；每轮每档取「首次跌破」那天。
+    # 阈值暂用 A 股口径 12/14/20，港股专属阈值待后续研究。
+    _nb = [i for i in range(len(_rh)) if i == 0 or _rh[i] > _rh[i-1]] + [len(_rh)]
+    dd_marks = []
+    for _b in range(len(_nb) - 1):
+        _a, _z = _nb[_b], _nb[_b+1] - 1
+        if _z < _a:
             continue
-        hi = max(tri_close[i-250:i+1])
-        dd.append(round((hi - tri_close[i]) / hi * 100, 1))
+        _peak = max(dd[_a:_z+1])
+        if _peak < DD_TIERS[0]:
+            continue
+        for _k, _th in enumerate(DD_TIERS):
+            _h = next((i for i in range(_a, _z+1) if dd[i] >= _th), None)
+            if _h is None:
+                continue
+            dd_marks.append({'date': dates[_h], 'dd': dd[_h], 'tier': _k + 1,
+                             'start': dates[_a], 'end': dates[_z], 'peak_dd': _peak})
+    # RSI：以全收益序列计算（与 A 股详情页同口径）
+    rsi14 = _wilder_rsi(tri_close, 14)
+    # 年度最深回撤（沿用运行最高点，跨年不清零）
+    _ym = {}
+    for i, d0 in enumerate(dates):
+        _ym.setdefault(d0[:4], 0.0)
+        _ym[d0[:4]] = max(_ym[d0[:4]], dd[i])
+    annual_dd = [{'year': y, 'dd': round(v2, 1)} for y, v2 in sorted(_ym.items())]
     # 估值/息差序列
     from collections import defaultdict
     pe_p, pb_p, dyr, dyr_p = [], [], [], []
@@ -2845,6 +3516,8 @@ def api_market_hk_advice_detail():
     return jsonify({
         'code': code, 'name': name, 'date': dates[cur],
         'dates': dates, 'tri_close': tri_close, 'price_close': price_close, 'dd_series': dd,
+        'dd_marks': dd_marks, 'dd_tiers': list(DD_TIERS),
+        'rsi14': rsi14, 'annual_dd': annual_dd,
         'pe_pct': pe_p, 'pb_pct': pb_p, 'dyr': dyr, 'dyr_pct': dyr_p, 'spread_series': spread_s,
         'pe_series': pe_s, 'pb_series': pb_s,
         'current': {
@@ -2854,7 +3527,10 @@ def api_market_hk_advice_detail():
             'pb': round(v['pb'], 2) if (v := val_map.get(dates[cur])) and v['pb'] is not None else None,
         },
         'signals_bt': bt,
-        'note': '港股规则：回撤≥15%/股息率≥6%/息差≥4% 为买点（回测 59-70%）；PE分位>80% 部分有效（60%）；PB分位无效（47%）；股息率分位<10% 反向（44%）——与A股框架不同',
+        'note': '回撤用「距运行最高点」锚定口径；买点为每轮各档首次跌破（阈值暂用 A 股口径 '
+                '12/14/20，港股专属阈值待研究）。其余信号沿用港股规则：股息率≥6%/息差≥4% '
+                '为买点（回测 59-70%）；PE分位>80% 部分有效（60%）；PB分位无效（47%）；'
+                '股息率分位<10% 反向（44%）',
     })
 
 
@@ -3035,7 +3711,7 @@ def api_market_coal_detail():
         SELECT date, close FROM index_daily_kline
         WHERE stock_code=? AND kline_type='normal' AND date>=date(?,'-10 years') AND date<=?
         ORDER BY date
-    """, (code, target_date, target_date)).fetchall()
+    """, (code, target_date)).fetchall()
     dates = [r['date'] for r in rows]
     closes = [r['close'] for r in rows]
     if len(dates) < 300:

@@ -57,6 +57,21 @@
 
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
+      <div class="pg-card">
+        <h3>🧬 指数 CPA 八阶段判定 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span><b>两层状态机</b>：环境层（UP/DOWN/RANGE 每日重算）+ 事件层（环境内记忆，环境一变重置）</td><td>2026-10-21</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>阶段⓪「突破待确认」：突破当日记 ⓪，次日收盘定夺；跌破不等确认</td><td>2026-10-21</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>三条结构不变量全过：覆盖 / 无吸收态（最长 124 日）/ 九阶段可达，最大占比 21.8%</td><td>2026-10-21</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>无未来视角</b>：截断检验 570 个时点、0 处不一致 + 静态审计无 [i+k] / [i:]</td><td>2026-10-21</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>出场规则实证</b>：②④买 ⑥卖 期望 −0.03%；②④买 ⑤卖 胜率 69.6%、中位 +3.79%（含未平仓）</td><td>2026-10-21</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>引擎 src/scanners/cpa_index.py + 每日扫描 scripts/scan_index_cpa_daily.py（394 指数入库）</td><td>2026-10-21</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>页面 web/market-scan/index-cpa.html：搜索框 + 八阶段筛选 + 阶段色带 + 判据明细</td><td>2026-10-21</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>导航「形态分析」下新增「指数CPA」；日更步骤 38</td><td>2026-10-21</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span>待改进：RANGE 内 ④↔⑧ 抖动（⑧→④ 占 82%），需改箱体上下半区或加 0.3ATR 死区</td><td>2026-10-21</td></tr>
+        </table>
+      </div>
+
 
       <div class="pg-card">
         <h3>🔬 CPA 阶段判定引擎 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
@@ -616,6 +631,12 @@
 <div class="lesson-card"><div class="ln">137. 重建脚本必须幂等，否则输出会被自己污染</div><div class="ld">regen_schema_summary.py 把自己的汇总行读回来当「旧说明」再拼一遍标记，于是每跑一次多一层「尚无独立章节」，库里已累积 33 行重复。凡是「读旧文件→写回」的脚本，都要能重复执行而结果不变。</div></div>
 <div class="lesson-card"><div class="ln">138. 同一张表有多章节时，索引不能取「最后出现」的那一节</div><div class="ld">汇总表的章节号取到最后匹配的标题，于是现役的 index_full_return_daily 被标成已废弃的 §18。出现同名多章节时要跳过标题含「已废弃」的那一节，否则索引会把读者指到历史存档。</div></div>
 <div class="lesson-card"><div class="ln">139. 写在别处的唤起词等于不存在</div><div class="ld">「收尾」这套六件套一直只写在 Hanako 的 pinned memory 里，DSH 会话读不到它，于是连续多轮收尾只 commit、不更新 progress/教训/待办，DATABASE_SCHEMA 也停更。跨 agent 复用的流程必须落成仓库里的 skill 文件（.agents/skills/shouwei/SKILL.md），不能只存在某个 agent 的记忆里。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">140. 把「事件」当「状态」建状态机，必然出现吸收态</div><div class="ld">Kell 的 CPA 八阶段（Wedge Pop / EMA Crossback / Base 'n Break）本质是事件，不是持续状态。单层状态机里，任一阶段只要出口比入口难就会吞掉整个状态空间——实测 ③ 连续占 32 日、⑧ 占 75%。解法是让第二层的记忆被第一层（环境）的生命周期封顶，环境一变即重置。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">141. 基准窗口含当日 = 条件永假（本项目的固定陷阱）</div><div class="ld">`close > max(c[i-20:i+1])` 与 `close < min(c[i-20:i+1])` 逻辑上不可能成立，因为比较基准包含了自己。本项目在箱体突破、新低判定上各踩一次，每次表现为「某阶段一次都不触发」。凡是用极值做比较，窗口右侧必须是 i（不含当日）。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">142. 迁移矩阵漏写目标 = 阶段永久为 0</div><div class="ld">给引擎加阶段 ④ 的进入条件后仍不触发，因为 ALLOWED[cur] 集合里没有任何一项包含 4，入口被规则本身挡住。加新阶段时必须同时改三处：判据、迁移矩阵的「能去哪里」、迁移矩阵的「谁能进来」。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">143. 持股论点的持有条件必须同时包含均线，不能只看突破位</div><div class="ld">为让 ② 活久一点而加的「收盘在突破位之上就持有」，会让价格跌穿 EMA10/20/50 后仍停在 ②（实测 931157 于 2026-10-21 跌穿全部均线却显示突破阶段）。突破位可能远低于均线，两个条件缺一不可。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">144. 出场比入场重要一个量级</div><div class="ld">同一买入规则（②④首次进入）下，出场在 ⑥ 破位期望 −0.03%/笔，出场在 ⑤ 衰竭延伸期望 +1.58%/笔、胜率 72.4%。⑥ 要等创 10 日新低才触发，等于卖在地板上；⑤ 在偏离 EMA20 超 2ATR 时卖出，卖在强势里。设计择时系统应优先打磨出场规则。</div></div>
+
 
 </div>
 <script>

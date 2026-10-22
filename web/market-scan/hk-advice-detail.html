@@ -34,6 +34,8 @@ td:first-child{font-family:var(--font-body)}
 .muted{color:var(--muted)}
 html[data-theme="light"] .chart-card{background:rgba(255,255,255,.7)}
 </style>
+<link rel="stylesheet" href="/shared/css/advice-card.css">
+<script src="/shared/js/advice-card.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -49,14 +51,16 @@ html[data-theme="light"] .chart-card{background:rgba(255,255,255,.7)}
     <div class="chart-card"><div class="ct">🎯 买卖点规则（当前状态）</div>
       <table><thead><tr><th>规则</th><th>当前值</th><th>状态</th><th>说明</th></tr></thead><tbody id="rules-body"></tbody></table></div>
     <div class="stat-row" id="stats"></div>
-    <div class="chart-card"><div class="ct">📉 250日回撤（全收益，≥15%买点区）</div><div id="chart-dd" style="height:220px"></div></div>
+    <div class="chart-card"><div class="ct">📈 全收益 vs 价格（2016 起）</div><div id="chart-px" style="height:540px"></div><div class="cs">全收益=含分红再投资（蓝）；价格=净值口径（灰虚线）。买点标在全收益曲线上</div></div>
+    <div class="chart-card"><div class="ct">📉 历史回撤曲线（2016 起 · 距运行最高点 · 锚定口径）</div><div id="chart-dd" style="height:480px"></div><div class="cs">回撤 = 距运行最高点（历史最高价）。参考高点一旦被突破即更新。买点 = 每轮各档首次跌破，阈值暂用 A 股口径 12/14/20</div></div>
+    <div class="chart-card"><div class="ct">📊 RSI(14) · 全收益口径</div><div id="chart-rsi" style="height:260px"></div><div class="cs">Wilder RSI，以全收益序列计算（与 A 股详情页同口径）。三条虚线为 30 / 50 / 70</div></div>
+    <div class="chart-card"><div class="ct">📉 年度最深回撤（距运行最高点 · 展示用）</div><div id="chart-annualdd" style="height:240px"></div><div class="cs">沿用运行最高点、跨年不清零；旧版每年初把参考高点重置为当年首个交易日，会低估跨年延续的下跌</div></div>
     <div class="chart-card"><div class="ct">🎯 信号有效性回测（2018起 · 60日前瞻 · 全收益口径）</div>
       <table><thead><tr><th>信号</th><th>触发次数</th><th>60日胜率</th><th>60日中位</th><th>判定</th></tr></thead><tbody id="bt-body"></tbody></table>
       <div class="cs">买点规则：回撤≥15% / 股息率≥6% / 息差≥4%；港股 PE 分位>80% 部分有效，PB 无效，股息率分位<10% 反向</div>
     </div>
   </div>
   <div id="pane-val" style="display:none">
-    <div class="chart-card"><div class="ct">📈 全收益 vs 价格（2016起）</div><div id="chart-px" style="height:280px"></div><div class="cs">全收益=含分红再投资；价格=净值口径</div></div>
     <div class="chart-card"><div class="ct">📊 估值分位 + 股息率</div><div id="chart-val" style="height:260px"></div><div class="cs">港股分位有效性：PE 部分有效 / PB 无效 / 股息率分位反向（见操作建议·信号表）</div></div>
     <div class="chart-card"><div class="ct">📊 PE/PB 绝对值走势</div><div id="chart-abs" style="height:240px"></div></div>
     <div class="chart-card"><div class="ct">📈 股债息差（≥4% 买点区）</div><div id="chart-spread" style="height:220px"></div></div>
@@ -111,7 +115,33 @@ async function load(){
   else if (buyN === 1) { lv = '观察', lvTxt = midC; advice = '1 项达标（回撤' + (ddOk?'✅':'❌') + ' 股息率' + (dyOk?'✅':'❌') + ' 息差' + (spOk?'✅':'❌') + '），继续等待' }
   else if (peHi) { lv = '高位警示', lvTxt = dnC; advice = 'PE 分位 ' + c.pe_pct + '% >80%（60%胜率卖出倾向）+ 无买点达标——偏减仓/观望' }
   else { lv = '观望', lvTxt = '#8b8b90'; advice = '无买点达标（回撤 ' + (c.dd_250||0) + '% 远未到 15%）——持有等回撤或股息率提升' }
-  document.getElementById('advice').innerHTML = '<div class="lv" style="color:' + lvTxt + '">' + lv + '</div><div class="tx">' + advice + '</div>';
+  // 建议卡：走共用组件（保留本页的三条件计数逻辑，不套用 A 股现金流打分模型）
+  const hkLevel = buyN >= 2 ? 'low' : (buyN === 1 ? 'neutral' : (peHi ? 'reduce' : 'high'));
+  const hkFactors = [
+    {factor: '买点1 · 回撤≥15%', desc: (c.dd_250 || 0) + '%', value: ddOk ? 33 : 0,
+     note: '全收益 250 日回撤，60 日胜率 69%'},
+    {factor: '买点2 · 股息率≥6%', desc: (c.dyr || 0) + '%', value: dyOk ? 33 : 0,
+     note: '历史分位 ' + (c.dyr_pct || 0) + '%'},
+    {factor: '买点3 · 息差≥4pp', desc: (c.spread || 0) + 'pp', value: spOk ? 33 : 0,
+     note: '股息率 − 10 年国债，60 日胜率 60%'},
+    {factor: '风险 · PE 分位>80%', desc: (c.pe_pct || 0) + '%', value: peHi ? 70 : 0,
+     risk: true, note: 'PE ' + (c.pe != null ? c.pe : '—') + ' 倍，60% 胜率卖出倾向'},
+    {factor: '风险 · 位置过高', desc: '回撤 ' + (c.dd_250 || 0) + '%',
+     value: (c.dd_250 != null && c.dd_250 < 5) ? 30 : 0,
+     risk: true, note: '回撤 <5%：接近历史高点'},
+  ];
+  const hkBuyScore = (ddOk ? 33 : 0) + (dyOk ? 33 : 0) + (spOk ? 33 : 0);
+  const hkRiskScore = Math.max(peHi ? 70 : 0, (c.dd_250 != null && c.dd_250 < 5) ? 30 : 0);
+  const hkRiskN = (peHi ? 1 : 0) + ((c.dd_250 != null && c.dd_250 < 5) ? 1 : 0);
+  document.getElementById('advice').innerHTML = window.renderAdviceCard({
+    level: hkLevel, label: lv, reasons: [advice],
+    buyScore: hkBuyScore, riskScore: hkRiskScore,
+    scoreDetail: hkFactors,
+    breadth: {hit: hkRiskN, total: 2,
+              text: `买入条件达标 ${buyN} / 3，风险因子 ${hkRiskN} / 2`},
+    footer: '本页为<b>条件计数模型</b>：3 项买点各 33 分，非 A 股现金流的打分模型 · '
+          + '全收益口径 · 数据截至 ' + d.date
+  });
   // 买卖点规则明细表（四信号 + PE/PB 绝对值）
   const rules = [
     ['🟢 买点1 · 回撤≥15%', (c.dd_250||0) + '%', ddOk, '全收益250日回撤，60日胜率69%'],
@@ -137,6 +167,9 @@ async function load(){
   window._hkData = d;
   // 操作建议 tab 图（默认可见）
   runChart('chart-dd', function(){ buildDd(d); });
+  runChart('chart-px', function(){ buildPx(d); });
+  runChart('chart-rsi', function(){ buildRsi(d); });
+  runChart('chart-annualdd', function(){ buildAnnual(d); });
   try { buildBt(d.signals_bt); } catch (e) { console.error('[chart] buildBt', e); }
   // 若当前在估值 tab，也渲染
   if (window._hkTab === 'val') renderValTab(d);
@@ -151,7 +184,6 @@ function switchHkTab(tab){
 }
 function renderValTab(d){
   if (!d) return;
-  runChart('chart-px', function(){ buildPx(d); });
   runChart('chart-val', function(){ buildVal(d); });
   runChart('chart-abs', function(){ buildAbs(d); });
   runChart('chart-spread', function(){ buildSpread(d); });
@@ -184,21 +216,101 @@ function baseOpt(dates){
 function buildPx(d){
   const el = document.getElementById('chart-px'); if (el._echart) el._echart.dispose();
   const ch = echarts.init(el);
-  ch.setOption(Object.assign(baseOpt(d.dates), { legend:{data:['全收益','价格'],bottom:0,textStyle:{color:tx(),fontSize:9}},
+  // 图例移到左上，把纵向空间还给曲线（与 A 股详情页同标准）
+  const opt = baseOpt(d.dates);
+  opt.grid = {left:'8%',right:'4%',top:38,bottom:34};
+  ch.setOption(Object.assign(opt, { legend:{data:['全收益','价格'],top:6,left:8,textStyle:{color:tx(),fontSize:9}},
     series:[
-      {name:'全收益',type:'line',data:d.tri_close,smooth:true,showSymbol:false,lineStyle:{color:upC,width:1.8}},
+      {name:'全收益',type:'line',data:d.tri_close,smooth:true,showSymbol:false,
+        lineStyle:{color:'#539BF5',width:1.8}, markPoint:MARK(d, 'tri')},
       {name:'价格',type:'line',data:d.price_close,smooth:true,showSymbol:false,lineStyle:{color:'#8b8b90',width:1,type:'dashed'}}
     ]}));
+  opt.dataZoom = [{type:'inside',start:0,end:100},
+    {type:'slider',height:10,bottom:6,start:0,end:100,
+     dataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},
+     selectedDataBackground:{lineStyle:{opacity:0},areaStyle:{opacity:0}},
+     borderColor:'rgba(139,139,144,.25)',fillerColor:'rgba(139,139,144,.12)',
+     handleSize:'80%',showDetail:false}];
+  ch.setOption(opt);
   el._echart = ch;
+}
+// 买点标记：三档配色圆点 + 幅度/档位标注，与 A 股详情页、报告图 1 同一表示法
+const MK_COL = ['#10b981','#f97316','#ef4444'];
+const MK_NAME = ['买点','强买点','极强买点'];
+const MK_DY = [15,0,-15];
+function MARK(d, src){
+  const raw = d.dd_marks || [];
+  const line = src === 'tri' ? d.tri_close : d.dd_series;
+  // 同一天可能同时触发多个档位（跌幅太急，一天穿过两条线）。
+  // 这种情况合并成一个标记，标注里列出全部信号，避免后画的把先画的完全盖住。
+  const byDate = {};
+  raw.forEach(function(m){ (byDate[m.date] = byDate[m.date] || []).push(m); });
+  return {data: Object.keys(byDate).map(function(dt){
+      const ms = byDate[dt].slice().sort(function(a,b){ return (b.tier||1)-(a.tier||1); });
+      const idx = d.dates.indexOf(dt);
+      if (idx === -1 || line[idx] == null) return null;
+      const deep = ms[0];
+      const k = Math.min(Math.max((deep.tier||1)-1, 0), 2);
+      const names = ms.map(function(m){
+        return MK_NAME[Math.min(Math.max((m.tier||1)-1, 0), 2)];
+      }).join('＋');
+      const txt = deep.dd + '% ' + names + (ms.length > 1 ? '（' + ms.length + ' 信号）' : '');
+      // 靠右边缘的标记，标注改放左侧，否则会被裁掉
+      const atRight = idx > d.dates.length * 0.93;
+      return {name:dt+' '+names+'（回撤 '+deep.dd+'%）',
+              coord:[dt, line[idx]], symbol:'circle',
+              symbolSize: k===2?13:(k===1?11:9),
+              itemStyle:{color:MK_COL[k], borderColor:'#0f0f12', borderWidth:1.5},
+              label:{show:true, formatter:txt,
+                     position: atRight ? 'left' : 'right',
+                     offset: atRight ? [-4, MK_DY[k]] : [4, MK_DY[k]],
+                     color:MK_COL[k], fontSize:9, fontWeight:'bold',
+                     backgroundColor:'rgba(15,15,18,.86)', padding:[1,3], borderRadius:2}};
+    }).filter(Boolean), label:{show:false}};
 }
 function buildDd(d){
   const el = document.getElementById('chart-dd'); if (el._echart) el._echart.dispose();
   const ch = echarts.init(el);
+  const TI = d.dd_tiers || [12,14,20];
+  const DC = ['#fca5a5','#ef4444','#b91c1c'];
   ch.setOption(Object.assign(baseOpt(d.dates), { series:[
-    {name:'250日回撤%',type:'line',data:d.dd_series,smooth:false,showSymbol:false,lineStyle:{color:midC,width:1.2},
-      markLine:{silent:true,symbol:'none',label:{color:upC,fontSize:9,formatter:'买点 15%'},data:[{yAxis:15,lineStyle:{color:upC,type:'dashed'}}]},
-      markArea:{silent:true,itemStyle:{color:'rgba(239,68,68,.08)'},data:[[{yAxis:15},{yAxis:999}]]}}
+    {name:'回撤%',type:'line',data:d.dd_series,smooth:false,showSymbol:false,
+      lineStyle:{color:'#539BF5',width:1.5}, areaStyle:{color:'rgba(83,155,245,.10)'},
+      markLine:{silent:true,symbol:'none',data:TI.map(function(v,k){return {
+        yAxis:v, lineStyle:{color:DC[k],type:'dashed',width:0.8},
+        label:{formatter:v+'% '+['买点线','强买点线','极强买点线'][k], color:DC[k], fontSize:9,
+               position: k===TI.length-1 ? 'insideStartBottom' : 'insideStartTop'}};})},
+      markPoint:MARK(d, 'dd')}
   ]}));
+  el._echart = ch;
+}
+function buildRsi(d){
+  const el = document.getElementById('chart-rsi'); if (!el || !d.rsi14) return;
+  if (el._echart) el._echart.dispose();
+  const ch = echarts.init(el);
+  ch.setOption(Object.assign(baseOpt(d.dates), { series:[
+    {name:'RSI(14)',type:'line',data:d.rsi14,smooth:false,showSymbol:false,
+      lineStyle:{color:'#f59e0b',width:1.4},
+      markLine:{silent:true,symbol:'none',data:[
+        {yAxis:70,lineStyle:{color:'#ef4444',type:'dashed',width:0.8},label:{formatter:'70',color:'#ef4444',fontSize:9}},
+        {yAxis:50,lineStyle:{color:'#8b8b90',type:'dashed',width:0.6},label:{formatter:'50',color:'#8b8b90',fontSize:9}},
+        {yAxis:30,lineStyle:{color:'#10b981',type:'dashed',width:0.8},label:{formatter:'30',color:'#10b981',fontSize:9}}]}}
+  ]}));
+  el._echart = ch;
+}
+function buildAnnual(d){
+  const el = document.getElementById('chart-annualdd'); if (!el || !d.annual_dd) return;
+  if (el._echart) el._echart.dispose();
+  const ch = echarts.init(el);
+  ch.setOption({
+    backgroundColor:'transparent', tooltip:{trigger:'axis', formatter:function(p){return p[0].name+'年<br/>年内最深回撤: '+p[0].value+'%';}},
+    grid:{left:'8%',right:'4%',top:12,bottom:24},
+    xAxis:{type:'category',data:d.annual_dd.map(function(x){return x.year;}),axisLabel:{color:tx(),fontSize:9},axisLine:{lineStyle:{color:sp()}}},
+    yAxis:{type:'value',name:'回撤%',axisLabel:{color:tx(),fontSize:9},splitLine:{lineStyle:{color:sp()}}},
+    series:[{type:'bar',data:d.annual_dd.map(function(x){return x.dd;}),barWidth:'55%',
+      itemStyle:{color:function(p){return p.value>=30?'#ef4444':(p.value>=20?'#f97316':(p.value>=12?'#f59e0b':'#8b8b90'));}},
+      label:{show:true,position:'top',fontSize:9,color:tx(),formatter:'{c}%'}}]
+  });
   el._echart = ch;
 }
 function buildVal(d){

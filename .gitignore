@@ -138,3 +138,11 @@ web/backtest/daily/
 web/discipline/reports/
 web/stock-health/reports/
 web/chanlun-backtest-compare/data/
+
+# 研究报告插件的本地产物
+.research-ledger/
+research-reports/
+fund-reports/
+
+# hanako-report 技能以目录联接形式存在，只保留 D:\hanako\.agents 下的规范副本
+.agents/skills/hanako-report/

@@ -1,0 +1,119 @@
+/* ─────────────────────────────────────────────────────────────
+ * 持仓建议卡 · 共用样式
+ *
+ * 口径来源：market-scan/dividend-advice-detail.html 的实测 computed style
+ * （font 13px / bg rgba(26,26,31,.6) / pad 16px 18px / radius 14px）
+ *
+ * 用法：<link rel="stylesheet" href="/shared/css/advice-card.css">
+ *       + <script src="/shared/js/advice-card.js"></script>
+ *       + window.renderAdviceCard(opts) 返回 HTML 字符串
+ *
+ * 注意：红利页仍用自己内联的样式（已稳定，不迁移）。
+ * 本文件供之后新增的指数页面使用，两处视觉保持一致。
+ * ───────────────────────────────────────────────────────────── */
+
+.advice-card {
+  font-size: 13px;
+  color: #e4e4e7;
+  background: rgba(26, 26, 31, 0.6);
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  margin: 0 0 16px;
+}
+
+/* 等级：纯文字、加粗、无底色药丸 */
+.advice-card .lv {
+  font-size: 17.6px;
+  font-weight: 700;
+  display: block;
+}
+
+/* 等级下的一句话说明 */
+.advice-card .tx {
+  font-size: 12px;
+  color: #a1a1aa;
+  display: block;
+  line-height: 1.6;
+}
+
+/* 分数条 */
+.advice-card .ac-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px 0;
+}
+.advice-card .ac-bar-label {
+  width: 52px;
+  font-size: 0.7rem;
+  color: #a1a1aa;
+}
+.advice-card .ac-bar-track {
+  flex: 1;
+  height: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.advice-card .ac-bar-fill {
+  display: block;
+  height: 100%;
+}
+.advice-card .ac-bar-val {
+  width: 34px;
+  text-align: right;
+  font-size: 0.72rem;
+}
+
+/* 风险广度行 */
+.advice-card .ac-breadth {
+  font-size: 0.68rem;
+  color: #a1a1aa;
+  margin: 2px 0 0 60px;
+}
+
+/* 回撤参考点 / 任意说明框 */
+.advice-card .ac-note-box {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  font-size: 0.68rem;
+  color: #a1a1aa;
+  line-height: 1.9;
+}
+.advice-card .ac-note-box b { color: #e4e4e7; }
+
+/* 因子明细表 */
+.advice-card .ac-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 0.7rem;
+}
+.advice-card .ac-table th {
+  text-align: left;
+  padding: 4px 6px;
+  font-weight: 500;
+  color: #a1a1aa;
+}
+.advice-card .ac-table td {
+  padding: 5px 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.advice-card .ac-table .r { text-align: right; }
+
+/* 底部元信息 */
+.advice-card .ac-foot {
+  font-size: 0.68rem;
+  color: #a1a1aa;
+  margin-top: 8px;
+  line-height: 1.8;
+}
+.advice-card .ac-foot b { color: #e4e4e7; }
+
+@media (max-width: 760px) {
+  .advice-card { padding: 13px 14px; }
+  .advice-card .lv { font-size: 16px; }
+}

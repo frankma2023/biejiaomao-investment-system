@@ -2,12 +2,13 @@
 """
 scripts/fetch_index_full_return.py — 红利指数全收益（total_return）拉取
 =====================================================================
-数据源：理杏仁 /index/candlestick type=total_return（全收益率点位，2016 前无数据）
+数据源：理杏仁 /index/candlestick type=total_return（全收益率点位）
+实测 980092 全收益自 2012-12-31 起可得，首点 close=1000（基点）；此前注释误记为「2016 前无数据」
 表：index_full_return_daily（stock_code=原指数代码，与价格指数 index_daily_kline 分表）
 
 用法：
   python scripts/fetch_index_full_return.py            # 增量（各指数表内 MAX(date) 起）
-  python scripts/fetch_index_full_return.py --full     # 全量（2016-01-01 起）
+  python scripts/fetch_index_full_return.py --full     # 全量（2012-12-31 起）
 """
 import sys, os, io, sqlite3, argparse
 from datetime import datetime
@@ -37,7 +38,7 @@ INDICES = [
     ('980092', '国证自由现金流'),
 ]
 
-FULL_START = '2016-01-01'
+FULL_START = '2012-12-31'
 
 
 def main():

@@ -69,7 +69,7 @@
 #       periods: [...]
 defaults:
   # 图上默认只显示这一条（其余靠点图例展开），见前端 legend.selected
-  default_period: 6
+  default_period: 20
   periods:
     - period: 6
       buy_tiers:
@@ -98,4 +98,13 @@ defaults:
         - {threshold: 67, label: 卖点,     short: 卖}
         - {threshold: 73, label: 强卖点,   short: 强卖}
         - {threshold: 78, label: 极强卖点, short: 极强卖}
+  # ── 全收益口径阈值（RSI 改用含分红再投资的序列时使用）──────────────
+  # 校准方法：取价格口径各阈值的实际触发频率，在全收益序列上取同一分位。
+  # 样本 2016-09-28 ~ 2026-09-28（全收益序列起于 2016-09）。
+  # 全收益序列涨得更快，同一相对位置对应的 RSI 读数系统性高 1~2 点。
+  full_return_tiers:
+    6:  {buy: [30, 21, 11], sell: [82, 90, 93]}
+    14: {buy: [39, 32, 25], sell: [72, 78, 84]}
+    20: {buy: [41, 37, 30], sell: [68, 74, 80]}
+
 overrides: {}

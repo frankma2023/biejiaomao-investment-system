@@ -388,6 +388,14 @@ TASKS.append(("35a.周线缠论笔", [PYTHON_EXE, "scripts/backfill_chanlun_week
 # 步骤 36：周线 CPA 阶段判定（依赖 35a 周线笔 + K线；增量式：仅重算有新完整周的股票，幂等可重复）
 TASKS.append(("36.周线CPA判定", [PYTHON_EXE, "scripts/incremental_cpa_weekly.py"]))
 
+# 步骤 37：指数操作建议（RSI 多周期 + 锚定回撤 + 买入分/风险分 → index_advice_daily）
+# 幂等：同日重复跑覆盖。口径与 src/server.py 的 _fcf_advice_v2 同源，改一处须同步另一处。
+TASKS.append(("37.指数操作建议", [PYTHON_EXE, "scripts/compute_index_advice_daily.py"]))
+
+# 步骤 38：指数 CPA 八阶段扫描（环境层 + 环境内事件 → index_cpa_daily）
+# 依赖日线K线就位；幂等：同日同指数覆盖写。约 394 个指数，耗时 ~2min。
+TASKS.append(("38.指数CPA扫描", [PYTHON_EXE, "scripts/scan_index_cpa_daily.py"]))
+
 for item in TASKS:
     label, cmd = item[0], item[1]
     opts = item[2] if len(item) > 2 else {}

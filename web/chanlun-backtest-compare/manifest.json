@@ -727,5 +727,95 @@
     "run_date": "2026-09-28",
     "market_phase": null,
     "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-09-29",
+    "pool_size": 523,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-09-29",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-09-30",
+    "pool_size": 538,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-09-30",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-10-09",
+    "pool_size": 353,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-10-09",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-10-12",
+    "pool_size": 372,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-10-12",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-10-13",
+    "pool_size": 351,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-10-13",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-10-14",
+    "pool_size": 395,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-10-14",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-10-15",
+    "pool_size": 400,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-10-15",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-10-16",
+    "pool_size": 374,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-10-17",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-10-19",
+    "pool_size": 368,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-10-19",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-10-21",
+    "pool_size": 354,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-10-21",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
   }
 ]
