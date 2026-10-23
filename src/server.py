@@ -3619,6 +3619,99 @@ def api_market_div_sustainability():
     })
 
 
+@app.route('/api/market-scan/coal-advice-detail')
+def api_market_coal_advice_detail():
+    """中证煤炭网格投资法详情。
+
+    页面 coal-advice-detail.html 需要长序列、年度分解与间距敏感性，
+    与列表接口 coal-advice 的载荷不同，故单独提供。
+    """
+    code, name = COAL_INDEX
+    date_q = (request.args.get('date') or '').strip()
+    db = get_db()
+
+    rows = db.execute(
+        "SELECT date, close FROM index_daily_kline "
+        "WHERE stock_code=? AND kline_type='normal' AND close>0 "
+        "ORDER BY date", (code,)).fetchall()
+    if not rows:
+        return jsonify({'error': 'no data'})
+    if date_q:
+        rows = [r for r in rows if r['date'] <= date_q]
+    if len(rows) < 300:
+        return jsonify({'error': 'insufficient data'})
+
+    dates = [r['date'] for r in rows]
+    closes = [float(r['close']) for r in rows]
+    target = dates[-1]
+
+    # 年化波动
+    import math
+    rets = [math.log(closes[i] / closes[i - 1]) for i in range(1, len(closes))
+            if closes[i - 1] > 0]
+    mu = sum(rets) / len(rets)
+    vol = (sum((x - mu) ** 2 for x in rets) / (len(rets) - 1)) ** 0.5 * math.sqrt(244) * 100
+
+    # 网格阶梯（围绕现价，上下各 6 档）
+    cur = closes[-1]
+    base = min(closes[-250:]) * 0.95
+    step_amt = base * COAL_GRID_STEP / 100
+    lv = int((cur - base) / step_amt) if step_amt > 0 else 0
+    grid_lines = []
+    for k in range(lv - 6, lv + 7):
+        grid_lines.append({
+            'value': round(base + k * step_amt, 2),
+            'label': ('档位 %+d' % (k - lv)) if k != lv else '当前档',
+            'current': k == lv,
+        })
+
+    # 年度分解（2018 起）
+    annual = []
+    for y in range(2018, int(target[:4]) + 1):
+        seg = [(d, c) for d, c in zip(dates, closes) if d[:4] == str(y)]
+        if len(seg) < 120:
+            continue
+        cs = [c for _, c in seg]
+        r = _grid_backtest(cs, COAL_GRID_STEP)
+        grid_ret = round((r[0] / 100000 - 1) * 100, 1) if r else None
+        idx_ret = round((cs[-1] / cs[0] - 1) * 100, 1)
+        annual.append({
+            'year': str(y),
+            'idx_ret': idx_ret,
+            'grid_ret': grid_ret if grid_ret is not None else 0.0,
+            'hold_ret': idx_ret,
+            'excess': round(grid_ret - idx_ret, 1) if grid_ret is not None else None,
+        })
+
+    # 间距敏感性（2018 起连续区间）
+    seg18 = [(d, c) for d, c in zip(dates, closes) if d >= '2018-01-01']
+    cs18 = [c for _, c in seg18]
+    step_sens = []
+    hold_ret = round((cs18[-1] / cs18[0] - 1) * 100, 1) if len(cs18) > 2 else None
+    if len(cs18) >= 300:
+        for st in (3, 5, 8, 10, 15, 20):
+            r = _grid_backtest(cs18, st)
+            if not r:
+                continue
+            gr = round((r[0] / 100000 - 1) * 100, 1)
+            step_sens.append({
+                'step': st, 'grid_ret': gr, 'hold_ret': hold_ret,
+                'excess': round(gr - hold_ret, 1) if hold_ret is not None else None,
+                'trades': r[1],
+            })
+
+    return jsonify({
+        'date': target, 'code': code, 'name': name,
+        'grid_step': COAL_GRID_STEP,
+        'data_note': COAL_DATA_NOTE,
+        'stats': {'ann_vol': round(vol, 1), 'days': len(closes)},
+        'dates_long': dates, 'closes_long': [round(c, 2) for c in closes],
+        'grid_lines': grid_lines,
+        'annual': annual,
+        'step_sens': step_sens,
+    })
+
+
 @app.route('/api/market-scan/coal-advice')
 def api_market_coal_advice():
     """中证煤炭网格投资建议：网格档位位置 + 网格回测摘要（支持历史回看）"""

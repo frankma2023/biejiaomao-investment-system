@@ -58,6 +58,23 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>🧬 指数研究体系 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span><b>新建 index-research skill</b>：Q1~Q4 四问框架、分析菜单 §3.10 核对表、回测可信度 7 条、上涨本质总结三段式</td><td>2026-10-22</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>skill 补齐四类必备图表：基准三线图 / 成分重叠堆叠条 / RSI 交互图 / 估值全景 3 图 + 财务全景 7 图</td><td>2026-10-22</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>中证A500 研究</b>：R²=0.977 vs 沪深300，全收益年化 6.85%、分红占比 31%</td><td>2026-10-22</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>中证煤炭 研究</b>：R²=0.382，分红占比 75%，PE 分位 87.8%（盈利腰斩 58% 导致被动变贵）</td><td>2026-10-22</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>证券公司 研究</b>：PE 分位 0.0%（历史最便宜），而 2025 净利润 2297 亿创历史新高</td><td>2026-10-22</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>新增 docs/report/validate_report.py</b>：自动校验章节齐全 / 无 NaN / 无 JS 错误 / 曲线是否真的渲染 / 路径起笔合法 / 图表窗口与正文一致</td><td>2026-10-22</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>新增 scripts/fetch_index_financials.py</b>：指数级财报取数，支持 non_financial / security / bank / insurance 等 6 类端点</td><td>2026-10-22</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>新表 index_financials_annual（营收/营业利润/净利润/ROE/EPS/净利润率/营业利润率/分红）</td><td>2026-10-22</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>补齐 000510/000300/000905/000985/399998/399975 全收益序列</td><td>2026-10-22</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>新增接口 /api/market-scan/coal-advice-detail（修复页面 Unexpected token '&lt;'）</td><td>2026-10-22</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span>待办：报告副标题的价格区间与全收益区间不一致（如煤炭 2009 vs 2012），需分开标注</td><td>2026-10-22</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>🧬 指数 CPA 八阶段判定 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span><b>两层状态机</b>：环境层（UP/DOWN/RANGE 每日重算）+ 事件层（环境内记忆，环境一变重置）</td><td>2026-10-21</td></tr>
@@ -636,6 +653,13 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">142. 迁移矩阵漏写目标 = 阶段永久为 0</div><div class="ld">给引擎加阶段 ④ 的进入条件后仍不触发，因为 ALLOWED[cur] 集合里没有任何一项包含 4，入口被规则本身挡住。加新阶段时必须同时改三处：判据、迁移矩阵的「能去哪里」、迁移矩阵的「谁能进来」。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">143. 持股论点的持有条件必须同时包含均线，不能只看突破位</div><div class="ld">为让 ② 活久一点而加的「收盘在突破位之上就持有」，会让价格跌穿 EMA10/20/50 后仍停在 ②（实测 931157 于 2026-10-21 跌穿全部均线却显示突破阶段）。突破位可能远低于均线，两个条件缺一不可。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">144. 出场比入场重要一个量级</div><div class="ld">同一买入规则（②④首次进入）下，出场在 ⑥ 破位期望 −0.03%/笔，出场在 ⑤ 衰竭延伸期望 +1.58%/笔、胜率 72.4%。⑥ 要等创 10 日新低才触发，等于卖在地板上；⑤ 在偏离 EMA20 超 2ATR 时卖出，卖在强势里。设计择时系统应优先打磨出场规则。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">145. 理杏仁指数财报的端点按行业分支，不是靠参数</div><div class="ld">产业类指数走 /index/fs/non_financial；证券公司走 /index/fs/security；另有 bank / insurance / other_financial / reit / hybrid。当初在 /index/fs/financial 上反复试 fsTableType 参数全部 500，方向就错了——应该换端点路径。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">146. 接口返回是顶层列表时，.get('data') 会静默返回空</div><div class="ld">/index/fs/non_financial 直接返回 list，不是 {'data': [...]}。我按字典取值 → 拿到空列表 → 得出「数据不存在」的错误结论，并写进了报告。凡「接口有响应但解析为空」，先打印原始响应类型与首元素。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">147. SVG 路径首点必须用 M：用下标判断会漏掉前置 null</div><div class="ld">写成 d += (i ? 'L' : 'M') 时，若前 n 个点是 null 被 continue 跳过，第一个实际点的 i 已经大于 0，于是用 L 起笔 → 没有 moveto 的非法路径 → 浏览器静默不渲染。必须用 started 标志，每段有效区间重新起笔 M。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">148. 图表的取数窗口必须与正文数字的窗口一致</div><div class="ld">图上取最近 2500 日、正文 CAGR 取全样本，会得出「图上 A 领先但数字说 A 落后」的自相矛盾结论。二者都正确，但放在一起就是错。图表窗口应在报告里显式标注，并与统计口径强制统一。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">149. 报告必须跑自动校验器，肉眼过一遍会漏</div><div class="ld">本轮 validate_report.py 抓到三个肉眼没发现的错误：三张估值图完全没渲染、D.val 未定义导致整页 JS 崩溃、PE 数值区间异常。校验器管不到「数值是否合理」（有包围盒即可通过），所以仍需补一层数值合理性检查。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">150. 周期行业的 PE 在盈利低谷会爆表，必须剔除而非只裁剪</div><div class="ld">煤炭 2016 年 PE 在 -2929 ~ +3433 之间跳动。只做 2%~98% 分位裁剪仍会把曲线压成一条直线；必须先剔除 PE ≤ 0 与 > 150 的失效值，再做裁剪。负 PE 意味着亏损，没有估值含义。</div></div>
+
 
 
 </div>
