@@ -826,5 +826,14 @@
     "run_date": "2026-10-22",
     "market_phase": null,
     "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-10-23",
+    "pool_size": 370,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-10-23",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
   }
 ]
