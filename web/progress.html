@@ -58,6 +58,19 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>📊 指数研究扩展 + 投资决策讨论 <span class="badge" style="background:#FFF3E0;color:#E65100">部分完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span><b>新增 5 份指数研究报告</b>：国证价值100 / 港股通高股息 / A500 / 煤炭 / 券商，均含 13 章 + 双基准（沪深300 + 中证红利）</td><td>2026-10-26</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>编制规则修订核查</b>：国证价值100（2024-10，旧历史被覆盖）、中证红利（2013 / 2022，官方称 9.3%→10.2%）、港股通高股息（2024-09 仅改权重）</td><td>2026-10-26</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>新脚本</b>：fetch_index_financials.py（6 类行业端点）、fetch_cni_constituents.py（akshare 补国证成分）、fetch_index_fundamental_range.py</td><td>2026-10-26</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>新表 index_financials_annual / index_constituents_cni</td><td>2026-10-26</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>红利页新增「🏛 宽基」tab（A500 / 沪深300 / 中证500 / 中证全指）+ 930914 卡片</td><td>2026-10-26</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span><b>未完成</b>：图表配色统一 / 图例去圆圈 —— 反复尝试失败，已保留现状</td><td>2026-10-26</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span><b>未完成</b>：980092 自由现金流编制规则修订史（已知 2024-12 发布、历史全为回测）</td><td>2026-10-26</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>🧪 报告自动校验器 + 双基准 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span><b>指数研究改为双基准</b>：沪深300 全收益 + 中证红利全收益（000922），四线同图</td><td>2026-10-23</td></tr>
@@ -675,6 +688,11 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">151. 一个图表功能分散在 7 个落点，漏一处就静默少一条线</div><div class="ld">加中证红利基准时分散在：数据加载 / 归一 / 注入 / 按钮 / 状态开关 / 绘制 / 图例 / Y 轴范围（实际 8 处）。漏任一都不报错，只是图上少一条线或曲线被裁。给 A500 加这一条基准改了 5 轮才通——每轮都以为做完了。凡新增图表序列，必须逐点核对清单。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">152. 曲线被裁到图外时包围盒仍非零，「渲染成功」的检查抓不到</div><div class="ld">校验收紧前只查 bbox 是否为零（能否渲染），但 Y 轴范围算漏序列时曲线会画到 viewBox 之外，bbox 照样非零。必须额外校验 bbox 落在自身 viewBox 内。券商 PE 图因此被裁 77px 而无人察觉。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">153. 校验器自己也会写错，加完必须拿全部报告回归</div><div class="ld">本轮校验器自身出现两个 bug：用 bad = [...] 覆盖了同名函数 bad() 导致 TypeError；只统计 path 不统计 rect，把成分堆叠条误判为「有图例无图形」。工具加完立刻对全部存量报告跑一遍，是唯一能发现这类问题的办法。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">154. ECharts 实例不一定挂在 DOM 元素的自定义属性上，必须用官方 API</div><div class="ld">我假设图表实例存在 div._echart，写了批量后处理遍历它，结果「带实例的div: 0」——全部落空却毫无报错。正确做法是 echarts.getInstanceByDom(el)，这是官方公开 API。凡要对既有图表做批量改造，先确认实例怎么取，不要靠猜。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">155. getOption() 读到正确值 ≠ 页面显示正确，验证样式必须截图</div><div class="ld">多次出现「读 API 返回值是白点/新色，但截图里还是旧样式」。ECharts 的 option 与最终绘制之间还有合并、主题、emphasis 等环节，读 option 只能证明「设置进去了」，不能证明「画出来了」。样式类修改一律以截图为准。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">156. 对已写死 lineStyle 的图表，事后 setOption 覆盖常常无效</div><div class="ld">想用统一后处理把颜色改成调色板，对 series 内显式写了 lineStyle.color 的图不生效。此类改造必须在「定义处」改，即改生成 option 的源码，而不是建图后再覆盖。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">157. 改 1300 行内联 JS 的单文件页面，补丁式修改必然反复出错</div><div class="ld">本轮改 dividend-advice-detail.html 的样式失败 6 次：静默失效、括号语法错误致整个 tab 白屏、实例遍历落空。这类文件应先把图表配置抽成独立 .js，每图一个配置对象，统一样式在一处定义，改一次全部生效。</div></div>
+
 
 
 

@@ -46,6 +46,7 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
   <div class="tabs" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
   <button class="pill-tab active" onclick="switchIvTab('ov')">📊 总览</button>
   <button class="pill-tab" onclick="switchIvTab('red')">📌 红利指数</button>
+  <button class="pill-tab" onclick="switchIvTab('wide')">🏛 宽基</button>
   <button class="pill-tab" onclick="switchIvTab('fcf')">🧲 自由现金流</button>
   <button class="pill-tab" onclick="switchIvTab('coal')">⛏ 中证煤炭</button>
   <button class="pill-tab" onclick="switchIvTab('hk')">🇭🇰 港股红利</button>
@@ -55,7 +56,8 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
 </div>
 <div id="pane-ov" class="iv-pane"></div>
 <div id="pane-red" class="iv-pane" style="display:none"></div>
-<div id="pane-fcf" class="iv-pane" style="display:none"></div>
+<div id="pane-wide" style="display:none"><div id="wide-body"></div></div>
+  <div id="pane-fcf" class="iv-pane" style="display:none"></div>
 <div id="pane-coal" class="iv-pane" style="display:none"></div>
 <div id="pane-hk" class="iv-pane" style="display:none"></div>
 <div id="pane-broker" class="iv-pane" style="display:none"></div>
@@ -90,12 +92,12 @@ const LV = {
 
 // 指数投资 tab 切换
 function switchIvTab(tab) {
-  ['ov','red','fcf','coal','hk','broker','bean','color'].forEach(function(t) {
+  ['ov','red','wide','fcf','coal','hk','broker','bean','color'].forEach(function(t) {
     var el = document.getElementById('pane-' + t);
     if (el) el.style.display = (t === tab) ? '' : 'none';
   });
   document.querySelectorAll('.pill-tab').forEach(function(b, i) {
-    b.classList.toggle('active', ['ov','red','fcf','coal','hk','broker','bean','color'][i] === tab);
+    b.classList.toggle('active', ['ov','red','wide','fcf','coal','hk','broker','bean','color'][i] === tab);
   });
   if (tab === 'ov' && frChart) frChart.resize();
   // HK 图：pane 隐藏时 init 会 0 尺寸空白，切到 HK tab 再懒渲染
@@ -146,7 +148,28 @@ async function load() {
       redHtml += '</div>';
     });
     redHtml += '</div>';
-    // 2026-09-03 定投回测结论（一次性/标准/RSI/估值四策略 + 起点敏感性 + 实操纪律）
+    // 🏛 宽基（无个股归零风险，用于对照红利/价值风格）
+  let wideHtml = '';
+  wideHtml += '<div class="section-hdr">🏛 宽基指数（回撤+估值规则）</div>';
+  wideHtml += '<div style="font-size:0.62rem;color:var(--muted);margin:-4px 0 8px">宽基无个股归零风险，下有封底；波动本身即是投资空间。卡片规则与红利一致，仅作为对照观察。</div>';
+  wideHtml += '<div class="sector-grid">';
+  (da.wide || []).forEach(x => {
+    const lv = LV[x.advice_level] || LV.hold;
+    const peV = x.valuation && x.valuation.pe_pct != null ? x.valuation.pe_pct + '%' : '—';
+    const dyV = x.valuation && x.valuation.dyr_pct != null ? x.valuation.dyr_pct + '%' : '—';
+    wideHtml += '<div class="sector-card" style="background:' + lv[2].bg + ';border-color:' + lv[2].bd + '" onclick="window.open(\'../dividend-advice-detail.html?code=' + x.code + '&date=' + date + '\')">';
+    wideHtml += '<div class="sc-title">' + x.name + ' <span class="code">' + x.code + '</span></div>';
+    wideHtml += '<div style="margin-top:6px"><span class="lv" style="color:' + lv[1] + '">' + lv[0] + '</span></div>';
+    wideHtml += '<div class="tx">' + x.advice + '</div>';
+    wideHtml += '<div class="meta">回撤 ' + x.dd_250 + '%' + (x.dd_source === 'full_return' ? '（全收益）' : '') + ' · PE分位 ' + peV + ' · 股息率分位 ' + dyV + '</div>';
+    wideHtml += '<div class="sig">信号: ' + (x.signals && x.signals.length ? x.signals.map(s => SIG_CN[s] || s).join(' · ') : '—') + '</div>';
+    wideHtml += '</div>';
+  });
+  wideHtml += '</div>';
+  const wideEl = document.getElementById('wide-body');
+  if (wideEl) wideEl.innerHTML = wideHtml;
+
+  // 2026-09-03 定投回测结论（一次性/标准/RSI/估值四策略 + 起点敏感性 + 实操纪律）
     redHtml += '<div class="section-hdr">📊 红利指数怎么投：定投策略回测结论（2026-09-03）</div>';
     redHtml += '<div class="card" style="font-size:0.68rem;color:var(--text-secondary);line-height:2">';
     redHtml += '<div style="font-weight:600;color:var(--text-primary)">一、背景：RSI 择时争论的两派都对，只是错位</div>';

@@ -1248,7 +1248,7 @@ def api_pipeline_run():
                     pass
             
             results.append({
-                'code': code,
+                'code': code, 'cat': cat,
                 'name': info['name'],
                 'close': round(info['close'], 2) if info['close'] else None,
                 'rps250': rps['rps250'],
@@ -1318,6 +1318,15 @@ DIVIDEND_INDICES = [
     ('932305', '智选高股息', 'smart'),
     ('000015', '红利指数', 'pure'),
     ('931848', '800红利低波', 'lowvol'),
+    ('930914', '港股通高股息', 'hk'),
+]
+
+# 宽基：与红利并列的第二类观察对象。宽基无个股归零风险，亦用于对照红利/价值风格。
+WIDE_INDICES = [
+    ('000510', '中证A500', 'wide'),
+    ('000300', '沪深300', 'wide'),
+    ('000905', '中证500', 'wide'),
+    ('000985', '中证全指', 'wide'),
 ]
 
 # 全收益指数映射：价格指数代码 -> 全收益代码（回撤计算优先用全收益，分红再投资更真实）
@@ -1509,7 +1518,10 @@ def _pct_and_quantiles(db, code, target_date, field):
         return None
     # dyr 在表里是小数（0.0421），统一换算成百分数便于核对
     _scale = 100.0 if field == 'dyr' else 1.0
-    vals = [r['v'] * _scale for r in rows]
+    vals = [r['v'] * _scale for r in rows
+            if r['v'] is not None]
+    if not vals:
+        return {'current': None, 'note': 'no data'}
     cur = vals[-1]
     out = {'current': round(cur, 2)}
 
@@ -1757,7 +1769,7 @@ def api_market_dividend_advice():
         target_date = r[0]
 
     results = []
-    for code, name, cat in DIVIDEND_INDICES:
+    for code, name, cat in DIVIDEND_INDICES + WIDE_INDICES:
         ad = _anchored_dd(db, code, target_date)
         if ad is None:
             continue
@@ -1838,7 +1850,9 @@ def api_market_dividend_advice():
         summary = f"买入区 {buy_count}/{n} · 风险提示 {warn_count}/{n}，整体中性"
 
     return jsonify({'date': target_date, 'summary': summary,
-                    'model': 'v2.0', 'indices': results})
+                    'model': 'v2.0',
+                    'indices': [r for r in results if r.get('cat') != 'wide'],
+                    'wide': [r for r in results if r.get('cat') == 'wide']})
 
 
 @app.route('/api/market-scan/dividend-advice-detail')

@@ -71,7 +71,8 @@ html[data-theme="light"] .tab.active{background:var(--accent-subtle);color:var(-
     <div id="val-stats" class="stat-row"></div>
     <div class="chart-card"><div class="ct">📊 PE-TTM 走势与十年分位</div><div id="val-chart-pe" style="height:480px"></div><div id="val-text-pe" class="analysis-text"></div></div>
     <div class="chart-card"><div class="ct">📊 PB 走势与十年分位</div><div id="val-chart-pb" style="height:480px"></div><div id="val-text-pb" class="analysis-text"></div></div>
-    <div class="chart-card"><div class="ct">📊 股息率 走势与十年分位</div><div id="val-chart-dyr" style="height:420px"></div><div id="val-text-dyr" class="analysis-text"></div></div>
+    <div class="chart-card"><div class="ct">🔍 沪深300 估值分位对照（以沪深300 更长历史做参照）</div><div id="val-chart-hs-cmp" style="height:400px"></div><div class="cs" style="font-size:0.62rem;line-height:1.9">本指数估值序列自发布日（2024-09-23）起，历史过短；沪深300 有 2016 年起的完整序列。同图可判断「本指数估值分位处在 A 股大盘的什么位置」。<br>⚠ 两条线各自相对<b>自身历史</b>计算分位，刻度可比、水平不可直接相减。</div></div>
+<div class="chart-card"><div class="ct">📊 股息率 走势与十年分位</div><div id="val-chart-dyr" style="height:420px"></div><div id="val-text-dyr" class="analysis-text"></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div class="chart-card"><div class="ct">📊 ROE（%）</div><div id="val-chart-roe" style="height:360px"></div><div id="val-text-roe" class="analysis-text"></div></div>
       <div class="chart-card"><div class="ct">📊 EPS（元/股）</div><div id="val-chart-eps" style="height:360px"></div><div id="val-text-eps" class="analysis-text"></div></div>
@@ -106,10 +107,10 @@ function loadTemp() {
     .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
     .then(m => {
       if (m && m.spread) renderTemp(m);
-      else box.innerHTML = '<div class="chart-card"><div class="ct">🌡 红利温度计</div><div class="cs">数据不足或接口异常</div></div>';
+      else box.innerHTML = '<div class="chart-card"><div class="ct">🌡 温度计</div><div class="cs">数据不足或接口异常</div></div>';
     })
     .catch(e => {
-      box.innerHTML = '<div class="chart-card"><div class="ct">🌡 红利温度计</div><div class="cs">接口异常：' + (e && e.message ? e.message : '未知') + '</div></div>';
+      box.innerHTML = '<div class="chart-card"><div class="ct">🌡 温度计</div><div class="cs">接口异常：' + (e && e.message ? e.message : '未知') + '</div></div>';
     });
 }
 
@@ -826,6 +827,8 @@ function switchTab(tab) {
   document.getElementById('pane-advice').style.display = tab === 'advice' ? '' : 'none';
   document.getElementById('pane-valuation').style.display = tab === 'valuation' ? '' : 'none';
   if (tab === 'valuation' && !valLoaded) { valLoaded = true; loadValuation(); }
+  // 两个 tab 都跑：图例统一成彩色短线（去掉圆圈+白填充）
+  [200, 500, 900, 1400, 2000, 3000, 4500].forEach(ms => setTimeout(applyPalette, ms));
 }
 
 async function loadValuation() {
@@ -860,6 +863,8 @@ async function loadValuation() {
       data.dyr_pct,
       hs.dyr && hs.dyr.map(v => v != null ? (v * 100).toFixed(2) : null),
       dyrColor, tx2, sp2);
+      renderHsCmp(data, tx2, sp2);
+      setTimeout(applyPalette, 400);
     genValText('val-text-pe', 'PE-TTM', data.pe, data.pe_pct, hs.pe, '倍', clr(pePct));
     genValText('val-text-pb', 'PB', data.pb, data.pb_pct, hs.pb, '倍', clr(pbPct));
     const dyrPctInv = data.dyr_pct && data.dyr_pct.map(v => v != null ? (1 - v) : null);
@@ -895,29 +900,156 @@ async function loadValFS(c) {
   } catch (e) { /* 财务数据可能不全，静默 */ }
 }
 
+// 折线点位统一样式：白色填充 + 描边取该线颜色，避免一张图里蓝圈绿圈混杂
+// ── 统一配色：按系列顺序固定取色，图例自动跟随 ───────────────────
+// 之前遍历 div._echart 全部落空，因为实例并不挂在这个属性上；
+// 改用官方 echarts.getInstanceByDom() 才能拿到所有实例。
+if (typeof echarts !== 'undefined') {
+  echarts.registerTheme('ivdark', {color: ['#f59e0b', '#539BF5', '#10b981', '#ef4444', '#a78bfa', '#8f8f97']});
+}
+
+const PALETTE = ['#f59e0b', '#539BF5', '#10b981', '#ef4444', '#a78bfa', '#8f8f97'];
+
+function applyPalette() {
+  if (typeof echarts === 'undefined') return;
+  let hit = 0;
+  document.querySelectorAll('div').forEach(function (el) {
+    const inst = echarts.getInstanceByDom(el);
+    if (!inst) return;
+    try {
+      const opt = inst.getOption();
+      if (!opt || !opt.series || !opt.series.length) return;
+      inst.setOption({
+        color: PALETTE.slice(),
+        series: opt.series.map(function (s, idx) {
+          const c = PALETTE[idx % PALETTE.length];
+          if (s.type && s.type !== 'line') return {};      // 柱状/散点只取配色
+          return {
+            symbol: 'none', showSymbol: false,             // 图例与图上都不画点
+            lineStyle: {color: c},
+            itemStyle: {color: c},
+            emphasis: {itemStyle: {color: c}}
+          };
+        })
+      });
+      hit++;
+    } catch (e) { /* 单图失败不影响其他 */ }
+  });
+  return hit;
+}
+
+function whitenAll() {
+  document.querySelectorAll('div').forEach(function (d) {
+    if (!d._echart) return;
+    try {
+      var opt = d._echart.getOption();
+      if (!opt || !opt.series) return;
+      d._echart.setOption({series: opt.series.map(function (s) {
+        if (s.type && s.type !== 'line') return {};
+        var lc = (s.lineStyle && s.lineStyle.color)
+              || (s.itemStyle && s.itemStyle.color) || '#8f8f97';
+        return {symbol: 'circle', symbolSize: 8,
+                itemStyle: {color: '#fff', borderColor: lc, borderWidth: 2},
+                emphasis: {scale: 1.6, itemStyle: {color: '#fff', borderColor: lc, borderWidth: 2.5}}};
+      })});
+    } catch (e) { /* 单图失败不影响其他 */ }
+  });
+}
+
 function buildValChart(id, name, dates, vals, pcts, hsVals, lineColor, tx, sp) {
   const dom = document.getElementById(id); if (!dom) return;
   if (dom._echart) dom._echart.dispose();
   const ch = echarts.init(dom);
   const pctVals = (pcts || []).map(v => v != null ? (v * 100).toFixed(0) : null);
   ch.setOption({
-    backgroundColor: chartBg, tooltip: {trigger: 'axis'},
+    backgroundColor: chartBg,
+    // 数值保留 2 位小数：原始序列精度到多位，直接展示会出现 12.3456789 这类读数
+    tooltip: {trigger: 'axis', formatter: ps => {
+      let s = ps[0].axisValue;
+      ps.forEach(x => {
+        if (x.value == null || x.value === '-') return;
+        const v = Number(x.value);
+        s += '<br/>' + x.marker + x.seriesName + ': '
+           + (isFinite(v) ? v.toFixed(2) : x.value)
+           + (x.seriesName.indexOf('分位') >= 0 ? '%' : '');
+      });
+      return s;
+    }},
     legend: {data: [name, '沪深300', '十年分位%'], bottom: 0, textStyle: {color: tx, fontSize: 10}},
     grid: {left: '8%', right: '4%', top: 12, bottom: 92},
     xAxis: {type: 'category', data: dates, axisLabel: {color: tx, fontSize: 9, formatter: v => v.slice(0, 7)}, axisLine: {lineStyle: {color: sp}}},
-    dataZoom: [{type: 'inside', start: 50, end: 100}, {type: 'slider', start: 50, end: 100, height: 10, bottom: 52,dataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},selectedDataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},borderColor: 'rgba(139,139,144,.25)', fillerColor: 'rgba(139,139,144,.12)',handleSize: '80%', showDetail: false}],
+    dataZoom: [{type: 'inside', start: 0, end: 100}, {type: 'slider', start: 0, end: 100, height: 10, bottom: 52,dataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},selectedDataBackground: {lineStyle: {opacity: 0}, areaStyle: {opacity: 0}},borderColor: 'rgba(139,139,144,.25)', fillerColor: 'rgba(139,139,144,.12)',handleSize: '80%', showDetail: false}],
     yAxis: [
       {type: 'value', name: name, axisLabel: {color: tx, fontSize: 9}, splitLine: {lineStyle: {color: sp}}},
       {type: 'value', name: '分位%', min: 0, max: 100, axisLabel: {color: tx, fontSize: 9, formatter: v => v + '%'}, splitLine: {show: false}}
     ],
     series: [
-      {name: name, type: 'line', data: vals, smooth: true, symbol: 'none', lineStyle: {color: lineColor, width: 1.5}, yAxisIndex: 0},
-      {name: '沪深300', type: 'line', data: hsVals, smooth: true, symbol: 'none', lineStyle: {color: '#AAA', width: 1, type: 'dotted'}, yAxisIndex: 0},
-      {name: '十年分位%', type: 'line', data: pctVals, smooth: true, symbol: 'none', lineStyle: {color: '#E8A838', width: 1.5, type: 'dashed'}, yAxisIndex: 1,
-        markLine: {silent: true, data: [{yAxis: 70, label: {formatter: '偏高', color: tx, fontSize: 9}, lineStyle: {color: '#FFB347', type: 'dotted'}}, {yAxis: 30, label: {formatter: '偏低', color: tx, fontSize: 9}, lineStyle: {color: '#26C6DA', type: 'dotted'}}]}}
+      {name: name, type: 'line', data: vals, smooth: true, yAxisIndex: 0,
+       lineStyle: {color: lineColor, width: 1.5}, showSymbol: false, symbol: 'none'},
+      {name: '沪深300', type: 'line', data: hsVals, smooth: true, yAxisIndex: 0,
+       lineStyle: {color: '#AAA', width: 1, type: 'dotted'}, showSymbol: false, symbol: 'none'},
+      {name: '十年分位%', type: 'line', data: pctVals, smooth: true, yAxisIndex: 1,
+       lineStyle: {color: '#E8A838', width: 1.5, type: 'dashed'}, showSymbol: false, symbol: 'none',
+       markLine: {silent: true, data: [
+         {yAxis: 70, label: {formatter: '偏高', color: tx, fontSize: 9}, lineStyle: {color: '#FFB347', type: 'dotted'}},
+         {yAxis: 30, label: {formatter: '偏低', color: tx, fontSize: 9}, lineStyle: {color: '#26C6DA', type: 'dotted'}}]}}
+
     ]
   });
   dom._echart = ch;
+}
+
+// 沪深300 估值分位对照：按日期把当前指数对齐到沪深300 的时间轴
+async function renderHsCmp(me, tx, sp) {
+  const dom = document.getElementById('val-chart-hs-cmp');
+  if (!dom || dom._echart || !me) return;
+  let ref;
+  try {
+    const r = await fetch(API_BASE + '/api/market-scan/dividend-advice-detail?code=000300');
+    ref = await r.json();
+  } catch (e) { ref = null; }
+  if (!ref || !ref.dates) { dom.innerHTML = '<div class="cs">沪深300 数据暂不可用</div>'; return; }
+
+  const axis = (ref && ref.dates) || meDates;   // 优先用沪深300 的更长轴
+  const toMap = (dates, vals) => {
+    const m = {};
+    (dates || []).forEach((d, i) => { if (vals[i] != null) m[d] = vals[i]; });
+    return m;
+  };
+  const meDates = me.dates || [];
+  const mePe = toMap(meDates, me.pe_pct || me.pe_series);
+  const mePb = toMap(meDates, me.pb_pct || me.pb_series);
+  const pad = m => axis.map(d => (m[d] != null ? m[d] : null));
+
+  const ch = echarts.init(dom);
+  const mk = (nm, data, c) => ({name: nm, type: 'line', data: data, smooth: true,
+    showSymbol: false, connectNulls: false, lineStyle: {color: c, width: 1.6}});
+  ch.setOption({
+    backgroundColor: chartBg,
+    tooltip: {trigger: 'axis', formatter: ps => {
+      let s = ps[0].axisValue;
+      ps.forEach(x => { if (x.value == null) return;
+        s += '<br/>' + x.marker + x.seriesName + ': ' + Number(x.value).toFixed(1) + '%'; });
+      return s;
+    }},
+    legend: {data: ['本指数 PE分位', '沪深300 PE分位', '本指数 PB分位', '沪深300 PB分位'],
+             bottom: 0, textStyle: {color: tx, fontSize: 9}},
+    grid: {left: '7%', right: '4%', top: 14, bottom: 58},
+    xAxis: {type: 'category', data: axis, axisLabel: {color: tx, fontSize: 9,
+            formatter: v => String(v).slice(0, 7)}, axisLine: {lineStyle: {color: sp}}},
+    yAxis: {type: 'value', min: 0, max: 100, name: '分位%',
+            axisLabel: {color: tx, fontSize: 9, formatter: '{value}%'},
+            splitLine: {lineStyle: {color: sp}}},
+    dataZoom: [{type: 'inside', start: 0, end: 100}],
+    series: [
+      mk('本指数 PE分位', pad(mePe), '#f59e0b'),
+      mk('沪深300 PE分位', ref.pe_series, '#539BF5'),
+      mk('本指数 PB分位', pad(mePb), '#10b981'),
+      mk('沪深300 PB分位', ref.pb_series, '#ef4444'),
+    ]
+  });
+  dom._echart = ch;
+  setTimeout(applyPalette, 200);
 }
 
 function genValText(id, name, vals, pcts, hsVals, unit, pctClr) {
@@ -1006,7 +1138,7 @@ function renderTemp(m) {
   const sp2 = isDark ? 'rgba(200,200,200,0.08)' : 'rgba(128,128,128,0.1)';
   function tone(v) { return v >= 70 ? '#ef4444' : (v >= 55 ? '#f59e0b' : (v <= 30 ? '#10b981' : '#8b8b90')); }
   const stat = (l, n, c) => '<div class="stat-box"><div class="n" style="color:' + c + '">' + n + '</div><div class="l">' + l + '</div></div>';
-  let html = '<div class="chart-card"><div class="ct">🌡 红利温度计</div>';
+  let html = '<div class="chart-card"><div class="ct">🌡 温度计</div>';
   html += '<div class="stat-row" style="margin-bottom:10px">';
   html += stat('拥挤度', cw.score != null ? cw.score + '·' + (cw.level || '') : '—', tone(cw.score));
   html += stat('恐慌贪婪', fg.score != null ? fg.score + '·' + (fg.level || '') : '—', tone(fg.score));
