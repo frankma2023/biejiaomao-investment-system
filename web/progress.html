@@ -58,6 +58,20 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>🎓 个股体检升级：七大师 → 九大师 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span><b>新增 Oliver Kell（CPA 价格行为）正式入册</b>——原为「半成员」，只在步骤 9 有一行字，未进投票名单</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>新增 Michael Mauboussin（预期投资）</b>——补上「反推价格隐含预期」这一空缺，与其余八位不重叠</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>新增 §步骤 7.5 CPA 九阶段判定细则</b>：基部构筑/突破/回踩/延伸/衰竭/派发/破位，每阶段给可判定门槛</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>写入 CPA 不对称铁律：<b>买点必须次日确认，破位不需要确认</b></td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>新增 §步骤 6.5 预期反推</b>：隐含 g = WACC − 1/PE、与自身 3 年 CAGR 对照、ROIC vs WACC 价值创造检验</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>裁决规则新增「伪共识」识别：5:4 若 ≥2 票同流派，须点出并下调评级 + 九人流派分组表</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>「七大师/六大师/七大师」三处矛盾说法全部统一为九大师（skill 24.2 KB / 401 行）</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span>待办：万华 600309 报告仍是七大师版本，需按九大师重出</td><td>2026-10-27</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>🩺 个股体检 + CANSLIM 评分卡 v3.7 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span><b>万华化学 600309 体检报告</b>：终裁「观望」，C=14/22 业绩强但 N=1.6、S=0 股价未走出来</td><td>2026-10-27</td></tr>
@@ -710,6 +724,9 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">159. 分部业绩只看毛利率水平会得出反向结论，必须看变化与毛利额增量</div><div class="ld">万华石化占收入 40%、毛利率仅 6.8%，我判为「拖累项」。实际它从 −0.4% 提升到 +6.8%（+7.2pp），毛利额增量 +33.9 亿，占四个板块总增量的 44.2%，是第一贡献者。周期股板块毛利率长期在低位恰恰说明弹性最大——用「水平低」否定它，等于在最该关注时忽略它。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">160. 一体化企业的上游板块不能用单独毛利率评判</div><div class="ld">垂直一体化公司常以内部转移价让上游供应下游，利润在下游体现、成本在上游承担。万华石化（乙烯配套）的「低毛利」有一部分是内部定价的结果，其价值体现在保证原料自给与降低整体成本，这部分协同收益无法从财报分部数据直接量化，只能定性说明并标注「不可量化」。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">161. 分档设计要用全市场分布校准，不能凭直觉</div><div class="ld">CANSLIM 的 L 维度原设计 4 档（RS250 ≥95/90/80/70 → 10/8/5/2）。跑全市场 5,278 只才发现：均值仅 1.33/14、中位 0、54.2% 拿 0 分，且 RPS250 处于 50~70 分位的 1,066 只（20%）与垫底股同为 0 分——断层过陡。改成 7 档后均值 2.20（+65%）。任何评分分档都该先跑全市场分布再定档位。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">162. 同一常量在多处硬编码，必然出现三种说法并存</div><div class="ld">stock-health-report skill 里「大师人数」同时出现七大师（L3、L13、L63）、六大师（L10、L89），而步骤 9 实际列了 8 位（含 Oliver Kell）。改一次要改六处，还漏了 description。凡是「人数、上限、维度名」这类常量，应在文档开头单点定义，其余位置引用而非重复书写。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">163. 加人数从 7 到 9 保住了奇数，但引出了「伪共识」</div><div class="ld">原设计「奇数 7 人避免平局」很对，加到 9 仍无平局。但 9 人里技术派 4 人（欧奈尔/威科夫/利弗莫尔/Kell）、价值派 3 人（段永平/巴菲特/Mauboussin）、风险派 2 人（芒格/索罗斯），任何两派联手即成多数。所以只数票数不够，必须识别票源结构——5:4 若多数来自同一流派，那是流派共识不是全局共识，应下调评级。</div></div>
+
 
 
 
