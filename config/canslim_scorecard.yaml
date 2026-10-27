@@ -99,21 +99,46 @@ s_supply_demand:
   - 5
   - 2
 l_leader:
+  # v3.7（2026-10-27）L 分档加密：全市场实测 RS 三子项均值仅 1.33/14、中位 0、50% 股票拿 0 分，
+  # 且 RPS250 50~70 分位（1066 只）与垫底股同为 0 分，断层过陡。三处调整后总分仍 22。
   rs250_tiers:
   - 95
   - 90
+  - 85
   - 80
+  - 75
   - 70
+  - 60
   rs250_scores:
   - 10
   - 8
+  - 6
   - 5
-  - 2
+  - 4
+  - 3
+  - 1
   excess_return_threshold: 5
+  # v3.7：以下三项原为代码内 cfg.get 默认值，PRD 有写但 YAML 未配，现显式补入对齐三边
+  excess_return_scores:
+  - 4
+  - 2
+  rs_momentum_score: 2
+  # 减速惩罚 -2 → -1：全市场 41.9% 处于减速状态，-2 使该子项成为负期望
+  rs_momentum_penalty: -1
+  # RS20 门槛 95/90 → 90/80：原门槛下 90.2% 股票拿 0 分，覆盖过低
+  rs20_bonus_tiers:
+  - 90
+  - 80
+  rs20_bonus_scores:
+  - 2
+  - 1
   industry_ret20_threshold: 3.0
   industry_ret20_score_high: 4
   industry_ret20_score_mid: 2
 i_institutional:
+  # v3.7（2026-10-27）I 维度上限 18 → 13，方案A：持股4 + 增减5 + 覆盖2 + 上调2 = 13
+  # 砍分理由：研报覆盖是「市值/知名度」代理变量，对成熟公司恒满分、区分度低，砍幅最大；
+  # 机构数量变化是 O'Neil「I」原意（机构在增持），保留最高权重。
   inst_holding_tiers:
   - 12
   - 5
@@ -123,10 +148,11 @@ i_institutional:
   - 3
   - 1
   inst_count_score:
-  - 8
-  - 4
+  - 6
+  - 3
   analyst_coverage_tiers:
   - 3
   - 1
-  analyst_coverage_score: 5
-  analyst_coverage_score_low: 2
+  analyst_coverage_score: 2
+  analyst_coverage_score_low: 1
+  # rating_up 保持展示项：新浪源无评级字段，恒 0，不占权重（v3.7 说明）

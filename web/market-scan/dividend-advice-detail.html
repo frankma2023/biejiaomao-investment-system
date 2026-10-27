@@ -291,7 +291,7 @@ async function load() {
   // 全收益口径，如 980092）时只少那一条，已拿到的价格线与沪深300 照常画，
   // 不能让整块图消失。原来要求两条都在，任一缺就整块不渲染。
   if (d.price_norm || d.hs300_norm) {
-    charts.push({title:'📈 价格 vs 全收益 vs 沪深300（分红再投资价值 · 近3年起点=100 · 全收益自2016起）', el:'chart-tri', h:330, init: el => {
+    charts.push({title:'📈 价格 vs 全收益 vs 沪深300（三条线各自归一化，起点=100；价格与全收益之差即分红再投资贡献）', el:'chart-tri', h:330, init: el => {
       const c = echarts.init(el);
       const nm = d.name || '指数';
       const series = [], legend = [];

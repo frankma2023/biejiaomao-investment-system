@@ -113,8 +113,29 @@ def score_c(db, stock_code, target_date, p):
 
     # Non-recurring ratio
     np_val = latest.get('net_profit_single') or 0
-    np_adj = latest.get('net_profit_adj_single') or 0
-    if np_val > 0:
+    np_adj = latest.get('net_profit_adj_single')      # 缺失时是 None，不能 or 0
+    # v3.7：扣非缺失（季报滞后未入库）时——
+    #   ① 优先回溯最近一期有值的季度占比作代理；
+    #   ② 近 4 期都没有 → 兜底给 +3（多数 A 股公司扣非占比在 90% 以上）。
+    # 绝不能把缺失当 0%：旧实现 or 0 会把「没数据」判成「扣非 0%」而扣 3 分。
+    _adj_src = 'current'
+    if np_adj is None:
+        try:
+            _prev = db.execute(
+                "SELECT net_profit_single, net_profit_adj_single "
+                "FROM stock_financials_quarterly WHERE stock_code=? "
+                "AND report_date<? AND net_profit_adj_single IS NOT NULL "
+                "AND net_profit_single>0 ORDER BY report_date DESC LIMIT 1",
+                (stock_code, latest.get('report_date') or '')).fetchone()
+        except sqlite3.OperationalError:
+            _prev = None
+        if _prev and _prev['net_profit_single']:
+            np_val, np_adj = _prev['net_profit_single'], _prev['net_profit_adj_single']
+            _adj_src = 'prev_period'
+        else:
+            np_adj = None
+            _adj_src = 'fallback'
+    if np_val > 0 and np_adj is not None:
         ratio = np_adj / np_val * 100
         if ratio >= cfg.get('nonrecurring_ratio', 90):
             score += cfg.get('nonrecurring_score', 3)
@@ -122,8 +143,17 @@ def score_c(db, stock_code, target_date, p):
         elif ratio < 70:
             score += cfg.get('nonrecurring_warning', -3)
             bd['nonrecurring'] = {'value': round(ratio, 1), 'score': cfg.get('nonrecurring_warning', -3)}
+    elif _adj_src == 'fallback':
+        # 近 4 期都取不到扣非 → 按多数公司 >90% 兜底给满分，并在 breakdown 里标明来源
+        score += cfg.get('nonrecurring_score', 3)
+        bd['nonrecurring'] = {'value': '-', 'score': cfg.get('nonrecurring_score', 3),
+                              'note': '扣非缺失，按兜底计满分'}
+    if _adj_src == 'prev_period' and 'nonrecurring' in bd:
+        bd['nonrecurring']['note'] = '本期扣非缺失，用上期占比代理'
+        bd['nonrecurring']['source'] = 'prev_period'
 
-    return {"score": max(0, score), "detail": ", ".join(detail), "breakdown": bd}
+    # v3.7 复核补：C 维度补上限截断，与 PRD「上限22」及其余五维写法一致
+    return {"score": max(0, min(score, 22)), "detail": ", ".join(detail), "breakdown": bd}
 
 
 def score_a(db, stock_code, target_date, p):
@@ -524,7 +554,8 @@ def score_i(db, stock_code, target_date, p):
 
     # v3.2：负债率移出 I 维度（2026-08-27）——语义错置（I 度量机构态度，负债率是公司质量）；
     # 原 2 分拨给首次覆盖(+1)与研报覆盖(+1)。负债率如需风险检查，另设门禁（未启用）
-    return {"score": max(0, min(score, 18)), "detail": ", ".join(detail), "breakdown": bd}
+    # v3.7：I 维度上限 18 → 13
+    return {"score": max(0, min(score, 13)), "detail": ", ".join(detail), "breakdown": bd}
 
 
 def score_market(db, target_date, p):

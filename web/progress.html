@@ -58,6 +58,20 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>🩺 个股体检 + CANSLIM 评分卡 v3.7 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span><b>万华化学 600309 体检报告</b>：终裁「观望」，C=14/22 业绩强但 N=1.6、S=0 股价未走出来</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>CANSLIM v3.7 三项改动</b>：总分 105→100、I 维度 18→13、扣非缺失按上期代理/兜底+3</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>L 维度分档加密</b>：全市场 5,278 只实测 RS 三子项均值仅 1.33/14、54.2% 拿 0 分 → 7 档 + 惩罚 −2→−1 + 门槛 95/90→90/80</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>L 改后实测：均值 1.33→2.20（+65%）、中位 0→2、0 分占比 54.2%→42.0%</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>复核修 5 处 PRD/配置/代码漂移 + score_c 缺上限截断</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>stock-health-report skill §3 重写：四条取数法写死（market-health / 营收构成 / 行业搜索 / 财报先查库）</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span>待办：CANSLIM 的 M（大盘）分量仍为空，评分任务未取到大盘环境</td><td>2026-10-27</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span>待办：N 维度满分 17 但实测最高 10，是否也需加密分档待评估</td><td>2026-10-27</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>📊 指数研究扩展 + 投资决策讨论 <span class="badge" style="background:#FFF3E0;color:#E65100">部分完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span><b>新增 5 份指数研究报告</b>：国证价值100 / 港股通高股息 / A500 / 煤炭 / 券商，均含 13 章 + 双基准（沪深300 + 中证红利）</td><td>2026-10-26</td></tr>
@@ -692,6 +706,11 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">155. getOption() 读到正确值 ≠ 页面显示正确，验证样式必须截图</div><div class="ld">多次出现「读 API 返回值是白点/新色，但截图里还是旧样式」。ECharts 的 option 与最终绘制之间还有合并、主题、emphasis 等环节，读 option 只能证明「设置进去了」，不能证明「画出来了」。样式类修改一律以截图为准。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">156. 对已写死 lineStyle 的图表，事后 setOption 覆盖常常无效</div><div class="ld">想用统一后处理把颜色改成调色板，对 series 内显式写了 lineStyle.color 的图不生效。此类改造必须在「定义处」改，即改生成 option 的源码，而不是建图后再覆盖。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">157. 改 1300 行内联 JS 的单文件页面，补丁式修改必然反复出错</div><div class="ld">本轮改 dividend-advice-detail.html 的样式失败 6 次：静默失效、括号语法错误致整个 tab 白屏、实例遍历落空。这类文件应先把图表配置抽成独立 .js，每图一个配置对象，统一样式在一处定义，改一次全部生效。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">158. 把「我的取值方式错了」当成「数据不存在」——同一轮犯了四次</div><div class="ld">万华体检中连续四次误报数据缺失：① 用 /api/market-scan（404），真接口是 /api/market-health ② 读 CANSLIM 的 total/items 字段（不存在），真字段是 score/grade/C~M ③ 说财报没拉到，其实 stock_financials_quarterly 有 55 期到 2026-09-30 ④ 说行业前瞻搜不到，其实证券时报有完整供需数据。共同点：查询失败就下结论，没有核对字段名/路径是否用对。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">159. 分部业绩只看毛利率水平会得出反向结论，必须看变化与毛利额增量</div><div class="ld">万华石化占收入 40%、毛利率仅 6.8%，我判为「拖累项」。实际它从 −0.4% 提升到 +6.8%（+7.2pp），毛利额增量 +33.9 亿，占四个板块总增量的 44.2%，是第一贡献者。周期股板块毛利率长期在低位恰恰说明弹性最大——用「水平低」否定它，等于在最该关注时忽略它。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">160. 一体化企业的上游板块不能用单独毛利率评判</div><div class="ld">垂直一体化公司常以内部转移价让上游供应下游，利润在下游体现、成本在上游承担。万华石化（乙烯配套）的「低毛利」有一部分是内部定价的结果，其价值体现在保证原料自给与降低整体成本，这部分协同收益无法从财报分部数据直接量化，只能定性说明并标注「不可量化」。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">161. 分档设计要用全市场分布校准，不能凭直觉</div><div class="ld">CANSLIM 的 L 维度原设计 4 档（RS250 ≥95/90/80/70 → 10/8/5/2）。跑全市场 5,278 只才发现：均值仅 1.33/14、中位 0、54.2% 拿 0 分，且 RPS250 处于 50~70 分位的 1,066 只（20%）与垫底股同为 0 分——断层过陡。改成 7 档后均值 2.20（+65%）。任何评分分档都该先跑全市场分布再定档位。</div></div>
+
 
 
 
