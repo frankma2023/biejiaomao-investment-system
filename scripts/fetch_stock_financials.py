@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS stock_financials_quarterly (
     net_profit_adj_qoq      REAL,                   -- 扣非净利润环比(%)
     gross_margin_single     REAL,                   -- 当季毛利率(%)  [计算]
     roe_single              REAL,                   -- 当季ROE
-    free_cash_flow          REAL,                   -- 当季自由现金流
+    free_cash_flow          REAL,                   -- 累积自由现金流（q.m.fcf.t，YTD；Q4 累积=全年，与年报同值，勿当单季用）
     asset_liability_ratio   REAL,                   -- 当季资产负债率(%)
     interest_bearing_debt_ratio REAL,               -- 当季有息负债率(%)
     current_ratio           REAL,                   -- 当季流动比率
