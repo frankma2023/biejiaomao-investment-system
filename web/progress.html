@@ -58,6 +58,23 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>🧠 九大师入场条件全部落地 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span><b>skill §步骤 9.7</b>：九位大师各自的独有入场条件全部写入（19.4 → 56.4 KB）</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>欧奈尔</b>：CANSLIM≥65 + 口袋支点(10日) + 量比≥1.5 + 距52周高≥-15%；<b>已取消杯柄要求</b>（全池 0 例，且他与平底/碟形/双底等价）</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>利弗莫尔</b>：关键点=250日前高（排除最近5日），突破+量能≥1.3+站稳≥3日</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>威科夫</b>：Spring→Test→SOS 三段式 + 箱体振幅≤35% 约束（盐湖 40.6% 判定无效 Spring）</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>巴菲特</b>：ROE连续5年≥15% + DCF折价≥30% + FCF近3年正 + 负债率≤60%（卫星化学 4/4 唯一满分）</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>芒格</b>：Invert 五项排雷；修掉「累计亏损时现金含量算出假正值」的坑（隆基曾误显 3.43x）</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>Mauboussin</b>：反推隐含 g + 扣非双轨（年度CAGR + TTM）+ 背离>30pp 标「拐点」+ ROIC vs WACC</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>索罗斯</b>：反身性阶段（位置+RPS趋势）+ 换手率中枢偏离（750日中位）+ 大盘 rating 不强制降级</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>段永平</b>：<b>不设量化条件</b>——只做业务定位+十年护城河+能力圈否决权（用户指出商业模式判断不适合K线切片）</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>Oliver Kell</b>：CPA 引擎六状态字段全读（stage/six_dir/invalid_level/inv_state）</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span>待办：九位落地后需重跑一次完整体检报告，验证九套逻辑能否产出有区分度的结论</td><td>2026-10-29</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>🔔 自选股入条件提醒系统 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span><b>新表 stock_entry_conditions / stock_entry_alerts</b>：存结构化入条件规则 + 每日评估结果</td><td>2026-10-29</td></tr>
@@ -742,6 +759,10 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">163. 加人数从 7 到 9 保住了奇数，但引出了「伪共识」</div><div class="ld">原设计「奇数 7 人避免平局」很对，加到 9 仍无平局。但 9 人里技术派 4 人（欧奈尔/威科夫/利弗莫尔/Kell）、价值派 3 人（段永平/巴菲特/Mauboussin）、风险派 2 人（芒格/索罗斯），任何两派联手即成多数。所以只数票数不够，必须识别票源结构——5:4 若多数来自同一流派，那是流派共识不是全局共识，应下调评级。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">164. 「只给否定票」的报告没有价值，必须回答「怎样才行、差多少」</div><div class="ld">九位大师初版每次都齐声说「观望、PE 偏高」，读者拿不到任何可执行信息。新增步骤 9.5 后，每位大师必须给出可量化门槛 + 当前值 + 达成度（已达成项数/条件总数），并汇总出 P0 否决线。同一只卫星化学，从「观望」变成「谨慎推荐，等放量站上 26.40（差 4.3%）」——后者可执行。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">165. 条件阈值若不加校准，会写成「恒真」或「永假」</div><div class="ld">批量给 35 只自选股套统一模板时发现：已经站上 MA60 的股票，「价 > MA60」这条恒为真，失去筛选意义。改为按个股自身状态分叉——已站上 MA60 的改用「距 250 日高点 ≥ -5%」，未站上的用「需站上 MA60 + 距高点 ≥ -12%」。凡批量套模板，必先检查每条规则在该股当前状态下是否有区分度。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">166. 不同方法论的时间尺度不同，不能都套同一组均线/量能条件</div><div class="ld">九位大师若都用「站上MA60+放量1.5x」，投票就失去意义。实测 2026-10-29：欧奈尔要新高（全池0/4）、威科夫要底部缩量（4只有Spring）、巴菲特要ROE持续+DCF折价（卫星4/4）、芒格要不出事（潍柴盐湖0雷）、索罗斯要反身性早期（4只①早期但大盘D）。同一池子得出完全不同的候选，这才是多视角的价值。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">167. 拥挤度必须对照长期中枢，单窗口分位会给出相反结论</div><div class="ld">用「近250日换手率分位」测拥挤度，万华化学得14%（判为极冷）；换成1250日窗口是62%（偏热）。根因是换手率中枢本身在漂移（卫星750日中位0.913% vs 250日中位1.471%）。正确算法：当前换手率 ÷ 近750日中位数为主指标，250日分位仅作参考。任何「分位」类指标都要先问：窗口多长、中枢是否漂移。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">168. 有些方法不能被量化，硬量化就是误用</div><div class="ld">段永平判的是「这是不是一门好生意」（穿透财报看商业模式，十年尺度），不是「现在什么位置」。我一度用「毛利率≥25%且标准差≤5pp + PE≤12.5」去量化他，结果卫星化学被判「等」，而它在巴菲特/Mauboussin 眼里是「便宜+高增长」。这不是他错了，是用K线切片去量化商业模式这件事本身错了。已废弃该口径，改为三个定性问题+能力圈否决权。</div></div>
+
 
 
 
