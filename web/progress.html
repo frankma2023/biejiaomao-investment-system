@@ -58,6 +58,20 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>🔔 自选股入条件提醒系统 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span><b>新表 stock_entry_conditions / stock_entry_alerts</b>：存结构化入条件规则 + 每日评估结果</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>scripts/eval_entry_conditions.py</b>：9 类规则引擎（MA/量比/CANSLIM/PE分位/RSI/距高点/250位置/成交额），支持 --add 与 --seed</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>驾驶舱新增「🔔 自选提醒」tab</b>：进度条 + 逐条✅❌ + 全部满足时红色提醒条与计数徽标</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>新 API <code>/api/cockpit/entry-alerts</code></td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>daily_update.py 第 39 步</b>：每日自动评估自选池入条件</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>个股体检 skill 新增 §步骤 9.5（入条件清单）与 §步骤 9.6（写入命令），报告必须附 --add 命令</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>自选池 35 只已全部初始化条件</b>：0 条达成 25 只、1 条达成 10 只、全部满足 0 只</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span>待办：35 只的条件是批量模板，非逐只九大师分析，阈值需按个股校准</td><td>2026-10-29</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>🎓 个股体检升级：七大师 → 九大师 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span><b>新增 Oliver Kell（CPA 价格行为）正式入册</b>——原为「半成员」，只在步骤 9 有一行字，未进投票名单</td><td>2026-10-27</td></tr>
@@ -726,6 +740,9 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">161. 分档设计要用全市场分布校准，不能凭直觉</div><div class="ld">CANSLIM 的 L 维度原设计 4 档（RS250 ≥95/90/80/70 → 10/8/5/2）。跑全市场 5,278 只才发现：均值仅 1.33/14、中位 0、54.2% 拿 0 分，且 RPS250 处于 50~70 分位的 1,066 只（20%）与垫底股同为 0 分——断层过陡。改成 7 档后均值 2.20（+65%）。任何评分分档都该先跑全市场分布再定档位。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">162. 同一常量在多处硬编码，必然出现三种说法并存</div><div class="ld">stock-health-report skill 里「大师人数」同时出现七大师（L3、L13、L63）、六大师（L10、L89），而步骤 9 实际列了 8 位（含 Oliver Kell）。改一次要改六处，还漏了 description。凡是「人数、上限、维度名」这类常量，应在文档开头单点定义，其余位置引用而非重复书写。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">163. 加人数从 7 到 9 保住了奇数，但引出了「伪共识」</div><div class="ld">原设计「奇数 7 人避免平局」很对，加到 9 仍无平局。但 9 人里技术派 4 人（欧奈尔/威科夫/利弗莫尔/Kell）、价值派 3 人（段永平/巴菲特/Mauboussin）、风险派 2 人（芒格/索罗斯），任何两派联手即成多数。所以只数票数不够，必须识别票源结构——5:4 若多数来自同一流派，那是流派共识不是全局共识，应下调评级。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">164. 「只给否定票」的报告没有价值，必须回答「怎样才行、差多少」</div><div class="ld">九位大师初版每次都齐声说「观望、PE 偏高」，读者拿不到任何可执行信息。新增步骤 9.5 后，每位大师必须给出可量化门槛 + 当前值 + 达成度（已达成项数/条件总数），并汇总出 P0 否决线。同一只卫星化学，从「观望」变成「谨慎推荐，等放量站上 26.40（差 4.3%）」——后者可执行。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">165. 条件阈值若不加校准，会写成「恒真」或「永假」</div><div class="ld">批量给 35 只自选股套统一模板时发现：已经站上 MA60 的股票，「价 > MA60」这条恒为真，失去筛选意义。改为按个股自身状态分叉——已站上 MA60 的改用「距 250 日高点 ≥ -5%」，未站上的用「需站上 MA60 + 距高点 ≥ -12%」。凡批量套模板，必先检查每条规则在该股当前状态下是否有区分度。</div></div>
+
 
 
 

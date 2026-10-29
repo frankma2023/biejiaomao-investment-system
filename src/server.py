@@ -493,6 +493,50 @@ def get_capital_flow_data(target_date, db):
 # API: GET /api/market-health
 # ═══════════════════════════════════════════════
 
+@app.route('/api/cockpit/entry-alerts')
+def api_cockpit_entry_alerts():
+    """自选股「入条件」评估结果。
+
+    返回每只自选股当前满足了几条入条件、是否全部满足（= 提醒），
+    以及逐条明细。数据由 scripts/eval_entry_conditions.py 写入。
+    """
+    db = get_db()
+    try:
+        rows = db.execute("""
+            SELECT c.stock_code, c.stock_name, c.rules, c.summary, c.source,
+                   a.date, a.satisfied, a.total, a.detail, a.triggered
+            FROM stock_entry_conditions c
+            LEFT JOIN stock_entry_alerts a
+              ON a.stock_code=c.stock_code
+             AND a.date=(SELECT MAX(date) FROM stock_entry_alerts
+                         WHERE stock_code=c.stock_code)
+            WHERE c.enabled=1
+            ORDER BY COALESCE(a.triggered,0) DESC, COALESCE(a.satisfied,0)*1.0
+                     / NULLIF(a.total,0) DESC
+        """).fetchall()
+    except Exception:
+        return jsonify({'date': None, 'items': [], 'note': '尚未初始化入条件表'})
+
+    import json as _json
+    items = []
+    for r in rows:
+        try:
+            det = _json.loads(r['detail']) if r['detail'] else []
+        except Exception:
+            det = []
+        items.append({
+            'code': r['stock_code'], 'name': r['stock_name'],
+            'summary': r['summary'], 'source': r['source'],
+            'date': r['date'],
+            'satisfied': r['satisfied'] or 0, 'total': r['total'] or 0,
+            'triggered': bool(r['triggered']),
+            'detail': det,
+        })
+    alerts = [x for x in items if x['triggered']]
+    return jsonify({'date': items[0]['date'] if items else None,
+                    'alerts': len(alerts), 'items': items})
+
+
 @app.route('/api/market-health')
 def api_market_health():
     target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))

@@ -101,11 +101,13 @@ html[data-theme="light"] .control-bar input{background:rgba(255,255,255,.7)}
   <button class="tab-btn active" onclick="switchTab('b1')" id="tab-b1">🔔 高关注B1 <span class="cnt" id="cnt-b1">0</span></button>
   <button class="tab-btn" onclick="switchTab('b2')" id="tab-b2">✅ B2确认 <span class="cnt" id="cnt-b2">0</span></button>
   <button class="tab-btn" onclick="switchTab('cup')" id="tab-cup">☕ 杯柄信号 <span class="cnt" id="cnt-cup">0</span></button>
+  <button class="tab-btn" onclick="switchTab('entry')" id="tab-entry">🔔 自选提醒 <span class="cnt" id="cnt-entry">0</span></button>
 </div>
 
 <div class="flow-hint" id="flow-hint"></div>
 <div id="signals"></div>
 <div id="cup-signals" style="display:none"></div>
+<div id="entry-signals" style="display:none"></div>
 </div>
 
 <script src="../shared/js/nav.js"></script>
@@ -117,16 +119,63 @@ var allSignals=[],currentTab='b1',currentDate='';
 var cupData={signals:[],candidates:[],date:'',latest_date:'',fallback:false};
 var cupView='signal';
 
-function switchTab(t){
-  currentTab=t;
-  ['b1','b2','cup'].forEach(function(k){
-    document.getElementById('tab-'+k).classList.toggle('active',t===k);
+
+function loadEntry(){
+  var box = document.getElementById('entry-signals');
+  box.innerHTML = '<div class="empty">加载中…</div>';
+  fetch(API + '/api/cockpit/entry-alerts').then(function(r){return r.json();}).then(function(d){
+    var items = d.items || [];
+    document.getElementById('cnt-entry').textContent = d.alerts || 0;
+    if(!items.length){
+      box.innerHTML = '<div class="empty">暂无入条件配置。用 <code>python scripts/eval_entry_conditions.py --seed</code> 初始化，或在个股体检报告生成后写入。</div>';
+      return;
+    }
+    var h = '';
+    if(d.alerts > 0){
+      h += '<div class="alert-banner" style="background:rgba(239,68,68,.12);border:1px solid #ef4444;border-radius:10px;padding:12px 16px;margin-bottom:14px">'
+        + '<b style="color:#ef4444">🔔 ' + d.alerts + ' 只自选股已满足全部入条件</b>'
+        + '<div style="font-size:.72rem;color:var(--muted);margin-top:4px">数据日期 ' + (d.date||'—') + '，请复核后决策</div></div>';
+    }
+    items.forEach(function(x){
+      var pct = x.total ? Math.round(x.satisfied / x.total * 100) : 0;
+      var color = x.triggered ? '#ef4444' : (pct >= 60 ? '#f59e0b' : '#8b8b90');
+      h += '<div class="card" style="border-left:3px solid ' + color + ';margin-bottom:12px">';
+      h += '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">';
+      h += '<b style="font-size:1rem">' + x.name + '</b><span style="color:var(--muted);font-size:.72rem">' + x.code + '</span>';
+      h += '<span style="margin-left:auto;font-weight:700;color:' + color + '">' + x.satisfied + ' / ' + x.total;
+      if(x.triggered) h += ' 🔔 全部满足';
+      h += '</span></div>';
+      if(x.summary) h += '<div style="font-size:.72rem;color:var(--muted);margin:6px 0">' + x.summary + '</div>';
+      h += '<div style="height:5px;background:rgba(139,139,144,.18);border-radius:3px;margin:8px 0">';
+      h += '<div style="height:5px;width:' + pct + '%;background:' + color + ';border-radius:3px"></div></div>';
+      (x.detail || []).forEach(function(t){
+        var mark = t.ok === true ? '✅' : (t.ok === false ? '❌' : '➖');
+        var col = t.ok === true ? '#ef4444' : (t.ok === false ? '#10b981' : 'var(--muted)');
+        h += '<div style="font-size:.72rem;color:' + col + ';padding:2px 0">' + mark + ' ' + t.desc + '</div>';
+      });
+      if(x.source) h += '<div style="font-size:.66rem;color:var(--muted);margin-top:8px">条件来源：' + x.source + (x.date ? '　·　评估日 ' + x.date : '') + '</div>';
+      h += '</div>';
+    });
+    box.innerHTML = h;
+  }).catch(function(e){
+    box.innerHTML = '<div class="empty">加载失败：' + e.message + '</div>';
   });
-  document.getElementById('signals').style.display = (t==='cup')?'none':'';
-  document.getElementById('cup-signals').style.display = (t==='cup')?'':'none';
-  if(t==='cup') renderCup(); else render();
 }
 
+function switchTab(t){
+  currentTab=t;
+  ['b1','b2','cup','entry'].forEach(function(k){
+    document.getElementById('tab-'+k).classList.toggle('active',t===k);
+  });
+  document.getElementById('signals').style.display = (t==='b1'||t==='b2')?'':'none';
+  document.getElementById('cup-signals').style.display = (t==='cup')?'':'none';
+  document.getElementById('entry-signals').style.display = (t==='entry')?'':'none';
+  if(t==='cup') renderCup();
+  else if(t==='entry') loadEntry();
+  else render();
+}
+
+fetch(API + '/api/cockpit/entry-alerts').then(function(r){return r.json();}).then(function(d){var e=document.getElementById('cnt-entry');if(e)e.textContent=d.alerts||0;}).catch(function(){});
 function loadToday(){
   var d=new Date(); d.setHours(d.getHours()+8);
   var today=d.toISOString().slice(0,10);
@@ -406,7 +455,7 @@ function toggleTheme(){
 // 支持 ?tab=cup / ?tab=b2 直达，便于从日报或其它页面链接过来
 var _wantTab=new URLSearchParams(location.search).get('tab');
 loadToday();
-if(_wantTab && ['b1','b2','cup'].indexOf(_wantTab)>=0) switchTab(_wantTab);
+if(_wantTab && ['b1','b2','cup','entry'].indexOf(_wantTab)>=0) switchTab(_wantTab);
 </script>
 </body>
 </html>

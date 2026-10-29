@@ -396,6 +396,11 @@ TASKS.append(("37.指数操作建议", [PYTHON_EXE, "scripts/compute_index_advic
 # 依赖日线K线就位；幂等：同日同指数覆盖写。约 394 个指数，耗时 ~2min。
 TASKS.append(("38.指数CPA扫描", [PYTHON_EXE, "scripts/scan_index_cpa_daily.py"]))
 
+# 自选股入条件每日评估（2026-10-29）：读 stock_entry_conditions，
+# 用本地库算每条规则是否满足，写 stock_entry_alerts，驾驶舱「自选提醒」tab 读取。
+TASKS.append(("39.自选股入条件评估",
+              [PYTHON_EXE, "scripts/eval_entry_conditions.py"]))
+
 for item in TASKS:
     label, cmd = item[0], item[1]
     opts = item[2] if len(item) > 2 else {}
