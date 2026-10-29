@@ -99,6 +99,42 @@ def _rsi(closes, period):
     return 100 - 100 / (1 + rs)
 
 
+def get_cpa_stage(con, code, date=None):
+    """读 CPA 引擎已算好的阶段（个股 cpa_stage_daily / 指数 index_cpa_daily）。
+
+    引擎在 src/scanners/cpa_index.py，全市场每日扫描，不需要重算。
+    返回 {stage, name, action, days, support, invalid} 或 None。
+    """
+    try:
+        if is_index_code(code):
+            r = con.execute(
+                "SELECT stage, stage_name, days_in_stage, since_date, action, close "
+                "FROM index_cpa_daily WHERE stock_code=? "
+                + ("AND date<=? " if date else "")
+                + "ORDER BY date DESC LIMIT 1",
+                (code, date) if date else (code,)).fetchone()
+            if not r:
+                return None
+            return {'stage': r['stage'], 'name': r['stage_name'],
+                    'days': r['days_in_stage'], 'since': r['since_date'],
+                    'action': r['action'], 'close': r['close'],
+                    'support': None, 'invalid': None}
+        r = con.execute(
+            "SELECT stage, prior_stage, days_in_stage, stage_start_date, action, "
+            "structure_support, invalid_level, close FROM cpa_stage_daily "
+            "WHERE stock_code=? " + ("AND date<=? " if date else "")
+            + "ORDER BY date DESC LIMIT 1",
+            (code, date) if date else (code,)).fetchone()
+        if not r:
+            return None
+        return {'stage': r['stage'], 'prior': r['prior_stage'],
+                'days': r['days_in_stage'], 'since': r['stage_start_date'],
+                'action': r['action'], 'support': r['structure_support'],
+                'invalid': r['invalid_level'], 'close': r['close']}
+    except sqlite3.OperationalError:
+        return None
+
+
 def compute_metrics(con, code):
     rows = _kline(con, code)
     if len(rows) < 60:
@@ -157,7 +193,7 @@ def compute_metrics(con, code):
 
 
 # ══════════ 规则评估 ══════════
-def eval_rule(rule, m, canslim):
+def eval_rule(rule, m, canslim, cpa=None):
     t = rule.get('type')
     op = rule.get('op', '>=')
     th = rule.get('v')
@@ -202,6 +238,23 @@ def eval_rule(rule, m, canslim):
     if t == 'pos_250':
         v = m.get('pos_250')
         return cmp(v), f'250日位置 {label(v,"%")} {op} {th}%', rule
+    if t == 'cpa_stage':
+        # 期望阶段（in）或排除阶段（not_in）。阶段用 ⓪~⑧ 或数字。
+        st = (cpa or {}).get('stage')
+        name = (cpa or {}).get('name') or ''
+        want_in = rule.get('in')
+        want_not = rule.get('not_in')
+        txt = f"CPA {st} {name[:22]}" if st is not None else 'CPA 无数据'
+        if st is None:
+            return None, txt, rule
+        s = str(st).strip()
+        if want_in:
+            ok = s in [str(x).strip() for x in want_in]
+            return ok, f"{txt} ∈ {want_in}", rule
+        if want_not:
+            ok = s not in [str(x).strip() for x in want_not]
+            return ok, f"{txt} ∉ {want_not}", rule
+        return None, txt + '（规则未指定 in / not_in）', rule
     if t == 'turnover':
         v = m.get('amount_yi')
         return cmp(v), f'成交额 {label(v,"亿")} {op} {th}亿', rule
@@ -226,16 +279,17 @@ def evaluate(con, code, rules, name=None):
     if not m:
         return None
     canslim = get_canslim(code)
+    cpa = get_cpa_stage(con, code)
     out, ok_n = [], 0
     for r in rules:
-        ok, txt, raw = eval_rule(r, m, canslim)
+        ok, txt, raw = eval_rule(r, m, canslim, cpa)
         if ok:
             ok_n += 1
         out.append({'rule': r, 'ok': ok, 'desc': txt})
     return {'stock_code': code, 'stock_name': name or code,
             'satisfied': ok_n, 'total': len(rules),
             'triggered': ok_n == len(rules), 'detail': out,
-            'canslim': canslim, 'close': m['close']}
+            'canslim': canslim, 'cpa': cpa, 'close': m['close']}
 
 
 def _sync_enabled(con):
@@ -367,7 +421,10 @@ def main():
     print(f'  评估 {len(results)} 只（{today}）')
     for res in results:
         flag = '🔔 触发' if res['triggered'] else f"{res['satisfied']}/{res['total']}"
-        print(f"    {res['stock_code']} {res['stock_name']:<8} {flag}")
+        cp = res.get('cpa') or {}
+        cps = (f"  CPA {cp.get('stage')} {str(cp.get('name') or '')[:20]}"
+               f"({cp.get('days')}日)") if cp else ''
+        print(f"    {res['stock_code']} {res['stock_name']:<8} {flag}{cps}")
         for d in res['detail']:
             mark = '✅' if d['ok'] else ('❌' if d['ok'] is False else '➖')
             print(f"       {mark} {d['desc']}")
