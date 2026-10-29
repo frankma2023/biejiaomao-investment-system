@@ -60,7 +60,19 @@ def ensure_table(con):
 
 
 # ══════════ 指标计算 ══════════
+def is_index_code(code):
+    """指数代码判定：93xxxx / 98xxxx / Hxxxxx（国证、中证策略、港股通系列）。"""
+    c = str(code)
+    return c.startswith(('93', '98', 'H'))
+
+
 def _kline(con, code, n=260):
+    """个股走 daily_kline，指数走 index_daily_kline（两表字段名不同）。"""
+    if is_index_code(code):
+        return con.execute(
+            "SELECT date, close, amount FROM index_daily_kline "
+            "WHERE stock_code=? AND kline_type='normal' AND close>0 "
+            "ORDER BY date DESC LIMIT ?", (code, n)).fetchall()
     return con.execute(
         "SELECT date, close, amount FROM daily_kline WHERE stock_code=? "
         "AND close>0 ORDER BY date DESC LIMIT ?", (code, n)).fetchall()
@@ -107,7 +119,23 @@ def compute_metrics(con, code):
     m['pos_250'] = round((cur - lo) / (hi - lo) * 100, 0) if hi > lo else 50
     m['rsi6'] = round(_rsi(closes, 6), 1) if _rsi(closes, 6) else None
     # 估值分位
-    # fundamental_indicator 是长表（metric_code/value），不是宽表
+    # 指数：走 index_fundamental_daily 宽表
+    if is_index_code(code):
+        try:
+            r = con.execute(
+                "SELECT pe_ttm, pe_ttm_pct, pb, pb_pct, dyr FROM index_fundamental_daily "
+                "WHERE stock_code=? AND pe_ttm IS NOT NULL ORDER BY date DESC LIMIT 1",
+                (code,)).fetchone()
+            if r:
+                m['pe'] = round(r['pe_ttm'], 2) if r['pe_ttm'] is not None else None
+                m['pe_pct'] = round((r['pe_ttm_pct'] or 0) * 100, 1)
+                m['pb'] = round(r['pb'], 2) if r['pb'] is not None else None
+                m['dyr'] = round((r['dyr'] or 0) * 100, 2)
+        except sqlite3.OperationalError:
+            pass
+        return m
+
+    # 个股：fundamental_indicator 是长表（metric_code/value），不是宽表
     try:
         rows2 = con.execute(
             "SELECT metric_code, value FROM fundamental_indicator "
@@ -155,6 +183,8 @@ def eval_rule(rule, m, canslim):
         v = m.get('vol_ratio')
         return cmp(v), f'量比 {label(v)} {op} {th}', rule
     if t == 'canslim':
+        if canslim is None:
+            return None, 'CANSLIM 不适用于指数', rule
         return cmp(canslim), f'CANSLIM {label(canslim)} {op} {th}', rule
     if t == 'canslim_dim':
         d = rule.get('dim')
@@ -179,7 +209,9 @@ def eval_rule(rule, m, canslim):
 
 
 def get_canslim(code):
-    """从 canslim_scorecard 表或直接调评分函数取总分（失败返回 None）。"""
+    """CANSLIM 只对个股有意义；指数返回 None（规则里的 canslim 会被判为不适用）。"""
+    if is_index_code(code):
+        return None
     sys.path.insert(0, str(ROOT / 'src'))
     try:
         from scanners import canslim_score as cs
@@ -204,6 +236,24 @@ def evaluate(con, code, rules, name=None):
             'satisfied': ok_n, 'total': len(rules),
             'triggered': ok_n == len(rules), 'detail': out,
             'canslim': canslim, 'close': m['close']}
+
+
+def _sync_enabled(con):
+    """把 stock_entry_conditions.enabled 与 watchlist 在场状态对齐。
+
+    watchlist 用 removed_at IS NULL 表示在场；移出的股票条件保留但不展示，
+    一旦重新加入自选池（removed_at 置 NULL）条件会自动恢复启用。
+    """
+    try:
+        con.execute("""
+            UPDATE stock_entry_conditions
+               SET enabled = CASE WHEN stock_code IN (
+                     SELECT stock_code FROM watchlist WHERE removed_at IS NULL
+                   ) THEN 1 ELSE 0 END
+        """)
+        con.commit()
+    except sqlite3.OperationalError:
+        pass
 
 
 def main():
@@ -276,16 +326,25 @@ def main():
         con.commit()
         print(f'  ✓ 已写入 {len(seed)} 条示例条件')
 
-    # 评估
+    # 同步 enabled：以自选池「在场」为准。移出自选池的自动隐藏，
+    # 重新加回时自动恢复——不需要手工改 enabled。
+    _sync_enabled(con)
+
+    # 评估：只取自选池「在场」的股票。
+    # 移出自选池 = 不再关注 → 连评估都不做（CANSLIM 评分要跑全部引擎，很贵）。
+    # 这里用 JOIN + removed_at IS NULL 硬过滤，不依赖 enabled 的同步顺序。
     if a.code:
-        rows = con.execute("SELECT * FROM stock_entry_conditions WHERE stock_code=?",
-                           (a.code,)).fetchall()
-    else:
+        rows = con.execute(
+            "SELECT * FROM stock_entry_conditions WHERE stock_code=? AND enabled=1",
+            (a.code,)).fetchall()
+    elif _has(con, 'watchlist'):
         rows = con.execute(
             "SELECT c.* FROM stock_entry_conditions c "
             "JOIN watchlist w ON w.stock_code=c.stock_code "
-            "WHERE c.enabled=1").fetchall() if _has(con, 'watchlist') else \
-            con.execute("SELECT * FROM stock_entry_conditions WHERE enabled=1").fetchall()
+            "WHERE c.enabled=1 AND w.removed_at IS NULL").fetchall()
+    else:
+        rows = con.execute(
+            "SELECT * FROM stock_entry_conditions WHERE enabled=1").fetchall()
 
     today = datetime.now().date().isoformat()
     now = datetime.now().isoformat(timespec='seconds')

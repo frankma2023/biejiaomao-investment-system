@@ -244,6 +244,28 @@ python scripts/eval_entry_conditions.py --code <CODE> --name "<名称>" \
 - **全部条件满足时 tab 计数变红、顶部出现提醒条**——此时应回看本报告的
   §入条件清单与情景，确认是否真的到了可执行的位置，而不是自动买入
 
+#### 只对「在场」股票评估（省算力）
+
+watchlist 表用 **
+emoved_at IS NULL** 表示股票仍在自选池，移出的保留历史记录。
+**移出自选池 = 不再关注 → 连评估都不做**（CANSLIM 评分要跑全部引擎，很贵）。
+
+评估脚本已硬过滤：
+
+`sql
+SELECT c.* FROM stock_entry_conditions c
+  JOIN watchlist w ON w.stock_code = c.stock_code
+ WHERE c.enabled = 1 AND w.removed_at IS NULL
+`
+
+**两个必须遵守的点：**
+
+1. **查 watchlist 一律带 
+emoved_at IS NULL**。只看行数会误判——
+   实测表里 37 行，但在场只有 8 只，其余 29 只是历史移除记录。
+2. **移出的股票条件保留不删**（enabled=0）。重新加回自选池时
+   _sync_enabled() 会自动恢复启用，不需要重写条件。
+
 #### 数据表
 
 | 表 | 用途 |
