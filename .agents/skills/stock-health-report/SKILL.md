@@ -100,7 +100,7 @@ ROIC 可用 净利 /（有息负债 + 股东权益）粗算，**算不出时明�
 
 | 标的 | 表 | 关键字段 |
 | :--- | :--- | :--- |
-| **个股** | `cpa_stage_daily` | `stage`（⓪~⑧）、`prior_stage`、`days_in_stage`、`stage_start_date`、`action`、`structure_support`、`invalid_level`、`metrics_json` |
+| **个股** | `cpa_stage_daily` | `stage`、`prior_stage`、`days_in_stage`、`stage_start_date`、`action`、`structure_support`、`invalid_level`、**`metrics_json`（内含 `six_dir`/`vr`/`ema10`/`ema20`）** |
 | **指数** | `index_cpa_daily` | `stage`、`stage_name`、`days_in_stage`、`since_date`、`action` |
 | 个股周线 | `cpa_stage_stock_weekly` | 同上（多周期共振用） |
 
@@ -134,6 +134,36 @@ ORDER BY date DESC LIMIT 1;
 
 **注意 ② 与 ④ 的区别是位置性的，不是形态性的**：② = 突破后确立上升（前环境 ≠ UP），④ = 延续性突破。二者都是买点候选，但 ② 更强。
 
+#### **必须读全部状态字段——只报阶段标号会误导（踩过坑）**
+
+**阶段标号只是一个粗标签，同一个标号内部可能方向相反。** 实测万华 600309（2026-10-28）：
+
+```json
+{"stage":"⑥", "six_dir":"rebound", "close":70.46,
+ "ema10":68.226, "ema20":68.667, "invalid_level":68.67,
+ "structure_support":64.92, "action":"观察", "days_in_stage":2}
+```
+
+**若只报「⑥ 破位下坠」——标号对，但状态说反了。**
+⑥ 的内部方向 `six_dir = rebound`（反弹），价格已站上 EMA10/EMA20，
+失效位 68.67 未跌破。真实状态是「⑥ 内反弹、向 ② 演进的待明阶段」。
+
+**Oliver Kell 必须原样引用以下五项，缺一项即不合格：**
+
+| 字段 | 来源 | 含义 |
+| :--- | :--- | :--- |
+| `stage` + 名称 | `stage` | ⓪~⑧ 标号 |
+| **`six_dir`** | `metrics_json` | **⑥ 内部方向：`rebound` / `fall`**。⑥ 不等于一定在下坠 |
+| **`invalid_level`** | 表字段 | **失效价**。⑥ 时通常 = EMA20，跌破才确认 |
+| `structure_support` | 表字段 | 结构支撑位 |
+| **最近一次转换的 `inv_state`** | `cpa_stage_transitions` | **`valid` / `pending` / `invalidated`**。`pending` = 该转换尚未确认 |
+
+**尤其注意 `inv_state`：** ⑦→⑥ 若为 `pending`，说明 ⑥ 还没被确认，
+**此时报「已破位」是错的，应报「破位待确认」。**
+
+**接口 `/api/cpa/stock?code=<CODE>` 已返回 `daily[]`（含 ema10/ema20/six_dir/invalid_level）
+与 `transitions[]`（含 `inv_state`），优先直接用该接口，避免漏字段。**
+
 #### 铁律：买点与破位的不对称
 
 > **买点需要次日确认**（突破日收盘站上关键位，次日收盘仍在关键位上方才算成立）；
@@ -150,9 +180,11 @@ ORDER BY date DESC LIMIT 1;
 #### Oliver Kell 必须输出的四项
 
 1. **引擎阶段**（⓪~⑧ + 名称 + 已持续天数 + action）
-2. **支撑与失效位**（`structure_support` / `invalid_level` 原值）
-3. **风险收益比** = (到最近压力位涨幅) ÷ (到 `invalid_level` 跌幅)。**< 2 时投「等」或「回避」。**
-4. **周线共振**（`cpa_stage_stock_weekly` 的阶段是否与日线一致；不一致要说明）
+2. **⑥ 时的内部方向**（`six_dir` = rebound / fall；非 ⑥ 可略）
+3. **支撑与失效位**（`structure_support` / `invalid_level` 原值）
+4. **转换确认状态**（最近一次 `inv_state` = valid / pending / invalidated）
+5. **风险收益比** = (到最近压力位涨幅) ÷ (到 `invalid_level` 跌幅)。**< 2 时投「等」或「回避」。**
+6. **周线共振**（`cpa_stage_stock_weekly` 的阶段是否与日线一致；不一致要说明）
 
 #### 入条件里的 CPA 规则
 
