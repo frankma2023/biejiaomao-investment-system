@@ -58,6 +58,21 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>🎨 报告呈现层规范化（hanako-glass） <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span><b>报告 HTML 全面改用项目既有 hanako-glass 设计系统</b>（共享 CSS 22.5 KB + 20 余令牌），不再自写配色</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>引入 <b>Noto Serif SC 900</b> 作为中文标题字体（Instrument Serif 无中文字形也无 700 字重）</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>默认浅色模式（<code>data-theme="light"</code>），保留 ◐ 切换与 localStorage 记忆</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>表格规范：<b>首列左对齐</b>（共享 CSS 默认居中）+ <b>末列居中并加 28px 左间距</b>（避免与数值列连成一片）</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>修正 <b>红涨绿跌语义反向</b>：hanako-glass 的 --rise 是绿、--fall 是红，按名字直用会全反</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>九票制呈现固化：每张大师卡 = 条件表 + 点评 + callout，九位不得缺项</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>卫星化学 002648 九大师报告完成</b>（37.0 KB）：买 2 / 等 5 / 回避 2，九票全有效</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>CPA 引擎重算完成后补入 Kell 判定：⑥T、six_dir=rebound、失效位 25.71、风险收益比 0.86</td><td>2026-10-29</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>万华化学 600309 报告重跑：TTM FCF 修正后芒格由「等」转「买」</td><td>2026-10-29</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>🧠 九大师入场条件全部落地 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span><b>skill §步骤 9.7</b>：九位大师各自的独有入场条件全部写入（19.4 → 56.4 KB）</td><td>2026-10-29</td></tr>
@@ -762,6 +777,10 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">166. 不同方法论的时间尺度不同，不能都套同一组均线/量能条件</div><div class="ld">九位大师若都用「站上MA60+放量1.5x」，投票就失去意义。实测 2026-10-29：欧奈尔要新高（全池0/4）、威科夫要底部缩量（4只有Spring）、巴菲特要ROE持续+DCF折价（卫星4/4）、芒格要不出事（潍柴盐湖0雷）、索罗斯要反身性早期（4只①早期但大盘D）。同一池子得出完全不同的候选，这才是多视角的价值。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">167. 拥挤度必须对照长期中枢，单窗口分位会给出相反结论</div><div class="ld">用「近250日换手率分位」测拥挤度，万华化学得14%（判为极冷）；换成1250日窗口是62%（偏热）。根因是换手率中枢本身在漂移（卫星750日中位0.913% vs 250日中位1.471%）。正确算法：当前换手率 ÷ 近750日中位数为主指标，250日分位仅作参考。任何「分位」类指标都要先问：窗口多长、中枢是否漂移。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">168. 有些方法不能被量化，硬量化就是误用</div><div class="ld">段永平判的是「这是不是一门好生意」（穿透财报看商业模式，十年尺度），不是「现在什么位置」。我一度用「毛利率≥25%且标准差≤5pp + PE≤12.5」去量化他，结果卫星化学被判「等」，而它在巴菲特/Mauboussin 眼里是「便宜+高增长」。这不是他错了，是用K线切片去量化商业模式这件事本身错了。已废弃该口径，改为三个定性问题+能力圈否决权。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">169. 项目已有设计系统时，自写一套 CSS 等于白做</div><div class="ld">写个股报告时自己定义了一套色值和卡片样式，做完才发现 hanako-report 技能 §六 明确写着「所有报告呈现层必须使用 hanako-glass 设计系统」，共享 CSS 就在 web/shared/css/ 目录里（22.5 KB，20 余令牌）。这和「手编 CPA 阈值」是同一类错误：有现成的权威实现却另起一套。任何呈现层工作开始前，先查 web/shared/ 与相关 skill 的规范节。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">170. 设计令牌名与业务语义相反时，直接按名字用会全反</div><div class="ld">hanako-glass 的 --rise 是绿色 #10b981、--fall 是红色 #ef4444（面向「风险深度」语境），而 A 股要红涨绿跌。按名字写 .rise{color:var(--rise)} 的结果是：买入标签显绿、回避标签显红、+63.4% 显绿、-15.4% 显红，四处全反。修法是语义类反向映射：.rise{color:var(--fall)}、.fall{color:var(--rise)}。用任何设计系统前，先核对令牌名与业务含义是否一致，不一致就建语义层隔离。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">171. 改字体要改字体栈，不是只改 font-weight</div><div class="ld">要求「标题加粗」时只把 font-weight 改成 900，看上去没变化——因为 Instrument Serif 不含中文字形，中文一直走系统宋体回退，而系统宋体没被请求下载过任何新字体。浏览器只在有元素实际用到某字体时才下载它。正确做法是同时改 --font-display 字体栈加入 Noto Serif SC，再验证 document.fonts 里有该字体的 status==='loaded'。只看 computed font-weight 会误判成功。</div></div>
+
 
 
 
