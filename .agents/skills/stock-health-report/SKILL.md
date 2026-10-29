@@ -812,6 +812,145 @@ ROIC = 净利 × (1 − 25%) ÷ (有息负债 + 股东权益)
 | **Mauboussin** | **反推隐含 g vs 扣非双轨增速（年度CAGR+TTM）；背离>30pp标「拐点」；ROIC vs WACC** | **已落地（本节上方）** |
 | Oliver Kell | CPA 阶段 + six_dir + invalid_level + inv_state | **已落地（§步骤7.5）** |
 
+#### 报告 HTML 规范：必须用 hanako-glass 设计系统
+
+**项目已有统一的呈现层设计系统，禁止自写一套配色。** `hanako-report` 技能 §六 明确要求
+所有报告的呈现层使用 `hanako-glass`，本 skill 遵守同一约束。
+
+| 资源 | 路径 |
+| :--- | :--- |
+| 共享 CSS | `web/shared/css/hanako-glass.css`（22.5 KB，20+ 设计令牌） |
+| 设计令牌 | `web/shared/design-model.yaml` |
+| 规范说明 | `D:/hanako/.agents/skills/hanako-glass/SKILL.md` |
+
+##### 五个固定选择（本项目已验证）
+
+**① 默认浅色模式**
+
+`<html lang="zh-CN" data-theme="light">`。hanako-glass 默认深色，但投研报告在浅色下可读性更好，
+**必须在 `<html>` 上写死 `data-theme="light"`**，同时保留 `◐` 切换按钮与 `localStorage` 记忆。
+
+**② 标题用 Noto Serif SC 900**
+
+`Instrument Serif` **不含中文字形**，也没有 700 字重。中文标题必须回退到真有字重的衬线字体：
+
+```
+https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;700;900&display=swap
+```
+
+```css
+:root{ --font-display: 'Instrument Serif', 'Noto Serif SC', Georgia, 'Songti SC', serif; }
+h1,h2,h3,h4,.nav-brand,.master-top .nm{font-weight:900 !important;letter-spacing:.005em}
+```
+
+**必须验证字体真的下载了**：
+`[...document.fonts].some(f => f.family.includes('Noto Serif SC') && f.status === 'loaded')`。
+若标题的 computed `fontFamily` 里没有 Noto，说明 `:root` 覆盖没生效——
+**浏览器只有在有元素用到该字体时才会下载它**。
+
+> **踩过的坑**：第一次只改了 `font-weight` 没改字体栈，结果 Noto 从未被请求，
+> 中文仍走系统宋体 + 合成粗体，看不出效果。
+
+**③ 表格首列左对齐（共享 CSS 的默认值不适用）**
+
+hanako-glass 的 `.data-table td / th` 默认 **`text-align:center`**（面向数据仪表盘）。
+报告是长文档，首列必须有左阅读轴，**每个报告都要加这段覆盖**：
+
+```css
+.data-table th:first-child,.data-table td:first-child{text-align:left;padding-left:16px}
+.data-table th:last-child,.data-table td:last-child{padding-right:16px}
+.data-table td:not(.num):not(.mono){text-align:left}
+.data-table td.mono{text-align:left}
+/* .num 专用于数值列（右对齐 + 等宽 tabular-nums）；.mono 用于等宽但左对齐的内容列 */
+.data-table td.num,.data-table th.num{font-family:var(--font-mono);text-align:right;font-variant-numeric:tabular-nums}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+`
+
+**③-b 末列（判定/结果列）必须居中，并与数值列拉开间距**
+
+数值列右对齐、判定列左对齐时，两列会连成一片，判定文字看起来像数值的后缀。
+**居中是最省事的分隔手段**——两侧对称留白，天然形成「白色走廊」：
+
+`css
+.data-table th:last-child,.data-table td:last-child{padding-right:16px;padding-left:28px}
+.data-table td:last-child:not(.num):not(.mono),
+.data-table th:last-child{text-align:center}
+`
+
+> **踩过的坑**：只加 padding-left 仍显拥挤，因为左对齐时每行判定文字的起点
+> 都紧贴数值列右边缘；**居中后左右同时留白，视觉分离才成立**。
+``
+
+> **踩过的坑**：给内容列误用 `.num` 会整列右贴；`.mono` 若不显式加 `text-align:left`，
+> 会继承共享 CSS 的居中。
+
+**④ 复用组件，不自造**
+
+| 用途 | 类名 |
+| :--- | :--- |
+| 页面骨架 | `.app-container`（**外层只用一次，绝不嵌套**） |
+| 顶栏 | `.top-nav` + `.nav-brand` + `.nav-links` + `.theme-toggle` |
+| 卡片 | `.glass-card`（通用）/ `.chart-card`（图表）/ `.stat-card`（数字） |
+| 表格 | `.table-shell` > `table.data-table` |
+| 标签 | `.tag` / `.badge` |
+
+**页面 `<style>` 只放报告特有样式，色值一律用 `var(--accent)` 等令牌，不写死。**
+
+**⑤ 红涨绿跌——令牌名与 A 股惯例相反，必须自建语义类**
+
+hanako-glass 的 `--rise` 是**绿** `#10b981`、`--fall` 是**红** `#ef4444`。
+用户要求的是**红涨绿跌**（A 股惯例），**因此不能直接用 `--rise`/`--fall` 的名字**。
+
+```css
+.rise{color:var(--fall)}   /* 涨/买 → 红 */
+.fall{color:var(--rise)}   /* 跌/卖 → 绿 */
+```
+
+> **这是最容易出错的一处**：按令牌名直觉用会全反。
+> **报告正文统一用 `.rise`（语义=涨，色=红）与 `.fall`（语义=跌，色=绿），
+> 语义与令牌名相反是刻意的。**
+
+##### 九票制的呈现要求
+
+**每位大师一张独立卡片**，卡片顶部一行：序号（等宽 `01`）+ 姓名（衬线）+ 右侧票标（`.tag`）。
+
+| 票 | 颜色 | 用词 |
+| :--- | :--- | :--- |
+| 买 | 红 | 买入 |
+| 等 | 灰 | 等 |
+| 回避 | 绿 | 回避 |
+| 数据缺口 | 琥珀 | 数据缺口 |
+
+**每张卡片必须含三部分**：量化条件表 / 一句点评 / 一个 `.callout`（pos·neg·neu）高亮块。
+
+**九位全部要有 callout，不得有大师只有表格和段落**——否则视觉权重不一致。
+
+| callout 变体 | 用在哪 |
+| :--- | :--- |
+| .callout.pos | 该位给出正面判定（买）时 |
+| .callout.neg | 该位给出负面判定（回避）时 |
+| .callout.neu | 该位给出中性判定（等）时 |
+
+一位大师若同时有正反两面（如「预期差大但资本效率低」），可以放两个 callout，
+但必须在报告里说明为何给两个。
+
+**缺数据的大师不投票**，但要说明缺口原因与替代参考，且明确写「不据此定票」。
+
+**汇总区**：`.vote-grid`（买/等/回避，有缺口时加第四格）+ 汇总表 + 分歧结构解读段。
+
+**分歧解读必须写，且要点明「分歧在哪个维度」**——例如
+「两票买来自价格维度、五票等来自时点维度、芒格的等来自筹码维度」。
+**只报票数不报维度，等于没解读。**
+
+##### 交付前必查
+
+1. `<html data-theme="light">` 存在
+2. Noto Serif SC `status === 'loaded'` 为 true
+3. 首列左对齐覆盖样式存在
+4. 九张大师卡片齐全，票标与正文结论一致
+5. 无 JS 错误、无 4xx 请求（用 Playwright 校验）
+6. **截图确认渲染**——样式表算出来的值正确，不等于画面上正确
+
 ### 步骤 10 · 主持人裁决
 ```
 ① 机器分汇总：CANSLIM 分 + 技术分 + 财务质量 + 估值带（客观先定盘）
