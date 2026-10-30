@@ -58,6 +58,21 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>📊 中远海控 601919 九大师体检 + 财报新鲜度硬门槛 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span><b>中远海控 601919 九大师报告完成</b>（39.2 KB）：买 1（芒格）/ 等 4 / 回避 4，终裁观望偏多</td><td>2026-10-30</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span><b>事故：首次分析遗漏 2026Q3 财报</b>——本地库该股最新季度仅到 2026-06-30，而全库已有 3,627 只更新至 2026-09-30</td><td>2026-10-30</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>定向补拉 Q3：单季净利 <b>172.3 亿（同比 +80.7%、环比 +128.5%）</b>，毛利率 23.43%，单季 FCF 256.2 亿</td><td>2026-10-30</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>补拉后结论翻转：TTM 净利 385.6 亿、TTM FCF 232.7 亿、<b>现金含量 0.44x → 0.60x</b>，<b>芒格由「等」转「买」</b></td><td>2026-10-30</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>CANSLIM 46.2 → 48.2（C 项拿满 22/22）；PE 9.36 → 7.91；Mauboussin 预期差 −33.7pp → −5.6pp</td><td>2026-10-30</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>skill 新增 §步骤 1.5 财报新鲜度检查（硬门槛）</b>：三步 SQL 对照 + 判定表 + 定向补拉方法</td><td>2026-10-30</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>记录定向补拉的三处 API 坑：路径 <code>/company/fs/non_financial</code>、参数 <code>stockCodes</code>、返回值直接是 list</td><td>2026-10-30</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>万华化学 600309 报告用 hanako-glass 重跑（35.2 KB）：CPA ⑥→② 突破成立，Kell 转买，赔率 4.15</td><td>2026-10-30</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>skill 补 <code>.wide</code> 两列表格规则（末列居中对两列说明表会误伤）</td><td>2026-10-30</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>🎨 报告呈现层规范化（hanako-glass） <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span><b>报告 HTML 全面改用项目既有 hanako-glass 设计系统</b>（共享 CSS 22.5 KB + 20 余令牌），不再自写配色</td><td>2026-10-29</td></tr>
@@ -780,6 +795,9 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">169. 项目已有设计系统时，自写一套 CSS 等于白做</div><div class="ld">写个股报告时自己定义了一套色值和卡片样式，做完才发现 hanako-report 技能 §六 明确写着「所有报告呈现层必须使用 hanako-glass 设计系统」，共享 CSS 就在 web/shared/css/ 目录里（22.5 KB，20 余令牌）。这和「手编 CPA 阈值」是同一类错误：有现成的权威实现却另起一套。任何呈现层工作开始前，先查 web/shared/ 与相关 skill 的规范节。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">170. 设计令牌名与业务语义相反时，直接按名字用会全反</div><div class="ld">hanako-glass 的 --rise 是绿色 #10b981、--fall 是红色 #ef4444（面向「风险深度」语境），而 A 股要红涨绿跌。按名字写 .rise{color:var(--rise)} 的结果是：买入标签显绿、回避标签显红、+63.4% 显绿、-15.4% 显红，四处全反。修法是语义类反向映射：.rise{color:var(--fall)}、.fall{color:var(--rise)}。用任何设计系统前，先核对令牌名与业务含义是否一致，不一致就建语义层隔离。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">171. 改字体要改字体栈，不是只改 font-weight</div><div class="ld">要求「标题加粗」时只把 font-weight 改成 900，看上去没变化——因为 Instrument Serif 不含中文字形，中文一直走系统宋体回退，而系统宋体没被请求下载过任何新字体。浏览器只在有元素实际用到某字体时才下载它。正确做法是同时改 --font-display 字体栈加入 Noto Serif SC，再验证 document.fonts 里有该字体的 status==='loaded'。只看 computed font-weight 会误判成功。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">172. 「我的库里没有」不等于「公司没发」——财报季必须对照全库最新期</div><div class="ld">分析中远海控时，本地库该股最新季度仅到 2026-06-30，我据此得出「TTM 同比 −46%、周期下行中段」并交付报告。用户提醒后补拉 Q3：单季净利 172.3 亿、同比 +80.7%、环比 +128.5%，TTM 同比收窄至 −8.2%，结论从「无人投买」翻转为「芒格转买」。根因是没做「该股最新期 vs 全库最新期」的对照——当时全库已有 3,627 只股票更新到 2026-09-30。已做成 skill 步骤 1.5 的硬门槛。这是教训 158 的第三次复发（前两次：查不到当成没数据、字段名搞错说返回空）。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">173. 全量重拉脚本不能随手跑，必须用定向补拉</div><div class="ld">为补 601919 的一期财报，误运行 scripts/fetch_stock_financials.py，它默认重拉全市场 5,684 只股票从 2016 年起的全部报告期，启动即刷屏，只能立刻杀进程。正确做法是写定向脚本：只传一只股票与最新一期，走同一个 api_post。另外该 API 有三处与直觉不符：路径是 /company/fs/non_financial（不是 /cn/company/fundamental/...）、参数名是 stockCodes（不是 codes）、返回值直接是 list（不是 {"data": [...]}）——连试三次才摸对。</div></div>
+
 
 
 
