@@ -58,6 +58,17 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>🔍 财报时序核查与误判撤回 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>核查 <code>daily_update.py</code> 第 18b 步：<b>确实每日拉取季度财报</b>（<code>--quarters-only --recent</code>，披露窗口内覆盖写幂等）</td><td>2026-10-30</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>核实 601919 的 Q3 <b>公告日为 2026-10-30</b>，而 daily_update 上次运行于 <b>2026-10-29 21:36</b>——脚本跑完约 12 小时后才发布</td><td>2026-10-30</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span><b>撤回误判</b>：曾把「3,628 / 5,684 只覆盖」当成抓取缺陷，实为正常披露进度（三季报法定截止日 10-31，核查当日 10-30）</td><td>2026-10-30</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>结论：<b>真实情况是信息时序错位，不是系统缺陷</b>——披露截止日前的任何分析都可能漏掉最后一天披露的公司</td><td>2026-10-30</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>待办文件中该条误判已划线标注撤回原因，保留供追溯</td><td>2026-10-30</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>📊 中远海控 601919 九大师体检 + 财报新鲜度硬门槛 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span><b>中远海控 601919 九大师报告完成</b>（39.2 KB）：买 1（芒格）/ 等 4 / 回避 4，终裁观望偏多</td><td>2026-10-30</td></tr>
@@ -797,6 +808,8 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">171. 改字体要改字体栈，不是只改 font-weight</div><div class="ld">要求「标题加粗」时只把 font-weight 改成 900，看上去没变化——因为 Instrument Serif 不含中文字形，中文一直走系统宋体回退，而系统宋体没被请求下载过任何新字体。浏览器只在有元素实际用到某字体时才下载它。正确做法是同时改 --font-display 字体栈加入 Noto Serif SC，再验证 document.fonts 里有该字体的 status==='loaded'。只看 computed font-weight 会误判成功。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">172. 「我的库里没有」不等于「公司没发」——财报季必须对照全库最新期</div><div class="ld">分析中远海控时，本地库该股最新季度仅到 2026-06-30，我据此得出「TTM 同比 −46%、周期下行中段」并交付报告。用户提醒后补拉 Q3：单季净利 172.3 亿、同比 +80.7%、环比 +128.5%，TTM 同比收窄至 −8.2%，结论从「无人投买」翻转为「芒格转买」。根因是没做「该股最新期 vs 全库最新期」的对照——当时全库已有 3,627 只股票更新到 2026-09-30。已做成 skill 步骤 1.5 的硬门槛。这是教训 158 的第三次复发（前两次：查不到当成没数据、字段名搞错说返回空）。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">173. 全量重拉脚本不能随手跑，必须用定向补拉</div><div class="ld">为补 601919 的一期财报，误运行 scripts/fetch_stock_financials.py，它默认重拉全市场 5,684 只股票从 2016 年起的全部报告期，启动即刷屏，只能立刻杀进程。正确做法是写定向脚本：只传一只股票与最新一期，走同一个 api_post。另外该 API 有三处与直觉不符：路径是 /company/fs/non_financial（不是 /cn/company/fundamental/...）、参数名是 stockCodes（不是 codes）、返回值直接是 list（不是 {"data": [...]}）——连试三次才摸对。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">174. 别把「时序错位」当成「系统缺陷」——先核对公告日与脚本运行时间</div><div class="ld">发现 601919 的 Q3 不在库里，我推断「daily_update 财报抓取没覆盖全部标的」，还建议用户去修脚本。实际核查：步骤 18b 每日运行 fetch_stock_financials.py --quarters-only --recent，机制正常；601919 的 Q3 公告日是 2026-10-30，而脚本上次运行是 2026-10-29 21:36 —— 数据在脚本跑完之后才产生。覆盖率 3,628/5,684 也不是缺陷：三季报法定截止日 10-31，核查当日 10-30，36% 公司本就还没披露。判断「数据缺失」前，先比对「数据的产生时间」与「采集的运行时间」。</div></div>
+
 
 
 
