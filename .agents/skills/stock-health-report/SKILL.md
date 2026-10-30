@@ -26,6 +26,62 @@ description: 个股深度尽调报告（四层体检 + 主持人裁决，九大�
 运行：`python scripts/collect_data.py <CODE> --detail`（detail 模式含均线全系/MACD/KDJ/RSI/BOLL/量能/支撑压力/近15日K线 + 财务评估六卡实际输出）。
 然后 web_search 补齐外部信息：行业最新动态、近期公告/财报要点、业务分部数据、可比公司、有无重大新闻。搜索不超过 4 次，聚焦"业务结构 + 行业格局 + 边际变化"。
 
+#### 步骤 1.5 · **财报新鲜度检查（硬门槛，2026-10-30 新增）**
+
+**在动笔写任何结论之前，必须确认该股的最新财报是否已入库。
+**「我的库里没有」不等于「公司没发」。**
+
+**背景（真实事故）**：分析中远海控 601919 时，本地库中该股最新季度仅到 2026-06-30，
+而全库已有 3,627 只股票更新至 2026-09-30。报告据此得出「周期下行中段、TTM 同比 −46%」的结论并交付；
+用户提醒后补拉 Q3，数据显示**单季净利 172.3 亿、同比 +80.7%、环比 +128.5%**，
+TTM 同比从 −46% 收窄至 −8.2%——**结论从「无人投买」翻转为「芒格转买」。**
+
+##### 检查方法（每次报告必做）
+
+`sql
+-- 1) 全库最新报告期是什么？
+SELECT MAX(report_date) FROM stock_financials_quarterly;
+
+-- 2) 该股最新报告期是什么？
+SELECT MAX(report_date) FROM stock_financials_quarterly WHERE stock_code='<CODE>';
+
+-- 3) 两者是否一致？若有差距，再看全库有多少股票已更新到最新期
+SELECT COUNT(*) FROM stock_financials_quarterly WHERE report_date='<全库最新期>';
+`
+
+**判定：**
+
+| 情形 | 处理 |
+| :--- | :--- |
+| 该股最新期 = 全库最新期 | ✅ 通过 |
+| 该股落后，且全库已有数百只以上更新到最新期 | ⚠ **该股数据缺失，必须补拉后再分析** |
+| 该股落后，全库几乎无股票更新到该期 | ✅ 该期尚未进入披露高峰，可接受 |
+
+##### 补拉方法（定向，不跑全市场）
+
+**不要运行 scripts/fetch_stock_financials.py 的全量模式**——它会重拉 5,684 只股票的全部历史期，耗时数小时。
+**用定向补拉：**
+
+`python
+from fetch_stock_financials import api_post, QUARTERLY_METRICS
+payload = {'date': 'latest', 'stockCodes': ['<CODE>'],
+           'metricsList': [m[0] for m in QUARTERLY_METRICS]}
+r = api_post('/company/fs/non_financial', payload)
+# 返回是 list；每条含 date / reportDate / q.ps.* / q.m.* 嵌套结构
+`
+
+**注意三个坑：**
+1. **API 路径是 /company/fs/non_financial**（不是 /cn/company/fundamental/...）
+2. **参数名是 stockCodes**（不是 codes）
+3. **返回值直接是 list**，不是 {data: [...]}
+
+**补拉后必须重算所有依赖季度数据的指标**：TTM（FCF / 净利 / 扣非）、现金含量、PE、CANSLIM 的 A 项。
+
+##### 报告里必须声明
+
+**报告的「数据缺口」表中增加一行「财报新鲜度」，写明该股最新报告期与全库最新期是否一致。**
+若曾补拉，须在正文中说明补拉了哪一期。
+
 ### 步骤 2 · 否决筛查（先确认不会死）
 - ST/退市/上市状态（快照 §2）、质押爆仓风险、重大造假/失信历史（搜索确认）
 - **致命项命中 → 直接输出"回避"报告**，不再做后续层（可简要说明否决理由）。
