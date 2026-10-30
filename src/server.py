@@ -537,6 +537,62 @@ def api_cockpit_entry_alerts():
                     'alerts': len(alerts), 'items': items})
 
 
+@app.route('/api/market-health/history')
+def api_market_health_history():
+    """大盘健康分历史序列，可叠加指数走势。
+
+    查询参数:
+      start  起始日期（默认 2026-03-01）
+      end    结束日期（默认最新）
+      idx    逗号分隔的指数代码，如 "000985,000300"；为空则不返回指数
+    """
+    start = request.args.get('start', '2026-03-01')
+    end = request.args.get('end', '2099-12-31')
+    idx_arg = request.args.get('idx', '').strip()
+    db = get_db()
+
+    health = []
+    try:
+        for r in db.execute(
+                "SELECT date, total_score, rating, ma50_above_value, hl_ratio_value, "
+                "ad_ratio_value FROM market_health_daily "
+                "WHERE date >= ? AND date <= ? ORDER BY date", (start, end)):
+            health.append({'date': r['date'], 'score': r['total_score'],
+                           'rating': r['rating'],
+                           'ma50_above': r['ma50_above_value'],
+                           'hl_ratio': r['hl_ratio_value'],
+                           'ad_ratio': r['ad_ratio_value']})
+    except Exception:
+        pass
+
+    IDX_NAME = {'000985': '中证全指', '000001': '上证指数', '399001': '深证成指',
+                '399006': '创业板指', '000688': '科创50', '000300': '沪深300'}
+    indices = {}
+    codes = [c.strip() for c in idx_arg.split(',') if c.strip()] if idx_arg else []
+    for code in codes:
+        try:
+            rows = db.execute(
+                "SELECT date, close FROM index_daily_kline WHERE stock_code=? "
+                "AND kline_type='normal' AND date >= ? AND date <= ? ORDER BY date",
+                (code, start, end)).fetchall()
+        except Exception:
+            rows = []
+        if not rows:
+            continue
+        base = rows[0][1]
+        indices[code] = {
+            'name': IDX_NAME.get(code, code),
+            'base': base,
+            'base_date': rows[0]['date'],
+            # 归一化为起点=100，便于与健康分（0~100）同轴比较
+            'series': [[r['date'], round(r['close'] / base * 100, 2)] for r in rows],
+        }
+
+    return jsonify({'start': health[0]['date'] if health else start,
+                    'end': health[-1]['date'] if health else end,
+                    'count': len(health), 'health': health, 'indices': indices})
+
+
 @app.route('/api/market-health')
 def api_market_health():
     target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
