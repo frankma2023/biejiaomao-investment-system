@@ -345,8 +345,8 @@
       // ═══ 大盘健康分长期趋势（2026-03 起）═══
       html+='<div class="section-hdr" style="margin-top:18px">📈 大盘健康分趋势 · 2026-03 至今</div>';
       html+='<div style="font-size:9px;color:var(--muted);margin-bottom:8px;line-height:1.7">'
-        + '💡 灰线=健康分(0-100) · 叠加指数已归一化为起点=100，与健康分同轴可比 · '
-        + '点击下方按钮切换叠加指数</div>';
+        + '💡 灰线=健康分(0-100) · 叠加指数已归一化为起点=100 · '
+        + 'Y 轴按当前可见序列自适应 · 点击下方按钮切换叠加指数</div>';
       html+='<div id="health-idx-toggles" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>';
       html+='<div class="score-card" style="padding:10px"><div id="chart-health-trend" style="height:260px"></div></div>';
       html+='<div id="health-corr" style="margin-top:8px;font-size:10px;color:var(--muted);line-height:1.9"></div>';
@@ -1105,6 +1105,17 @@ function loadHealthTrend(){
         z:5
       });
     });
+    // Y 轴按当前可见序列动态计算范围（指数归一化后可达 150+，写死会裁切）
+    var _vals = [];
+    series.forEach(function(s){
+      (s.data||[]).forEach(function(v){ if(v!=null && !isNaN(v)) _vals.push(v); });
+    });
+    var _lo = _vals.length ? Math.min.apply(null,_vals) : 0;
+    var _hi = _vals.length ? Math.max.apply(null,_vals) : 100;
+    var _pad = (_hi - _lo) * 0.08 || 5;
+    var yMin = Math.max(0, Math.floor((_lo - _pad)/5)*5);
+    var yMax = Math.ceil((_hi + _pad)/5)*5;
+
     ch.setOption({
       grid:{left:38, right:14, top:26, bottom:28},
       tooltip:{trigger:'axis', backgroundColor:isDark?'rgba(20,20,25,.94)':'rgba(255,255,255,.97)',
@@ -1115,7 +1126,7 @@ function loadHealthTrend(){
         axisLine:{lineStyle:{color:gridC}},
         axisLabel:{color:txtC, fontSize:9, interval:Math.floor(dates.length/7)},
         splitLine:{show:false}},
-      yAxis:{type:'value', min:0, max:130,
+      yAxis:{type:'value', min:yMin, max:yMax, splitNumber:5,
         axisLine:{show:false}, axisTick:{show:false},
         axisLabel:{color:txtC, fontSize:9},
         splitLine:{lineStyle:{color:gridC}}},
