@@ -58,6 +58,21 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>📈 大盘健康分长期趋势图 + 匹配度诊断 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span>market-scan 页面在「大盘健康分」卡片下方新增<b>趋势折线图</b>（2026-03 至今），支持六只指数叠加</td><td>2026-11-02</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>回补健康分历史 55 个交易日</b>（原库仅 113 条，2026-05-05 起；现 168 条，2026-03-02 起）</td><td>2026-11-02</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>新增 API <code>GET /api/market-health/history?start=&amp;end=&amp;idx=</code>，指数归一化起点=100</td><td>2026-11-02</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>图表下方<b>实时显示健康分与各指数的相关性</b>（水平相关 + 日变动相关）</td><td>2026-11-02</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>Y 轴改为按可见序列动态计算</b>：原写死 0~130 会裁切科创50（最高 150.7）与创业板指（132.7）</td><td>2026-11-02</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>PRD 新增第七章「健康分与指数的匹配度诊断」</b>（164 个交易日定量分析）</td><td>2026-11-02</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>诊断结论：同向率 72.4%（大涨大跌 80~95%、小涨小跌 55~62%）；放大 5.9 倍；<b>k=0 相关 0.49 而其余平移全在 ±0.14 内——是同步指标，无领先性</b></td><td>2026-11-02</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>结论：<b>不应为贴合指数调整权重</b>——贴合会让健康分变成指数重复品；若要前瞻应新增分量（北向资金/期权隐含波动率）</td><td>2026-11-02</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>诊断脚本落库 <code>scripts/diag_health_vs_index.py</code>，可复现全部数字</td><td>2026-11-02</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>🧪 结构性压力测试 + 巴菲特 ROE 门槛放宽 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span><b>用两只极端样本做压力测试</b>：RS20 最强（杰克科技 603337）+ CANSLIM 最高（博众精工 688097）</td><td>2026-10-30</td></tr>
@@ -824,6 +839,9 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">174. 别把「时序错位」当成「系统缺陷」——先核对公告日与脚本运行时间</div><div class="ld">发现 601919 的 Q3 不在库里，我推断「daily_update 财报抓取没覆盖全部标的」，还建议用户去修脚本。实际核查：步骤 18b 每日运行 fetch_stock_financials.py --quarters-only --recent，机制正常；601919 的 Q3 公告日是 2026-10-30，而脚本上次运行是 2026-10-29 21:36 —— 数据在脚本跑完之后才产生。覆盖率 3,628/5,684 也不是缺陷：三季报法定截止日 10-31，核查当日 10-30，36% 公司本就还没披露。判断「数据缺失」前，先比对「数据的产生时间」与「采集的运行时间」。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">175. 九票制必须定期用极端样本做压力测试，验证「还能不能投出买票」</div><div class="ld">连续分析了万华、中远、卫星后，用户质疑「会不会任何股票都评估为不买」。用两只极端样本测试：RS20 最强（杰克科技 53.20、位置 100%、换手 10 倍）+ CANSLIM 最高（博众精工 77.0 A 级、位置 35%）。结果博众拿到 2 票买入，证明无绝对缺陷；但暴露真实特征——欧奈尔要「距新高 ≤15%」与索罗斯要「位置 ≤40%」在位置上互斥，技术派四人很难同时投票。判据保守不等于失效，但需要可验证的证据，不能凭感觉认为「应该有买点」。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">176. 红涨绿跌只适用于价格方向与买卖票，评分与比率必须用中性色</div><div class="ld">压力测试报告里把「CANSLIM 77.0」「DCF 溢价 58%」套上了 .rise/.fall（红/绿），读者会误读为「上涨」或「下跌」——但评分和估值差没有方向。规则：只有「价格变动」（+1.6%、距高 -15.4%）与「买卖票标」（买入红、回避绿）用红绿；评分、负债率、换手倍数、DCF 溢价一律中性色。颜色承载语义时，要明确它承载的是哪一类语义。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">177. 判断「A 是否反映 B」不能只画图，必须算相关系数并分层看同向率</div><div class="ld">最初只在页面上并排画健康分与指数曲线，视觉上「两个都在动」就算交代了。实际做分层同向率后才发现关键结构：指数跌 >2% 时健康分同向率 95%、涨 1~2% 时 85%，但涨 0~1% 只有 62%、跌 0~1% 只有 55%——整体 72.4% 掩盖了「极端时准、小幅时近似随机」的真相。同时平移相关系数显示 k=0 为 0.49、其余全在 ±0.14 内，证明它是同步指标而非领先指标。图表只能给方向感，强度与结构必须靠统计量。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">178. 不同量级的序列叠加必须先归一化，坐标轴写死会静默裁切数据</div><div class="ld">指数原始点位（上证 3599、深证 10833）与健康分（0-100）不同量级，直接叠加会压成平线，故统一归一化为起点=100。但归一化后仍有问题：Y 轴写死 min:0 max:130，而科创50 归一化后最高 150.7、创业板指 132.7，全选时顶部被静默裁掉——图上看不出异常，只是曲线「不见了」。改为按当前可见序列动态计算 min/max（上下各留 8% 空白、向 5 的整数对取整）后解决。凡是硬编码坐标轴范围，都要先核对数据实际区间。</div></div>
+
 
 
 
