@@ -1,0 +1,85 @@
+# 大盘卖出评分卡阈值配置
+# 对应《大盘环境判断卖出评分卡》§5.1；修改阈值时同步更新该文档第七章的校准记录。
+# 校准依据可用 scripts/diag_sell_score_thresholds.py 复跑验证。
+
+# 抛盘日：25 个交易日内的抛盘日个数 → 分值
+distribution_days:
+  tiers:
+    - {min_days: 9, score: 40}
+    - {min_days: 7, score: 20}
+    - {min_days: 5, score: 10}
+  high_zone_pct: 0.95        # 收盘价 ≥ 52周高点 × 该比例视为高位，分值 ×2
+
+# 追盘日失效
+follow_through_day:
+  score: 30
+  lookback_days: 30          # 失效 FTD 在最近多少个自然日内仍计分
+
+# 龙头股见顶
+leader:
+  score: 25
+  rps_threshold: 99          # RPS250 ≥ 该值入池
+  min_pool_size: 5           # 股池小于此数则判定样本不足
+  fall_pct: -0.10            # 从入池价回落超过该比例算「回落」
+  fall_ratio: 0.50           # 股池中回落股占比 ≥ 该值触发
+
+# 垃圾股补涨
+junk_rally:
+  score: 25
+  cheap_pct: 0.20            # 低价股取价格分位最低 20%
+  expensive_pct: 0.80        # 高价股取价格分位最高 20%
+  lookback_days: 20          # 涨幅回溯窗口
+  ratio: 1.5                 # 低价股涨幅 > 高价股 × 该倍数
+  trade_days: 5              # 连续多少个交易日成立
+  sample_size: 50            # 每组采样只数
+
+# 指数背离
+divergence:
+  indexes: ['000985', '000001', '399001', '399006', '000300']
+  leader: '000985'           # 领涨指数
+  index_min_gain: 0.005      # 指数当日涨幅阈值（小数，0.005 = 0.5%）
+  ad_ratio_max: 1.0          # 成分股涨跌比低于此值算「跌多涨少」
+  streak_days: 2             # 连续多少个交易日成立
+  score_normal: 20           # 非领涨指数背离分值
+  score_leader: 40           # 领涨指数背离分值
+  score_cap: 60              # 累加上限
+
+# 均线系统
+moving_average:
+  ma50_score: 30
+  ma50_lookback: 10          # 在 MA50 下方持续天数
+  ma50_min_below: 5          # 至少多少个交易日在下方才判定跌破
+  ma200_score: 40            # 状态型信号：指数在年线下方可持续数月，分值不宜过高
+  death_cross_score: 60
+
+# 市场宽度
+market_width:
+  ad_low5_score: 20
+  ad_low5_trade_days: 5      # 近 N 个交易日
+  ad_low5_min_days: 4        # 其中至少 N 日满足
+  ad_low5_threshold: 0.7     # 当日涨跌比低于此值
+  ad_crash_score: 60
+  ad_crash_threshold: 0.15   # 当日涨跌比低于此值（清仓级，约每月一次）
+  hlnl_score: 30
+  hlnl_threshold: 0.5
+  hlnl_streak: 3
+
+# 上涨无量
+vol_dry:
+  score: 20
+  min_up_days: 3             # 近 5 日中至少 N 日上涨
+  window: 5
+  vol_ratio: 0.80            # 5 日均量 < 20 日均量 × 该比例
+  vol_ma_days: 20
+
+# 决策档位
+position_tiers:
+  clear: 140                 # ≥ 该分：清仓
+  reduce_25: 100             # ≥ 该分：减仓至 25%
+  reduce_50: 60              # ≥ 该分：减仓至 50%
+  # 低于 reduce_50：正常仓位(70-100%)
+
+# 熔断
+meltdown:
+  cleared_signals: ['ma200_broken', 'death_cross', 'ad_crash']
+  single_cap: 25             # 单个清仓级信号 → 仓位上限

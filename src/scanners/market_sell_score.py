@@ -43,6 +43,63 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 DB_PATH = os.path.join(PROJECT_DIR, "data", "lixinger.db")
 
+# ═══════════════════════════════════════════════
+# 阈值配置（config/market/market_sell_score.yaml）
+# 改阈值只改 YAML，不要改代码；校准依据见 scripts/diag_sell_score_thresholds.py
+# ═══════════════════════════════════════════════
+
+_CFG_CACHE = None
+# 兜底默认值：与 YAML 同步维护。配置缺失/键缺失时使用，保证行为不变。
+_CFG_DEFAULT = {
+    'distribution_days': {'tiers': [{'min_days': 9, 'score': 40},
+                                    {'min_days': 7, 'score': 20},
+                                    {'min_days': 5, 'score': 10}],
+                          'high_zone_pct': 0.95},
+    'follow_through_day': {'score': 30, 'lookback_days': 30},
+    'leader': {'score': 25, 'rps_threshold': 99, 'min_pool_size': 5,
+               'fall_pct': -0.10, 'fall_ratio': 0.50},
+    'junk_rally': {'score': 25, 'cheap_pct': 0.20, 'expensive_pct': 0.80,
+                   'lookback_days': 20, 'ratio': 1.5, 'trade_days': 5, 'sample_size': 50},
+    'divergence': {'indexes': ['000985', '000001', '399001', '399006', '000300'],
+                   'leader': '000985', 'index_min_gain': 0.005, 'ad_ratio_max': 1.0,
+                   'streak_days': 2, 'score_normal': 20, 'score_leader': 40, 'score_cap': 60},
+    'moving_average': {'ma50_score': 30, 'ma50_lookback': 10, 'ma50_min_below': 5,
+                       'ma200_score': 40, 'death_cross_score': 60},
+    'market_width': {'ad_low5_score': 20, 'ad_low5_trade_days': 5, 'ad_low5_min_days': 4,
+                     'ad_low5_threshold': 0.7, 'ad_crash_score': 60,
+                     'ad_crash_threshold': 0.15, 'hlnl_score': 30,
+                     'hlnl_threshold': 0.5, 'hlnl_streak': 3},
+    'vol_dry': {'score': 20, 'min_up_days': 3, 'window': 5,
+                'vol_ratio': 0.80, 'vol_ma_days': 20},
+    'position_tiers': {'clear': 140, 'reduce_25': 100, 'reduce_50': 60},
+    'meltdown': {'cleared_signals': ['ma200_broken', 'death_cross', 'ad_crash'],
+                 'single_cap': 25},
+}
+
+
+def cfg():
+    """读取阈值配置；文件缺失或解析失败时返回兜底默认值。"""
+    global _CFG_CACHE
+    if _CFG_CACHE is not None:
+        return _CFG_CACHE
+    path = os.path.join(PROJECT_DIR, 'config', 'market', 'market_sell_score.yaml')
+    merged = {k: dict(v) if isinstance(v, dict) else v for k, v in _CFG_DEFAULT.items()}
+    try:
+        import yaml
+        with open(path, encoding='utf-8') as f:
+            loaded = yaml.safe_load(f) or {}
+        for k, v in loaded.items():
+            if isinstance(v, dict) and isinstance(merged.get(k), dict):
+                merged[k].update(v)
+            else:
+                merged[k] = v
+    except Exception as e:                      # 配置文件缺失不阻塞计算
+        logger.warning(f"读取 {path} 失败，使用兜底默认值: {e}")
+    _CFG_CACHE = merged
+    return _CFG_CACHE
+
+
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -128,21 +185,18 @@ def score_distribution(conn, target_date):
     if kline_rows:
         high_52w = max(r['close'] for r in kline_rows if r['close'])
         latest_close = kline_rows[0]['close'] if kline_rows[0]['close'] else 0
-        if latest_close >= high_52w * 0.95:
+        if latest_close >= high_52w * cfg()['distribution_days']['high_zone_pct']:
             high_zone = 1
 
     # 评分
     # 阈值 5/7/9 来自 2026 年逐日实测的 25 日内抛盘日数分布（中位 5、P75 7、P90 9）。
     # 原阈值 4/5/6 的起点落在中位数之下，导致低档几乎恒真。
     # 复跑：scripts/diag_sell_score_thresholds.py
-    if dist_count >= 9:
-        base_score = 40
-    elif dist_count >= 7:
-        base_score = 20
-    elif dist_count >= 5:
-        base_score = 10
-    else:
-        base_score = 0
+    base_score = 0
+    for tier in cfg()['distribution_days']['tiers']:
+        if dist_count >= tier['min_days']:
+            base_score = tier['score']
+            break
 
     final_score = base_score * 2 if high_zone else base_score
 
@@ -444,9 +498,9 @@ def score_ma_break(conn, target_date):
     below_50_now = closes[0] < ma50_now
     # 简化：检查最近是否连续 5 天低于 MA50
     below_count = sum(1 for i in range(min(10, len(closes))) if closes[i] < ma50_now)
-    if below_count >= 5 and below_50_now:
+    if below_count >= cfg()['moving_average']['ma50_min_below'] and below_50_now:
         ma50_broken = 1
-        ma50_score = 30
+        ma50_score = cfg()['moving_average']['ma50_score']
 
     # 200日线：收盘跌破。
     # 分值由 80 降为 40（2026-11-03）：该信号是「状态」而非「事件」，
@@ -454,12 +508,12 @@ def score_ma_break(conn, target_date):
     # 让评分卡退化为「指数在不在年线上方」的二元判断。
     if closes[0] < ma200_now:
         ma200_broken = 1
-        ma200_score = 40
+        ma200_score = cfg()['moving_average']['ma200_score']
 
     # 死叉：MA50 下穿 MA200
     if ma50_now < ma200_now and ma50_5d_ago >= ma200_5d_ago:
         death_cross = 1
-        death_cross_score = 60
+        death_cross_score = cfg()['moving_average']['death_cross_score']
 
     detail = []
     if ma50_broken:
@@ -520,10 +574,11 @@ def score_market_width(conn, target_date):
     # 阈值 0.7 + 5日内≥4日：0.7 保留 PRD 原意，把「连续5日」放宽为「4 of 5」
     # （连续5日在宽基指数上等于永假，实测全历史最长连续仅 3 天）。
     # 复跑：scripts/diag_sell_score_thresholds.py
-    low_days = sum(1 for v in daily_up_down if v < 0.7)
-    if len(daily_up_down) >= 5 and low_days >= 4:
+    _mw = cfg()['market_width']
+    low_days = sum(1 for v in daily_up_down if v < _mw['ad_low5_threshold'])
+    if len(daily_up_down) >= _mw['ad_low5_trade_days'] and low_days >= _mw['ad_low5_min_days']:
         ad_low5 = 1
-        ad_low5_score = 20
+        ad_low5_score = _mw['ad_low5_score']
 
     # AD < 0.5：必须用「当日」涨跌比。原实现用 ad（=market_health_daily 的 5 日均值），
     # 2026 年实测：当日<0.5 有 67 天，平滑<0.5 仅 1 天 → 60 分信号与清仓级熔断近乎失效。
@@ -534,9 +589,9 @@ def score_market_width(conn, target_date):
     today_ratio = daily_up_down[0] if daily_up_down else None
     ad_crash = 0
     ad_crash_score = 0
-    if today_ratio is not None and today_ratio < 0.15:
+    if today_ratio is not None and today_ratio < _mw['ad_crash_threshold']:
         ad_crash = 1
-        ad_crash_score = 60
+        ad_crash_score = _mw['ad_crash_score']
 
     # NH/NL < 0.5 连续 3 天。原实现读 market_health_daily.hl_ratio_value，
     # 但该字段的「连续」叠加在可能已被平滑的序列上，与 ad_low5 同型缺陷。
@@ -553,8 +608,11 @@ def score_market_width(conn, target_date):
         hlnl_low = 1
         hlnl_score = 30
 
-    return ad_low5_score + ad_crash_score + hlnl_score, ad_low5, ad_crash, hlnl_low, 0, \
-           f"AD={ad:.2f} HL={hl:.2f}"
+    # 返回各分量分值与触发标识。调用方必须使用这里的分值，不得另行硬编码
+    # （compute_all 曾重复硬编码 20/60/30，与 ma_break 属同类遮蔽问题——2026-11-03 修复）。
+    return (ad_low5_score, ad_crash_score, hlnl_score,
+            ad_low5, ad_crash, hlnl_low,
+            f"AD={ad:.2f} HL={hl:.2f}")
 
 
 def score_vol_dry(conn, target_date):
@@ -572,8 +630,8 @@ def score_vol_dry(conn, target_date):
     recent5 = rows[:5]
     up_days = sum(1 for r in recent5 if r['change'] and r['change'] > 0)
 
-    if up_days < 3:
-        return 0, 0, f"5日内仅{up_days}日上涨（需≥3日）"
+    if up_days < cfg()['vol_dry']['min_up_days']:
+        return 0, 0, f"5日内仅{up_days}日上涨（需≥{cfg()['vol_dry']['min_up_days']}日）"
 
     # 日均量 vs 20 日均量
     vol_5d = sum(r['volume'] for r in recent5) / 5
@@ -622,14 +680,11 @@ def compute_all(target_date):
     logger.info(f"  均线: {ma_detail} → {ma_total}分")
 
     # 7. 市场宽度
-    # 同样的问题：分值在函数内算出后又在此硬编码一遍。改为统一取返回值，
-    # 这里 score_market_width 已返回总分，故直接沿用其分量（见其 return 注释）。
-    width_total, ad_low5, ad_crash, hlnl_low, _, width_detail = score_market_width(conn, target_date)
-    # 各分量分值从总分拆解而来，避免第二处定义：
-    #   ad_low5 = 20、ad_crash = 60、hlnl = 30（与 score_market_width 内一致）
-    ad_low5_score = 20 if ad_low5 else 0
-    ad_crash_score = 60 if ad_crash else 0
-    hlnl_score = 30 if hlnl_low else 0
+    # 分值统一取自 score_market_width 的返回值，不得在此另行硬编码——
+    # 与 score_ma_break 属同类遮蔽问题（2026-11-03 修复）。
+    (ad_low5_score, ad_crash_score, hlnl_score,
+     ad_low5, ad_crash, hlnl_low, width_detail) = score_market_width(conn, target_date)
+    width_total = ad_low5_score + ad_crash_score + hlnl_score
     logger.info(f"  市场宽度: {width_detail} → {width_total}分")
 
     # 8. 上涨无量
