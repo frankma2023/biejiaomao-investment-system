@@ -343,7 +343,7 @@
       html+='</div>';
 
       // ═══ 大盘健康分长期趋势（2026-03 起）═══
-      html+='<div class="section-hdr" style="margin-top:18px">📈 大盘健康分趋势 · 2026-03 至今</div>';
+      html+='<div class="section-hdr" style="margin-top:18px">📈 大盘健康分趋势 · 2026-01 至今</div>';
       html+='<div style="font-size:9px;color:var(--muted);margin-bottom:8px;line-height:1.7">'
         + '💡 灰线=健康分(0-100) · 叠加指数已归一化为起点=100 · '
         + 'Y 轴按当前可见序列自适应 · 点击下方按钮切换叠加指数</div>';
@@ -1152,7 +1152,7 @@ function makeTrendChart(spec){
 var healthTrend = makeTrendChart({
   togglesId:'health-idx-toggles', btnClass:'health-idx-btn',
   chartId:'chart-health-trend', corrId:'health-corr',
-  endpoint:'/api/market-health/history', start:'2026-03-01', dataKey:'health',
+  endpoint:'/api/market-health/history', start:'2026-01-01', dataKey:'health',
   mainSeries: function(d, dates, isDark, key){
     return {
       name:'健康分', type:'line', data: d[key].map(function(x){return x.score}),
