@@ -425,6 +425,22 @@ TASKS.append(("38.指数CPA扫描", [PYTHON_EXE, "scripts/scan_index_cpa_daily.p
 TASKS.append(("39.自选股入条件评估",
               [PYTHON_EXE, "scripts/eval_entry_conditions.py"]))
 
+# TRADE_GUARD：非交易日早退。
+# 2026-11-03 清理了 2026-05-30/06-06/06-21 等 7 条非交易日残留
+# （周末或节假日被误算，因为入口未校验今天是否交易日）。
+# 判定方式：指数 000985 在 today_str 是否有日 K 线——有则必为交易日。
+# --force 可跳过（补算历史数据时用）。
+if "--force" not in sys.argv:
+    _con = sqlite3.connect(os.path.join(BASE_DIR, "data", "lixinger.db"))
+    _hit = _con.execute(
+        "SELECT 1 FROM index_daily_kline WHERE stock_code='000985' "
+        "AND kline_type='normal' AND date=? LIMIT 1", (today_str,)).fetchone()
+    _con.close()
+    if not _hit:
+        log(f"[SKIP] {today_str} 非交易日（000985 无日K线），全部步骤跳过。"
+            f"确需执行请加 --force")
+        sys.exit(0)
+
 for item in TASKS:
     label, cmd = item[0], item[1]
     opts = item[2] if len(item) > 2 else {}
