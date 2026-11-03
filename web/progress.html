@@ -58,6 +58,18 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>💰 新增卖出信号：融资余额 5 日快速下降 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-warn"></span><b>用户观察</b>：2026-07 融资余额急跌，但在健康分里最差也是 0 分——极端恶化与轻微恶化无法区分</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>根因确认</b>：<code>score_margin_5d = _tier6(val, [1.5,1.0,0.5,-0.5,-1.0], [15,12,9,6,3,0])</code>——−1.1% 与 −7% 同为 0 分，分值下限抹掉了尾部信息</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>方案</b>：不搬走健康分项（两者视角不同：健康分看「水平」，卖出分看「事件」），在卖出分新增 <code>margin_decline</code>：5日跌幅 ≥3% → 10 分、≥5% → 25 分（2026 年触发 10% / 2%）</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>顺带修正 109 天陈旧融资数据</b>：如 2026-05-12 存 37524.88、2026-07-27 存 +357.51%、2026-06-26 存 +106.25%，重算后分别为 +3.74% / −0.69% / +1.61%</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>档位验证：不需调整</b>。均值 86.8 → 88.6（+1.8），清仓档 15.3% → 18.5%（+3.2pp），四档仍均匀（26/24/32/19）</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>修复 <code>INDEX_NAMES</code> 未定义（背离重写时引入，导致 4 天计算失败）</td><td>2026-11-03</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>⚖️ 卖出评分卡信号修复与权重校准 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-warn"></span><b>12 个信号中 5 个从未触发</b>：抛盘日、追盘日、龙头见顶、指数背离、AD 低位、上涨无量（共 6 项）</td><td>2026-11-03</td></tr>
@@ -863,6 +875,9 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">180. 「阈值不对」往往是「权重不对」的症状，先查权重再动阈值</div><div class="ld">我一路判断「档位 60/100/140 需要重定」，因为重跑后 51.7% 的日子落在「清仓」档。但根因是两个信号权重失衡：破200日线占日均总分 44%（80分×68%触发率），AD<0.5 触发率 33.7%（读5日均值导致）。把 80→40、0.5→0.15 之后，总分均值从 124.4 降到 80.7，原档位分布变成正常29%/减仓50%25%/减仓25%34%/清仓12%——PRD 原本的设计恰好适用。诊断顺序：先看各信号日均贡献占比，再看阈值，最后才怀疑档位。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">181. 信号「从不触发」有四种成因，必须逐一定位而非统一归为「没数据」</div><div class="ld">12 个信号中 6 个从未触发，实际是四类不同问题：① 缺写入脚本（抛盘日——detect() 算得好好的，没人写库）② 依赖表停更（追盘日）③ 查询或阈值 bug（龙头见顶股池无下界累积到 1067 只；指数背离的 WHERE date=? 让 LAG 失效、0.5 当百分数）④ 阈值未校准（AD低位读5日均值再要求连续5天=9天窗口；上涨无量要求宽基5连涨，2026年0次）。把「没触发」笼统归因于「数据缺失」会全部修错。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">182. 补数据时只填了「看起来相关」的字段，被下游查询条件静默过滤</div><div class="ld">追盘日补算后信号仍是 0 分。查查询条件发现 score_ftd_failure 用的是 (invalidated_date IS NOT NULL OR is_valid = 1)——而我写入时只设了 is_valid=0 和 invalidated_reason，没写 invalidated_date，失效的 FTD 全被过滤掉。补上从 failure_reason 里正则提取的日期后，信号从 20 天恢复到 61 天。教训：往已有表补数据前，必须先读下游的 WHERE 条件，确认哪些字段参与了过滤，不能只按表结构的语义填。这和「改了函数但调用方覆盖」是同一类问题——写入端正确不等于读取端能看见。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">183. 只有正值的子项无法表达极端恶化——0 分下限会吃掉尾部信息</div><div class="ld">健康分的融资余额项按 _tier6 分档，最差档是 0 分。2026-07-20 融资余额 5 日跌 6.96%，与跌 1.1% 一样都是 0 分。这在复合指标里是系统性问题：任何「只得正分」的子项，其分值下限都会把「很差」和「灾难级」压缩成同一个值。解决方式不是调分值，而是把这类指标放进一个单调递增、无上限的指标里（卖出分），或者给它单独设一个「极端」标记。判断一个指标该放哪个分数体系，看的是它的语义是「水平」还是「事件」。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">184. 存量的派生指标会随着底层表补数据而过时，必须定期重算</div><div class="ld">market_health_daily 里有 109 天的 margin_5d_value 是错的：存着 37524.88、-26.99、+357.51% 这种值，而底层 daily_margin_history 本身完全干净（28,862 亿稳步降到 24,546 亿，无跳变）。原因是这些值在数据未灌全时就被计算并落库，之后底层补齐了但派生值没跟着重算。教训：派生字段一旦落库就与源数据脱钩；补数据之后必须连带重算依赖它的指标，否则会出现「数据看起来有值，但值是错的」——比缺数据更难发现。</div></div>
+
 
 
 
