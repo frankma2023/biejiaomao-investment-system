@@ -732,8 +732,8 @@
       }
       document.getElementById('content').innerHTML=html;
       // 图表需在 DOM 挂载后初始化
-      if(document.getElementById('health-idx-toggles')){ renderHealthIdxToggles(); loadHealthTrend(); }
-      if(document.getElementById('sell-idx-toggles')){ renderSellIdxToggles(); loadSellTrend(); }
+      if(document.getElementById('health-idx-toggles')){ healthTrend.renderToggles(); healthTrend.load(); }
+      if(document.getElementById('sell-idx-toggles')){ sellTrend.renderToggles(); sellTrend.load(); }
       loadCapitalFlow(h.date);
     }
 
@@ -1015,199 +1015,175 @@ var HEALTH_IDX = [
 ];
 var healthIdxActive = {};   // code -> true
 
-function renderHealthIdxToggles(){
-  var box = document.getElementById('health-idx-toggles');
-  if(!box) return;
-  var h = '';
-  HEALTH_IDX.forEach(function(x){
-    var on = !!healthIdxActive[x.code];
-    h += '<button data-code="'+x.code+'" class="health-idx-btn" '
-       + 'style="font-size:10px;padding:3px 9px;border-radius:20px;cursor:pointer;'
-       + 'border:1px solid '+(on?x.color:'var(--border)')+';'
-       + 'background:'+(on?x.color+'1f':'transparent')+';'
-       + 'color:'+(on?x.color:'var(--muted)')+'">'
-       + '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;'
-       + 'background:'+x.color+';margin-right:5px;opacity:'+(on?1:.35)+'"></span>'
-       + x.name + '</button>';
-  });
-  box.innerHTML = h;
-  box.querySelectorAll('.health-idx-btn').forEach(function(b){
-    b.onclick = function(){
-      var c = b.getAttribute('data-code');
-      healthIdxActive[c] = !healthIdxActive[c];
-      renderHealthIdxToggles();
-      loadHealthTrend();
-    };
-  });
+
+// ═══════════ 长期趋势图公共渲染器 ═══════════
+// 健康分图与卖出评分图结构相同（指数切换 + fetch + ECharts + 动态Y轴 + 相关性），
+// 仅端点、字段名、主序列样式与文案不同，故抽成一个工厂。
+function _corr(a,b){
+  var n=a.length; if(n<10) return null;
+  var ma=0,mb=0,i;
+  for(i=0;i<n;i++){ma+=a[i];mb+=b[i];} ma/=n; mb/=n;
+  var num=0,da=0,db=0;
+  for(i=0;i<n;i++){var x=a[i]-ma,y=b[i]-mb; num+=x*y; da+=x*x; db+=y*y;}
+  return (da&&db)? num/Math.sqrt(da*db) : null;
 }
 
+function makeTrendChart(spec){
+  var STATE = {};
 
-    // ── 相关性：健康分与各指数的皮尔逊系数（水平 + 日变动）──
-    function _corr(a,b){
-      var n=a.length; if(n<10) return null;
-      var ma=0,mb=0,i;
-      for(i=0;i<n;i++){ma+=a[i];mb+=b[i];} ma/=n; mb/=n;
-      var num=0,da=0,db=0;
-      for(i=0;i<n;i++){var x=a[i]-ma,y=b[i]-mb; num+=x*y; da+=x*x; db+=y*y;}
-      return (da&&db)? num/Math.sqrt(da*db) : null;
-    }
-    function renderHealthCorr(d){
-      var box=document.getElementById('health-corr'); if(!box) return;
-      var hm={}; d.health.forEach(function(x){hm[x.date]=x.score});
-      var rows=[];
-      Object.keys(d.indices||{}).forEach(function(code){
-        var nm=d.indices[code].name, pts=d.indices[code].series||[];
-        var ds=pts.filter(function(p){return hm[p[0]]!=null}).map(function(p){return p[0]});
-        if(ds.length<30) return;
-        var hv=ds.map(function(x){return hm[x]});
-        var iv=ds.map(function(dt){var v=null;pts.forEach(function(p){if(p[0]===dt)v=p[1]});return v;});
-        var rh=_corr(hv,iv);
-        var dh=[],di=[];
-        for(var i=1;i<hv.length;i++){dh.push(hv[i]-hv[i-1]); di.push(iv[i]/iv[i-1]-1);}
-        var rd=_corr(dh,di);
-        rows.push({nm:nm, rh:rh, rd:rd, n:ds.length});
-      });
-      if(!rows.length){ box.innerHTML='<span style="opacity:.6">勾选指数后显示健康分与该指数的相关性</span>'; return; }
-      rows.sort(function(a,b){return (b.rh||0)-(a.rh||0)});
-      var h='<b style="color:var(--text-primary)">健康分与各指数的相关性</b>　';
-      h+='<span style="opacity:.7">水平相关=分值与点位的关系；日变动相关=当天分数变化与指数涨跌的关系</span><br>';
-      rows.forEach(function(r){
-        var c1=r.rh==null?'—':r.rh.toFixed(2), c2=r.rd==null?'—':r.rd.toFixed(2);
-        var col=(r.rh!=null&&r.rh>=0.4)?'#ef4444':(r.rh!=null&&r.rh<0.2?'#10b981':'var(--text-primary)');
-        h+='<span style="display:inline-block;margin-right:16px">'
+  function renderToggles(){
+    var box = document.getElementById(spec.togglesId);
+    if(!box) return;
+    var h = '';
+    HEALTH_IDX.forEach(function(x){
+      var on = !!STATE[x.code];
+      h += '<button data-code="'+x.code+'" class="'+spec.btnClass+'" '
+         + 'style="font-size:10px;padding:3px 9px;border-radius:20px;cursor:pointer;'
+         + 'border:1px solid '+(on?x.color:'var(--border)')+';'
+         + 'background:'+(on?x.color+'1f':'transparent')+';'
+         + 'color:'+(on?x.color:'var(--muted)')+'">'
+         + '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;'
+         + 'background:'+x.color+';margin-right:5px;opacity:'+(on?1:.35)+'"></span>'
+         + x.name + '</button>';
+    });
+    box.innerHTML = h;
+    box.querySelectorAll('.'+spec.btnClass).forEach(function(b){
+      b.onclick = function(){
+        var c = b.getAttribute('data-code');
+        STATE[c] = !STATE[c];
+        renderToggles();
+        load();
+      };
+    });
+  }
+
+  function renderCorr(d){
+    var box = document.getElementById(spec.corrId); if(!box) return;
+    var sm = {}; d[spec.dataKey].forEach(function(x){ sm[x.date] = x.score });
+    var rows = [];
+    Object.keys(d.indices||{}).forEach(function(code){
+      var nm = d.indices[code].name, pts = d.indices[code].series||[];
+      var ds = pts.filter(function(p){ return sm[p[0]] != null }).map(function(p){ return p[0] });
+      if(ds.length < 30) return;
+      var sv = ds.map(function(x){ return sm[x] });
+      var iv = ds.map(function(dt){ var v=null; pts.forEach(function(p){ if(p[0]===dt) v=p[1] }); return v; });
+      var rh = _corr(sv, iv);
+      var dh=[], di=[];
+      for(var i=1;i<sv.length;i++){ if(iv[i]!=null && iv[i-1]!=null){ dh.push(sv[i]-sv[i-1]); di.push(iv[i]/iv[i-1]-1); } }
+      rows.push({nm:nm, rh:rh, rd:_corr(dh,di)});
+    });
+    if(!rows.length){ box.innerHTML = spec.corrEmpty; return; }
+    rows.sort(spec.corrSort);
+    var h = '<b style="color:var(--text-primary)">'+spec.corrTitle+'</b>　';
+    h += '<span style="opacity:.7">'+spec.corrNote+'</span><br>';
+    rows.forEach(function(r){
+      var c1 = r.rh==null?'—':r.rh.toFixed(2), c2 = r.rd==null?'—':r.rd.toFixed(2);
+      var col = spec.corrColor(r.rh);
+      h += '<span style="display:inline-block;margin-right:16px">'
          + '<span style="color:var(--muted)">'+r.nm+'</span>　水平 <b style="color:'+col+'">'+c1+'</b>'
          + '　日变动 <b>'+c2+'</b></span>';
-      });
-      box.innerHTML=h;
-    }
+    });
+    box.innerHTML = h;
+  }
 
-function loadHealthTrend(){
-  var codes = Object.keys(healthIdxActive).filter(function(k){return healthIdxActive[k]});
-  var url = API_BASE + '/api/market-health/history?start=2026-03-01'
-          + (codes.length ? '&idx=' + codes.join(',') : '');
-  fetch(url).then(function(r){return r.json()}).then(function(d){
-    var el = document.getElementById('chart-health-trend');
-    if(!el) return;
-    if(el._echart) el._echart.dispose();
-    var ch = echarts.init(el); el._echart = ch;
-    var isDark = document.documentElement.dataset.theme === 'dark';
-    var gridC = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
-    var txtC  = isDark ? '#8b8b90' : '#6b7280';
-    var dates = d.health.map(function(x){return x.date});
-    var series = [{
-      name:'健康分', type:'line', data: d.health.map(function(x){return x.score}),
+  function load(){
+    var codes = Object.keys(STATE).filter(function(k){ return STATE[k] });
+    var url = API_BASE + spec.endpoint + '?start=' + spec.start
+            + (codes.length ? '&idx=' + codes.join(',') : '');
+    fetch(url).then(function(r){ return r.json() }).then(function(d){
+      var el = document.getElementById(spec.chartId);
+      if(!el) return;
+      if(el._echart) el._echart.dispose();
+      var ch = echarts.init(el); el._echart = ch;
+      var isDark = document.documentElement.dataset.theme === 'dark';
+      var gridC = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
+      var txtC  = isDark ? '#8b8b90' : '#6b7280';
+      var dates = d[spec.dataKey].map(function(x){ return x.date });
+      // 主序列：由 spec.mainSeries 提供，便于两张图各自定制
+      var series = [ spec.mainSeries(d, dates, isDark, spec.dataKey) ];
+      Object.keys(d.indices||{}).forEach(function(code){
+        var meta = HEALTH_IDX.filter(function(x){ return x.code===code })[0] || {color:'#999'};
+        var m = {};
+        (d.indices[code].series||[]).forEach(function(pt){ m[pt[0]] = pt[1] });
+        series.push({
+          name: d.indices[code].name, type:'line',
+          data: dates.map(function(dt){ return m[dt] != null ? m[dt] : null }),
+          smooth:true, symbol:'none', connectNulls:true,
+          lineStyle:{width:1.4, color:meta.color, opacity:.9},
+          z:5
+        });
+      });
+      // Y 轴按可见序列动态计算（指数归一化后可达 150+，写死会裁切）
+      var _vals = [];
+      series.forEach(function(s){ (s.data||[]).forEach(function(v){ if(v!=null && !isNaN(v)) _vals.push(v); }); });
+      var _lo = _vals.length ? Math.min.apply(null,_vals) : 0;
+      var _hi = _vals.length ? Math.max.apply(null,_vals) : 100;
+      var _pad = (_hi - _lo) * 0.08 || 5;
+      var yMin = Math.max(0, Math.floor((_lo - _pad)/5)*5);
+      var yMax = Math.ceil((_hi + _pad)/5)*5;
+
+      ch.setOption({
+        grid:{left:38, right:14, top:26, bottom:28},
+        tooltip:{trigger:'axis', backgroundColor:isDark?'rgba(20,20,25,.94)':'rgba(255,255,255,.97)',
+          borderColor:gridC, textStyle:{color:isDark?'#e4e4e7':'#1f2328',fontSize:11}},
+        legend:{top:0, right:0, itemWidth:10, itemHeight:6,
+          textStyle:{color:txtC, fontSize:10}},
+        xAxis:{type:'category', data:dates, boundaryGap:false,
+          axisLine:{lineStyle:{color:gridC}},
+          axisLabel:{color:txtC, fontSize:9, interval:Math.floor(dates.length/7)},
+          splitLine:{show:false}},
+        yAxis:{type:'value', min:yMin, max:yMax, splitNumber:5,
+          axisLine:{show:false}, axisTick:{show:false},
+          axisLabel:{color:txtC, fontSize:9},
+          splitLine:{lineStyle:{color:gridC}}},
+        series: series
+      });
+      renderCorr(d);
+    }).catch(function(e){
+      var el = document.getElementById(spec.chartId);
+      if(el) el.innerHTML = '<div style="padding:20px;font-size:11px;color:var(--muted)">加载失败：'+e.message+'</div>';
+    });
+  }
+
+  return { renderToggles: renderToggles, load: load, renderCorr: renderCorr };
+}
+
+// ── 健康分趋势图 ──
+var healthTrend = makeTrendChart({
+  togglesId:'health-idx-toggles', btnClass:'health-idx-btn',
+  chartId:'chart-health-trend', corrId:'health-corr',
+  endpoint:'/api/market-health/history', start:'2026-03-01', dataKey:'health',
+  mainSeries: function(d, dates, isDark, key){
+    return {
+      name:'健康分', type:'line', data: d[key].map(function(x){return x.score}),
       smooth:true, symbol:'none', lineStyle:{width:2,color:isDark?'#e4e4e7':'#1f2328'},
       areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
         {offset:0,color:isDark?'rgba(228,228,231,.14)':'rgba(31,35,40,.10)'},
         {offset:1,color:'rgba(0,0,0,0)'}])},
       z:10
-    }];
-    Object.keys(d.indices||{}).forEach(function(code){
-      var meta = HEALTH_IDX.filter(function(x){return x.code===code})[0] || {color:'#999'};
-      var m = {};
-      (d.indices[code].series||[]).forEach(function(pt){ m[pt[0]] = pt[1] });
-      series.push({
-        name: d.indices[code].name, type:'line',
-        data: dates.map(function(dt){ return m[dt] != null ? m[dt] : null }),
-        smooth:true, symbol:'none', connectNulls:true,
-        lineStyle:{width:1.4, color:meta.color, opacity:.9},
-        z:5
-      });
-    });
-    // Y 轴按当前可见序列动态计算范围（指数归一化后可达 150+，写死会裁切）
-    var _vals = [];
-    series.forEach(function(s){
-      (s.data||[]).forEach(function(v){ if(v!=null && !isNaN(v)) _vals.push(v); });
-    });
-    var _lo = _vals.length ? Math.min.apply(null,_vals) : 0;
-    var _hi = _vals.length ? Math.max.apply(null,_vals) : 100;
-    var _pad = (_hi - _lo) * 0.08 || 5;
-    var yMin = Math.max(0, Math.floor((_lo - _pad)/5)*5);
-    var yMax = Math.ceil((_hi + _pad)/5)*5;
-
-    ch.setOption({
-      grid:{left:38, right:14, top:26, bottom:28},
-      tooltip:{trigger:'axis', backgroundColor:isDark?'rgba(20,20,25,.94)':'rgba(255,255,255,.97)',
-        borderColor:gridC, textStyle:{color:isDark?'#e4e4e7':'#1f2328',fontSize:11}},
-      legend:{top:0, right:0, itemWidth:10, itemHeight:6,
-        textStyle:{color:txtC, fontSize:10}},
-      xAxis:{type:'category', data:dates, boundaryGap:false,
-        axisLine:{lineStyle:{color:gridC}},
-        axisLabel:{color:txtC, fontSize:9, interval:Math.floor(dates.length/7)},
-        splitLine:{show:false}},
-      yAxis:{type:'value', min:yMin, max:yMax, splitNumber:5,
-        axisLine:{show:false}, axisTick:{show:false},
-        axisLabel:{color:txtC, fontSize:9},
-        splitLine:{lineStyle:{color:gridC}}},
-      series: series
-    });
-    renderHealthCorr(d);
-  }).catch(function(e){
-    var el = document.getElementById('chart-health-trend');
-    if(el) el.innerHTML = '<div style="padding:20px;font-size:11px;color:var(--muted)">加载失败：'+e.message+'</div>';
-  });
-}
-
-// 页面主题切换后重绘
-var _origToggleTheme = window.toggleTheme;
-window.toggleTheme = function(){
-  if(_origToggleTheme) _origToggleTheme();
-  setTimeout(function(){
-    renderHealthIdxToggles();
-    loadHealthTrend();
-    renderSellIdxToggles();
-    loadSellTrend();
-    ['chart-volume-trend','chart-hl-trend'].forEach(function(id){
-      var e=document.getElementById(id); if(e&&e._echart) e._echart.resize();
-    });
-  }, 60);
-};
-
-// ═══════════ 卖出评分长期趋势图 ═══════════
-var SELL_IDX_ACTIVE = {};
-
-function renderSellIdxToggles(){
-  var box = document.getElementById('sell-idx-toggles');
-  if(!box) return;
-  var h = '';
-  HEALTH_IDX.forEach(function(x){
-    var on = !!SELL_IDX_ACTIVE[x.code];
-    h += '<button data-code="'+x.code+'" class="sell-idx-btn" '
-       + 'style="font-size:10px;padding:3px 9px;border-radius:20px;cursor:pointer;'
-       + 'border:1px solid '+(on?x.color:'var(--border)')+';'
-       + 'background:'+(on?x.color+'1f':'transparent')+';'
-       + 'color:'+(on?x.color:'var(--muted)')+'">'
-       + '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;'
-       + 'background:'+x.color+';margin-right:5px;opacity:'+(on?1:.35)+'"></span>'
-       + x.name + '</button>';
-  });
-  box.innerHTML = h;
-  box.querySelectorAll('.sell-idx-btn').forEach(function(b){
-    b.onclick = function(){
-      var c = b.getAttribute('data-code');
-      SELL_IDX_ACTIVE[c] = !SELL_IDX_ACTIVE[c];
-      renderSellIdxToggles();
-      loadSellTrend();
     };
-  });
-}
+  },
+  corrEmpty:'<span style="opacity:.6">勾选指数后显示健康分与该指数的相关性</span>',
+  corrTitle:'健康分与各指数的相关性',
+  corrNote:'水平相关=分值与点位的关系；日变动相关=当天分数变化与指数涨跌的关系',
+  corrSort: function(a,b){ return (b.rh||0)-(a.rh||0) },
+  corrColor: function(rh){
+    return (rh!=null && rh>=0.4) ? '#ef4444' : ((rh!=null && rh<0.2) ? '#10b981' : 'var(--text-primary)');
+  }
+});
 
-function loadSellTrend(){
-  var codes = Object.keys(SELL_IDX_ACTIVE).filter(function(k){return SELL_IDX_ACTIVE[k]});
-  var url = API_BASE + '/api/market-sell-score/history?start=2026-01-01'
-          + (codes.length ? '&idx=' + codes.join(',') : '');
-  fetch(url).then(function(r){return r.json()}).then(function(d){
-    var el = document.getElementById('chart-sell-trend');
-    if(!el) return;
-    if(el._echart) el._echart.dispose();
-    var ch = echarts.init(el); el._echart = ch;
-    var isDark = document.documentElement.dataset.theme === 'dark';
-    var gridC = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
-    var txtC  = isDark ? '#8b8b90' : '#6b7280';
-    var dates = d.scores.map(function(x){return x.date});
-    var series = [{
-      name:'卖出评分', type:'line', data: d.scores.map(function(x){return x.score}),
+// ── 卖出评分趋势图（阶梯线：分值是状态机，只在档位切换时变化）──
+var sellTrend = makeTrendChart({
+  togglesId:'sell-idx-toggles', btnClass:'sell-idx-btn',
+  chartId:'chart-sell-trend', corrId:'sell-corr',
+  endpoint:'/api/market-sell-score/history', start:'2026-01-01', dataKey:'scores',
+  mainSeries: function(d, dates, isDark, key){
+    return {
+      name:'卖出评分', type:'line', data: d[key].map(function(x){return x.score}),
       smooth:false, step:'end', symbol:'none',
+      lineStyle:{width:2, color:'#ef4444'},
+      areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
+        {offset:0,color:'rgba(239,68,68,.16)'},{offset:1,color:'rgba(0,0,0,0)'}])},
       // 决策阈值参考线必须挂在 series 上，置于 option 根层不渲染
       markLine:{silent:true, symbol:'none',
         lineStyle:{type:'dashed', width:1, opacity:.5},
@@ -1216,82 +1192,19 @@ function loadSellTrend(){
           {yAxis:100, lineStyle:{color:'#f59e0b'}, label:{formatter:'100', position:'insideEndTop', fontSize:9, color:'#f59e0b'}},
           {yAxis:140, lineStyle:{color:'#ef4444'}, label:{formatter:'140', position:'insideEndTop', fontSize:9, color:'#ef4444'}}
         ]},
-      lineStyle:{width:2, color:'#ef4444'},
-      areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
-        {offset:0,color:'rgba(239,68,68,.16)'},{offset:1,color:'rgba(0,0,0,0)'}])},
       z:10
-    }];
-    Object.keys(d.indices||{}).forEach(function(code){
-      var meta = HEALTH_IDX.filter(function(x){return x.code===code})[0] || {color:'#999'};
-      var m = {};
-      (d.indices[code].series||[]).forEach(function(pt){ m[pt[0]] = pt[1] });
-      series.push({
-        name: d.indices[code].name, type:'line',
-        data: dates.map(function(dt){ return m[dt] != null ? m[dt] : null }),
-        smooth:true, symbol:'none', connectNulls:true,
-        lineStyle:{width:1.4, color:meta.color, opacity:.9}, z:5
-      });
-    });
+    };
+  },
+  corrEmpty:'<span style="opacity:.6">勾选指数后显示卖出评分与该指数的相关性（预期为负）</span>',
+  corrTitle:'卖出评分与各指数的相关性',
+  corrNote:'反向指标应为负值；越负说明越能反映该指数的风险',
+  corrSort: function(a,b){ return (a.rh||0)-(b.rh||0) },
+  corrColor: function(rh){
+    return (rh!=null && rh<=-0.4) ? '#ef4444' : ((rh!=null && rh>-0.2) ? '#10b981' : 'var(--text-primary)');
+  }
+});
 
-    var _vals = [];
-    series.forEach(function(s){ (s.data||[]).forEach(function(v){ if(v!=null&&!isNaN(v)) _vals.push(v); }); });
-    var _lo = _vals.length?Math.min.apply(null,_vals):0;
-    var _hi = _vals.length?Math.max.apply(null,_vals):100;
-    var _pad = (_hi-_lo)*0.08 || 5;
-    var yMin = Math.max(0, Math.floor((_lo-_pad)/5)*5);
-    var yMax = Math.ceil((_hi+_pad)/5)*5;
 
-    ch.setOption({
-      grid:{left:38, right:14, top:26, bottom:28},
-      tooltip:{trigger:'axis', backgroundColor:isDark?'rgba(20,20,25,.94)':'rgba(255,255,255,.97)',
-        borderColor:gridC, textStyle:{color:isDark?'#e4e4e7':'#1f2328',fontSize:11}},
-      legend:{top:0, right:0, itemWidth:10, itemHeight:6,
-        textStyle:{color:txtC, fontSize:10}},
-      xAxis:{type:'category', data:dates, boundaryGap:false,
-        axisLine:{lineStyle:{color:gridC}},
-        axisLabel:{color:txtC, fontSize:9, interval:Math.floor(dates.length/7)},
-        splitLine:{show:false}},
-      yAxis:{type:'value', min:yMin, max:yMax, splitNumber:5,
-        axisLine:{show:false}, axisTick:{show:false},
-        axisLabel:{color:txtC, fontSize:9},
-        splitLine:{lineStyle:{color:gridC}}},
-      series: series
-    });
-    renderSellCorr(d);
-  }).catch(function(e){
-    var el = document.getElementById('chart-sell-trend');
-    if(el) el.innerHTML = '<div style="padding:20px;font-size:11px;color:var(--muted)">加载失败：'+e.message+'</div>';
-  });
-}
-
-function renderSellCorr(d){
-  var box = document.getElementById('sell-corr'); if(!box) return;
-  var sm = {}; d.scores.forEach(function(x){sm[x.date]=x.score});
-  var rows = [];
-  Object.keys(d.indices||{}).forEach(function(code){
-    var pts = d.indices[code].series||[];
-    var ds = pts.filter(function(p){return sm[p[0]]!=null}).map(function(p){return p[0]});
-    if(ds.length<30) return;
-    var sv = ds.map(function(x){return sm[x]});
-    var iv = ds.map(function(dt){var v=null;pts.forEach(function(p){if(p[0]===dt)v=p[1]});return v;});
-    var rh = _corr(sv, iv);
-    var ds_=[],di_=[];
-    for(var i=1;i<sv.length;i++){ if(iv[i]!=null&&iv[i-1]!=null){ ds_.push(sv[i]-sv[i-1]); di_.push(iv[i]/iv[i-1]-1); } }
-    rows.push({nm:d.indices[code].name, rh:rh, rd:_corr(ds_,di_)});
-  });
-  if(!rows.length){ box.innerHTML='<span style="opacity:.6">勾选指数后显示卖出评分与该指数的相关性（预期为负）</span>'; return; }
-  rows.sort(function(a,b){return (a.rh||0)-(b.rh||0)});
-  var h='<b style="color:var(--text-primary)">卖出评分与各指数的相关性</b>　';
-  h+='<span style="opacity:.7">反向指标应为负值；越负说明越能反映该指数的风险</span><br>';
-  rows.forEach(function(r){
-    var c1=r.rh==null?'—':r.rh.toFixed(2), c2=r.rd==null?'—':r.rd.toFixed(2);
-    var col=(r.rh!=null&&r.rh<=-0.4)?'#ef4444':(r.rh!=null&&r.rh>-0.2?'#10b981':'var(--text-primary)');
-    h+='<span style="display:inline-block;margin-right:16px">'
-     + '<span style="color:var(--muted)">'+r.nm+'</span>　水平 <b style="color:'+col+'">'+c1+'</b>'
-     + '　日变动 <b>'+c2+'</b></span>';
-  });
-  box.innerHTML=h;
-}
 </script>
 </body>
 </html>

@@ -302,6 +302,16 @@ TASKS.extend([
     ("13b.抛盘日明细",   [PYTHON_EXE, "scripts/backfill_distribution_days.py",
                           "--index", "000985",
                           "--start", (date.fromisoformat(today_str) - timedelta(days=45)).strftime("%Y-%m-%d")]),
+    # 13c. 指数成分股（季度更新）。
+    # 成分股按季度调整，无需每日拉取；指数背离信号按各指数自身成分股算涨跌比，
+    # 快照过旧会让背离判定失真（2026-11-03 实测滞后 6 个月）。
+    # 条件：每季首月（1/4/7/10）的首个周一执行，--months 4 覆盖近一个季度。
+    ("13c.指数成分股",   [PYTHON_EXE, "scripts/fetch_index_constituents.py",
+                          "--months", "4", "--category=market"]
+     if (WEEKDAY == 0
+         and date.fromisoformat(today_str).month in (1, 4, 7, 10)
+         and date.fromisoformat(today_str).day <= 7)
+     else ["python", "-c", "print('skip 13c: 非季度首月首个周一')"]),
     # 14. 大盘卖出评分（环境恶化预警）
     ("14.大盘卖出评分",   [PYTHON_EXE, "src/scanners/market_sell_score.py", "--date", today_str]),
     # 15. 大盘扫描快照（6 卡片 + 趋势图）
