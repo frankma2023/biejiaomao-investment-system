@@ -142,6 +142,7 @@ def ensure_tables():
             hlnl_score              INTEGER,
             vol_dry_up              INTEGER DEFAULT 0,
             vol_dry_score           INTEGER,
+            margin_decline_score    INTEGER,
             signal_details          TEXT,
             cleared_signals         TEXT
         )
@@ -461,7 +462,8 @@ def score_divergence(conn, target_date):
         total_score = 20 * len(triggered)
     total_score = min(total_score, 60)
 
-    names = [INDEX_NAMES.get(c, c) for c in triggered]
+    names = [{'000985': '中证全指', '000001': '上证指数', '399001': '深证成指',
+              '399006': '创业板指', '000300': '沪深300'}.get(c, c) for c in triggered]
     detail = ('背离: ' + '、'.join(names) + ('（含领涨）' if leader_triggered else '')) \
         if triggered else '无背离'
     return total_score, 1 if triggered else 0, 1 if leader_triggered else 0, detail
@@ -643,6 +645,43 @@ def score_vol_dry(conn, target_date):
     return 0, 0, f"无量信号未触发"
 
 
+
+# ═══════════════════════════════════════════════
+# 13. 融资余额 5 日快速下降（资金面恶化）
+# ═══════════════════════════════════════════════
+
+def compute_margin_5d(conn, target_date):
+    """全市场融资余额 5 日累计变化率（%）。与 market_health.compute_margin_5d 同口径。"""
+    rows = conn.execute("""
+        SELECT date, SUM(financing_balance) AS total
+        FROM daily_margin_history
+        WHERE date >= date(?, '-10 days') AND date <= ?
+        GROUP BY date ORDER BY date DESC LIMIT 6
+    """, (target_date, target_date)).fetchall()
+    if len(rows) < 2:
+        return None
+    latest = rows[0]['total'] or 0
+    prev = rows[min(5, len(rows) - 1)]['total'] or 0
+    if prev <= 0:
+        return None
+    return round((latest - prev) / prev * 100, 2)
+
+
+def score_margin_decline(conn, target_date):
+    """融资余额 5 日快速下降 → 卖出分。
+
+    与健康分的融资余额项区别：健康分按「水平」打分且有 0 分下限
+    （−1.1% 与 −7% 同为 0 分，丢失极端信息）；这里按「事件」打分，
+    跌幅越大分越高，专门捕捉杠杆资金崩塌。
+    """
+    val = compute_margin_5d(conn, target_date)
+    if val is None:
+        return 0, 0, "融资余额数据不足"
+    for tier in cfg()['margin_decline']['tiers']:
+        if val <= tier['max_pct']:
+            return 1, tier['score'], f"融资余额5日{val:+.2f}%（跌幅≥{abs(tier['max_pct']):.0f}%）"
+    return 0, 0, f"融资余额5日{val:+.2f}%，未达阈值"
+
 # ═══════════════════════════════════════════════
 # 主流程
 # ═══════════════════════════════════════════════
@@ -687,6 +726,10 @@ def compute_all(target_date):
     width_total = ad_low5_score + ad_crash_score + hlnl_score
     logger.info(f"  市场宽度: {width_detail} → {width_total}分")
 
+    # 8b. 融资余额 5 日快速下降（资金面恶化）
+    margin_decl, margin_decline_score, margin_decline_detail = score_margin_decline(conn, target_date)
+    logger.info(f"  融资余额恶化: {margin_decline_detail} → {margin_decline_score}分")
+
     # 8. 上涨无量
     vol_dry, vol_dry_score, vol_dry_detail = score_vol_dry(conn, target_date)
     logger.info(f"  上涨无量: {vol_dry_detail} → {vol_dry_score}分")
@@ -694,7 +737,8 @@ def compute_all(target_date):
     # 汇总
     total = (dist_score + ftd_score + leader_score + junk_score + div_score +
              ma50_score + ma200_score + death_score +
-             ad_low5_score + ad_crash_score + hlnl_score + vol_dry_score)
+             ad_low5_score + ad_crash_score + hlnl_score + vol_dry_score +
+             margin_decline_score)
 
     # 仓位建议
     if total >= 140:
@@ -763,9 +807,9 @@ def compute_all(target_date):
          ad_ratio_low5, ad_low5_score,
          ad_ratio_crash, ad_crash_score,
          hlnl_ratio_low, hlnl_score,
-         vol_dry_up, vol_dry_score,
+         vol_dry_up, vol_dry_score, margin_decline_score,
          signal_details, cleared_signals)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (target_date, total, position_advice, meltdown,
           dist_count, dist_score, dist_high,
           ftd_failed, ftd_score,
@@ -778,7 +822,7 @@ def compute_all(target_date):
           ad_low5, ad_low5_score,
           ad_crash, ad_crash_score,
           hlnl_low, hlnl_score,
-          vol_dry, vol_dry_score,
+          vol_dry, vol_dry_score, margin_decline_score,
           json.dumps(signal_details, ensure_ascii=False),
           json.dumps(cleared_signals, ensure_ascii=False)))
     conn.commit()
