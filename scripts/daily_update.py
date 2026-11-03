@@ -288,6 +288,13 @@ TASKS.extend([
     ("12.行业分组健康",   [PYTHON_EXE, "src/scanners/market_health.py", "--date", today_str, "--sector"]),
     # 13. 指数资金活跃度（北向/主力资金）
     ("13.指数资金流向",   [PYTHON_EXE, "src/scanners/index_capital_flow.py", "--date", today_str]),
+    # 13a. 追盘日明细（供第 14 步使用）。
+    # 原先 follow_through_days 无写入脚本（detectors/follow_through_day.py 只算不落库），
+    # 库内最新仅 2026-04-01，导致「追盘日失效」信号在 30 日窗口内查不到记录而恒为 0。
+    # 每日增量回补近 120 天；INSERT OR REPLACE，幂等。
+    ("13a.追盘日明细",   [PYTHON_EXE, "scripts/backfill_follow_through_days.py",
+                          "--index", "000985",
+                          "--start", (date.fromisoformat(today_str) - timedelta(days=120)).strftime("%Y-%m-%d")]),
     # 13b. 抛盘日明细（供第 14 步使用）。
     # 原先 distribution_days_detail 无写入脚本，只有 000001 的历史数据，
     # 而 market_sell_score 的抛盘日信号查 index_code='000985' → 该信号恒为 0 分。

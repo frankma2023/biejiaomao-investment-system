@@ -862,6 +862,8 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">179. 函数算了正确值、调用方又硬编码覆盖一遍——改函数不生效且无报错</div><div class="ld">修「破200日线 80→40」时改了 score_ma_break 里的 ma200_score = 80，重跑后数据仍是 80、日均贡献 54.7 分毫不变。原因是 compute_all 第 611 行把分值又硬编码了一遍：ma200_score = 80 if ma200_b else 0，立刻覆盖了函数返回值。这不是普通重复代码，是遮蔽（shadowing）——比重复更危险，因为「改了没反应」不会报错，只能通过对比「改前改后数据是否变化」发现。修法是让函数返回各项分值、调用方直接使用，删掉重复定义。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">180. 「阈值不对」往往是「权重不对」的症状，先查权重再动阈值</div><div class="ld">我一路判断「档位 60/100/140 需要重定」，因为重跑后 51.7% 的日子落在「清仓」档。但根因是两个信号权重失衡：破200日线占日均总分 44%（80分×68%触发率），AD<0.5 触发率 33.7%（读5日均值导致）。把 80→40、0.5→0.15 之后，总分均值从 124.4 降到 80.7，原档位分布变成正常29%/减仓50%25%/减仓25%34%/清仓12%——PRD 原本的设计恰好适用。诊断顺序：先看各信号日均贡献占比，再看阈值，最后才怀疑档位。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">181. 信号「从不触发」有四种成因，必须逐一定位而非统一归为「没数据」</div><div class="ld">12 个信号中 6 个从未触发，实际是四类不同问题：① 缺写入脚本（抛盘日——detect() 算得好好的，没人写库）② 依赖表停更（追盘日）③ 查询或阈值 bug（龙头见顶股池无下界累积到 1067 只；指数背离的 WHERE date=? 让 LAG 失效、0.5 当百分数）④ 阈值未校准（AD低位读5日均值再要求连续5天=9天窗口；上涨无量要求宽基5连涨，2026年0次）。把「没触发」笼统归因于「数据缺失」会全部修错。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">182. 补数据时只填了「看起来相关」的字段，被下游查询条件静默过滤</div><div class="ld">追盘日补算后信号仍是 0 分。查查询条件发现 score_ftd_failure 用的是 (invalidated_date IS NOT NULL OR is_valid = 1)——而我写入时只设了 is_valid=0 和 invalidated_reason，没写 invalidated_date，失效的 FTD 全被过滤掉。补上从 failure_reason 里正则提取的日期后，信号从 20 天恢复到 61 天。教训：往已有表补数据前，必须先读下游的 WHERE 条件，确认哪些字段参与了过滤，不能只按表结构的语义填。这和「改了函数但调用方覆盖」是同一类问题——写入端正确不等于读取端能看见。</div></div>
+
 
 
 
