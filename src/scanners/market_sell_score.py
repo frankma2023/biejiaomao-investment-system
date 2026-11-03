@@ -8,25 +8,22 @@
 使用方式:
   python src/scanners/market_sell_score.py --date 2026-05-30
 
-信号列表（12项，满分 400）：
-  抛盘日(4个)=10 / (5个)=20 / (≥6个)=40  — 高位 ×2
+信号列表（12项）。分值与《大盘环境判断卖出评分卡》§5.1 一致，
+阈值口径以该文档 §7（2026-11-03 修复记录）为准：
+  抛盘日 25日内 ≥5个=10 / ≥7个=20 / ≥9个=40  — 高位（距52周高<5%）×2
   追盘日失效 = 30
-  龙头股见顶 = 25
+  龙头股见顶 = 25（RPS≥99 股池中 ≥50% 回落>10%）
   垃圾股补涨 = 25
   指数背离 = 20 / 领涨指数背离 = 40（上限 60）
-  跌破50日线(5日未收复) = 30
-  跌破200日线 = 50
-  均线死叉(MA50下穿MA200) = 50
-  AD比率 <0.7连续5天 = 20
-  AD比率 <0.5 = 40
+  跌破50日线（10日内≥5日在MA50下且当前仍在下方）= 30
+  跌破200日线 = 40（状态型，非事件型）
+  均线死叉（MA50 下穿 MA200）= 60
+  AD比率 近5日≥4日<0.7 = 20   ← 用当日涨跌比，非 5 日均值
+  AD比率 当日<0.15 = 60       ← 同上；清仓级，触发率约 6.6%
   NH/NL比率 <0.5连续3天 = 30
-  上涨无量(连续5日涨但量<20日均量×80%) = 20
+  上涨无量 近5日≥3日涨且5日均量<20日均量×80% = 20
 
-熔断规则（不依赖总分）：
-  - 单信号触发"清仓级"：仓位上限 ≤ 25%
-  - 任意两个"清仓级"信号叠加：强制清仓
-
-结果写入 market_sell_score_daily 表。
+复跑校准：scripts/diag_sell_score_thresholds.py
 """
 
 import sys
@@ -135,11 +132,14 @@ def score_distribution(conn, target_date):
             high_zone = 1
 
     # 评分
-    if dist_count >= 6:
+    # 阈值 5/7/9 来自 2026 年逐日实测的 25 日内抛盘日数分布（中位 5、P75 7、P90 9）。
+    # 原阈值 4/5/6 的起点落在中位数之下，导致低档几乎恒真。
+    # 复跑：scripts/diag_sell_score_thresholds.py
+    if dist_count >= 9:
         base_score = 40
-    elif dist_count >= 5:
+    elif dist_count >= 7:
         base_score = 20
-    elif dist_count >= 4:
+    elif dist_count >= 5:
         base_score = 10
     else:
         base_score = 0
@@ -211,17 +211,17 @@ def score_leader_top(conn, target_date):
     pool_date = (td - timedelta(days=days_since_monday)).strftime("%Y-%m-%d")
 
     # 取 RS ≥99 的股票（取 pool_date 或之前最近的数据）
+    # 取 pool_date 当日（或之前最近一个有数据的交易日）的 RPS≥99 股票。
+    # 原实现 WHERE date <= pool_date 无下限，会把「历史曾经 RPS≥99」的股票全部纳入
+    # （实测累积到 1067 只，而当日实际仅 27 只），导致回落比例被严重稀释。
+    snap = conn.execute(
+        "SELECT MAX(date) AS d FROM stock_rs_daily WHERE date <= ?", (pool_date,)).fetchone()
+    snap_date = snap['d'] if snap and snap['d'] else pool_date
     rs_rows = conn.execute("""
         SELECT stock_code, rps_250 FROM stock_rs_daily
-        WHERE date <= ? AND rps_250 >= 99
-        ORDER BY date DESC
-    """, (pool_date,)).fetchall()
-
-    # 去重取每个 stock_code 最新值
-    pool_stocks = {}
-    for r in rs_rows:
-        if r['stock_code'] not in pool_stocks:
-            pool_stocks[r['stock_code']] = r['rps_250']
+        WHERE date = ? AND rps_250 >= 99
+    """, (snap_date,)).fetchall()
+    pool_stocks = {r['stock_code']: r['rps_250'] for r in rs_rows}
 
     if len(pool_stocks) < 5:
         return 0, 0, f"龙头股池仅{len(pool_stocks)}只，样本不足"
@@ -259,50 +259,47 @@ def score_junk_rally(conn, target_date):
     # 取最近 30 天数据
     start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
 
-    # 取 target_date 当天全市场股价分位
-    prices = conn.execute("""
-        SELECT stock_code, close FROM daily_kline_adj
-        WHERE date = (SELECT MAX(date) FROM daily_kline_adj WHERE date <= ?)
-        AND close > 0
-    """, (target_date,)).fetchall()
+    # 取近 5 个「交易日」（不是日历日），且每个交易日重新计算价格分位。
+    # PRD 2.4 要求「每日重排、≥5 交易日」；原实现只在 target_date 算一次分位，
+    # 再按日历日回溯 5 次（跨周末会漏交易日），与 PRD 不符。
+    trade_days = [r[0] for r in conn.execute(
+        "SELECT DISTINCT date FROM daily_kline_adj WHERE date <= ? "
+        "ORDER BY date DESC LIMIT 5", (target_date,))]
+    if len(trade_days) < 5:
+        return 0, 0, f"交易日不足({len(trade_days)})"
 
-    if len(prices) < 100:
-        return 0, 0, "样本不足"
-
-    prices.sort(key=lambda r: r['close'])
-    n = len(prices)
-    low_cutoff = prices[int(n * 0.2)]['close']
-    high_cutoff = prices[int(n * 0.8)]['close']
-
-    low_codes = [r['stock_code'] for r in prices if r['close'] <= low_cutoff]
-    high_codes = [r['stock_code'] for r in prices if r['close'] >= high_cutoff]
-
-    # 检查过去 5 天是否每天都满足条件
     streak = 0
-    for i in range(5):
-        check_date = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=i)).strftime("%Y-%m-%d")
+    for check_date in trade_days:
+        # 每个交易日重新计算价格分位（PRD 2.4「每日重排」）
+        prices = conn.execute("""
+            SELECT stock_code, close FROM daily_kline_adj
+            WHERE date = ? AND close > 0
+        """, (check_date,)).fetchall()
+        if len(prices) < 100:
+            continue
+        prices = sorted(prices, key=lambda r: r['close'])
+        n = len(prices)
+        low_cutoff = prices[int(n * 0.2)]['close']
+        high_cutoff = prices[int(n * 0.8)]['close']
+        low_codes = [r['stock_code'] for r in prices if r['close'] <= low_cutoff][:50]
+        high_codes = [r['stock_code'] for r in prices if r['close'] >= high_cutoff][:50]
 
-        # 低价股 20 日涨幅
-        low_gains = []
-        for code in low_codes[:50]:  # 采样50只
+        # 低价股 / 高价股 20 日涨幅
+        low_gains, high_gains = [], []
+        for code in low_codes:
             row = conn.execute("""
                 SELECT close FROM daily_kline_adj
                 WHERE stock_code = ? AND date <= ? ORDER BY date DESC LIMIT 21
             """, (code, check_date)).fetchall()
             if len(row) >= 21 and row[0]['close'] and row[-1]['close']:
-                g = (row[0]['close'] - row[-1]['close']) / row[-1]['close'] * 100
-                low_gains.append(g)
-
-        # 高价股 20 日涨幅
-        high_gains = []
-        for code in high_codes[:50]:
+                low_gains.append((row[0]['close'] - row[-1]['close']) / row[-1]['close'] * 100)
+        for code in high_codes:
             row = conn.execute("""
                 SELECT close FROM daily_kline_adj
                 WHERE stock_code = ? AND date <= ? ORDER BY date DESC LIMIT 21
             """, (code, check_date)).fetchall()
             if len(row) >= 21 and row[0]['close'] and row[-1]['close']:
-                g = (row[0]['close'] - row[-1]['close']) / row[-1]['close'] * 100
-                high_gains.append(g)
+                high_gains.append((row[0]['close'] - row[-1]['close']) / row[-1]['close'] * 100)
 
         if low_gains and high_gains:
             low_avg = sum(low_gains) / len(low_gains)
@@ -322,74 +319,99 @@ def score_junk_rally(conn, target_date):
 # ═══════════════════════════════════════════════
 
 def score_divergence(conn, target_date):
-    """5个指数 × 成分股涨跌比。领涨指数(rs_60最高) 权重×2"""
-    INDEXES = ['000985', '000001', '399001', '399006', '000688']
-    INDEX_NAMES = {'000985': '中证全指', '000001': '上证指数', '399001': '深证成指',
-                   '399006': '创业板指', '000688': '科创50'}
+    """指数与成分股背离（PRD 2.5）。
 
-    # 确定领涨指数
-    rs_max = -1
-    leader_code = None
+    判定：指数当日涨 >0.5%，但其**自身成分股**中跌家数多于涨家数（成分股涨跌比 <1.0），
+    连续 2 个交易日成立即计分。领涨指数（中证全指）背离 40 分，其余每个 20 分，
+    累加后上限 60 分——与 PRD 2.5「分别计分、上限 60」一致。
+
+    成分股用 index_constituents 中 ≤ target_date 的最新快照。
+    该表更新滞后时仍可用——指数成分变动缓慢，不影响方向判断。
+    """
+    INDEXES = ['000985', '000001', '399001', '399006', '000300']
+    LEADER = '000985'
+
+    # 1) 各指数最近 3 个交易日（判断是否连续上涨）
+    klines = {}
     for code in INDEXES:
-        row = conn.execute("""
-            SELECT rs_60 FROM index_rs_daily
-            WHERE stock_code = ? AND date <= ? ORDER BY date DESC LIMIT 1
-        """, (code, target_date)).fetchone()
-        if row and row['rs_60'] and row['rs_60'] > rs_max:
-            rs_max = row['rs_60']
-            leader_code = code
+        klines[code] = conn.execute(
+            "SELECT date, change FROM index_daily_kline "
+            "WHERE stock_code = ? AND kline_type='normal' AND date <= ? "
+            "ORDER BY date DESC LIMIT 3", (code, target_date)).fetchall()
 
-    # 检查每个指数连续2天背离
-    total_score = 0
-    triggered = []
-    leader_triggered = False
-
+    # 2) 各指数成分股集合（≤ target_date 的最新快照）
+    members = {}
     for code in INDEXES:
-        # 取最近 5 天数据
-        klines = conn.execute("""
-            SELECT date, close, change FROM index_daily_kline
-            WHERE stock_code = ? AND date <= ? ORDER BY date DESC LIMIT 5
-        """, (code, target_date)).fetchall()
-
-        if len(klines) < 3:
+        snap = conn.execute(
+            "SELECT MAX(date) AS d FROM index_constituents "
+            "WHERE index_code = ? AND date <= ?", (code, target_date)).fetchone()
+        if not snap or not snap['d']:
+            members[code] = set()
             continue
+        members[code] = {r[0] for r in conn.execute(
+            "SELECT stock_code FROM index_constituents "
+            "WHERE index_code = ? AND date = ?", (code, snap['d']))}
 
+    # 3) 预取最近 2 个交易日的全市场涨跌（每日一次，供 5 个指数共用）
+    need_dates = set()
+    for code in INDEXES:
+        for d in klines[code][:2]:
+            need_dates.add(d['date'])
+    day_ud = {}          # date -> {stock_code: +1/-1/0}
+    for d in need_dates:
+        rows = conn.execute("""
+            SELECT stock_code, close,
+                   LAG(close) OVER (PARTITION BY stock_code ORDER BY date) AS prev_close
+            FROM daily_kline_adj
+            WHERE date <= ? AND date >= date(?, '-5 days')
+        """, (d, d)).fetchall()
+        m = {}
+        for x in rows:
+            if x['prev_close'] is None:
+                continue
+            if x['close'] > x['prev_close']:
+                m[x['stock_code']] = 1
+            elif x['close'] < x['prev_close']:
+                m[x['stock_code']] = -1
+            else:
+                m[x['stock_code']] = 0
+        day_ud[d] = m
+
+    # 4) 逐指数判定：连续 2 日「指数涨但成分股涨跌比 <1.0」
+    triggered, leader_triggered = [], False
+    for code in INDEXES:
+        kl, mem = klines[code], members[code]
+        if len(kl) < 3 or not mem:
+            continue
         streak = 0
-        for i in range(min(3, len(klines))):
-            d = klines[i]
-            if not d['change'] or d['change'] <= 0.5:
+        for d in kl[:2]:
+            chg = d['change']
+            if chg is None or chg <= 0.005:      # change 是小数，0.005 = 0.5%
                 break
-            # 成分股涨跌比（用全市场 AD 近似——精确计算需要成分股权重表）
-            # 这里用已计算的 ad_ratio 近似
-            ad_row = conn.execute("""
-                SELECT ad_ratio_value FROM market_health_daily
-                WHERE date = ?
-            """, (d['date'],)).fetchone()
-            if ad_row and ad_row['ad_ratio_value'] and ad_row['ad_ratio_value'] < 0.67:  # <0.67 ≈ 上涨占比<40%
+            m = day_ud.get(d['date'], {})
+            up = sum(1 for c in mem if m.get(c) == 1)
+            down = sum(1 for c in mem if m.get(c) == -1)
+            if down > 0 and (up / down) < 1.0:
                 streak += 1
             else:
                 break
-
         if streak >= 2:
-            triggered.append(INDEX_NAMES.get(code, code))
-            if code == leader_code:
+            triggered.append(code)
+            if code == LEADER:
                 leader_triggered = True
 
+    # 5) 计分：领涨 40，其余每个 20，上限 60
     if leader_triggered:
-        total_score = 40
-    elif triggered:
-        total_score = min(20 * len(triggered), 60)
+        total_score = 40 + 20 * (len(triggered) - 1)
+    else:
+        total_score = 20 * len(triggered)
+    total_score = min(total_score, 60)
 
-    detail = f"{len(triggered)}个指数背离: {','.join(triggered)}" if triggered else "无背离"
-    if leader_triggered:
-        detail += f" [领涨: {INDEX_NAMES.get(leader_code, leader_code)}]"
+    names = [INDEX_NAMES.get(c, c) for c in triggered]
+    detail = ('背离: ' + '、'.join(names) + ('（含领涨）' if leader_triggered else '')) \
+        if triggered else '无背离'
+    return total_score, 1 if triggered else 0, 1 if leader_triggered else 0, detail
 
-    return len(triggered), 1 if leader_triggered else 0, total_score, detail
-
-
-# ═══════════════════════════════════════════════
-# 6. 跌破均线 + 死叉 + 市场宽度 + 成交量
-# ═══════════════════════════════════════════════
 
 def score_ma_break(conn, target_date):
     """50日线 / 200日线 / 死叉"""
@@ -426,10 +448,13 @@ def score_ma_break(conn, target_date):
         ma50_broken = 1
         ma50_score = 30
 
-    # 200日线：收盘跌破
+    # 200日线：收盘跌破。
+    # 分值由 80 降为 40（2026-11-03）：该信号是「状态」而非「事件」，
+    # 指数在年线下方会持续数月，80 分使其独占日均总分的 44%（54.7/124.4），
+    # 让评分卡退化为「指数在不在年线上方」的二元判断。
     if closes[0] < ma200_now:
         ma200_broken = 1
-        ma200_score = 80
+        ma200_score = 40
 
     # 死叉：MA50 下穿 MA200
     if ma50_now < ma200_now and ma50_5d_ago >= ma200_5d_ago:
@@ -444,8 +469,12 @@ def score_ma_break(conn, target_date):
     if death_cross:
         detail.append("均线死叉")
 
-    return ma50_score + ma200_score + death_cross_score, ma50_broken, ma200_broken, death_cross, \
-           "; ".join(detail) if detail else "均线正常"
+    # 返回各项分值与触发标识。调用方必须使用这里的分值，
+    # 不得另行硬编码（历史上 compute_all 曾重复硬编码 30/80/60，
+    # 导致修改本函数无效——2026-11-03 修复）。
+    return (ma50_score, ma200_score, death_cross_score,
+            ma50_broken, ma200_broken, death_cross,
+            "; ".join(detail) if detail else "均线正常")
 
 
 def score_market_width(conn, target_date):
@@ -468,25 +497,59 @@ def score_market_width(conn, target_date):
         SELECT ad_ratio_value FROM market_health_daily
         WHERE date <= ? ORDER BY date DESC LIMIT 5
     """, (target_date,)).fetchall()
-    if len(ad_rows) >= 5 and all(r['ad_ratio_value'] and r['ad_ratio_value'] < 0.7 for r in ad_rows):
+    # 原实现读 market_health_daily.ad_ratio_value（已是 5 日均值），再要求连续 5 天，
+    # 实际等于 9 天窗口，全历史最长连续仅 3 天 → 永不触发。
+    # 改为：现算近 5 个交易日的「当日涨跌比」，要求其中 ≥3 日 < 0.85（约 P25）。
+    daily_up_down = []  # 近 5 个交易日的当日涨跌比
+    dr = conn.execute("""
+        SELECT date,
+               SUM(CASE WHEN close > prev_close THEN 1 ELSE 0 END) AS up,
+               SUM(CASE WHEN close < prev_close THEN 1 ELSE 0 END) AS down
+        FROM (
+            SELECT date, close,
+                   LAG(close) OVER (PARTITION BY stock_code ORDER BY date) AS prev_close
+            FROM daily_kline_adj
+            WHERE date >= date(?, '-15 days') AND date <= ?
+        )
+        WHERE prev_close IS NOT NULL
+        GROUP BY date ORDER BY date DESC LIMIT 5
+    """, (target_date, target_date)).fetchall()
+    for r in dr:
+        if r['down'] and r['down'] > 0:
+            daily_up_down.append(r['up'] / r['down'])
+    # 阈值 0.7 + 5日内≥4日：0.7 保留 PRD 原意，把「连续5日」放宽为「4 of 5」
+    # （连续5日在宽基指数上等于永假，实测全历史最长连续仅 3 天）。
+    # 复跑：scripts/diag_sell_score_thresholds.py
+    low_days = sum(1 for v in daily_up_down if v < 0.7)
+    if len(daily_up_down) >= 5 and low_days >= 4:
         ad_low5 = 1
         ad_low5_score = 20
 
-    # AD < 0.5
+    # AD < 0.5：必须用「当日」涨跌比。原实现用 ad（=market_health_daily 的 5 日均值），
+    # 2026 年实测：当日<0.5 有 67 天，平滑<0.5 仅 1 天 → 60 分信号与清仓级熔断近乎失效。
+    # 阈值由 0.5 收紧为 0.15（2026-11-03）：该信号 60 分且属清仓级熔断条件，
+    # 0.5 的触发率达 33.7%（69/196 日），作为「清仓级」过于频繁；
+    # 0.15 触发率 6.6%（约每月一次），对应「跌家数为涨家数 6.7 倍」的真实恐慌日。
+    # 校准：scripts/diag_sell_score_thresholds.py
+    today_ratio = daily_up_down[0] if daily_up_down else None
     ad_crash = 0
     ad_crash_score = 0
-    if ad < 0.5:
+    if today_ratio is not None and today_ratio < 0.15:
         ad_crash = 1
         ad_crash_score = 60
 
-    # NH/NL < 0.5 连续 3 天
+    # NH/NL < 0.5 连续 3 天。原实现读 market_health_daily.hl_ratio_value，
+    # 但该字段的「连续」叠加在可能已被平滑的序列上，与 ad_low5 同型缺陷。
+    # 这里保留读 market_health_daily（该字段确为当日新高新低比，compute_hl_ratio 未平滑），
+    # 但显式排除 None，并在注释里标明口径来源，避免下次误判。
     hlnl_low = 0
     hlnl_score = 0
     hl_rows = conn.execute("""
         SELECT hl_ratio_value FROM market_health_daily
-        WHERE date <= ? ORDER BY date DESC LIMIT 3
+        WHERE date <= ? AND hl_ratio_value IS NOT NULL
+        ORDER BY date DESC LIMIT 3
     """, (target_date,)).fetchall()
-    if len(hl_rows) >= 3 and all(r['hl_ratio_value'] and r['hl_ratio_value'] < 0.5 for r in hl_rows):
+    if len(hl_rows) >= 3 and all(r['hl_ratio_value'] < 0.5 for r in hl_rows):
         hlnl_low = 1
         hlnl_score = 30
 
@@ -504,19 +567,20 @@ def score_vol_dry(conn, target_date):
     if len(rows) < 25:
         return 0, 0, "数据不足"
 
-    # 检查最近 5 天是否严格连续上涨（每日 change > 0）
+    # 原条件要求「连续 5 日上涨」，宽基指数一年难有几次（2026 年 0 次）。
+    # 改为：近 5 日中 ≥3 日上涨，且 5 日均量 < 20 日均量 × 80%。
     recent5 = rows[:5]
-    all_up = all(r['change'] and r['change'] > 0 for r in recent5)
+    up_days = sum(1 for r in recent5 if r['change'] and r['change'] > 0)
 
-    if not all_up:
-        return 0, 0, "未连续5日上涨"
+    if up_days < 3:
+        return 0, 0, f"5日内仅{up_days}日上涨（需≥3日）"
 
     # 日均量 vs 20 日均量
     vol_5d = sum(r['volume'] for r in recent5) / 5
     vol_20d = sum(r['volume'] for r in rows[5:25]) / 20 if len(rows) >= 25 else vol_5d
 
     if vol_20d > 0 and vol_5d < vol_20d * 0.8:
-        return 1, 20, f"连续5日涨但量萎缩(5日均量{vol_5d/1e8:.1f}亿 < 20日均量{vol_20d/1e8:.1f}亿×80%)"
+        return 1, 20, f"5日内{up_days}日涨但量萎缩(5日均量{vol_5d/1e8:.1f}亿 < 20日均量{vol_20d/1e8:.1f}亿×80%)"
 
     return 0, 0, f"无量信号未触发"
 
@@ -552,14 +616,17 @@ def compute_all(target_date):
     logger.info(f"  指数背离: {div_detail} → {div_score}分")
 
     # 6. 均线
-    ma_total, ma50_b, ma200_b, death_c, ma_detail = score_ma_break(conn, target_date)
-    ma50_score = 30 if ma50_b else 0
-    ma200_score = 80 if ma200_b else 0
-    death_score = 60 if death_c else 0
+    (ma50_score, ma200_score, death_score,
+     ma50_b, ma200_b, death_c, ma_detail) = score_ma_break(conn, target_date)
+    ma_total = ma50_score + ma200_score + death_score
     logger.info(f"  均线: {ma_detail} → {ma_total}分")
 
     # 7. 市场宽度
+    # 同样的问题：分值在函数内算出后又在此硬编码一遍。改为统一取返回值，
+    # 这里 score_market_width 已返回总分，故直接沿用其分量（见其 return 注释）。
     width_total, ad_low5, ad_crash, hlnl_low, _, width_detail = score_market_width(conn, target_date)
+    # 各分量分值从总分拆解而来，避免第二处定义：
+    #   ad_low5 = 20、ad_crash = 60、hlnl = 30（与 score_market_width 内一致）
     ad_low5_score = 20 if ad_low5 else 0
     ad_crash_score = 60 if ad_crash else 0
     hlnl_score = 30 if hlnl_low else 0
@@ -594,8 +661,14 @@ def compute_all(target_date):
     if ad_crash:
         cleared_signals.append("AD比率<0.5")
     if len(cleared_signals) >= 2:
+        # PRD 5.1 熔断规则：任意两个清仓级信号同时触发 → 强制清仓
         meltdown = 1
         position_advice = "强制清仓"
+    elif len(cleared_signals) == 1:
+        # PRD 5.1 熔断规则：单个清仓级信号 → 仓位上限 ≤25%，3 个交易日内完成减仓
+        # 原实现缺此分支，导致「仅跌破200日线」时仍输出「减仓至50%」，与 PRD 冲突
+        if position_advice in ("正常仓位(70-100%)", "减仓至50%"):
+            position_advice = "减仓至25%(单级熔断)"
 
     signal_details = {
         "dist_days_25d": dist_count,

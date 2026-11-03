@@ -288,6 +288,13 @@ TASKS.extend([
     ("12.行业分组健康",   [PYTHON_EXE, "src/scanners/market_health.py", "--date", today_str, "--sector"]),
     # 13. 指数资金活跃度（北向/主力资金）
     ("13.指数资金流向",   [PYTHON_EXE, "src/scanners/index_capital_flow.py", "--date", today_str]),
+    # 13b. 抛盘日明细（供第 14 步使用）。
+    # 原先 distribution_days_detail 无写入脚本，只有 000001 的历史数据，
+    # 而 market_sell_score 的抛盘日信号查 index_code='000985' → 该信号恒为 0 分。
+    # 每日增量回补近 45 天（25 日窗口 + 缓冲）；已存在行 INSERT OR REPLACE，幂等。
+    ("13b.抛盘日明细",   [PYTHON_EXE, "scripts/backfill_distribution_days.py",
+                          "--index", "000985",
+                          "--start", (date.fromisoformat(today_str) - timedelta(days=45)).strftime("%Y-%m-%d")]),
     # 14. 大盘卖出评分（环境恶化预警）
     ("14.大盘卖出评分",   [PYTHON_EXE, "src/scanners/market_sell_score.py", "--date", today_str]),
     # 15. 大盘扫描快照（6 卡片 + 趋势图）

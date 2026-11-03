@@ -649,6 +649,15 @@
           html+='<div class="id">'+m.desc+'</div></div>';
         });
         html+='</div>';
+
+        // ═══ 卖出评分长期趋势（2026-01 起）═══
+        html+='<div class="section-hdr" style="margin-top:18px">📉 卖出评分趋势 · 2026-01 至今</div>';
+        html+='<div style="font-size:9px;color:var(--muted);margin-bottom:8px;line-height:1.7">'
+          + '💡 分数越高越危险 · 横线=现行决策阈值 60 / 100 / 140（待重定）· '
+          + '叠加指数已归一化为起点=100 · Y 轴自适应</div>';
+        html+='<div id="sell-idx-toggles" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>';
+        html+='<div class="score-card" style="padding:10px"><div id="chart-sell-trend" style="height:260px"></div></div>';
+        html+='<div id="sell-corr" style="margin-top:8px;font-size:10px;color:var(--muted);line-height:1.9"></div>';
       }
 
       // ═══ L1: 核心信号 ═══
@@ -722,6 +731,9 @@
         html+='</div></div>';
       }
       document.getElementById('content').innerHTML=html;
+      // 图表需在 DOM 挂载后初始化
+      if(document.getElementById('health-idx-toggles')){ renderHealthIdxToggles(); loadHealthTrend(); }
+      if(document.getElementById('sell-idx-toggles')){ renderSellIdxToggles(); loadSellTrend(); }
       loadCapitalFlow(h.date);
     }
 
@@ -745,9 +757,6 @@
         }
       }
 
-  // 健康分趋势：默认只显示健康分自身，指数按需叠加
-  renderHealthIdxToggles();
-  loadHealthTrend();
       // 卡片3: 用中证全指收盘价趋势作为市场走势代理
       if(idx000985&&idx000985.klines.length>5){
         var kl2=idx000985.klines.slice(-20);
@@ -1146,11 +1155,143 @@ window.toggleTheme = function(){
   setTimeout(function(){
     renderHealthIdxToggles();
     loadHealthTrend();
+    renderSellIdxToggles();
+    loadSellTrend();
     ['chart-volume-trend','chart-hl-trend'].forEach(function(id){
       var e=document.getElementById(id); if(e&&e._echart) e._echart.resize();
     });
   }, 60);
 };
+
+// ═══════════ 卖出评分长期趋势图 ═══════════
+var SELL_IDX_ACTIVE = {};
+
+function renderSellIdxToggles(){
+  var box = document.getElementById('sell-idx-toggles');
+  if(!box) return;
+  var h = '';
+  HEALTH_IDX.forEach(function(x){
+    var on = !!SELL_IDX_ACTIVE[x.code];
+    h += '<button data-code="'+x.code+'" class="sell-idx-btn" '
+       + 'style="font-size:10px;padding:3px 9px;border-radius:20px;cursor:pointer;'
+       + 'border:1px solid '+(on?x.color:'var(--border)')+';'
+       + 'background:'+(on?x.color+'1f':'transparent')+';'
+       + 'color:'+(on?x.color:'var(--muted)')+'">'
+       + '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;'
+       + 'background:'+x.color+';margin-right:5px;opacity:'+(on?1:.35)+'"></span>'
+       + x.name + '</button>';
+  });
+  box.innerHTML = h;
+  box.querySelectorAll('.sell-idx-btn').forEach(function(b){
+    b.onclick = function(){
+      var c = b.getAttribute('data-code');
+      SELL_IDX_ACTIVE[c] = !SELL_IDX_ACTIVE[c];
+      renderSellIdxToggles();
+      loadSellTrend();
+    };
+  });
+}
+
+function loadSellTrend(){
+  var codes = Object.keys(SELL_IDX_ACTIVE).filter(function(k){return SELL_IDX_ACTIVE[k]});
+  var url = API_BASE + '/api/market-sell-score/history?start=2026-01-01'
+          + (codes.length ? '&idx=' + codes.join(',') : '');
+  fetch(url).then(function(r){return r.json()}).then(function(d){
+    var el = document.getElementById('chart-sell-trend');
+    if(!el) return;
+    if(el._echart) el._echart.dispose();
+    var ch = echarts.init(el); el._echart = ch;
+    var isDark = document.documentElement.dataset.theme === 'dark';
+    var gridC = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
+    var txtC  = isDark ? '#8b8b90' : '#6b7280';
+    var dates = d.scores.map(function(x){return x.date});
+    var series = [{
+      name:'卖出评分', type:'line', data: d.scores.map(function(x){return x.score}),
+      smooth:false, step:'end', symbol:'none',
+      // 决策阈值参考线必须挂在 series 上，置于 option 根层不渲染
+      markLine:{silent:true, symbol:'none',
+        lineStyle:{type:'dashed', width:1, opacity:.5},
+        data:[
+          {yAxis:60,  lineStyle:{color:'#10b981'}, label:{formatter:'60', position:'insideEndTop', fontSize:9, color:'#10b981'}},
+          {yAxis:100, lineStyle:{color:'#f59e0b'}, label:{formatter:'100', position:'insideEndTop', fontSize:9, color:'#f59e0b'}},
+          {yAxis:140, lineStyle:{color:'#ef4444'}, label:{formatter:'140', position:'insideEndTop', fontSize:9, color:'#ef4444'}}
+        ]},
+      lineStyle:{width:2, color:'#ef4444'},
+      areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
+        {offset:0,color:'rgba(239,68,68,.16)'},{offset:1,color:'rgba(0,0,0,0)'}])},
+      z:10
+    }];
+    Object.keys(d.indices||{}).forEach(function(code){
+      var meta = HEALTH_IDX.filter(function(x){return x.code===code})[0] || {color:'#999'};
+      var m = {};
+      (d.indices[code].series||[]).forEach(function(pt){ m[pt[0]] = pt[1] });
+      series.push({
+        name: d.indices[code].name, type:'line',
+        data: dates.map(function(dt){ return m[dt] != null ? m[dt] : null }),
+        smooth:true, symbol:'none', connectNulls:true,
+        lineStyle:{width:1.4, color:meta.color, opacity:.9}, z:5
+      });
+    });
+
+    var _vals = [];
+    series.forEach(function(s){ (s.data||[]).forEach(function(v){ if(v!=null&&!isNaN(v)) _vals.push(v); }); });
+    var _lo = _vals.length?Math.min.apply(null,_vals):0;
+    var _hi = _vals.length?Math.max.apply(null,_vals):100;
+    var _pad = (_hi-_lo)*0.08 || 5;
+    var yMin = Math.max(0, Math.floor((_lo-_pad)/5)*5);
+    var yMax = Math.ceil((_hi+_pad)/5)*5;
+
+    ch.setOption({
+      grid:{left:38, right:14, top:26, bottom:28},
+      tooltip:{trigger:'axis', backgroundColor:isDark?'rgba(20,20,25,.94)':'rgba(255,255,255,.97)',
+        borderColor:gridC, textStyle:{color:isDark?'#e4e4e7':'#1f2328',fontSize:11}},
+      legend:{top:0, right:0, itemWidth:10, itemHeight:6,
+        textStyle:{color:txtC, fontSize:10}},
+      xAxis:{type:'category', data:dates, boundaryGap:false,
+        axisLine:{lineStyle:{color:gridC}},
+        axisLabel:{color:txtC, fontSize:9, interval:Math.floor(dates.length/7)},
+        splitLine:{show:false}},
+      yAxis:{type:'value', min:yMin, max:yMax, splitNumber:5,
+        axisLine:{show:false}, axisTick:{show:false},
+        axisLabel:{color:txtC, fontSize:9},
+        splitLine:{lineStyle:{color:gridC}}},
+      series: series
+    });
+    renderSellCorr(d);
+  }).catch(function(e){
+    var el = document.getElementById('chart-sell-trend');
+    if(el) el.innerHTML = '<div style="padding:20px;font-size:11px;color:var(--muted)">加载失败：'+e.message+'</div>';
+  });
+}
+
+function renderSellCorr(d){
+  var box = document.getElementById('sell-corr'); if(!box) return;
+  var sm = {}; d.scores.forEach(function(x){sm[x.date]=x.score});
+  var rows = [];
+  Object.keys(d.indices||{}).forEach(function(code){
+    var pts = d.indices[code].series||[];
+    var ds = pts.filter(function(p){return sm[p[0]]!=null}).map(function(p){return p[0]});
+    if(ds.length<30) return;
+    var sv = ds.map(function(x){return sm[x]});
+    var iv = ds.map(function(dt){var v=null;pts.forEach(function(p){if(p[0]===dt)v=p[1]});return v;});
+    var rh = _corr(sv, iv);
+    var ds_=[],di_=[];
+    for(var i=1;i<sv.length;i++){ if(iv[i]!=null&&iv[i-1]!=null){ ds_.push(sv[i]-sv[i-1]); di_.push(iv[i]/iv[i-1]-1); } }
+    rows.push({nm:d.indices[code].name, rh:rh, rd:_corr(ds_,di_)});
+  });
+  if(!rows.length){ box.innerHTML='<span style="opacity:.6">勾选指数后显示卖出评分与该指数的相关性（预期为负）</span>'; return; }
+  rows.sort(function(a,b){return (a.rh||0)-(b.rh||0)});
+  var h='<b style="color:var(--text-primary)">卖出评分与各指数的相关性</b>　';
+  h+='<span style="opacity:.7">反向指标应为负值；越负说明越能反映该指数的风险</span><br>';
+  rows.forEach(function(r){
+    var c1=r.rh==null?'—':r.rh.toFixed(2), c2=r.rd==null?'—':r.rd.toFixed(2);
+    var col=(r.rh!=null&&r.rh<=-0.4)?'#ef4444':(r.rh!=null&&r.rh>-0.2?'#10b981':'var(--text-primary)');
+    h+='<span style="display:inline-block;margin-right:16px">'
+     + '<span style="color:var(--muted)">'+r.nm+'</span>　水平 <b style="color:'+col+'">'+c1+'</b>'
+     + '　日变动 <b>'+c2+'</b></span>';
+  });
+  box.innerHTML=h;
+}
 </script>
 </body>
 </html>

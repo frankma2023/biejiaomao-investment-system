@@ -593,6 +593,61 @@ def api_market_health_history():
                     'count': len(health), 'health': health, 'indices': indices})
 
 
+@app.route('/api/market-sell-score/history')
+def api_market_sell_score_history():
+    """大盘卖出评分历史序列 + 指数叠加（与 health/history 同口径）。"""
+    start = request.args.get('start', '2026-01-01')
+    end = request.args.get('end', '2099-12-31')
+    idx_arg = request.args.get('idx', '').strip()
+    db = get_db()
+
+    rows_out = []
+    try:
+        for r in db.execute(
+                "SELECT date, total_score, position_advice, meltdown_triggered, "
+                "dist_score, ftd_score, leader_score, junk_score, divergence_score, "
+                "ma50_score, ma200_score, death_cross_score, hlnl_score, "
+                "ad_low5_score, ad_crash_score, vol_dry_score FROM market_sell_score_daily "
+                "WHERE date >= ? AND date <= ? ORDER BY date", (start, end)):
+            rows_out.append({
+                'date': r['date'], 'score': r['total_score'],
+                'advice': r['position_advice'],
+                'meltdown': r['meltdown_triggered'],
+                'dist': r['dist_score'], 'ftd': r['ftd_score'],
+                'leader': r['leader_score'], 'junk': r['junk_score'],
+                'divergence': r['divergence_score'],
+                'ma50': r['ma50_score'], 'ma200': r['ma200_score'],
+                'death_cross': r['death_cross_score'], 'hlnl': r['hlnl_score'],
+                'ad_low5': r['ad_low5_score'], 'ad_crash': r['ad_crash_score'],
+                'vol_dry': r['vol_dry_score']})
+    except Exception:
+        pass
+
+    IDX_NAME = {'000985': '中证全指', '000001': '上证指数', '399001': '深证成指',
+                '399006': '创业板指', '000688': '科创50', '000300': '沪深300'}
+    indices = {}
+    codes = [c.strip() for c in idx_arg.split(',') if c.strip()] if idx_arg else []
+    for code in codes:
+        try:
+            rr = db.execute(
+                "SELECT date, close FROM index_daily_kline WHERE stock_code=? "
+                "AND kline_type='normal' AND date >= ? AND date <= ? ORDER BY date",
+                (code, start, end)).fetchall()
+        except Exception:
+            rr = []
+        if not rr:
+            continue
+        base = rr[0][1]
+        indices[code] = {
+            'name': IDX_NAME.get(code, code), 'base': base,
+            'base_date': rr[0]['date'],
+            'series': [[x['date'], round(x['close'] / base * 100, 2)] for x in rr]}
+
+    return jsonify({'start': rows_out[0]['date'] if rows_out else start,
+                    'end': rows_out[-1]['date'] if rows_out else end,
+                    'count': len(rows_out), 'scores': rows_out, 'indices': indices})
+
+
 @app.route('/api/market-health')
 def api_market_health():
     target_date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
