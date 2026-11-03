@@ -58,6 +58,24 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>⚖️ 卖出评分卡信号修复与权重校准 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-warn"></span><b>12 个信号中 5 个从未触发</b>：抛盘日、追盘日、龙头见顶、指数背离、AD 低位、上涨无量（共 6 项）</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>抛盘日</b>：<code>distribution_day.py</code> 的 detect() 算法完整但 CLI 只打印不写库，全库无写入脚本 → 新增 <code>backfill_distribution_days.py</code>，回补 000985 共 441 行</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>龙头见顶</b>：股池查询 <code>WHERE date <= pool_date</code> 无下界，累积到 1067 只（当日实际 27 只）→ 限定当日快照</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>指数背离</b>：① <code>WHERE date=?</code> 使 LAG 拿不到前一日 → prev_close 恒 NULL ② 阈值 0.5 把小数当百分数（等于要求涨 50%）③ 改用各指数**自身成分股**算涨跌比</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>AD 低位 / AD&lt;0.5</b>：读的是 5 日均值（中位 1.29）再要求连续 5 天 = 9 天窗口 → 改当日值；AD&lt;0.5 阈值收紧到 &lt;0.15（触发率 33.7%→6.6%）</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>上涨无量</b>：要求宽基指数连续 5 日收红（2026 年 0 次）→ 改「近 5 日 ≥3 日上涨」</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span><b>最隐蔽的 bug</b>：<code>compute_all</code> 把均线分值硬编码重复一遍（30/80/60），<b>遮蔽了 score_ma_break 的返回值</b>——改函数里的 80→40 完全无效且无报错</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>权重校准</b>：破 200 日线 80→40（占日均总分 44%→33%），AD&lt;0.5 阈值 0.5→0.15；总分均值 124.4→80.7</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>结论：档位 60/100/140 无需重定</b> ——「档位不对」实为「权重不对」的症状。修正后分布为正常 29% / 减仓50% 25% / 减仓25% 34% / 清仓 12%</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>双轴审查（Standards + Spec 并行子代理）发现 15 项问题，其中 3 个真 bug、5 处 PRD 内部矛盾，全部修复</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>接入 daily_update.py 第 13b 步</b>（抛盘日明细），保证第 14 步大盘卖出评分每天有数据可读</td><td>2026-11-03</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>新增可复跑校准脚本 <code>diag_sell_score_thresholds.py</code>，注释中的校准数字均可复现</td><td>2026-11-03</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>📈 大盘健康分长期趋势图 + 匹配度诊断 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-done"></span>market-scan 页面在「大盘健康分」卡片下方新增<b>趋势折线图</b>（2026-03 至今），支持六只指数叠加</td><td>2026-11-02</td></tr>
@@ -841,6 +859,10 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">176. 红涨绿跌只适用于价格方向与买卖票，评分与比率必须用中性色</div><div class="ld">压力测试报告里把「CANSLIM 77.0」「DCF 溢价 58%」套上了 .rise/.fall（红/绿），读者会误读为「上涨」或「下跌」——但评分和估值差没有方向。规则：只有「价格变动」（+1.6%、距高 -15.4%）与「买卖票标」（买入红、回避绿）用红绿；评分、负债率、换手倍数、DCF 溢价一律中性色。颜色承载语义时，要明确它承载的是哪一类语义。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">177. 判断「A 是否反映 B」不能只画图，必须算相关系数并分层看同向率</div><div class="ld">最初只在页面上并排画健康分与指数曲线，视觉上「两个都在动」就算交代了。实际做分层同向率后才发现关键结构：指数跌 >2% 时健康分同向率 95%、涨 1~2% 时 85%，但涨 0~1% 只有 62%、跌 0~1% 只有 55%——整体 72.4% 掩盖了「极端时准、小幅时近似随机」的真相。同时平移相关系数显示 k=0 为 0.49、其余全在 ±0.14 内，证明它是同步指标而非领先指标。图表只能给方向感，强度与结构必须靠统计量。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">178. 不同量级的序列叠加必须先归一化，坐标轴写死会静默裁切数据</div><div class="ld">指数原始点位（上证 3599、深证 10833）与健康分（0-100）不同量级，直接叠加会压成平线，故统一归一化为起点=100。但归一化后仍有问题：Y 轴写死 min:0 max:130，而科创50 归一化后最高 150.7、创业板指 132.7，全选时顶部被静默裁掉——图上看不出异常，只是曲线「不见了」。改为按当前可见序列动态计算 min/max（上下各留 8% 空白、向 5 的整数对取整）后解决。凡是硬编码坐标轴范围，都要先核对数据实际区间。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">179. 函数算了正确值、调用方又硬编码覆盖一遍——改函数不生效且无报错</div><div class="ld">修「破200日线 80→40」时改了 score_ma_break 里的 ma200_score = 80，重跑后数据仍是 80、日均贡献 54.7 分毫不变。原因是 compute_all 第 611 行把分值又硬编码了一遍：ma200_score = 80 if ma200_b else 0，立刻覆盖了函数返回值。这不是普通重复代码，是遮蔽（shadowing）——比重复更危险，因为「改了没反应」不会报错，只能通过对比「改前改后数据是否变化」发现。修法是让函数返回各项分值、调用方直接使用，删掉重复定义。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">180. 「阈值不对」往往是「权重不对」的症状，先查权重再动阈值</div><div class="ld">我一路判断「档位 60/100/140 需要重定」，因为重跑后 51.7% 的日子落在「清仓」档。但根因是两个信号权重失衡：破200日线占日均总分 44%（80分×68%触发率），AD<0.5 触发率 33.7%（读5日均值导致）。把 80→40、0.5→0.15 之后，总分均值从 124.4 降到 80.7，原档位分布变成正常29%/减仓50%25%/减仓25%34%/清仓12%——PRD 原本的设计恰好适用。诊断顺序：先看各信号日均贡献占比，再看阈值，最后才怀疑档位。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">181. 信号「从不触发」有四种成因，必须逐一定位而非统一归为「没数据」</div><div class="ld">12 个信号中 6 个从未触发，实际是四类不同问题：① 缺写入脚本（抛盘日——detect() 算得好好的，没人写库）② 依赖表停更（追盘日）③ 查询或阈值 bug（龙头见顶股池无下界累积到 1067 只；指数背离的 WHERE date=? 让 LAG 失效、0.5 当百分数）④ 阈值未校准（AD低位读5日均值再要求连续5天=9天窗口；上涨无量要求宽基5连涨，2026年0次）。把「没触发」笼统归因于「数据缺失」会全部修错。</div></div>
+
 
 
 
