@@ -54,7 +54,7 @@ for key in ['sector_l2', 'thematic']:
 all_sector_stocks = set()
 if indices:
     ph = ','.join('?'*len(indices))
-    c.execute("SELECT DISTINCT stock_code FROM index_constituents WHERE index_code IN (%s) AND date=(SELECT MAX(date) FROM index_constituents)" % ph, indices)
+    c.execute("SELECT DISTINCT stock_code FROM index_constituents WHERE index_code IN (%s) AND date=(SELECT MAX(c2.date) FROM index_constituents c2 WHERE c2.index_code = index_constituents.index_code)" % ph, indices)
     all_sector_stocks = {r['stock_code'] for r in c.fetchall()}
 
 print('Step2: %d indices -> %d stocks' % (len(indices), len(all_sector_stocks)))

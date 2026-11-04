@@ -63,7 +63,7 @@ for key in ['sector_l2', 'thematic']:
 all_sector_stocks = set()
 if sector_indices:
     ph = ','.join('?'*len(sector_indices))
-    c.execute(f"SELECT DISTINCT stock_code FROM index_constituents WHERE index_code IN ({ph}) AND date=(SELECT MAX(date) FROM index_constituents)", sector_indices)
+    c.execute(f"SELECT DISTINCT stock_code FROM index_constituents WHERE index_code IN ({ph}) AND date=(SELECT MAX(c2.date) FROM index_constituents c2 WHERE c2.index_code = index_constituents.index_code)", sector_indices)
     all_sector_stocks = {r['stock_code'] for r in c.fetchall()}
 
 print(f'\n步骤二: L2+主题 {len(sector_indices)}指数 → {len(all_sector_stocks)}只成分股')

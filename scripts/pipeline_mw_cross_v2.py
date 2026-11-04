@@ -101,7 +101,7 @@ if l2_indices:
     ph = ','.join('?' * len(l2_indices))
     c.execute(f"""
         SELECT DISTINCT stock_code FROM index_constituents
-        WHERE index_code IN ({ph}) AND date=(SELECT MAX(date) FROM index_constituents)
+        WHERE index_code IN ({ph}) AND date=(SELECT MAX(c2.date) FROM index_constituents c2 WHERE c2.index_code = index_constituents.index_code)
     """, l2_indices)
     all_sector_stocks = {r['stock_code'] for r in c.fetchall()}
 
