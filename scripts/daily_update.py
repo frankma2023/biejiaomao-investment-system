@@ -435,18 +435,21 @@ TASKS.append(("39.自选股入条件评估",
 # TRADE_GUARD：非交易日早退。
 # 2026-11-03 清理了 2026-05-30/06-06/06-21 等 7 条非交易日残留
 # （周末或节假日被误算，因为入口未校验今天是否交易日）。
-# 判定方式：指数 000985 在 today_str 是否有日 K 线——有则必为交易日。
-# --force 可跳过（补算历史数据时用）。
-if "--force" not in sys.argv:
-    _con = sqlite3.connect(os.path.join(BASE_DIR, "data", "lixinger.db"))
-    _hit = _con.execute(
-        "SELECT 1 FROM index_daily_kline WHERE stock_code='000985' "
-        "AND kline_type='normal' AND date=? LIMIT 1", (today_str,)).fetchone()
-    _con.close()
-    if not _hit:
-        log(f"[SKIP] {today_str} 非交易日（000985 无日K线），全部步骤跳过。"
-            f"确需执行请加 --force")
-        sys.exit(0)
+#
+# 2026-11-04 修复两个缺陷：
+#   ① 变量名写错：原用 BASE_DIR（不存在），实际是 PROJECT_DIR → 每次运行都 NameError；
+#   ② 判定时机错：原在「拉数据之前」查当日 K 线，而当日 K 线由第 2 步才拉取，
+#      所以在真实交易日的正常时段必然查不到 → 会静默跳过整轮。
+# 现判定拆成两段：
+#   · 周末（weekday≥5）在这里直接跳过——永远不会是交易日；
+#   · 工作日节假日改为「第 2 步拉完指数日 K 之后」再判定，见下方 _checked_today。
+# --force 可全部跳过（补算历史数据时用）。
+if "--force" not in sys.argv and WEEKDAY >= 5:
+    log(f"[SKIP] {today_str} 为周末（weekday={WEEKDAY}），全部步骤跳过。"
+        f"确需执行请加 --force")
+    sys.exit(0)
+
+_checked_today = False      # 是否已做过「当日是否交易日」判定
 
 for item in TASKS:
     label, cmd = item[0], item[1]
@@ -459,6 +462,21 @@ for item in TASKS:
         failed.append(lbl)
         log(f"[WARN] {lbl} 失败，继续执行后续任务")
         # 继续执行，不终止
+
+    # 第 2 步拉完指数日 K 后，判定今天到底是不是交易日（周末已在入口排除）。
+    # 按命令路径匹配，不依赖中文标签。
+    if ("--force" not in sys.argv and not _checked_today
+            and any("fetch_index_daily_kline.py" in str(x) for x in cmd)):
+        _checked_today = True
+        _con = sqlite3.connect(os.path.join(PROJECT_DIR, "data", "lixinger.db"))
+        _hit = _con.execute(
+            "SELECT 1 FROM index_daily_kline WHERE stock_code='000985' "
+            "AND kline_type='normal' AND date=? LIMIT 1", (today_str,)).fetchone()
+        _con.close()
+        if not _hit:
+            log(f"[SKIP] {today_str} 无 000985 当日 K 线（工作日节假日或数据未发布），"
+                f"后续步骤跳过。确需执行请加 --force")
+            break
 
 # ═══════════════════════════════════════════════
 # 汇总
