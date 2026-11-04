@@ -107,7 +107,7 @@ def save_stock_results(db_path, code, dates_all, results, max_retry=8):
                         continue
                     db.execute(
                         "INSERT OR REPLACE INTO chanlun_weekly_bi_json "
-                        "(stock_code, scan_date, bi_json, WEEKLY_ALGO_VERSION) VALUES (?,?,?,?)",
+                        "(stock_code, scan_date, bi_json, algo_version) VALUES (?,?,?,?)",
                         (code, d, s['bi_json'], WEEKLY_ALGO_VERSION))
                 db.commit()
                 return len([s for _, s in results if s])

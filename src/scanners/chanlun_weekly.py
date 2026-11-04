@@ -34,7 +34,8 @@ import os
 
 import pandas as pd
 
-PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 三层 dirname 才能到仓库根：src/scanners/chanlun_weekly.py → src/scanners → src → <root>
+PROJECT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DB_PATH = os.path.join(PROJECT, 'data', 'lixinger.db')
 WEEKLY_ALGO_VERSION = 'czsc101_w'
 
