@@ -5899,29 +5899,42 @@ def api_stock_rs_double_strong():
 
 @app.route('/api/stock-rs/rs-line', methods=['GET'])
 def api_stock_rs_line():
-    """单只股票RS线历史序列"""
+    """单只股票 RS 线历史序列（读 stock_rs_daily，不重算）。
+
+    原实现每次请求都调 stock_rs.compute() 重算全市场 3 年 RS 线，单次超时
+    → 市场强度 tab 图表空白。该表已含 rs_line（归一化比值，起点 2014-01-02=100）
+    并每日更新，按请求窗口重新归一化到「窗口首日=100」即可，
+    与原 compute 的 rs_line_norm（rs_line_raw / first().over(stock_code) × 100）等价。
+    """
     code = request.args.get('code', '600519')
     start = request.args.get('start', '2024-01-01')
     end = request.args.get('end', datetime.now().strftime('%Y-%m-%d'))
     try:
-        from scanners.stock_rs import compute
-        import polars as pl
-        cache_key = end + '_' + (start or 'full')
-        if cache_key not in _rs_cache:
-            if len(_rs_cache) > 2:
-                _rs_cache.clear()
-            _rs_cache[cache_key] = compute(target_date=end, start_date=start)
-        df = _rs_cache[cache_key]
-        stock = df.filter((pl.col("stock_code")==code) & (pl.col("date")>=start) & (pl.col("date")<=end)).sort("date")
-        if stock.shape[0] == 0:
+        db = get_db()
+        # 不用 rs_line 列：该列在 2026-04-10 附近有归一化基准断层
+        # （部分股票基准从 2014-01-02 被改成 2026-04-10，源于截断窗口的历史重算）。
+        # 改用干净的 adj_close ÷ 指数收盘现算，口径与 stock_rs.compute 一致。
+        rows = db.execute(
+            "SELECT r.date, r.adj_close, r.rps_250, r.rps_20, k.close AS idx_close "
+            "FROM stock_rs_daily r "
+            "LEFT JOIN index_daily_kline k ON k.date=r.date "
+            "  AND k.stock_code='000985' AND k.kline_type='normal' "
+            "WHERE r.stock_code=? AND r.date>=? AND r.date<=? ORDER BY r.date",
+            (code, start, end)).fetchall()
+        db.close()
+        if not rows:
             return jsonify({'error': f'{code} 无数据'}), 404
+        raw = [(r['adj_close'] / r['idx_close']) if (r['adj_close'] and r['idx_close'])
+               else None for r in rows]
+        base = next((x for x in raw if x), None)
+        rs_norm = [round(x / base * 100, 2) if (x and base) else None for x in raw]
         return jsonify({
             'code': code,
-            'dates': stock["date"].to_list(),
-            'rs_line': [round(x, 2) if x else None for x in stock["rs_line_norm"].to_list()],
-            'close': stock["adj_close"].to_list(),
-            'rps_250': stock["rps_250"].to_list(),
-            'rps_20': stock["rps_20"].to_list(),
+            'dates': [r['date'] for r in rows],
+            'rs_line': rs_norm,
+            'close': [r['adj_close'] for r in rows],
+            'rps_250': [r['rps_250'] for r in rows],
+            'rps_20': [r['rps_20'] for r in rows],
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
