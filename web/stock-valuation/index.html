@@ -492,7 +492,7 @@ async function loadStrength(code){
   var tx=isDark?'#999':'#6E6E6E',sp=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
   ch.setOption({
     backgroundColor:'transparent',tooltip:{trigger:'axis'},
-    legend:{data:['RPS_250','RPS_120','RPS_60','RPS_20'],bottom:20,textStyle:{color:tx,fontSize:10},selectedMode:true},
+    legend:{data:['RPS_250','RPS_120','RPS_60','RPS_20'],bottom:20,textStyle:{color:tx,fontSize:10},selectedMode:true,icon:'rect',itemWidth:14,itemHeight:3,itemGap:14},
     grid:{left:'8%',right:'4%',top:8,bottom:55},
     xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9,formatter:function(v){return v.slice(0,7)}},axisLine:{lineStyle:{color:sp}}},
     yAxis:{type:'value',name:'RPS',min:0,max:100,axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},
@@ -521,7 +521,7 @@ async function loadStrength(code){
   var ch2=echarts.init(dom2);
   ch2.setOption({
     backgroundColor:'transparent',tooltip:{trigger:'axis'},
-    legend:{data:['股价(元)','RS线','顶背离','底背离'],bottom:20,textStyle:{color:tx,fontSize:10}},
+    legend:{data:[{name:'股价(元)',icon:'rect'},{name:'RS线',icon:'rect'},'顶背离','底背离'],bottom:20,textStyle:{color:tx,fontSize:10},itemWidth:14,itemHeight:3,itemGap:14},
     grid:{left:'8%',right:'4%',top:8,bottom:55},
     xAxis:{type:'category',data:d.dates,axisLabel:{color:tx,fontSize:9,formatter:function(v){return v.slice(0,7)}},axisLine:{lineStyle:{color:sp}}},
     yAxis:[{type:'value',name:'股价',axisLabel:{color:tx,fontSize:9},splitLine:{lineStyle:{color:sp}}},{type:'value',name:'RS线',axisLabel:{color:tx,fontSize:9},splitLine:{show:false}}],

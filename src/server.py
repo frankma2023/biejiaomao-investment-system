@@ -5915,7 +5915,8 @@ def api_stock_rs_line():
         # （部分股票基准从 2014-01-02 被改成 2026-04-10，源于截断窗口的历史重算）。
         # 改用干净的 adj_close ÷ 指数收盘现算，口径与 stock_rs.compute 一致。
         rows = db.execute(
-            "SELECT r.date, r.adj_close, r.rps_250, r.rps_20, k.close AS idx_close "
+            "SELECT r.date, r.adj_close, r.rps_250, r.rps_120, r.rps_60, r.rps_20, "
+            "k.close AS idx_close "
             "FROM stock_rs_daily r "
             "LEFT JOIN index_daily_kline k ON k.date=r.date "
             "  AND k.stock_code='000985' AND k.kline_type='normal' "
@@ -5934,6 +5935,8 @@ def api_stock_rs_line():
             'rs_line': rs_norm,
             'close': [r['adj_close'] for r in rows],
             'rps_250': [r['rps_250'] for r in rows],
+            'rps_120': [r['rps_120'] for r in rows],
+            'rps_60': [r['rps_60'] for r in rows],
             'rps_20': [r['rps_20'] for r in rows],
         })
     except Exception as e:
