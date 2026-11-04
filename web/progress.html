@@ -908,6 +908,7 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">188. 路径层级错一层，数据库会「静默地空着」——sqlite 连不存在的路径会直接建空库</div><div class="ld">chanlun_weekly.py 的 PROJECT = dirname(dirname(__file__)) 少一层，DB_PATH 解析成 src/data/lixinger.db。sqlite3.connect 发现文件不存在就创建一个 0 字节空库，不报错。于是 4116 只股票全部查表失败、周线笔从 2026-09-18 起停更；而周线 CPA 增量脚本比较的是「CPA 表 vs 周线笔表」，两表都停在同一天，一致判定「已是最新」，僵死两周无人发现。同日还发现同文件 INSERT 的列名写成了常量名 WEEKLY_ALGO_VERSION。教训：相对路径拼接必须断言目标文件存在；增量脚本比较「两表是否同步」时，无法发现「两表一起停更」。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">189. rmtree 前必须枚举目录全部内容，不能只确认目标文件</div><div class="ld">为清理一个误建的空库 src/data/lixinger.db，我执行 shutil.rmtree('src/data')。删之前只检查了 lixinger.db 的大小是 0 字节，没枚举目录里还有什么——结果连 src/data/lixr_api/ 下 26 个正当源码文件一起删掉（base_api.py、db_manager.py、各 API 封装）。已从 git 恢复（ad24a68）并导入自检通过。规则：任何递归删除前，先 Get-ChildItem -Recurse 列出全部内容并逐项确认可删；能用 unlink 单个文件就绝不用 rmtree 整个目录。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">190. 多返回值函数的「顺序」和「数值」一样重要——改顺序不报错，但会把值写进错误的列</div><div class="ld">复核卖出评分 13 信号触发率时，指数背离一项对不上：库中 200 天只有 1 天触发、累计 1 分，而直接调用同一个函数得到的是 4 天 / 140 分。根因是 aec2e28 重写 <code>score_divergence</code> 时把返回值改成了 <code>(分值, 是否触发, 是否领涨, 说明)</code>，而调用方仍按 <code>(个数, 领涨, 分值, 说明)</code> 解包——8 个打分函数里只有它把分值放在第一位。结果 40/60 分被写进 <code>divergence_count</code>，<code>divergence_score</code> 拿到标志位 0/1。无异常、无告警，前端还把 count 渲染成「60 个指数」暴露了个半截症状。影响：2 个交易日的仓位档位从「减仓」误判成「清仓」。与教训 179（调用方硬编码覆盖）、182（少填过滤字段）同族，都是「写入端正确、读取端看不见」。对策：多返回值一律在 docstring 写清顺序，并统一约定「明细在前、分值在后」；改返回顺序时用 grep 找全部调用点，不能只看函数体。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">191. 先判断瓶颈是 CPU 还是 I/O，再决定要不要加进程——加进程治不了 I/O，只会让所有进程一起变慢</div><div class="ld">CPA 日更（步骤 34）原来每天全量重算，8 进程把 8 核打满、要 29 分钟。第一反应是「加进程/换算法」，但实测拆开看：单股 1.475s 里 <b>笔顶加载 75.9%</b>，而笔顶阶段里 <b>json.loads 又占 76%</b>——每股要读 28MB 缠论笔 JSON，全池 173GB。这是 I/O + 解析，不是 CPU 密集。证据：8 进程相对单进程只有 <b>2.3x</b> 加速（CPU-bound 应接近 8x），吞吐 3.63 只/秒。所以优化方向必须是「少读字节」，不是「多开进程」。另两条同样反直觉：① 先改成范围查询（1 次 vs 2,900 次点查）反而<b>更慢</b>——真正贵的是 9KB 的 blob 本身；② 加上「按内容 memo」后热缓存 2.6x、冷缓存却 2x 变慢，说明同一段代码在两种缓存状态下的最优解不同，<b>不能只测一次就下结论</b>。顺带修掉的固定成本：DELETE 1,134 万行 102.6s、重写 1,070 万行 186s，都是单线程串行，纯增量追加就能省掉——但省完只剩 17%，因为计算没变。</div></div>
 
 
 
@@ -954,6 +955,21 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 </div>
 
 <div class="pg-section">
+<div class="pg-section">
+<div class="section-title">📌 2026-11-04 第二阶段 · CPA 日更性能优化（步骤 34/36）</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>定位瓶颈</b>：单股剖析 + 等价性比对。步骤 34 单股 1.475s 中 <b>笔顶加载占 75.9%</b>（每股约 2,900 次点查 + 2,900 次 JSON 解析，读 28MB <code>bi_json</code>）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>优化 1 · 笔顶加载</b>：逐日点查 → 一次范围查询 + 按内容 memo。实测快照逐字节重复率 <b>80%</b>（5.08x），单股 1.12s → 0.16s（热）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>优化 2 · 真增量</b>：<code>--incremental</code> 原为「每天 DELETE 1,134 万行 + 重写 1,070 万行」（实测 DELETE 102.6s + INSERT ≈186s，纯串行）。改为<b>只追加新日期</b>，写库量降到数千行</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>优化 3 · 引擎指纹自愈</b>：指纹 = 版本 + CFG + 本文件源码。改判据/阈值 → 指纹变 → <b>自动全量重建</b>，杜绝「增量写出陈旧历史」（教训 184）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>优化 4 · 低优先级</b>：进池前设 BELOW_NORMAL，子进程继承。空闲时照跑满 8 核，前台工作优先 —— 直接解决「90% CPU 导致其它工作无法进行」</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>优化 5 · 周线 invalidated</b>：<code>mark_invalidated_weekly</code> 每天全扫 57 万条迁移并逐条再查；改为只复核近 70 天窗口内未标记的行（最大窗口 8 周）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>正确性验证</b>：全量重建后行数 11,347,638 / 迁移 2,300,930 / 失效 1,029,203 与重建前<b>完全一致</b>，420 行抽样内容指纹 <code>bce0cca503b55e49</code> 前后相同（memo 零副作用）；端到端「删 5 只 3 天 → 跑增量 → 恢复」<b>逐行一致</b></td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>未解决的瓶颈（已量化）</b>：每日仍需为全部 5,981 只重放全历史（阶段是路径依赖）。实测 8 进程吞吐仅 <b>3.63 只/秒</b>（加速比 2.3x，典型 I/O-bound），全池 <b>约 24 分钟</b>。根因是每股读 28MB 缠论笔 JSON（全池 <b>173GB</b>）</td></tr>
+<tr><td><span class="pg-dot dot-todo"></span></td><td><b>下一步（待定）</b>：新增紧凑笔顶表 <code>chanlun_tops_runs(stock_code,start_date,end_date,tops_json)</code>，按内容合并为区段（每股约 600 段 vs 3,000 天）。预计读取量降到 <b>1/67</b>，全池 24 分钟 → <b>约 5 分钟</b>。代价：一次性构建 + chanlun 日更后需维护该表</td></tr>
+</table>
+</div>
+
 <div class="section-title">📌 2026-09-29 收尾 · 红利 RSI 买卖点 + 前端健壮性</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-done"></span></td><td>红利详情页 500 修复：<code>bond_yield_daily</code> 最新行 y10 为 NULL，导致三序列相减 TypeError；3 处读取加 <code>y10 IS NOT NULL</code></td></tr>

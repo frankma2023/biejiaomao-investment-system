@@ -357,16 +357,38 @@ def load_bi_tops_by_date(conn, code, dates):
     （实测覆盖约 5 年）。对 2018 年的某日而言，最新快照里的笔顶**全部在该日之后**。
     回填历史时用最新快照 = 拿未来数据算过去。
 
-    代价：每个日期一次点查 + 一次 JSON 解析（本机约 0.5ms/日）。
+    实现（2026-11-04 优化，两处）：
+      ① **一次范围查询**取该股全部快照，再按日期在内存分发。旧实现是逐日点查
+         （单股约 2,900 次查询）。
+      ② **按 bi_json 内容 memo**：实测相邻交易日快照逐字节重复率 80%
+         （样本 6 只：17,360 行仅 3,415 个不同内容，5.08x）。
+         `bi_json` 单条约 9.3 KB，逐日 json.loads 是单股耗时的 76%，
+         memo 后同内容只解析一次。
+
+    性能：单股该函数从 1.12s → 约 0.14s（读盘 0.07 + 解析 0.07 + 提取 0.01）。
+
+    ⚠ 多个日期可能返回**同一个 list 对象**（同内容共享）。下游只读，禁止原地修改；
+    确需修改请先 list() 复制。
     """
+    if not dates:
+        return {}
+    lo, hi = min(dates), max(dates)
+    snap = {r[0]: r[1] for r in conn.execute(
+        "SELECT scan_date, bi_json FROM chanlun_bi_json "
+        "WHERE stock_code=? AND scan_date>=? AND scan_date<=?",
+        (code, lo, hi))}
+    cache = {}
     out = {}
     for d in dates:
-        if d in out:
+        j = snap.get(d)
+        if not j:
+            out[d] = []
             continue
-        row = conn.execute(
-            "SELECT bi_json FROM chanlun_bi_json WHERE stock_code=? AND scan_date=?",
-            (code, d)).fetchone()
-        out[d] = _parse_tops(row[0] if row else None)
+        t = cache.get(j)
+        if t is None:
+            t = _parse_tops(j)
+            cache[j] = t
+        out[d] = t
     return out
 
 
@@ -379,6 +401,79 @@ def load_rps250(conn, code, date, win=250):
         return row[0] if row else None
     except Exception:
         return None
+
+
+# ═══════════════════════════════════════════════════════════
+# [3b] 增量模式的基础设施（2026-11-04 新增）
+#
+# 背景：原 `--incremental` 的实现是「等价全量重跑」——每天 DELETE 两表
+# （cpa_stage_daily 1,134 万行 + transitions 230 万行，实测 DELETE 102.6s）、
+# 重算全市场、再 INSERT 回 1,070 万行（实测 ~186s）。这三段都是单线程串行，
+# 每天固定消耗约 5 分钟纯 IO，且 8 进程把 8 核打满，其它工作无法进行。
+#
+# 现在的做法：
+#   ① 引擎指纹未变 → **只追加新日期的行**，不删不重写（写库量从 1,070 万行降到数千行）
+#   ② 引擎指纹变了（改了 CFG 或本文件） → 自动退回全量重建，避免「增量写出陈旧历史」
+#   ③ 进程优先级降到 BELOW_NORMAL → 空闲时照样跑满，前台工作优先
+#
+# 指纹包含本文件源码，所以**任何对 cpa_stage.py 的改动都会触发一次全量重建**。
+# 这是刻意的：宁可多跑一次重建，也不要增量写出与代码不一致的历史（教训 184）。
+# ═══════════════════════════════════════════════════════════
+
+ENGINE_VERSION = '2026-11-04.1'    # 逻辑变更时手工递增（指纹里已含源码，此项仅作人读标记）
+META_TABLE = 'cpa_engine_meta'
+
+
+def engine_fingerprint():
+    """引擎指纹 = 版本号 + CFG 全量 + 本文件源码 的 sha1 前 16 位。"""
+    import hashlib
+    h = hashlib.sha1()
+    h.update(ENGINE_VERSION.encode('utf-8'))
+    h.update(json.dumps(CFG, sort_keys=True, ensure_ascii=False,
+                        default=str).encode('utf-8'))
+    try:
+        with open(os.path.abspath(__file__), 'rb') as f:
+            h.update(f.read())
+    except Exception:
+        pass
+    return h.hexdigest()[:16]
+
+
+def _ensure_meta(conn):
+    conn.execute("""CREATE TABLE IF NOT EXISTS %s (
+        key TEXT PRIMARY KEY, value TEXT)""" % META_TABLE)
+    conn.commit()
+
+
+def _get_meta(conn, key):
+    try:
+        row = conn.execute("SELECT value FROM %s WHERE key=?" % META_TABLE,
+                           (key,)).fetchone()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
+def _set_meta(conn, key, value):
+    conn.execute("INSERT OR REPLACE INTO %s VALUES (?,?)" % META_TABLE, (key, value))
+    conn.commit()
+
+
+def lower_priority():
+    """把当前进程（及其子进程）降到 BELOW_NORMAL，让前台工作优先。
+
+    Windows 下子进程默认继承父进程的优先级类，所以在建池之前调用一次即可覆盖全部 worker。
+    非 Windows 或调用失败时静默跳过——不影响正确性，只影响「抢不抢 CPU」。
+    """
+    try:
+        import ctypes
+        BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
+        handle = ctypes.windll.kernel32.GetCurrentProcess()
+        ok = ctypes.windll.kernel32.SetPriorityClass(
+            ctypes.c_void_p(handle), BELOW_NORMAL_PRIORITY_CLASS)
+        return bool(ok)
+    except Exception:
+        return False
 
 
 def ensure_tables(conn):
@@ -1281,13 +1376,18 @@ def run_state_machine(conn, code, kl, ind, tops, warmup=260):
     return daily, trans
 
 
-def mark_invalidated(conn, code=None):
+def mark_invalidated(conn, code=None, recent_days=None):
     """事后标记 invalidated（PRD §9.5）：迁移后 N 日内出现【回退型】迁移 → invalidated=1
 
     修复（Spec review B2）：
       1. 阶段名归一化（⑥a/⑥b/⑥c → ⑥）后再查 N 值——原实现键不匹配导致⑥永不标记
       2. 去掉 int(N*1.5) 的无依据窗口放大（直接用 N 个交易日 ≈ N*1.45 日历日）
       3. 只把"回退型"迁移（stage_rank 变小）算失效——正向推进（②→③→④）不是失效
+
+    性能（2026-11-04）：新增 `recent_days` 参数。全量扫描 230 万条迁移实测 36s，
+    且每条都要再查一次后续迁移。增量模式下只需复核「窗口还没过期且尚未标记」的行
+    （最近 recent_days 天），行数从 230 万降到数万级。
+    全量重建时仍走 recent_days=None（等价原行为）。
     """
     def _rank(s):
         s = (s or '').replace('T', '')
@@ -1298,11 +1398,25 @@ def mark_invalidated(conn, code=None):
         return {'②': 2, '③': 3, '④': 4, '⑤': 5}.get(s, 0)
 
     q = "SELECT stock_code, transition_date, from_stage, to_stage FROM cpa_stage_transitions"
-    args = ()
+    args = []
+    where = []
     if code:
-        q += " WHERE stock_code=?"
-        args = (code,)
-    rows = conn.execute(q, args).fetchall()
+        where.append("stock_code=?")
+        args.append(code)
+    if recent_days:
+        # 以表内最新迁移日为基准，而非系统今天——补算历史区间时同样成立
+        anchor = conn.execute(
+            "SELECT MAX(transition_date) FROM cpa_stage_transitions").fetchone()[0]
+        if anchor:
+            cutoff = (datetime.strptime(anchor, '%Y-%m-%d')
+                      - timedelta(days=recent_days)).strftime('%Y-%m-%d')
+            # 只复核未标记、且窗口未过期的行
+            where.append("invalidated=0")
+            where.append("transition_date>=?")
+            args.append(cutoff)
+    if where:
+        q += " WHERE " + " AND ".join(where)
+    rows = conn.execute(q, tuple(args)).fetchall()
     n_inv = 0
     for r in rows:
         sc, td, fs, ts = r[0], r[1], r[2], r[3]
@@ -1397,10 +1511,15 @@ def _stock_codes(conn, start, end=None):
     return [r[0] for r in conn.execute(q, args)]
 
 
-def _backfill_worker(codes):
+def _backfill_worker(args):
     """多进程 worker：独立连接，处理一批股票（模块级函数才能 pickle）
+
+    args = (codes, since_map)：
+      since_map 为 None → 全量，返回该批股票的全部历史行（全量重建用）
+      since_map 为 dict → 增量，只返回 date > since_map[code] 的行（末尾追加用）
     返回 (daily_rows, trans_rows, skipped)
     """
+    codes, since_map = args
     import sqlite3 as _sq
     conn = _sq.connect(DB_PATH, timeout=30)
     conn.row_factory = _sq.Row
@@ -1419,6 +1538,13 @@ def _backfill_worker(codes):
             # 而不是一份最新快照跑 2016-2026 全历史（见 PRD §9.16）
             tops = load_bi_tops_by_date(conn, code, [k['date'] for k in kl])
             d, t = run_state_machine(conn, code, kl, ind, tops)
+            if since_map is not None:
+                # 状态机仍要跑完整历史（阶段是路径依赖的），但只把「新日期」的行交回主进程，
+                # 这样写库量从 1,070 万行降到「每股新增若干行」。
+                cut = since_map.get(code)
+                if cut:
+                    d = [r for r in d if r[1] > cut]
+                    t = [r for r in t if r[1] > cut]
             daily_all += d
             trans_all += t
         except Exception as e:
@@ -1435,6 +1561,7 @@ def backfill(start='2016-01-01', end=None, workers=8, purge=True):
     import time as _t
     from concurrent.futures import ProcessPoolExecutor, as_completed
     t0 = _t.time()
+    lower_priority()          # 必须在建池之前：子进程继承优先级类
     conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout=30000")
@@ -1453,7 +1580,7 @@ def backfill(start='2016-01-01', end=None, workers=8, purge=True):
     all_skipped = []
     done = 0
     with ProcessPoolExecutor(max_workers=workers) as ex:
-        futures = {ex.submit(_backfill_worker, c): i for i, c in enumerate(chunks)}
+        futures = {ex.submit(_backfill_worker, (c, None)): i for i, c in enumerate(chunks)}
         for fut in as_completed(futures):
             try:
                 d, t, skipped = fut.result()
@@ -1482,9 +1609,104 @@ def backfill(start='2016-01-01', end=None, workers=8, purge=True):
         print('  跳过明细(前10): %s' % ', '.join(str(s) for s in all_skipped[:10]))
 
 
-def incremental():
-    """每日增量：全市场重跑（单股全历史仅 ~0.3s，全市场 ~3min——比上下文恢复更简单可靠）"""
-    backfill(start='2016-01-01', workers=8, purge=True)
+def incremental(workers=8, force_rebuild=False):
+    """每日增量：**只追加新日期**，不删表、不重写历史。
+
+    与旧实现的区别（旧实现 = 等价全量重跑，见 [3b] 注释）：
+      旧：DELETE 1,134 万行（102.6s）→ 重算 → INSERT 1,070 万行（~186s）
+      新：读每股已存的最大日期 → 重算 → 只 INSERT 新日期（通常每股 1 行，全市场数千行）
+
+    安全阀：引擎指纹（ENGINE_VERSION + CFG + 本文件源码）与库中记录不一致时，
+    自动退回全量重建。所以改了判据或阈值**不会**导致历史行陈旧。
+
+    参数：
+      workers       进程数（默认 8；进程优先级已降到 BELOW_NORMAL，不影响前台工作）
+      force_rebuild 强制全量重建（改阈值后想立刻对齐时用）
+    """
+    import time as _t
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+
+    t0 = _t.time()
+    lower_priority()          # 必须在建池之前：子进程继承优先级类
+
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA journal_mode=WAL")
+    ensure_tables(conn)
+    _ensure_meta(conn)
+
+    fp = engine_fingerprint()
+    stored = _get_meta(conn, 'engine_fp')
+    if force_rebuild or stored != fp:
+        why = ('强制' if force_rebuild
+               else ('首次运行（无指纹）' if not stored else '引擎指纹变化：%s → %s' % (stored, fp)))
+        print('[REBUILD] %s → 全量重建（这一步会 DELETE 两表并重写全部历史）' % why, flush=True)
+        conn.close()
+        backfill(start='2016-01-01', workers=workers, purge=True)
+        conn2 = sqlite3.connect(DB_PATH, timeout=30)
+        _ensure_meta(conn2)
+        _set_meta(conn2, 'engine_fp', fp)
+        conn2.close()
+        return
+
+    # ── 追加模式 ──
+    since = {}
+    for code, dmax in conn.execute(
+            "SELECT stock_code, MAX(date) FROM cpa_stage_daily GROUP BY stock_code"):
+        since[code] = dmax
+    # 只跑「K 线最新日期 > CPA 最新日期」或「CPA 完全没有行」的股票
+    latest_k = {}
+    for code, dmax in conn.execute(
+            "SELECT stock_code, MAX(date) FROM daily_kline GROUP BY stock_code"):
+        latest_k[code] = dmax
+    all_codes = _stock_codes(conn, '2016-01-01')
+    todo = [c for c in all_codes
+            if c not in since or latest_k.get(c, '') > since.get(c, '')]
+    print('日线CPA增量: 池 %d 只 | 有新 K 线需追加 %d 只 | 其余已是最新'
+          % (len(all_codes), len(todo)), flush=True)
+    if not todo:
+        conn.close()
+        print('无需更新，%.1fs 退出（幂等验证通过）' % (_t.time() - t0))
+        return
+
+    n = max(1, len(todo) // (workers * 4))
+    chunks = [todo[i:i + n] for i in range(0, len(todo), n)]
+    n_daily = n_trans = 0
+    all_skipped = []
+    done = 0
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        futures = {ex.submit(_backfill_worker, (c, since)): i
+                   for i, c in enumerate(chunks)}
+        for fut in as_completed(futures):
+            try:
+                d, t, skipped = fut.result()
+                all_skipped += skipped
+            except Exception as e:
+                print('  ! chunk 失败: %s' % str(e)[:80], flush=True)
+                continue
+            if d:
+                conn.executemany(
+                    "INSERT OR REPLACE INTO cpa_stage_daily VALUES (?,?,?,?,?,?,?,?,?,?,?)", d)
+            if t:
+                conn.executemany("""INSERT OR REPLACE INTO cpa_stage_transitions
+                    (stock_code, transition_date, from_stage, to_stage, trigger_detail_json, invalidated, invalidated_date)
+                    VALUES (?,?,?,?,?,0,NULL)""", t)
+            conn.commit()
+            n_daily += len(d or [])
+            n_trans += len(t or [])
+            done += 1
+            print('  chunk %d/%d (新增日线 %d 行, 迁移 %d) %.0fs'
+                  % (done, len(chunks), n_daily, n_trans, _t.time() - t0), flush=True)
+
+    print('标记 invalidated（仅近 70 天窗口内未标记的迁移）...', flush=True)
+    n_inv = mark_invalidated(conn, recent_days=70)
+    _set_meta(conn, 'engine_fp', fp)
+    conn.close()
+    print('日线CPA增量完成: 新增 %d 行 | 迁移 %d | 失效标记 %d | 跳过 %d 只 | 耗时 %.0fs'
+          % (n_daily, n_trans, n_inv, len(all_skipped), _t.time() - t0))
+    if all_skipped:
+        print('  跳过明细(前10): %s' % ', '.join(str(s) for s in all_skipped[:10]))
 
 
 if __name__ == '__main__':
@@ -1492,10 +1714,14 @@ if __name__ == '__main__':
     p = _ap.ArgumentParser(description='CPA 阶段判定引擎回算')
     p.add_argument('--start', default='2016-01-01')
     p.add_argument('--end', default=None)
-    p.add_argument('--workers', type=int, default=8)
-    p.add_argument('--incremental', action='store_true', help='每日增量（等价全量重跑）')
+    p.add_argument('--workers', type=int, default=8,
+                   help='进程数（默认 8；进程会降到 BELOW_NORMAL 优先级，不抢前台）')
+    p.add_argument('--incremental', action='store_true',
+                   help='每日增量：只追加新日期；引擎指纹变化时自动全量重建')
+    p.add_argument('--rebuild', action='store_true',
+                   help='强制全量重建（忽略指纹）')
     a = p.parse_args()
     if a.incremental:
-        incremental()
+        incremental(workers=a.workers, force_rebuild=a.rebuild)
     else:
         backfill(a.start, a.end, a.workers)

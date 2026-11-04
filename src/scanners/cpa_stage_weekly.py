@@ -275,11 +275,16 @@ def _ensure_cfg():
     daily.CFG.update(WEEKLY_CFG)
 
 
-def mark_invalidated_weekly(conn):
+def mark_invalidated_weekly(conn, recent_days=None):
     """周线版 mark_invalidated：三处差异——表名 / inv_n(周) / 时间窗按周换算。
 
     日线用 N×1.45 日历日换算（交易日→日历日）；周线直接 N×7 天
     （周K日期+7N天近似，跨长假误差≤3天可接受，交接文档 T1-6）。
+
+    recent_days（2026-11-04 新增）：只复核「窗口未过期且尚未标记」的迁移。
+    本表 57 万条迁移逐条再查一次后续迁移，全扫的固定成本较高；增量模式下
+    窗口最大 8 周（56 天），传入 recent_days=70 即可覆盖全部可能翻转的行。
+    全量回算传 None（等价原行为）。
     """
     cfg_saved = {k: daily.CFG[k] for k in WEEKLY_CFG}
     daily.CFG.update(WEEKLY_CFG)
@@ -293,7 +298,16 @@ def mark_invalidated_weekly(conn):
             return {'②': 2, '③': 3, '④': 4, '⑤': 5}.get(s, 0)
 
         q = f"SELECT stock_code, transition_date, from_stage, to_stage FROM {WEEKLY_TRANS_TABLE}"
-        rows = conn.execute(q).fetchall()
+        args = ()
+        if recent_days:
+            anchor = conn.execute(
+                f"SELECT MAX(transition_date) FROM {WEEKLY_TRANS_TABLE}").fetchone()[0]
+            if anchor:
+                cutoff = (datetime.strptime(anchor, '%Y-%m-%d')
+                          - timedelta(days=recent_days)).strftime('%Y-%m-%d')
+                q += " WHERE invalidated=0 AND transition_date>=?"
+                args = (cutoff,)
+        rows = conn.execute(q, args).fetchall()
         n_inv = 0
         for r in rows:
             sc, td, fs, ts = r[0], r[1], r[2], r[3]

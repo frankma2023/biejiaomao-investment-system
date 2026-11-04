@@ -402,7 +402,12 @@ TASKS.append(("32.自选池日报", [PYTHON_EXE, "scripts/gen_watchlist_report.p
 # 步骤 33：微盘股指数（依赖 K线就位——月末定池/月初生效/日频点位，幂等可重复）
 TASKS.append(("33.微盘股指数", [PYTHON_EXE, "scripts/build_microcap_index.py", "--incremental"]))
 
-# 步骤 34：CPA 阶段判定（依赖 K线+笔数据——六阶段状态机全量重跑，~3min，幂等）
+# 步骤 34：CPA 阶段判定（依赖 K线+笔数据——六阶段状态机）
+# 2026-11-04 优化：--incremental 改为**只追加新日期**（原实现是每天 DELETE 两表
+# 1,134 万行再全量重写，纯串行 DELETE 102s + INSERT 186s）。引擎指纹变化时自动全量重建。
+# 进程降到 BELOW_NORMAL，不再抢占前台工作。
+# 实际耗时：全量重建约 29 分钟；每日追加约 24 分钟（剩余瓶颈是每股读 28MB 缠论笔 JSON，
+# 全池约 173GB I/O，非 CPU）。见 progress.html 教训 191。
 TASKS.append(("34.CPA阶段判定", [PYTHON_EXE, "src/scanners/cpa_stage.py", "--incremental"]))
 
 # 步骤 35：周K线缠论笔快照（依赖日线K线就位；ISO 真周线口径，周末/周五盘后才有新周，
@@ -410,6 +415,8 @@ TASKS.append(("34.CPA阶段判定", [PYTHON_EXE, "src/scanners/cpa_stage.py", "-
 TASKS.append(("35a.周线缠论笔", [PYTHON_EXE, "scripts/backfill_chanlun_weekly.py", "--start", "2016-01-01", "--incremental"]))
 
 # 步骤 36：周线 CPA 阶段判定（依赖 35a 周线笔 + K线；增量式：仅重算有新完整周的股票，幂等可重复）
+# 2026-11-04：mark_invalidated_weekly 增加 recent_days=70 限制，只复核窗口未过期的迁移
+# （原实现每天全扫 57 万条迁移并逐条再查，固定成本高）。
 TASKS.append(("36.周线CPA判定", [PYTHON_EXE, "scripts/incremental_cpa_weekly.py"]))
 
 # 步骤 37：指数操作建议（RSI 多周期 + 锚定回撤 + 买入分/风险分 → index_advice_daily）

@@ -83,8 +83,8 @@ def incremental(workers=8):
             conn.commit()
             n_daily += len(d or [])
             n_trans += len(t or [])
-    print('标记 invalidated（周线版）...', flush=True)
-    n_inv = wk.mark_invalidated_weekly(conn)
+    print('标记 invalidated（周线版，仅近 70 天窗口内未标记的迁移）...', flush=True)
+    n_inv = wk.mark_invalidated_weekly(conn, recent_days=70)
     conn.close()
     print('周线CPA增量完成: %d 行 | 迁移 %d | 失效 %d | 跳过 %d | 耗时 %.0fs' % (
         n_daily, n_trans, n_inv, len(skipped_all), _t.time() - t0))
