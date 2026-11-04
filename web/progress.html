@@ -58,6 +58,20 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>🔧 2026-11-04 页面数据异常连环修复 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-done"></span><b>行业分组健康分全 NULL</b>：<code>_get_constituent_weights</code> 用 <code>(SELECT MAX(date) FROM index_constituents)</code> 取整表全局最新日期；成分股按 category 分别刷新后，其他类别在该日无行 → stocks_count=0</td><td>2026-11-04</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>全库扫同类隐患</b>：6 处未按主键限定的 MAX(date)，修 5 处（<code>server.py:1305</code> 选股接口 + 4 个遗留 pipeline_mw_* 脚本）</td><td>2026-11-04</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>融资余额图停在 10-12</b>：<code>yAxis.min:24000</code> 硬编码，余额 10-13 跌破后被裁掉；改为动态 Y 轴</td><td>2026-11-04</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>全站扫 Y 轴硬编码</b>：360 个 HTML 中找到 15 处，2 处有风险（两融余额 <code>min:9000</code>、归一化图 <code>min:60</code>）已改动态，其余为天然有界指标或静态数据</td><td>2026-11-04</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>周线 CPA 停在 2026-09-18</b>：<code>chanlun_weekly.py</code> 的 PROJECT 少一层 dirname，DB_PATH 指向自动创建的空库 → 4116 只全部 <code>no such table</code>；另修 <code>INSERT</code> 列名误写为常量名 <code>WEEKLY_ALGO_VERSION</code>。回补周线笔 16.2 万周 + CPA 184 万行</td><td>2026-11-04</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span><b>误删源码事故</b>：清理空库时 <code>shutil.rmtree('src/data')</code> 删掉 26 个正当源码文件（<code>src/data/lixr_api/</code>）；已从 git 恢复（<code>ad24a68</code>）并导入自检通过</td><td>2026-11-04</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>市场强度 tab 无数据</b>：<code>/api/stock-rs/rs-line</code> 每次请求都全量重算 3 年全市场 RS 线 → 超时；改读表并用 <code>adj_close÷指数收盘</code> 现算（绕开 <code>rs_line</code> 列在 2026-04-10 的归一化基准断层）</td><td>2026-11-04</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>市场强度图补 RPS_120/RPS_60 两条曲线（API 漏返回）+ 图例去掉短横线上的圆点</td><td>2026-11-04</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>🏭 行业分组健康分全部字段为 NULL 的修复 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-warn"></span><b>故障</b>：market-scan 页面「行业分组健康分」9 组全部显示无数据，<code>total_score</code>/<code>rating</code>/<code>position</code> 均为 NULL，仅 <code>tech</code> 有值</td><td>2026-11-04</td></tr>
@@ -889,6 +903,11 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">183. 只有正值的子项无法表达极端恶化——0 分下限会吃掉尾部信息</div><div class="ld">健康分的融资余额项按 _tier6 分档，最差档是 0 分。2026-07-20 融资余额 5 日跌 6.96%，与跌 1.1% 一样都是 0 分。这在复合指标里是系统性问题：任何「只得正分」的子项，其分值下限都会把「很差」和「灾难级」压缩成同一个值。解决方式不是调分值，而是把这类指标放进一个单调递增、无上限的指标里（卖出分），或者给它单独设一个「极端」标记。判断一个指标该放哪个分数体系，看的是它的语义是「水平」还是「事件」。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">184. 存量的派生指标会随着底层表补数据而过时，必须定期重算</div><div class="ld">market_health_daily 里有 109 天的 margin_5d_value 是错的：存着 37524.88、-26.99、+357.51% 这种值，而底层 daily_margin_history 本身完全干净（28,862 亿稳步降到 24,546 亿，无跳变）。原因是这些值在数据未灌全时就被计算并落库，之后底层补齐了但派生值没跟着重算。教训：派生字段一旦落库就与源数据脱钩；补数据之后必须连带重算依赖它的指标，否则会出现「数据看起来有值，但值是错的」——比缺数据更难发现。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">185. 刷新共享维表的「一部分」会打穿所有「取全局最新」的下游查询</div><div class="ld">为修复指数背离的前视偏差，我跑了 fetch_index_constituents.py --category=market 把成分股刷到 2026-11-01。结果行业分组健康分 9 组全部变 NULL。原因：_get_constituent_weights 用 (SELECT MAX(date) FROM index_constituents) 取整表最新日期——这个子查询没有按 index_code 限定。刷新前全局最新是 2026-05-01，所有类别的指数在那一天都有行；刷新后全局最新变成 2026-11-01，但主题/策略类指数没有 11-01 的行，全查空。教训有两层：① 「取全局最新」这种写法在共享维表上迟早出事，应该按各自主键取各自的最新；② 刷新一个被多处消费的维表时，不能只验证你正在修的那个功能，要把所有「取最新快照」的下游查询列一遍逐一看结果。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">186. 「取全局最新快照」在共享维表上迟早出事</div><div class="ld">_get_constituent_weights 用 (SELECT MAX(date) FROM index_constituents) 且外层已按 index_code 过滤，看起来没问题——但子查询取的是整表最新日期。一旦只刷新了某一类指数（如 --category=market），MAX(date) 跳到新日期，其他类别在那天没有行，stocks_count 就变 0，行业分组健康分全部字段 NULL。全库扫出 6 处同类写法。修法：子查询必须按各自主键限定 (SELECT MAX(date) FROM ... c2 WHERE c2.index_code = ic.index_code)。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">187. 硬编码坐标轴下限会让数据「看起来断了」，和真缺数据无法区分</div><div class="ld">margin.html 融资余额图 yAxis.min:24000，余额 2026-10-13 跌破 24000 后折线全部被裁到可视区外，用户报「数据停在 10-12」，但接口 199 个交易日一天不缺。同一天还查出两融余额图 min:9000、归一化图 min:60 两处同类隐患。判据：断点位置若正好等于坐标轴整数值，就是裁切而非缺数据。修法：用 function(v){...} 按数据动态算 min/max。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">188. 路径层级错一层，数据库会「静默地空着」——sqlite 连不存在的路径会直接建空库</div><div class="ld">chanlun_weekly.py 的 PROJECT = dirname(dirname(__file__)) 少一层，DB_PATH 解析成 src/data/lixinger.db。sqlite3.connect 发现文件不存在就创建一个 0 字节空库，不报错。于是 4116 只股票全部查表失败、周线笔从 2026-09-18 起停更；而周线 CPA 增量脚本比较的是「CPA 表 vs 周线笔表」，两表都停在同一天，一致判定「已是最新」，僵死两周无人发现。同日还发现同文件 INSERT 的列名写成了常量名 WEEKLY_ALGO_VERSION。教训：相对路径拼接必须断言目标文件存在；增量脚本比较「两表是否同步」时，无法发现「两表一起停更」。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">189. rmtree 前必须枚举目录全部内容，不能只确认目标文件</div><div class="ld">为清理一个误建的空库 src/data/lixinger.db，我执行 shutil.rmtree('src/data')。删之前只检查了 lixinger.db 的大小是 0 字节，没枚举目录里还有什么——结果连 src/data/lixr_api/ 下 26 个正当源码文件一起删掉（base_api.py、db_manager.py、各 API 封装）。已从 git 恢复（ad24a68）并导入自检通过。规则：任何递归删除前，先 Get-ChildItem -Recurse 列出全部内容并逐项确认可删；能用 unlink 单个文件就绝不用 rmtree 整个目录。</div></div>
+
 
 
 
