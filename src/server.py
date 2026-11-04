@@ -1302,7 +1302,10 @@ def api_pipeline_run():
         SELECT DISTINCT ic.stock_code
         FROM index_constituents ic
         WHERE ic.index_code IN ({placeholders})
-          AND ic.date = (SELECT MAX(date) FROM index_constituents)
+          -- 按每个指数自身最新快照取。不能用 (SELECT MAX(date) FROM index_constituents)：
+          -- 那是整表全局最新日期，部分类别刷新后其他类别在该日期无行 → 查空。
+          AND ic.date = (SELECT MAX(c2.date) FROM index_constituents c2
+                         WHERE c2.index_code = ic.index_code)
     """, index_codes).fetchall()
     
     all_codes = [r['stock_code'] for r in stocks]
