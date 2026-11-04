@@ -907,6 +907,7 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">187. 硬编码坐标轴下限会让数据「看起来断了」，和真缺数据无法区分</div><div class="ld">margin.html 融资余额图 yAxis.min:24000，余额 2026-10-13 跌破 24000 后折线全部被裁到可视区外，用户报「数据停在 10-12」，但接口 199 个交易日一天不缺。同一天还查出两融余额图 min:9000、归一化图 min:60 两处同类隐患。判据：断点位置若正好等于坐标轴整数值，就是裁切而非缺数据。修法：用 function(v){...} 按数据动态算 min/max。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">188. 路径层级错一层，数据库会「静默地空着」——sqlite 连不存在的路径会直接建空库</div><div class="ld">chanlun_weekly.py 的 PROJECT = dirname(dirname(__file__)) 少一层，DB_PATH 解析成 src/data/lixinger.db。sqlite3.connect 发现文件不存在就创建一个 0 字节空库，不报错。于是 4116 只股票全部查表失败、周线笔从 2026-09-18 起停更；而周线 CPA 增量脚本比较的是「CPA 表 vs 周线笔表」，两表都停在同一天，一致判定「已是最新」，僵死两周无人发现。同日还发现同文件 INSERT 的列名写成了常量名 WEEKLY_ALGO_VERSION。教训：相对路径拼接必须断言目标文件存在；增量脚本比较「两表是否同步」时，无法发现「两表一起停更」。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">189. rmtree 前必须枚举目录全部内容，不能只确认目标文件</div><div class="ld">为清理一个误建的空库 src/data/lixinger.db，我执行 shutil.rmtree('src/data')。删之前只检查了 lixinger.db 的大小是 0 字节，没枚举目录里还有什么——结果连 src/data/lixr_api/ 下 26 个正当源码文件一起删掉（base_api.py、db_manager.py、各 API 封装）。已从 git 恢复（ad24a68）并导入自检通过。规则：任何递归删除前，先 Get-ChildItem -Recurse 列出全部内容并逐项确认可删；能用 unlink 单个文件就绝不用 rmtree 整个目录。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">190. 多返回值函数的「顺序」和「数值」一样重要——改顺序不报错，但会把值写进错误的列</div><div class="ld">复核卖出评分 13 信号触发率时，指数背离一项对不上：库中 200 天只有 1 天触发、累计 1 分，而直接调用同一个函数得到的是 4 天 / 140 分。根因是 aec2e28 重写 <code>score_divergence</code> 时把返回值改成了 <code>(分值, 是否触发, 是否领涨, 说明)</code>，而调用方仍按 <code>(个数, 领涨, 分值, 说明)</code> 解包——8 个打分函数里只有它把分值放在第一位。结果 40/60 分被写进 <code>divergence_count</code>，<code>divergence_score</code> 拿到标志位 0/1。无异常、无告警，前端还把 count 渲染成「60 个指数」暴露了个半截症状。影响：2 个交易日的仓位档位从「减仓」误判成「清仓」。与教训 179（调用方硬编码覆盖）、182（少填过滤字段）同族，都是「写入端正确、读取端看不见」。对策：多返回值一律在 docstring 写清顺序，并统一约定「明细在前、分值在后」；改返回顺序时用 grep 找全部调用点，不能只看函数体。</div></div>
 
 
 
@@ -933,6 +934,24 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 </script>
 <script src="shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
+
+<div class="pg-section">
+<div class="section-title">📌 2026-11-04 收尾 · 数据可信复核 + 指数背离分值修复</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-done"></span></td><td>阈值校准复跑：<code>diag_sell_score_thresholds.py</code> 三项分布与文档一致（抛盘日 P50=5、涨跌比≥4日占 7.0%、5 连涨 0 次）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>13 信号触发率逐项复核：11 项吻合，发现 2 处文档笔误（破200日线 138→<b>136</b>、健康分 204→<b>200</b> 行）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>修复指数背离分值丢失</b>：<code>score_divergence</code> 返回顺序与调用方解包顺序不一致，40/60 分被写进 <code>divergence_count</code>（教训 190）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><code>divergence_count</code> 恢复为「背离指数个数」语义——前端原先把分值渲染成「60 个指数」</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>重算 200 个交易日：4 天变化，<b>2 天档位修正</b>（2026-06-03 110→150、2026-06-25 81→140，均为「减仓」→「清仓」）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>新增 <code>recompute_sell_score_range.py</code>（区间重算 + 前后比对）、<code>diag_sell_score_2026_table.py</code>（13 信号表现算）、<code>diag_divergence_caliber.py</code>（两种计数口径对照）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>PRD v2.2：新增 §7.10 记录本次修复与复核全表；订正 §5.1 中过时的 80 分与 &lt;0.5 阈值；§7.9 两项待办结案</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>查清周线数据「停更」疑云：353 只停在 2026-09-18 全部是流动性池外标的（日均成交额&lt;5000万 / ST / 退市风险），按 POOL_SQL 复算「池内未更新」为 <b>0</b></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>market-scan 前端陈旧分母订正：均线卡 <code>max:170→130</code>（30+40+60）、AD 卡 <code>max:60→80</code>（20+60）；AD 两个信号名按真实阈值改为「AD近5日≥4日&lt;0.7」「AD当日&lt;0.15」，并加旧名别名兼容未重载的 8788</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td>8788 是老式 WSGI 进程、不自动重载，<code>server.py</code> 的信号名改动需重启后才生效；重启后 <code>web/market-scan</code> 里的 <code>SIG_ALIAS</code> 别名可删</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td>未改动待决定：背离指数池 PRD 写科创50（000688）、代码用沪深300（000300）；领涨指数 PRD 写「每周一定池取 rs_60 第一名」、代码固定 000985</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td>PRD §7.5 / §7.8 记载的「17/199 天（9%）」无法复现（单日口径 29 天、连续2日口径 4 天），已标为未被证实的旧记录</td></tr>
+</table>
+</div>
 
 <div class="pg-section">
 <div class="section-title">📌 2026-09-29 收尾 · 红利 RSI 买卖点 + 前端健壮性</div>

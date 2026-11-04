@@ -43,7 +43,7 @@
 
 ### 一句话概括设计取向
 
-**指标必须可复跑、阈值必须有分布依据、结论必须标注不确定。** 这个项目反复在做的事，就是把「凭感觉」的规则换成「有触发率数据支撑」的规则 —— 见 §10 的六个坑和 §11 的工作约定。
+**指标必须可复跑、阈值必须有分布依据、结论必须标注不确定。** 这个项目反复在做的事，就是把「凭感觉」的规则换成「有触发率数据支撑」的规则 —— 见 §10 的七个坑和 §11 的工作约定。
 
 
 ---
@@ -91,6 +91,9 @@ scripts/
   incremental_cpa_weekly.py    周线 CPA 增量（步骤 36）
   backfill_chanlun_weekly.py   周线笔（步骤 35a）
   diag_sell_score_thresholds.py    卖出评分阈值校准（可复跑）
+  diag_sell_score_2026_table.py    13 信号触发率表 + 档位分布（可复跑，表数字由此誊写）
+  diag_divergence_caliber.py       指数背离两种计数口径对照（较慢）
+  recompute_sell_score_range.py    按区间重算卖出评分（改逻辑/补数据后必跑）
 config/
   market/
     market_sell_score.yaml     卖出评分全部阈值
@@ -100,7 +103,7 @@ web/
   market-scan/margin.html      两融分析
   stock-valuation/index.html   个股估值（含「市场强度」tab）
   discipline/cpa-stock-weekly.html  个股周线 CPA
-  progress.html                开发进度 + 全部教训（到 189 条）
+  progress.html                开发进度 + 全部教训（到 190 条）
 docs/                          被 gitignore
   product/*.md                 各评分卡的 PRD（第七章记录每次修复）
   dev/指数CPA_待办事项.md        待办
@@ -200,10 +203,10 @@ git status --short          # 先看清楚改了什么
 git add -A
 git commit -m "简短中文标题: 关键改动1; 关键改动2"
 git push
-git rev-parse HEAD origin/main   # ← 必须验证两个哈希一致
+git rev-list --left-right --count HEAD...refs/remotes/origin/main   # ← 输出 "0	0" 即一致
 ```
 
-**最后一步不能省。** `git push` 会往 stderr 打警告（LF→CRLF 等），看起来像失败，实际是成功的。**唯一可靠的判据是 `git rev-parse HEAD origin/main` 输出两个相同哈希。**
+**最后一步不能省。** `git push` 会往 stderr 打警告（LF→CRLF 等），看起来像失败，实际是成功的。**唯一可靠的判据是本地与远程两个哈希相同；用上面这条命令，输出 `0	0` 表示未分叉。** 短名 `origin/main` 在部分环境解析不出（`fatal: Needed a single revision`），要写全 `refs/remotes/origin/main`。
 
 ### 6.3 commit message 风格
 
@@ -252,25 +255,27 @@ python -c "import ast,pathlib; ast.parse(pathlib.Path('src/server.py').read_text
 
 接手前它是这样的：**12 个信号里 6 个从未触发**，评分卡实际只有一半在看市场。
 
-修完后的触发率（2026 年 200 个交易日）：
+修完后的触发率（2026 年 200 个交易日，2026-11-04 复核重算）：
 
 | 信号 | 触发 | 日均贡献 |
 |---|---|---|
-| 破 200 日线 | 138 天(68%) | 27.2 |
-| 破 50 日线 | 122 天(61%) | 18.3 |
-| 抛盘日 | 139 天(70%) | 12.0 |
-| 追盘日失效 | 65 天(32%) | 9.8 |
-| NH/NL | 50 天(25%) | 7.5 |
-| 垃圾补涨 | 40 天(20%) | 5.0 |
-| AD 崩盘 | 13 天(6%) | 3.9 |
-| 融资余额恶化 | 20 天(10%) | 1.4 |
-| AD 低位 | 13 天(6%) | 1.3 |
-| 龙头见顶 | 10 天(5%) | 1.2 |
-| 均线死叉 | 3 天(2%) | 0.9 |
-| 指数背离 | 3 天(2%) | 0.6 |
-| 上涨无量 | 1 天(0%) | 0.1 |
+| 破 200 日线 | 136 天(68.0%) | 27.2 |
+| 破 50 日线 | 122 天(61.0%) | 18.3 |
+| 抛盘日 | 139 天(69.5%) | 12.0 |
+| 追盘日失效 | 65 天(32.5%) | 9.8 |
+| NH/NL | 50 天(25.0%) | 7.5 |
+| 垃圾补涨 | 40 天(20.0%) | 5.0 |
+| AD 崩盘 | 13 天(6.5%) | 3.9 |
+| 融资余额恶化 | 20 天(10.0%) | 1.4 |
+| AD 低位 | 13 天(6.5%) | 1.3 |
+| 龙头见顶 | 10 天(5.0%) | 1.2 |
+| 均线死叉 | 3 天(1.5%) | 0.9 |
+| 指数背离 | 4 天(2.0%) | 0.7 |
+| 上涨无量 | 1 天(0.5%) | 0.1 |
 
-总分均值 88.6，档位分布：<60 正常 26% / 60~100 减仓50% 24% / 100~140 减仓25% 32% / ≥140 清仓 18.5%。
+总分均值 89.28，档位分布（左闭右开，140 归清仓）：<60 正常 26.0% / 60~100 减仓50% 23.0% / 100~140 减仓25% 31.5% / ≥140 清仓 19.5%。
+
+**表内数字由 `scripts/diag_sell_score_2026_table.py` 现算，不要手工誊写。**
 
 **关键结论：档位 60/100/140 不需要改。**「档位不对」其实是「权重不对」的症状——把破200日线从 80 降到 40、AD崩盘阈值从 0.5 收紧到 0.15 之后，原档位分布自然健康了。
 
@@ -281,7 +286,7 @@ python -c "import ast,pathlib; ast.parse(pathlib.Path('src/server.py').read_text
 | 抛盘日 | `distribution_day.py` 的 `detect()` 算得对，**CLI 只打印不写库**，全库没有写入脚本 | 缺管道 |
 | 追盘日 | 同上（`follow_through_day.py`） | 缺管道 |
 | 龙头见顶 | `WHERE date <= pool_date` 无日期下界，股池累积到 1067 只（当日实际 27 只） | SQL bug |
-| 指数背离 | ① `WHERE date=?` 让 `LAG()` 拿不到前一日 → `prev_close` 恒 NULL ② 阈值 `0.5` 当成了 50%（`change` 存的是小数） | 两个 bug |
+| 指数背离 | ① `WHERE date=?` 让 `LAG()` 拿不到前一日 → `prev_close` 恒 NULL ② 阈值 `0.5` 当成了 50%（`change` 存的是小数） ③ **2026-11-04 补修**：函数返回 `(分值, 触发, 领涨, 说明)` 而调用方按 `(个数, 领涨, 分值, 说明)` 解包，分值被写进 count 列（见 §10 坑 7） | 三个 bug |
 | AD 低位 | 读 `ad_ratio_value`（已是 5 日均值）再要求「连续 5 天」= 9 天窗口 | 阈值未校准 |
 | 上涨无量 | 要求宽基指数连续 5 日收红，2026 年 0 次 | 阈值未校准 |
 
@@ -329,7 +334,7 @@ python -c "import ast,pathlib; ast.parse(pathlib.Path('src/server.py').read_text
 
 ---
 
-## 10. 必须知道的 6 个坑（每条都真实踩过）
+## 10. 必须知道的 7 个坑（每条都真实踩过）
 
 ### 坑 1：函数算了正确值，调用方硬编码覆盖 —— 改函数不生效且不报错
 
@@ -401,6 +406,24 @@ PROJECT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file
 
 **规则：先列出目录全部内容逐项确认；能 `unlink` 单文件就不要 `rmtree` 整目录。**
 
+### 坑 7：返回元组的**顺序**不一致——分值被静默写进另一个列
+
+```python
+# 错：score_divergence 返回 (分值, 是否触发, 是否领涨, 说明)
+def score_divergence(...):
+    return total_score, 1 if triggered else 0, 1 if leader_triggered else 0, detail
+# 而调用方按 (个数, 是否领涨, 分值, 说明) 解包
+div_count, div_leader, div_score, div_detail = score_divergence(conn, target_date)
+```
+
+`divergence_score` 拿到的是领涨标志位（0/1），真正的 40/60 分被写进了 `divergence_count`。
+**8 个打分函数里只有这一个把分值放在第一位**，重写函数时改了顺序、调用方没跟上，无异常、无告警。
+
+可见症状：前端把 `divergence_count` 渲染成「N 个指数」，2026-06-25 页面上显示「60 个指数」。
+
+**规则：多返回值的函数，返回顺序要么写进 docstring，要么统一约定「明细在前、分值在后」并全程遵守。
+同类问题还有教训 179（调用方硬编码覆盖）与教训 182（补数据少填过滤字段）——三者都是「写入端正确、读取端看不见」。**
+
 ---
 
 ## 11. 工作约定
@@ -438,10 +461,10 @@ PRD 里的数字必须在代码/脚本里可复现（`AGENTS.md` §三.4）。
 每次完成一轮工作：
 
 1. `web/progress.html` 追加卡片（问题 + 根因 + 修法 + 日期）
-2. 若有可复用的教训，追加 `lesson-card`（编号递增，当前到 **189**）
+2. 若有可复用的教训，追加 `lesson-card`（编号递增，当前到 **190**）
 3. `docs/dev/指数CPA_待办事项.md` 更新已完成项与新增待办
 4. `git add -A && git commit && git push`
-5. 验证：`git rev-parse HEAD origin/main` 两个哈希应一致（push 的 stderr 噪音是正常的）
+5. 验证：`git rev-list --left-right --count HEAD...refs/remotes/origin/main` 输出 `0	0`（push 的 stderr 噪音是正常的）
 
 ### 8.6 验证习惯
 
@@ -470,13 +493,22 @@ PRD 里的数字必须在代码/脚本里可复现（`AGENTS.md` §三.4）。
 
 **指数代码**：中证全指 `000985`、上证 `000001`、深证成指 `399001`、创业板指 `399006`、科创50 `000688`、沪深300 `000300`（`kline_type='normal'`）。
 
+**周线两张表的覆盖边界**：`cpa_stage_stock_weekly` 与 `chanlun_weekly_bi_json` 只覆盖
+`backfill_chanlun_weekly.py` 的 `POOL_SQL` 流动性池（近 20 日日均成交额 ≥ 5000 万、非 ST、
+正常上市），当前 4,116 只。**池外约 353 只个股与 376 个标的的最后一行停在 2026-09-18，
+这是设计使然，不是停更。** 判据：按 `POOL_SQL` 复算池成员，「池内但未更新」应为 0
+（2026-11-04 实测为 0）。看到周线数据落后时先做这一步，不要直接判定为 P0-2 的僵死。
+
 **注意 `000001` 在 `stock_rs_daily` 里是平安银行，在 `index_daily_kline` 里是上证指数。**
 
 ---
 
 ## 13. 与本项目无关但会影响判断的噪音
 
-- `git push` 经常输出 stderr 警告（LF→CRLF 等），**这不是失败**。用 `git rev-parse HEAD origin/main` 验证两个哈希一致。
+- `git push` 经常输出 stderr 警告（LF→CRLF 等），**这不是失败**。验证用
+  `git rev-list --left-right --count HEAD...refs/remotes/origin/main`，输出 `0	0` 即本地与远程一致。
+  注意 `git rev-parse HEAD origin/main` 在部分环境下报 `fatal: Needed a single revision`
+  （短名 `origin/main` 解析不出），要写成 `refs/remotes/origin/main`。
 - `Select-String -NotMatch 'AD|NH|...'` 这类过滤会误杀含 `ad_low5_score` 的行（PowerShell 大小写不敏感）。读日志时注意。
 - 数据库 180 GB，全表扫描很慢。诊断脚本请带日期范围。
 - `daily_update.py` 跑完约 40 步、可能几十分钟。日常验证用单步脚本，不要为此跑全流程。
@@ -487,11 +519,20 @@ PRD 里的数字必须在代码/脚本里可复现（`AGENTS.md` §三.4）。
 
 | 项 | 状态 |
 |---|---|
-| Git | `4b70dae`，本地与远程一致，工作区干净 |
-| 卖出评分 | 13 信号全部可用，档位 60/100/140 经两轮验证仍适用 |
-| 健康分 | 204 行 2026-01-05 ~ 11-03，趋势图与卖出评分同起点 |
+| Git | `1a08c49` + 本轮修复，本地与远程一致，工作区干净 |
+| 卖出评分 | 13 信号全部可用，档位 60/100/140 经两轮验证仍适用；2026-11-04 复核并修好指数背离的元组解包错误（§10 坑 7），已重算全区间 |
+| 健康分 | 200 行 2026-01-05 ~ 11-03，趋势图与卖出评分同起点 |
 | 行业分组 | 9 组正常 |
 | 页面 | market-scan / margin / stock-valuation / cpa-stock-weekly 均已验证渲染正常 |
-| 教训 | progress.html 至 189 条 |
+| 教训 | progress.html 至 190 条 |
 
-**接手后建议先做的第一件事**：跑一遍 `python scripts/diag_sell_score_thresholds.py`，确认当前数据下阈值行为与文档一致 —— 这是最快建立「数据可信」认知的方式。
+**接手后建议先做的第一件事**：依次跑这三条，确认数据与文档一致 —— 这是最快建立「数据可信」认知的方式。
+
+```powershell
+python scripts/diag_sell_score_thresholds.py    # 三个阈值的分布依据
+python scripts/diag_sell_score_2026_table.py    # 13 信号触发率 + 档位分布
+python scripts/recompute_sell_score_range.py --start 2026-11-01   # 最近几天应「0 天变化」
+```
+
+第三条的意义：**如果重算最近的日子出现数值变化，说明表里的存量值已经与当前逻辑脱节**
+（教训 184）。这比任何肉眼比对都可靠。

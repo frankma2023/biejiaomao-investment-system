@@ -382,6 +382,10 @@ def score_divergence(conn, target_date):
 
     成分股用 index_constituents 中 ≤ target_date 的最新快照。
     该表更新滞后时仍可用——指数成分变动缓慢，不影响方向判断。
+
+    返回值顺序：**(背离指数个数, 是否含领涨, 分值, 说明)**。
+    与其余打分函数一致，明细在前、分值在后；调用方 compute_all 按此解包。
+    divergence_count 会被前端直接渲染为「N 个指数」，故必须是个数而非分值。
     """
     INDEXES = ['000985', '000001', '399001', '399006', '000300']
     LEADER = '000985'
@@ -466,7 +470,8 @@ def score_divergence(conn, target_date):
               '399006': '创业板指', '000300': '沪深300'}.get(c, c) for c in triggered]
     detail = ('背离: ' + '、'.join(names) + ('（含领涨）' if leader_triggered else '')) \
         if triggered else '无背离'
-    return total_score, 1 if triggered else 0, 1 if leader_triggered else 0, detail
+    # (背离指数个数, 是否含领涨, 分值, 说明)
+    return len(triggered), 1 if leader_triggered else 0, total_score, detail
 
 
 def score_ma_break(conn, target_date):

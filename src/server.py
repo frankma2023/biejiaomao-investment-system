@@ -896,8 +896,8 @@ def api_market_sell_score():
         'ma50_score':        ('跌破50日线', '收盘跌破且5日未收复'),
         'ma200_score':       ('跌破200日线', '收盘跌破200日均线'),
         'death_cross_score': ('均线死叉', 'MA50下穿MA200'),
-        'ad_low5_score':     ('AD<0.7持续5天', '涨跌家数比连续低迷'),
-        'ad_crash_score':    ('AD<0.5', '涨跌家数比极端低迷（清仓级）'),
+        'ad_low5_score':     ('AD近5日≥4日<0.7', '近5日中有≥4日涨跌比<0.7'),
+        'ad_crash_score':    ('AD当日<0.15', '涨跌家数比极端低迷（清仓级）'),
         'hlnl_score':        ('NH/NL<0.5持续3天', '新高新低比恶化'),
         'vol_dry_score':     ('上涨无量', '连续涨但量萎缩'),
     }

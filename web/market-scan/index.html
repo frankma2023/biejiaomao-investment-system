@@ -616,16 +616,24 @@
         html+='</div>';
 
         // 7个子卡片
-        function sigScore(name){return ((sr.signals||[]).find(function(x){return x.name===name})||{}).score||0}
+        // 2026-11-04：AD 两个信号的名称按真实阈值改为「AD近5日≥4日<0.7」「AD当日<0.15」。
+        // 8788 是老式 WSGI 进程、不自动重载，重启前仍会下发旧名，故保留旧名别名，
+        // 避免改名后查不到分数而静默显示 0。API 重启一次后这段别名即可删除。
+        var SIG_ALIAS={'AD近5日≥4日<0.7':'AD<0.7持续5天','AD当日<0.15':'AD<0.5'};
+        function sigScore(name){
+          var alt=SIG_ALIAS[name];
+          return ((sr.signals||[]).find(function(x){
+            return x.name===name||(alt&&x.name===alt)})||{}).score||0
+        }
         html+='<div class="ind-grid">';
         const sellMeta=[
           {key:'leader',n:'龙头股见顶',icon:'🏔️',t:'领先',s:sigScore('龙头股见顶'),max:25,desc:'RS≥99龙头股>50%回落>10%'},
           {key:'junk',n:'垃圾股补涨',icon:'🗑️',t:'结构',s:sigScore('垃圾股补涨'),max:25,desc:'低价股涨幅>高价股1.5倍持续5天'},
           {key:'diverge',n:'指数背离',icon:'🔀',t:'背离',s:sigScore('指数背离'),max:60,desc:'5个指数成分股涨跌背离'},
-          {key:'ma',n:'均线系统',icon:'📐',t:'趋势',s:sigScore('跌破50日线')+sigScore('跌破200日线')+sigScore('均线死叉'),max:170,desc:'50日线/200日线/死叉'},
-          {key:'ad',n:'AD涨跌比',icon:'⚖️',t:'情绪',s:sigScore('AD<0.7持续5天')+sigScore('AD<0.5'),max:60,desc:'全市场涨跌家数比'},
+          {key:'ma',n:'均线系统',icon:'📐',t:'趋势',s:sigScore('跌破50日线')+sigScore('跌破200日线')+sigScore('均线死叉'),max:130,desc:'50日线/200日线/死叉'},
+          {key:'ad',n:'AD涨跌比',icon:'⚖️',t:'情绪',s:sigScore('AD近5日≥4日<0.7')+sigScore('AD当日<0.15'),max:80,desc:'全市场涨跌家数比'},
           {key:'hlnl',n:'NH/NL新高新低',icon:'📊',t:'宽度',s:sigScore('NH/NL<0.5持续3天'),max:30,desc:'52周新高/新低比<0.5持续3天'},
-          {key:'voldry',n:'上涨无量',icon:'📉',t:'量价',s:sigScore('上涨无量'),max:20,desc:'连续5日涨但量<20日均量×80%'},
+          {key:'voldry',n:'上涨无量',icon:'📉',t:'量价',s:sigScore('上涨无量'),max:20,desc:'近5日≥3日涨但量<20日均量×80%'},
         ];
         // 状态描述
         const sellState={
@@ -633,7 +641,7 @@
           junk:sd.junk_rally?'⚠️ 已触发':'✅ 未触发',
           diverge:(sd.divergence_count||0)+'个指数'+(sd.divergence_leader?' (含领涨)':''),
           ma:sd.ma200_broken?'200日线跌破':sd.ma50_broken?'50日线跌破':sd.death_cross?'死叉':'均线正常',
-          ad:sd.ad_crash?'<0.5极端':sd.ad_low5?'<0.7持续5天':'正常',
+          ad:sd.ad_crash?'<0.15极端':sd.ad_low5?'近5日≥4日<0.7':'正常',
           hlnl:sd.hlnl_low?'⚠️ <0.5':'✅ 正常',
           voldry:sd.vol_dry?'⚠️ 已触发':'✅ 未触发'
         };
