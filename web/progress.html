@@ -58,6 +58,17 @@
     <div class="section-title">功能模块</div>
     <div class="pg-grid">
       <div class="pg-card">
+        <h3>🏭 行业分组健康分全部字段为 NULL 的修复 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
+        <table class="pg-table">
+          <tr><td><span class="pg-dot dot-warn"></span><b>故障</b>：market-scan 页面「行业分组健康分」9 组全部显示无数据，<code>total_score</code>/<code>rating</code>/<code>position</code> 均为 NULL，仅 <code>tech</code> 有值</td><td>2026-11-04</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span><b>根因</b>：<code>market_health.py:715</code> 的 <code>_get_constituent_weights</code> 用 <code>AND date = (SELECT MAX(date) FROM index_constituents)</code> —— 子查询未按 <code>index_code</code> 限定，取整表全局最新日期</td><td>2026-11-04</td></tr>
+          <tr><td><span class="pg-dot dot-warn"></span><b>触发条件</b>：当日刷新成分股只跑了 <code>--category=market</code>，MAX(date) 从 2026-05-01 跳到 2026-11-01，而主题/策略类指数在 11-01 无行 → <code>stocks_count=0</code> → 全部打分字段 NULL</td><td>2026-11-04</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span><b>修法</b>：改为按每个指数各自最新快照取 <code>date = (SELECT MAX(date) FROM index_constituents c2 WHERE c2.index_code = ic.index_code)</code>，相关子查询，对任意刷新顺序都成立</td><td>2026-11-04</td></tr>
+          <tr><td><span class="pg-dot dot-done"></span>重算 2026-11-02 / 11-03 分组数据，9 组全部恢复（强势 70~73 / 中性 52~61 / 弱势 43，分层清晰）</td><td>2026-11-04</td></tr>
+        </table>
+      </div>
+
+      <div class="pg-card">
         <h3>💰 新增卖出信号：融资余额 5 日快速下降 <span class="badge" style="background:#E8F5E9;color:#2E7D32">已完成</span></h3>
         <table class="pg-table">
           <tr><td><span class="pg-dot dot-warn"></span><b>用户观察</b>：2026-07 融资余额急跌，但在健康分里最差也是 0 分——极端恶化与轻微恶化无法区分</td><td>2026-11-03</td></tr>
@@ -877,6 +888,8 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">182. 补数据时只填了「看起来相关」的字段，被下游查询条件静默过滤</div><div class="ld">追盘日补算后信号仍是 0 分。查查询条件发现 score_ftd_failure 用的是 (invalidated_date IS NOT NULL OR is_valid = 1)——而我写入时只设了 is_valid=0 和 invalidated_reason，没写 invalidated_date，失效的 FTD 全被过滤掉。补上从 failure_reason 里正则提取的日期后，信号从 20 天恢复到 61 天。教训：往已有表补数据前，必须先读下游的 WHERE 条件，确认哪些字段参与了过滤，不能只按表结构的语义填。这和「改了函数但调用方覆盖」是同一类问题——写入端正确不等于读取端能看见。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">183. 只有正值的子项无法表达极端恶化——0 分下限会吃掉尾部信息</div><div class="ld">健康分的融资余额项按 _tier6 分档，最差档是 0 分。2026-07-20 融资余额 5 日跌 6.96%，与跌 1.1% 一样都是 0 分。这在复合指标里是系统性问题：任何「只得正分」的子项，其分值下限都会把「很差」和「灾难级」压缩成同一个值。解决方式不是调分值，而是把这类指标放进一个单调递增、无上限的指标里（卖出分），或者给它单独设一个「极端」标记。判断一个指标该放哪个分数体系，看的是它的语义是「水平」还是「事件」。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">184. 存量的派生指标会随着底层表补数据而过时，必须定期重算</div><div class="ld">market_health_daily 里有 109 天的 margin_5d_value 是错的：存着 37524.88、-26.99、+357.51% 这种值，而底层 daily_margin_history 本身完全干净（28,862 亿稳步降到 24,546 亿，无跳变）。原因是这些值在数据未灌全时就被计算并落库，之后底层补齐了但派生值没跟着重算。教训：派生字段一旦落库就与源数据脱钩；补数据之后必须连带重算依赖它的指标，否则会出现「数据看起来有值，但值是错的」——比缺数据更难发现。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">185. 刷新共享维表的「一部分」会打穿所有「取全局最新」的下游查询</div><div class="ld">为修复指数背离的前视偏差，我跑了 fetch_index_constituents.py --category=market 把成分股刷到 2026-11-01。结果行业分组健康分 9 组全部变 NULL。原因：_get_constituent_weights 用 (SELECT MAX(date) FROM index_constituents) 取整表最新日期——这个子查询没有按 index_code 限定。刷新前全局最新是 2026-05-01，所有类别的指数在那一天都有行；刷新后全局最新变成 2026-11-01，但主题/策略类指数没有 11-01 的行，全查空。教训有两层：① 「取全局最新」这种写法在共享维表上迟早出事，应该按各自主键取各自的最新；② 刷新一个被多处消费的维表时，不能只验证你正在修的那个功能，要把所有「取最新快照」的下游查询列一遍逐一看结果。</div></div>
+
 
 
 

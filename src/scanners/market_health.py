@@ -708,11 +708,16 @@ def _get_constituent_weights(conn, index_codes):
     if not index_codes:
         return {}, 0
     placeholders = ','.join('?' * len(index_codes))
+    # 按每个指数「各自的最新快照」取成分股。
+    # 不能用 (SELECT MAX(date) FROM index_constituents)——那是整表全局最新日期：
+    # 一旦某类指数被单独刷新到更新的日期，其他类别在该日期无行，
+    # stocks_count 会变 0，行业分组健康分全部字段变 NULL（2026-11-03 实测踩到）。
     rows = conn.execute(f"""
         SELECT stock_code, COUNT(*) as cnt
-        FROM index_constituents
+        FROM index_constituents ic
         WHERE index_code IN ({placeholders})
-          AND date = (SELECT MAX(date) FROM index_constituents)
+          AND date = (SELECT MAX(date) FROM index_constituents c2
+                      WHERE c2.index_code = ic.index_code)
         GROUP BY stock_code
     """, index_codes).fetchall()
     
