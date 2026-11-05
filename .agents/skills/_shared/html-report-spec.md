@@ -91,9 +91,13 @@ font-variant-numeric:tabular-nums}
 ## 5. 涨跌语义类（红涨绿跌）
 
 ```css
-.rise{color:#10b981}   /* 涨 / 正向 */
-.fall{color:#ef4444}   /* 跌 / 风险 */
+.rise{color:#ef4444}   /* 涨 → 红（A 股惯例） */
+.fall{color:#10b981}   /* 跌 → 绿 */
 ```
+
+> **注意 hanako-glass 的令牌语义与 A 股惯例相反**：`--rise` 是 `#10b981`（绿）、`--fall` 是 `#ef4444`（红）。
+> 所以用令牌时**必须交叉引用**，例如 `.rise{color:var(--fall)}` `.fall{color:var(--rise)}`。
+> 直接写 `.rise{color:#10b981}` 就是把涨画成绿色——本项目已犯过一次。
 
 **只用于「价格变动」与「买卖票标」。** 评分、比率、估值差、分位一律用中性色——
 这些没有方向，着色会被误读。
