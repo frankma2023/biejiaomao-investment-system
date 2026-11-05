@@ -90,6 +90,11 @@ document.documentElement.dataset.theme=c;try{localStorage.setItem(K,c);}catch(e)
 """
 
 
+# ── 样式：唯一来源，禁止在此手抄 CSS ──
+CSS = open(os.path.join(PROJECT, '.agents', 'skills', '_shared',
+                        'report-style.css'), encoding='utf-8').read()
+
+
 def pct(v):
     return '—' if v is None else f'{v:+.2f}%'
 

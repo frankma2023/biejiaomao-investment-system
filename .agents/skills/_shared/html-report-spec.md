@@ -1,7 +1,36 @@
 # 报告 HTML 格式规范（公用组件）
 
-**本文件是投研类 HTML 报告的唯一格式基准。** 所有生成报告的技能都引用本文件，
-不各自复写样式。改动只改这里。
+## 0. 唯一来源：`report-style.css`
+
+**所有报告的配色、字体、间距、表格、组件样式，只在本目录的 `report-style.css` 定义一次。**
+
+| 规则 | 说明 |
+|---|---|
+| **禁止**在生成器里手抄 CSS | 复制即漂移。2026-11-05 两个报告各抄一遍配色，把红涨绿跌抄反，无人发现 |
+| **禁止**按报告单独调颜色 | 觉得配色不好，改 `report-style.css`，所有报告下次生成同时生效 |
+| 生成器必须读文件并内联 | 保持单文件交付，不引外链 |
+
+生成器统一写法：
+
+```python
+SPEC = os.path.join(PROJECT, '.agents', 'skills', '_shared', 'report-style.css')
+CSS = open(SPEC, encoding='utf-8').read()
+# 然后 html = f'<html data-theme="light"><head><style>{CSS}</style>...'
+```
+
+**本文档下方 §2~§6 的 CSS 代码块只是摘录，用于人工核对，不得直接复制到生成器。**
+唯一权威是 `report-style.css`。
+
+**改样式后的强制校验**（三类错误只有看图能发现）：
+
+1. 取一个已知上涨的数字，截图确认是**红色**
+2. 标题截图确认是**衬线**、900 字重
+3. 两列表格截图确认末列**没有被居中**
+
+---
+
+**本文件是投研类 HTML 报告的格式规范。** 所有生成报告的技能都引用本文件，
+不各自复写样式。改动只改 `report-style.css`。
 
 适用技能：`index-research`、`stock-health-report`、`market-logic`、`hanako-report`（呈现层）。
 
