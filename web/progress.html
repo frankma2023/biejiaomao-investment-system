@@ -979,7 +979,9 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <tr><td><span class="pg-dot dot-done"></span></td><td>实盘段跑输中证500（13.01% vs 16.16%，−3.2pp/年），仍赢中证红利（vs 9.17%，+3.8pp/年）；2026 年防守性单年验证（−2.6% vs 沪深300 −11.6%）</td></tr>
 <tr><td><span class="pg-dot dot-done"></span></td><td>AGENTS.md 新增 §二.1「起始日期早，不等于历史真实」，含三日期核查法、PDF 编号搜索键、三个已证实案例、报告须按修订日切样本</td></tr>
 <tr><td><span class="pg-dot dot-done"></span></td><td>产出《国证自由现金流（980092）研究报告》单文件 HTML（13 章 + 附录 A–E），生成器 <code>docs/report/make_fcf100_report.py</code> 可复跑</td></tr>
-<tr><td><span class="pg-dot dot-warn"></span></td><td>报告缺口：成分重叠（`index_constituents` 对 980092 为 0 行）、财务七图（理杏仁对国证系列 0 覆盖）、国际同类对照，三项均未获取，已在执行核对表与附录 E 声明</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>补齐美股同类对照</b>：akshare 抓 COWZ / CALF / SCHD / SPY（前复权，2016-12-19 起 9.85 年）。结果：<b>COWZ 年化 12.53%，跑输标普500（16.75%）4.2pp/年</b>，也跑输红利 SCHD（17.90%）5.4pp。同一因子在 A 股回测段赢本地基准 12.3pp、在美股实盘输 4.2pp —— 市场间差异大于策略间差异</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td>报告剩余缺口：成分重叠（`index_constituents` 对 980092 为 0 行）、财务七图（理杏仁对国证系列 0 覆盖）。美股对照未核 COWZ 编制规则修订史、费率、汇率</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td>数据源坑：新浪 qfq 在 SPY 2002 段、SCHD 2012 段有单日 ±100%~345% 坏数据；把序列裁到 COWZ 成立日之后，窗口内异常跳变 0 处</td></tr>
 <tr><td><span class="pg-dot dot-todo"></span></td><td>中证现金流（932365）等五只中证系现金流指数均无全收益序列，且同为 2024 年新发布，疑似同类问题，待逐一核查</td></tr>
 </table>
 </div>
