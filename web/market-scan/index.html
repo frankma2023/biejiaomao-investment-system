@@ -152,6 +152,11 @@
         <button onclick="computeSnapshot()" style="margin-left:auto;font-size:10px;padding:4px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer;font-family:var(--font-body)">🔄 刷新计算</button>
       </div>
       <div id="content"></div>
+      <div id="market-logic-bar" style="display:flex;gap:14px;align-items:center;margin:2px 0 10px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-left:3px solid #2563eb;border-radius:14px;flex-wrap:wrap;cursor:pointer" onclick="window.open('../market-logic/index.html')" title="点击查看每日「市场总结」历史">
+        <span style="font-family:var(--font-display);font-size:0.78rem;font-weight:800;color:var(--text-primary)">📝 市场总结</span>
+        <span style="font-size:0.62rem;color:var(--muted)">今日在交易什么逻辑 · 盘面事实 / 隔夜外部 / 传导链符号核对 / 明日看什么</span>
+        <span style="margin-left:auto;font-size:0.6rem;color:#2563eb">查看历史 →</span>
+      </div>
       <div id="microcap-bar" style="display:flex;gap:14px;align-items:center;margin:2px 0 10px;padding:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:14px;flex-wrap:wrap;cursor:pointer" onclick="window.open('../index-scan/microcap.html')" title="点击进入微盘股指数详情">
         <span style="font-family:var(--font-display);font-size:0.75rem;font-weight:800;color:#ef4444">🔬 微盘水温</span>
         <span style="font-size:0.6rem;color:var(--muted)" id="mc-load">加载中…</span>
