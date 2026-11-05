@@ -981,6 +981,7 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <tr><td><span class="pg-dot dot-done"></span></td><td>产出《国证自由现金流（980092）研究报告》单文件 HTML（13 章 + 附录 A–E），生成器 <code>docs/report/make_fcf100_report.py</code> 可复跑</td></tr>
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>补齐美股同类对照</b>：akshare 抓 COWZ / CALF / SCHD / SPY（前复权，2016-12-19 起 9.85 年）。结果：<b>COWZ 年化 12.53%，跑输标普500（16.75%）4.2pp/年</b>，也跑输红利 SCHD（17.90%）5.4pp。同一因子在 A 股回测段赢本地基准 12.3pp、在美股实盘输 4.2pp —— 市场间差异大于策略间差异</td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td>报告剩余缺口：成分重叠（`index_constituents` 对 980092 为 0 行）、财务七图（理杏仁对国证系列 0 覆盖）。美股对照未核 COWZ 编制规则修订史、费率、汇率</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>把国际对照改成硬约束</b>：index-research 新增 §1.6（默认「存在」、举证责任在「不做」一方、六级数据源阶梯、五条禁止跳过理由、降级必须写明口径、交付判据）；§3.10 核对表加 3.2.3 行；§八 自检加三条；§九 最短路径加 3b 步。AGENTS.md §三 同步一条仓库级约定</td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td>数据源坑：新浪 qfq 在 SPY 2002 段、SCHD 2012 段有单日 ±100%~345% 坏数据；把序列裁到 COWZ 成立日之后，窗口内异常跳变 0 处</td></tr>
 <tr><td><span class="pg-dot dot-todo"></span></td><td>中证现金流（932365）等五只中证系现金流指数均无全收益序列，且同为 2024 年新发布，疑似同类问题，待逐一核查</td></tr>
 </table>
