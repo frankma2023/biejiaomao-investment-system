@@ -360,3 +360,8 @@ date,event,chain,expect_up,expect_down,actual_up,actual_down,verdict
 | `stock-health-report` | 个股体检，不是当日 |
 | `market-logic`（本技能） | **当日**在交易什么，只做归因，不做选股 |
 | `quant-discipline` | 把本技能产出的判据转成可回测规则 |
+
+
+> **HTML 格式以 .agents/skills/_shared/html-report-spec.md 为准。**
+> 单文件、无外链 CSS/JS/字体、默认浅色、衬线标题 900、表格三件套、红涨绿跌。
+> 本节如有冲突，以公用规范为准（个股体检的深色玻璃皮肤为唯一例外）。

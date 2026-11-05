@@ -1070,3 +1070,8 @@ h1,h2,h3{font-family:var(--font-display);font-weight:900;letter-spacing:.005em}
 | `stock-health-report` | 个股体检，不是指数 |
 
 **同时触发时的顺序：先 index-research 定方法与算数，再 hanako-report 定呈现与封存。**
+
+
+> **HTML 格式以 .agents/skills/_shared/html-report-spec.md 为准。**
+> 单文件、无外链 CSS/JS/字体、默认浅色、衬线标题 900、表格三件套、红涨绿跌。
+> 本节如有冲突，以公用规范为准（个股体检的深色玻璃皮肤为唯一例外）。
