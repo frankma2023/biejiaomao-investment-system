@@ -33,6 +33,30 @@ a_annual_earnings:
   - 2
   - 1
   stability_cv_threshold: 30
+  # v3.7-A2：3Y CAGR 端点用 TTM（季度数≥16 时），消掉年报滞后
+  ttm_endpoint: true
+  # v3.7-A3：周期股识别与修复度打分
+  cyclic_cv_threshold: 80
+  # 峰谷比：8 季最高/最低（同号）>= 该值也判为周期股
+  cyclic_peak_trough_ratio: 3
+  cyclic_recovery_tiers:
+  - 0.9
+  - 0.7
+  - 0.5
+  - 0.3
+  cyclic_recovery_scores:
+  - 8
+  - 6
+  - 4
+  - 2
+  cyclic_single_q_tiers:
+  - 50
+  - 20
+  - 0
+  cyclic_single_q_scores:
+  - 3
+  - 2
+  - 1
 n_new:
   high52_tiers:
   - -3

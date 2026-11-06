@@ -165,8 +165,15 @@ def score_a(db, stock_code, target_date, p):
     score = 0; detail = []; bd = {}
 
     # 3Y CAGR
+    # v3.7-A2：端点改用 TTM，消掉年报滞后（最新年报距当前可能已 10 个月）
+    _qv = [q.get('net_profit_single') for q in get_quarterly(db, stock_code, target_date, 20)]
     lat = anns[0].get('net_profit') or 0
     old = anns[3].get('net_profit') if len(anns) > 3 else (anns[-1].get('net_profit') or 0)
+    _ttm_base = False
+    if len(_qv) >= 16 and all(v is not None for v in _qv[:16]):
+        lat = sum(_qv[0:4])
+        old = sum(_qv[12:16])
+        _ttm_base = True
     cagr = ((lat / old) ** (1.0/3.0) - 1) * 100 if (old > 0 and lat > 0) else 0
     tiers = cfg.get('eps_cagr_3y_tiers', [25, 15, 5])
     scs = cfg.get('eps_cagr_scores', [8, 5, 2])
@@ -219,6 +226,51 @@ def score_a(db, stock_code, target_date, p):
         elif cv < 50:
             score += 1
             bd['stability'] = {'value': round(cv, 1), 'score': 1}
+
+    # v3.7-A3：周期股识别。年度 CAGR 与稳定性对周期股是错误标尺（从峰值回落必然 0 分，
+    # 即使正在复苏）。改为「修复度 + 单季加速」，并打标 cyclic。
+    if len(_qv) >= 8 and all(v is not None for v in _qv[:8]):
+        _v8 = _qv[:8]
+        _m = sum(_v8) / len(_v8)
+        if _m != 0:
+            _sd = (sum((v - _m) ** 2 for v in _v8) / len(_v8)) ** 0.5
+            _cv = abs(_sd / _m) * 100
+            # 峰谷比更直观：8 季最高/最低（同号）>= 阈值也算周期股。
+            # 实测 601919 的 CV 只有 44%，单靠 CV 判不出航运这种周期股。
+            _p8, _t8 = max(_v8), min(_v8)
+            _ratio = (_p8 / abs(_t8)) if _t8 > 0 else 0.0
+            _is_cyc = (_cv >= cfg.get('cyclic_cv_threshold', 80)
+                       or _ratio >= cfg.get('cyclic_peak_trough_ratio', 3))
+            if _is_cyc:
+                _ttm_now = sum(_qv[:4])
+                _n = min(len(_qv) - 3, 13)
+                _peak = max((sum(_qv[j:j + 4]) for j in range(_n)), default=0)
+                _rec = (_ttm_now / _peak * 100) if _peak > 0 else 0
+                _rt = cfg.get('cyclic_recovery_tiers', [0.9, 0.7, 0.5, 0.3])
+                _rs = cfg.get('cyclic_recovery_scores', [8, 6, 4, 2])
+                _rec_sc = 0
+                for _i, _t in enumerate(_rt):
+                    if _rec / 100 >= _t:
+                        _rec_sc = _rs[_i]
+                        break
+                _sq = 0
+                if _qv[4]:
+                    _sq_yoy = (_qv[0] - _qv[4]) / abs(_qv[4]) * 100
+                    _qt = cfg.get('cyclic_single_q_tiers', [50, 20, 0])
+                    _qs = cfg.get('cyclic_single_q_scores', [3, 2, 1])
+                    for _i, _t in enumerate(_qt):
+                        if _sq_yoy >= _t:
+                            _sq = _qs[_i]
+                            break
+                _c_score = _rec_sc + ttm_sc + _sq
+                _c_bd = {'cyclic': True, 'cv': round(_cv, 1),
+                         'peak_trough': round(_ratio, 2),
+                         'recovery': {'value': round(_rec, 1), 'score': _rec_sc},
+                         'ttm_yoy': bd.get('ttm_yoy'), 'single_q': {'score': _sq}}
+                return {"score": min(_c_score, 19),
+                        "detail": "{}, 周期股 修复{:.0f}% 单季{:+.0f}%".format(
+                            ", ".join(detail), _rec, _sq_yoy if _qv[4] else 0),
+                        "breakdown": _c_bd}
 
     return {"score": min(score, 19), "detail": ", ".join(detail), "breakdown": bd}
 
