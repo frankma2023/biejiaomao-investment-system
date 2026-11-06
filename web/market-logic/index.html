@@ -9,7 +9,12 @@
    用法（生成器内）：
        SPEC = os.path.join(PROJECT, '.agents', 'skills', '_shared', 'report-style.css')
        CSS = open(SPEC, encoding='utf-8').read()
-       html = f'<html data-theme="light"><head><style>{CSS}</style>...'
+       # 再拼进报告的 <style> 标签里（标签写法见生成器，此处不写死）
+
+   注意（2026-11-06 踩过）：本文件会被整体内联进 style 元素，
+       注释里**绝不能出现** style 的闭合标签字面量，否则会提前闭合该元素，
+       后面的规则全部失效、页面完全裸样式（body 透明、h1 变 Times 32px）。
+       判断方法：浏览器里 body 背景色为 rgba(0,0,0,0) 即中招。
 
    为什么必须有这个文件：
        2026-11-05 曾因两个报告各自手抄配色，把「红涨绿跌」抄成了「绿涨红跌」。

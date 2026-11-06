@@ -11,7 +11,12 @@
    用法（生成器内）：
        SPEC = os.path.join(PROJECT, '.agents', 'skills', '_shared', 'report-style.css')
        CSS = open(SPEC, encoding='utf-8').read()
-       html = f'<html data-theme="light"><head><style>{CSS}</style>...'
+       # 再拼进报告的 <style> 标签里（标签写法见生成器，此处不写死）
+
+   注意（2026-11-06 踩过）：本文件会被整体内联进 style 元素，
+       注释里**绝不能出现** style 的闭合标签字面量，否则会提前闭合该元素，
+       后面的规则全部失效、页面完全裸样式（body 透明、h1 变 Times 32px）。
+       判断方法：浏览器里 body 背景色为 rgba(0,0,0,0) 即中招。
 
    为什么必须有这个文件：
        2026-11-05 曾因两个报告各自手抄配色，把「红涨绿跌」抄成了「绿涨红跌」。
@@ -224,9 +229,9 @@ ul { padding-left: 20px; }
 <p style="font-size:13px;color:var(--mut)">涨 4,869 只但上证仅 +0.10%、中证红利 −1.31% —— 极端结构分化，不是普涨。</p>
 
 <h2>二、结构与涨跌幅榜</h2>
-<div class="tw"><table><tr><th>指数涨幅前 12</th><th>涨跌</th></tr><tr><td>科创新能</td><td class="num rise">+6.00%</td></tr><tr><td>新能源</td><td class="num rise">+5.00%</td></tr><tr><td>SHS互联网</td><td class="num rise">+5.00%</td></tr><tr><td>SHS线上消费</td><td class="num rise">+5.00%</td></tr><tr><td>半导体材料设备</td><td class="num rise">+5.00%</td></tr><tr><td>光伏龙头30</td><td class="num rise">+5.00%</td></tr><tr><td>科创半导体材料设备</td><td class="num rise">+5.00%</td></tr><tr><td>科创200</td><td class="num rise">+4.00%</td></tr><tr><td>中证新能</td><td class="num rise">+4.00%</td></tr><tr><td>中证传媒</td><td class="num rise">+4.00%</td></tr><tr><td>中证影视</td><td class="num rise">+4.00%</td></tr><tr><td>CS娱乐TI</td><td class="num rise">+4.00%</td></tr></table></div>
+<div class="tw"><table><tr><th>指数涨幅前 12</th><th>涨跌</th></tr><tr><td>科创新能</td><td class="num rise">+6.00%</td></tr><tr><td>新能源</td><td class="num rise">+5.00%</td></tr><tr><td>SHS互联网</td><td class="num rise">+5.00%</td></tr><tr><td>SHS线上消费</td><td class="num rise">+5.00%</td></tr><tr><td>半导体材料设备</td><td class="num rise">+5.00%</td></tr><tr><td>光伏龙头30</td><td class="num rise">+5.00%</td></tr><tr><td>科创半导体材料设备</td><td class="num rise">+5.00%</td></tr><tr><td>中证储能</td><td class="num rise">+5.00%</td></tr><tr><td>储能电池</td><td class="num rise">+5.00%</td></tr><tr><td>科创200</td><td class="num rise">+4.00%</td></tr><tr><td>中证新能</td><td class="num rise">+4.00%</td></tr><tr><td>中证传媒</td><td class="num rise">+4.00%</td></tr></table></div>
 <div class="tw"><table><tr><th>指数跌幅前 6</th><th>涨跌</th></tr><tr><td>中证能源</td><td class="num fall">-5.00%</td></tr><tr><td>300能源</td><td class="num fall">-5.00%</td></tr><tr><td>全指能源</td><td class="num fall">-4.00%</td></tr><tr><td>油气资源</td><td class="num fall">-3.00%</td></tr><tr><td>中证煤炭</td><td class="num fall">-3.00%</td></tr><tr><td>300现金流</td><td class="num fall">-2.00%</td></tr></table></div>
-<div class="tw"><table><tr><th>关键板块</th><th>代表指数</th><th>涨跌</th></tr><tr><td>化工</td><td>细分化工</td><td class="num rise">+3.00%</td></tr><tr><td>光伏</td><td>光伏龙头30</td><td class="num rise">+5.00%</td></tr><tr><td>黄金</td><td>SSH黄金股票</td><td class="num rise">+4.00%</td></tr><tr><td>半导体</td><td>半导体材料设备</td><td class="num rise">+5.00%</td></tr><tr><td>芯片</td><td>科创芯片</td><td class="num rise">+2.00%</td></tr><tr><td>军工</td><td>军工龙头</td><td class="num rise">+1.00%</td></tr><tr><td>煤炭</td><td>煤炭等权</td><td class="num fall">-2.00%</td></tr><tr><td>银行</td><td>银行AH</td><td class="num rise">+0.00%</td></tr><tr><td>医药</td><td>800医药</td><td class="num rise">+3.00%</td></tr><tr><td>证券</td><td>证券公司</td><td class="num rise">+0.00%</td></tr><tr><td>新能源</td><td>新能源</td><td class="num rise">+5.00%</td></tr></table></div>
+<div class="tw"><table><tr><th>关键板块</th><th>代表指数</th><th>涨跌</th></tr><tr><td>化工</td><td>细分化工</td><td class="num rise">+3.00%</td></tr><tr><td>光伏</td><td>光伏龙头30</td><td class="num rise">+5.00%</td></tr><tr><td>黄金</td><td>SSH黄金股票</td><td class="num rise">+4.00%</td></tr><tr><td>半导体</td><td>半导体材料设备</td><td class="num rise">+5.00%</td></tr><tr><td>芯片</td><td>科创芯片</td><td class="num rise">+2.00%</td></tr><tr><td>算力</td><td>中证算力</td><td class="num fall">-1.00%</td></tr><tr><td>军工</td><td>军工龙头</td><td class="num rise">+1.00%</td></tr><tr><td>煤炭</td><td>煤炭等权</td><td class="num fall">-2.00%</td></tr><tr><td>银行</td><td>银行AH</td><td class="num rise">+0.00%</td></tr><tr><td>医药</td><td>800医药</td><td class="num rise">+3.00%</td></tr><tr><td>证券</td><td>证券公司</td><td class="num rise">+0.00%</td></tr><tr><td>新能源</td><td>新能源</td><td class="num rise">+5.00%</td></tr></table></div>
 <div class="tw"><table><tr><th>关键个股</th><th>涨跌</th></tr><tr><td>万华化学</td><td class="num rise">+3.75%</td></tr><tr><td>卫星化学</td><td class="num fall">-1.73%</td></tr><tr><td>恒逸石化</td><td class="num fall">-0.31%</td></tr><tr><td>恒力石化</td><td class="num rise">+4.36%</td></tr><tr><td>中国石油</td><td class="num fall">-7.93%</td></tr><tr><td>中国石化</td><td class="num fall">-0.87%</td></tr><tr><td>隆基绿能</td><td class="num rise">+3.92%</td></tr><tr><td>阳光电源</td><td class="num rise">+4.89%</td></tr><tr><td>通威股份</td><td class="num rise">+5.00%</td></tr></table></div>
 
 <h2>三、隔夜外部</h2>
