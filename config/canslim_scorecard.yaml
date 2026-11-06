@@ -35,12 +35,24 @@ a_annual_earnings:
   stability_cv_threshold: 30
 n_new:
   high52_tiers:
+  - -3
   - -5
+  - -10
   - -15
   high52_scores:
-  - 6
-  - 4
-  high_lookback_days: 5
+  - 10
+  - 8
+  - 5
+  - 2
+  # v3.6-B：新高升为主项(10 分)，形态降为次项(7 分)，N 上限仍 17
+  signal_lookback_days: 15
+  form_cap: 7
+  # v3.6-C：连续衰减 + 趋势延续底分
+  decay_step: 0.08
+  decay_floor: 0.2
+  max_signal_days: 3
+  continuation_enabled: true
+  continuation_ratio: 0.5
   day_cap: 10
   engine_scores:
     base_breakout_v2: 7

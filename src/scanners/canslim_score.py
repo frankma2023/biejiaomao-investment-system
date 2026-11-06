@@ -241,8 +241,8 @@ def score_n(db, stock_code, target_date, p, klines=None, signals=None):
     high52 = max(highs) if highs else close
     if high52 > 0:
         pct = (close - high52) / high52 * 100
-        tiers = cfg.get('high52_tiers', [-5, -15])
-        scs = cfg.get('high52_scores', [6, 4])
+        tiers = cfg.get('high52_tiers', [-3, -5, -10, -15])
+        scs = cfg.get('high52_scores', [10, 8, 5, 2])
         high_sc = 0
         for i, t in enumerate(tiers):
             if pct > t: high_sc = scs[i]; break
@@ -266,7 +266,7 @@ def score_n(db, stock_code, target_date, p, klines=None, signals=None):
     eng_cfg = cfg.get('engine_scores', {})
     mw_q = cfg.get('mw_quality', {})
     decay = cfg.get('decay_factors', [1.0, 0.8, 0.6, 0.4, 0.4])
-    lookback = cfg.get('high_lookback_days', 5)
+    lookback = cfg.get('signal_lookback_days', 15)
     fams = cfg.get('signal_families', {
         'base': ['base_breakout_v2', 'base_breakout', 'double_bottom', 'flat_base', 'saucer_base', 'cup_handle'],
         'pivot': ['pocket_pivot_v2', 'pocket_pivot'],
@@ -337,13 +337,43 @@ def score_n(db, stock_code, target_date, p, klines=None, signals=None):
         extra = len(by_fam) - 1 if by_fam else 0
         day_raw = fam_max + min(extra, 3)
         day_raw = min(day_raw, day_cap)
-        days_ago = min(max(v[3] for v in by_fam.values()), len(decay) - 1) if by_fam else 0
-        factor = decay[days_ago]
+        days_ago = max(v[3] for v in by_fam.values()) if by_fam else 0
+        # v3.6：连续衰减到下限。原离散 5 档与 5 天窗口重合，第 5 档(×0.4)永远用不上
+        factor = max(cfg.get('decay_floor', 0.2),
+                     1.0 - cfg.get('decay_step', 0.08) * days_ago)
         day_score = day_raw * factor
         form_sc += day_score
         day_parts.append((dt, round(day_raw, 1), round(factor, 2), round(day_score, 1)))
 
-    form_sc = min(form_sc, 17)
+    # v3.6：只取最近 max_signal_days 个信号日，防跨日累加虚高
+    max_days = cfg.get('max_signal_days', 3)
+    if len(day_parts) > max_days:
+        day_parts = day_parts[-max_days:]
+        form_sc = sum(p[3] for p in day_parts)
+
+    form_cap = cfg.get('form_cap', 7)
+    form_sc = min(form_sc, form_cap)
+
+    # v3.6-C：趋势延续底分——突破已过窗口但趋势未破，保留一半基础分
+    if cfg.get('continuation_enabled', True):
+        _r = db.execute('SELECT close FROM daily_kline_adj WHERE stock_code=? '
+                        'AND date<=? ORDER BY date DESC LIMIT 1',
+                        (stock_code, target_date)).fetchone()
+        _ma = db.execute('SELECT AVG(close) av FROM (SELECT close FROM daily_kline_adj '
+                         'WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 20)',
+                         (stock_code, target_date)).fetchone()
+        _hi = db.execute('SELECT MAX(high) mh FROM (SELECT high FROM daily_kline_adj '
+                         'WHERE stock_code=? AND date<=? ORDER BY date DESC LIMIT 20)',
+                         (stock_code, target_date)).fetchone()
+        if _r and _ma and _ma['av'] and _hi and _hi['mh']:
+            _c, _m = _r['close'], _ma['av']
+            if _c >= _m and _c >= _hi['mh'] * 0.95:
+                _cont = form_cap * cfg.get('continuation_ratio', 0.5)
+                if _cont > form_sc:
+                    form_sc = _cont
+                    bd['form_continuation'] = {
+                        'value': 'MA20 上方且距 20 日高 <5%',
+                        'score': round(_cont, 1)}
     score += round(form_sc, 1)
     bd['form_breakout'] = {'value': round(form_sc, 1), 'score': round(form_sc, 1)}
     if day_parts:
