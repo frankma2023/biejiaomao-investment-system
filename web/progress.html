@@ -915,6 +915,9 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">195. 派生序列的存量值会与源数据脱钩，无法用当前数据复现——研究必须重算，不能直接用存量</div><div class="ld">微盘 400/100 的线上序列（`microcap_index_daily`）用当前数据怎么都对不上：与「前复权+正确口径」比值 1.3301 / 1.5442，与「不复权」也对不上，成分池重合度只有 400 类 90.6%、100 类 83.6%（最低 10.0%）。说明当年建库时 <code>stock_equity_change</code> 与现在不同，<b>历史无法复现</b>。更要紧的是接缝：2026-09-14 数据源迁移那天，新旧两序列<b>逐日涨跌幅完全一致（差 0.000）</b>——因为增量重启时从新源重读前一日复权价，接缝无跳变，但 6.6pp/年 的水平偏移被静默带过。差异集中在分红送转季（2017-04-10 −1.58pp 等），即老序列丢了分红与送转。教训：迁移数据源后必须<b>全量重算并与旧序列比对水平</b>，只验证「日收益率接得上」会漏掉整段水平偏移（与教训 184 同族）。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">196. 跨市场折算年数不能用交易日本地化——用 A 股 243 天折美股，会把 CAGR 系统性压低</div><div class="ld">微盘报告的国际对照里写 <code>yy = len(x) / 243.0</code>，而美股每年约 252 个交易日。同一窗口算出 11.23 年（真值 10.84 年），把 IWC 的年化从 10.73% 压到 10.34%，跑输标普的幅度也从 5.97pp 缩成 5.6pp。<b>错误方向单一、幅度 0.4pp，看图完全看不出来</b>。改为按日历日折年：<code>(end - start).days / 365.25</code>。教训：只要对照里混了两个市场，年化折算一律走日历日；交易日本地化只适合「同市场内部」的窗口对齐。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">197. 有超额 ≠ 可投资——收益、载体、容量三者必须分开判</div><div class="ld">400 微盘 10.84 年化 19.02%、对中证2000 年化 alpha 18.75%（t=5.96），数字上远好于红利（7.61%）。但四条硬约束里三条不满足：<b>没有载体</b>（无 ETF、无场外、无期货，唯一真微盘是万得 868008，属 Wind 终端内部指数、取不到数据也不可交易）；<b>容量只有十亿量级</b>（池内总市值 7,259 亿，单只日成交额中位 3,283 万元，占全市场成交 1.22%）；<b>年化换手 144%</b>（100 类 210%）；<b>回撤 −48.6%，其中 2024-01 那次只用了 24 个交易日</b>——流动性事件，任何止损纪律在这种速度面前失效。<b>把「超额」直接翻译成「可长期持有」是本轮最大的口径错误风险</b>：红利能长期持有是因为有载体、有现金流（股息 4%~5%）、回撤 −27% 可由估值解释；微盘一条都不满足。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">198. 指数发布日就是分水岭——回溯段与实盘段必须分开报，合起来报等于把回测当业绩</div><div class="ld">中证800红利低波动（931848）基日 2013-12-31、发布日 2024-05-21，全区间 12.86 年里 <b>10.38 年是回溯（占 81%）</b>。全区间年化 14.18% 看着极好；切开后回溯段 15.59%、实盘段只剩 <b>8.44%</b>，落差 7.15pp，比中证红利的 9.22pp 落差还小一点。更关键的是显著性：全区间对中证红利 alpha 3.31%（t=2.05）成立，<b>实盘段 4.53% 但 t 只有 1.30，600 个交易日分不出来</b>。同一份材料里若只报全区间，读者会以为「这个指数每年多赚 14%」。教训：凡指数研究，第一张表就要写清基日/发布日/回溯年数，收益表一律两段并给样本量；alpha 的显著性只能在实盘段判。</div></div>
+      <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">199. 估值分位要先看样本长度——600 个交易日算出来的 99.5% 不能叫「十年级高位」</div><div class="ld">931848 的 <code>index_fundamental_daily</code> 只有 600 行，且<b>恰好从发布日 2024-05-21 开始</b>（理杏仁不给回溯估值）。于是 PE 9.83 的 99.5% 分位、股息率 3.87% 的 0.8% 分位，真实含义是「自发布以来最高」，不是「十年高位」。对照行里中证红利（000922）是 2016 年起的 2,634 个交易日分位，两者<b>不可直接比较</b>——报告里必须把「分位样本区间」做成一列写进表里。另有一层：区间窄（PE 7.42~9.87）不是「波动小」，只是没经历过完整的估值周期。</div></div>
+      <div class="lesson-card" style="border-left-color:#2563EB"><div class="ln">200. 表格默认「数字列右对齐」会把文字列一起污染——文字列必须显式声明左对齐</div><div class="ld">生成器的 <code>tbl(headers, rows)</code> 用 <code>i &gt;= num_from</code> 判断数字列，默认文字列只有第 0 列。结果「标的 / 因子暴露 / 说明 / 当前读数」这些中间文字列全被套上 <code>.num</code> 右对齐，长文本贴到列右缘、紧挨下一列，读起来像串行。修法是加 <code>left=()</code> 白名单，逐表声明。判断是否修好不能靠截图肉眼——用 Playwright 读 <code>getComputedStyle(td).textAlign</code> 逐表核验，一次就能定位到还漏了哪张表（本次漏了 §十三 判断表）。</div></div>
 
 
 
@@ -941,6 +944,25 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 </script>
 <script src="shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
+
+<div class="pg-section">
+<div class="section-title">📌 2026-11-10 · 中证800红利低波动（931848）研究：八成历史是回溯</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>先查发布日</b>：931848 基日 2013-12-31、<b>发布日 2024-05-21</b>、发布渠道「数据服务平台」、100 只、从<b>中证800 成分内</b>选连续分红+高股息率+低波动、<b>股息率加权</b>、每半年调仓 → 全区间 12.86 年里 <b>10.38 年（81%）是回溯</b></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>收益两段报</b>：全区间年化 14.18%（累计 +450.2%、波动 18.67%、夏普 0.65、最大回撤 −42.44%）；<b>回溯段 15.59% → 实盘段 8.44%</b>（落差 7.15pp）。同期中证红利 11.88%（13.68% → 4.46%）、沪深300 6.83%（6.75% → 7.35%，唯一反向）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>超额来源</b>：对中证红利 alpha <b>3.31%（t=2.05）</b>、β 0.888、R² 0.907；对沪深300 alpha 8.78%；双因子模型里沪深300 β 仅 0.116 → 超额来自<b>选样与股息率加权</b>，不是市场 β。<b>但实盘段 alpha t=1.30，不成立</b></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>与红利低波家族高度重合</b>：日收益相关 红利低波100（930955）<b>0.980</b>、红利低波（H30269）0.955、中证红利 0.952、沪深300 仅 0.840 → 它是红利低波家族的第五个成员，不是新风格</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>红利贡献 4.46pp/年</b>：全收益 14.18% 减价格 9.72% = 4.46pp（年均股息）。价格口径回撤 −43.45% 与全收益 −42.44% 基本一致</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>估值分位受限</b>：<code>index_fundamental_daily</code> 只有 600 行且<b>恰好从发布日起</b>。PE 9.83 落在自发布以来 <b>99.5%</b> 分位、股息率 3.87% 落在 <b>0.8%</b> 分位（区间 3.84~5.94）→ 只能叫「上市以来分位」，与中证红利 2016 起的分位不可比（教训 199）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>国际对照（§1.6 硬门槛）</b>：价格口径 + 拆股还原，同窗口 SPLV 6.86% / USMV 8.63% / SCHD 8.58% / <b>SPY 11.55%</b> / 931848 价格 9.72%，坏点全 0 → 美国低波红利产品<b>集体跑输标普</b>，夏普 SPLV 0.34 vs SPY 0.57；931848 在三者之上但仍低于 SPY，且回撤 −43.45% 远深于 SPLV 的 −36.56%</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>qfq 口径被否决</b>：新浪 qfq 给 SPY 15.85%、比价格口径高 4.30pp，而 SPY 真实股息率约 1.3% → 判定 qfq 对美股分红调整偏大，正式对照一律用「价格 + desplit」；NOBL 2026-05-28 的 0.5004、SCHD 2024-10-11 的 0.3373 拆股比例由跳变反推修正</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>回撤与买点</b>：锚定口径 10/14/20 三档，12.86 年只触发 <b>7 / 2 / 2 次</b>；按天口径 10~14% 档 60 日均值仅 +1.91%（基准 +3.88%）、250 日胜率 71.4%，是<b>最差的档</b>；14~20% 档反而最好（+6.22%、93.8%）。事件样本个位数，不做胜率承诺</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>当前判定：进观察名单，现在不买</b>。2026-11-09 全收益 5502.43、前高 5503.42（回撤 −0.02%，等于新高）；PE 99.5% 分位、股息率 0.8% 分位、日线 RSI 64.6（分位 81.0%）。三个转买条件：回撤进 10% 档（≈4953 以下）/ PE 回 8.5 以下 / 股息率回 4.5% 以上，满足两个再动手</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>载体已有但小</b>：跟踪 931848 的 ETF 三只（华宝 159355、鑫元 563980、万家 158023），均 2025 年前后新发；鑫元某日成交额仅 269 万元 → 大额进出有冲击成本</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td>产出《中证800红利低波动指数（931848）研究报告》单文件 HTML（18 章 + 附录 A–E，187 KB，8 张内联 SVG，校验 9 项通过 0 失败）。数字层 <code>scripts/divlow800_research.py</code> → <code>data/snapshot.json</code>、美股 <code>scripts/fetch_us_divlow_peers.py</code>、呈现层 <code>docs/report/800红利低波研究报告/make_report.py</code></td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td>未解决：931848 的编制方案<b>原始修订公告未取得</b>（只有官网 basic-info 接口的基日/发布日）；<code>index_financials_annual</code> 对四只指数全 0 行，理杏仁 <code>non_financial</code>/<code>security</code>/<code>bank</code> 三端点皆 0 条、仅 <code>hybrid</code> 有 2 个报告期 → ROE/净利润/净资产全部由 PE=PB×ROE 恒等式反推，非原始财报</td></tr>
+</table>
+</div>
 
 <div class="pg-section">
 <div class="section-title">📌 2026-11-10 · 自建 400/100 微盘指数研究（数据重修 + 可投资性判定）</div>
