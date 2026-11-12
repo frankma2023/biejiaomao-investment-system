@@ -918,6 +918,7 @@
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">198. 指数发布日就是分水岭——回溯段与实盘段必须分开报，合起来报等于把回测当业绩</div><div class="ld">中证800红利低波动（931848）基日 2013-12-31、发布日 2024-05-21，全区间 12.86 年里 <b>10.38 年是回溯（占 81%）</b>。全区间年化 14.18% 看着极好；切开后回溯段 15.59%、实盘段只剩 <b>8.44%</b>，落差 7.15pp，比中证红利的 9.22pp 落差还小一点。更关键的是显著性：全区间对中证红利 alpha 3.31%（t=2.05）成立，<b>实盘段 4.53% 但 t 只有 1.30，600 个交易日分不出来</b>。同一份材料里若只报全区间，读者会以为「这个指数每年多赚 14%」。教训：凡指数研究，第一张表就要写清基日/发布日/回溯年数，收益表一律两段并给样本量；alpha 的显著性只能在实盘段判。</div></div>
       <div class="lesson-card" style="border-left-color:#C62828"><div class="ln">199. 估值分位要先看样本长度——600 个交易日算出来的 99.5% 不能叫「十年级高位」</div><div class="ld">931848 的 <code>index_fundamental_daily</code> 只有 600 行，且<b>恰好从发布日 2024-05-21 开始</b>（理杏仁不给回溯估值）。于是 PE 9.83 的 99.5% 分位、股息率 3.87% 的 0.8% 分位，真实含义是「自发布以来最高」，不是「十年高位」。对照行里中证红利（000922）是 2016 年起的 2,634 个交易日分位，两者<b>不可直接比较</b>——报告里必须把「分位样本区间」做成一列写进表里。另有一层：区间窄（PE 7.42~9.87）不是「波动小」，只是没经历过完整的估值周期。</div></div>
       <div class="lesson-card" style="border-left-color:#2563EB"><div class="ln">200. 表格默认「数字列右对齐」会把文字列一起污染——文字列必须显式声明左对齐</div><div class="ld">生成器的 <code>tbl(headers, rows)</code> 用 <code>i &gt;= num_from</code> 判断数字列，默认文字列只有第 0 列。结果「标的 / 因子暴露 / 说明 / 当前读数」这些中间文字列全被套上 <code>.num</code> 右对齐，长文本贴到列右缘、紧挨下一列，读起来像串行。修法是加 <code>left=()</code> 白名单，逐表声明。判断是否修好不能靠截图肉眼——用 Playwright 读 <code>getComputedStyle(td).textAlign</code> 逐表核验，一次就能定位到还漏了哪张表（本次漏了 §十三 判断表）。</div></div>
+      <div class="lesson-card"><div class="ln">202. 「抓公众号」先问清抓的是哪一层——原页、搜索、还是同作者的其他平台</div><div class="ld">公众号原页要 cookie 或微信客户端 UA，搜狗只剩标题且跳转被拦，二十次幂一类聚合站多已下线。真正稳定的一条是「作者在别的平台同步发布」：搜狐号、雪球、头条往往同步同一篇。这次就是靠搜狐号 <code>v2.sohu.com/author-page-api</code> 免登录接口拿到 60 篇全文，代价是正文可能有排版差异、视频稿只剩标题。判断能不能抓，先确认作者在多平台的存在性，比硬碰反爬省事得多。</div></div>
       <div class="lesson-card"><div class="ln">201. `color-scheme` 有没有生效，要看 computed style，不看源码写没写</div><div class="ld">页面里写了 `html[data-theme="light"]{color-scheme:light}` 也不一定生效：同权重选择器按文档顺序裁决，共享样式表里更靠后的一行 `html.dark{color-scheme:dark}` 就能把它压掉。本次 11 个页面全中——`<html>` 上的 `class="dark"` 是静态的，切换主题只改 `data-theme`，所以 `html.dark` 永远匹配。核验只认一条：Playwright 读 `getComputedStyle(document.documentElement).colorScheme`，切换前后应分别是 `light` / `dark`。只看源码会误判成「已经修好」。</div></div>
 
 
@@ -945,6 +946,16 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 </script>
 <script src="shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
+
+<div class="pg-section">
+<div class="section-title">📌 2026-11-12 · 公众号文章抓取（指汇盈 · 搜狐号镜像）</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>前提纠偏</b>：公众号没有「关注列表」接口，也没有免登录的文章列表接口。搜狗微信 <code>type=1</code> 查「指汇盈」返回「暂无相关官方认证订阅号」，<code>type=2</code> 能拿到 10 条标题但 <code>/link?url=</code> 跳转被反爬拦（822 字节的空壳页）；<code>mp.weixin.qq.com/mp/profile_ext</code> 直接要验证码</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>可行路线</b>：抓作者在<b>搜狐号的同步发布</b>。搜狐号 <code>120994993</code> 的 API <code>https://v2.sohu.com/author-page-api/author-articles/pc/120994993?pNo=N</code> 免登录，每页 20 篇，字段含 <code>title/publicTime/link/brief/id</code>，作者名核实为「指汇盈」（<code>mp.sohu.com/profile</code> 返回 <code>authorName: 指汇盈</code>）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>落地</b>：<code>scripts/fetch_gzh_articles.py</code>（增量 + 正文抓取 + 入库）+ <code>config/gzh_accounts.yaml</code>（号清单，填 <code>sohu_id</code> 即可加号）。库落 <code>data/gzh.db</code> 表 <code>gzh_articles</code>，与 179 GB 主库分开，避免日更锁库</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>实测</b>：回填 3 页 = 60 篇（2026-09-18 ~ 2026-11-12），57 篇带正文（平均 1,519 字，区间 909~2,572）；3 篇是视频稿，页面只有标题无段落。重跑增量 0 篇，幂等</td></tr>
+</table>
+</div>
 
 <div class="pg-section">
 <div class="section-title">📌 2026-11-12 · 用 Google modern-web-guidance 修 dark-scheme（12 处）</div>
