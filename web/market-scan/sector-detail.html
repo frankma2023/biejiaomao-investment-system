@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="color-scheme" content="dark light">
+<script>(function(){try{var s=localStorage.getItem('theme')||'dark';var h=document.documentElement;h.dataset.theme=s;var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=s==='light'?'light':'dark'}catch(e){}})();</script>
+<style>html{color-scheme:dark light}html[data-theme="dark"]{color-scheme:dark}html[data-theme="light"]{color-scheme:light}</style>
 <title>行业分组详情</title>
 <link rel="stylesheet" href="/shared/css/hanako-glass.css">
 <style>
@@ -186,8 +189,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 loadGroup(initialGroup);
 
-function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
-(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);(function(m){if(m)m.content=n})(document.querySelector('meta[name="color-scheme"]'))}
 </script>
 </body>
 </html>

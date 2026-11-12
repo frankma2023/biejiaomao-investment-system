@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="color-scheme" content="dark light">
+<script>(function(){try{var s=localStorage.getItem('theme')||'dark';var h=document.documentElement;h.dataset.theme=s;var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=s==='light'?'light':'dark'}catch(e){}})();</script>
+<style>html{color-scheme:dark light}html[data-theme="dark"]{color-scheme:dark}html[data-theme="light"]{color-scheme:light}</style>
 <title>港股红利详情</title>
 <link rel="stylesheet" href="/shared/css/hanako-glass.css">
 <script src="/shared/js/api-client.js"></script>
@@ -78,8 +81,7 @@ const isDark = () => document.documentElement.dataset.theme === 'dark';
 const tx = () => isDark() ? '#999' : '#6E6E6E';
 const sp = () => isDark() ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
 const upC = '#ef4444', dnC = '#10b981', midC = '#f59e0b', bluC = '#539BF5';
-(function(){const s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
-function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);(function(m){if(m)m.content=n})(document.querySelector('meta[name="color-scheme"]'));location.reload()}
 
 // 单张图失败只影响它自己：同一页其余图与下方表格必须照常渲染
 function runChart(id, fn){

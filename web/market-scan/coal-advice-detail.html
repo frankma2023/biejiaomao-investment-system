@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="color-scheme" content="dark light">
+<script>(function(){try{var s=localStorage.getItem('theme')||'dark';var h=document.documentElement;h.dataset.theme=s;var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=s==='light'?'light':'dark'}catch(e){}})();</script>
+<style>html{color-scheme:dark light}html[data-theme="dark"]{color-scheme:dark}html[data-theme="light"]{color-scheme:light}</style>
 <title>中证煤炭网格投资法详情</title>
 <link rel="stylesheet" href="/shared/css/hanako-glass.css">
 <script src="/shared/js/api-client.js"></script>
@@ -49,7 +52,6 @@ td:first-child{font-family:var(--font-body)}
 </div>
 
 <script>
-(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 const params = new URLSearchParams(window.location.search);
 const date = params.get('date') || '';
 const DETAIL_API = API_BASE + '/api/market-scan/coal-advice-detail' + (date ? '?date=' + date : '');
@@ -174,7 +176,7 @@ load();
 
 function stat(n, l) { return '<div class="stat-box"><div class="n">' + l + '</div><div class="l">' + n + '</div></div>'; }
 
-function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);(function(m){if(m)m.content=n})(document.querySelector('meta[name="color-scheme"]'));location.reload()}
 </script>
 <script src="/shared/js/nav.js"></script>
 <script>window.NAV_PREFIX='../..';Nav.init({brandIcon:'🧭',brandText:'指数投资',currentPage:'red-dividend'})</script>

@@ -76,6 +76,7 @@
 
 /* ═══ 2.5 Dark scheme ═══ */
 html.dark { color-scheme: dark; }
+html[data-theme="light"] { color-scheme: light; }
 
 /* ═══ 3. Body ═══ */
 body {

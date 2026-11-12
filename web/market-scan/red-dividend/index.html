@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="color-scheme" content="dark light">
+<script>(function(){try{var s=localStorage.getItem('theme')||'dark';var h=document.documentElement;h.dataset.theme=s;var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=s==='light'?'light':'dark'}catch(e){}})();</script>
+<style>html{color-scheme:dark light}html[data-theme="dark"]{color-scheme:dark}html[data-theme="light"]{color-scheme:light}</style>
 <title>指数投资 · 总览</title>
 <link rel="stylesheet" href="/shared/css/hanako-glass.css">
 <script src="/shared/js/api-client.js"></script>
@@ -67,7 +70,6 @@ h1{font-family:var(--font-display);font-size:1.3rem;font-weight:400;color:var(--
 
 <script>
 // B1 修复：图表所需主题变量（echarts 图用，与 lab.html 同构）
-(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 const isDark = document.documentElement.dataset.theme === 'dark';
 const tx = isDark ? '#999' : '#6E6E6E';
 const sp = isDark ? 'rgba(200,200,200,0.08)' : 'rgba(128,128,128,0.1)';
@@ -430,7 +432,7 @@ function renderHkFR(fr) {
   hkEl._echart = hkCh;
 }
 
-function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);(function(m){if(m)m.content=n})(document.querySelector('meta[name="color-scheme"]'));location.reload()}
 </script>
 <script src="/shared/js/nav.js"></script>
 <script>window.NAV_PREFIX='../..';Nav.init({brandIcon:'🧭',brandText:'指数投资',currentPage:'red-dividend'})</script>

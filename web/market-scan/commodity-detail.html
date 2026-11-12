@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="color-scheme" content="dark light">
+<script>(function(){try{var s=localStorage.getItem('theme')||'dark';var h=document.documentElement;h.dataset.theme=s;var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=s==='light'?'light':'dark'}catch(e){}})();</script>
+<style>html{color-scheme:dark light}html[data-theme="dark"]{color-scheme:dark}html[data-theme="light"]{color-scheme:light}</style>
 <title>大宗商品ETF 详情 · 510170</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -158,8 +161,7 @@ function load(){
     });
 }
 
-function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n)}
-(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);(function(m){if(m)m.content=n})(document.querySelector('meta[name="color-scheme"]'))}
 window.addEventListener('resize',function(){ch1&&ch1.resize();ch2&&ch2.resize()});
 load();
 </script>

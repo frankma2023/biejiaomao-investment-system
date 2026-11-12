@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="color-scheme" content="dark light">
+<script>(function(){try{var s=localStorage.getItem('theme')||'dark';var h=document.documentElement;h.dataset.theme=s;var m=document.querySelector('meta[name="color-scheme"]');if(m)m.content=s==='light'?'light':'dark'}catch(e){}})();</script>
+<style>html{color-scheme:dark light}html[data-theme="dark"]{color-scheme:dark}html[data-theme="light"]{color-scheme:light}</style>
 <title>自由现金流指数操作建议详情</title>
 <link rel="stylesheet" href="/shared/css/hanako-glass.css">
 <script src="/shared/js/api-client.js"></script>
@@ -85,7 +88,6 @@ html[data-theme="light"] .tab.active{background:var(--accent-subtle);color:var(-
 </div>
 
 <script>
-(function(){var s=localStorage.getItem('theme')||'dark';document.documentElement.dataset.theme=s})();
 const params = new URLSearchParams(window.location.search);
 const date = params.get('date') || '';
 const code = params.get('code') || '980092';
@@ -418,7 +420,7 @@ function genValFsText(id, name, vals, unit, dates) {
 
 load();
 
-function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);location.reload()}
+function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'?'light':'dark';h.dataset.theme=n;localStorage.setItem('theme',n);(function(m){if(m)m.content=n})(document.querySelector('meta[name="color-scheme"]'));location.reload()}
 </script>
 <script src="/shared/js/nav.js"></script>
 <script>Nav.init({brandIcon:'🧲',brandText:'自由现金流',currentPage:'market-scan'})</script>
