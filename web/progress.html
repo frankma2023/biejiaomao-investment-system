@@ -949,6 +949,20 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-14 · 板块资金与两融固定页面（行业 55 + 主题策略 30）</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：查光伏 10 日资金时是临时写脚本跑一次。用户要求做成固定页面，「一目了然看到各板块 10 日资金与两融情况」</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新增 <code>scripts/gen_sector_flow.py</code></b> → <code>web/sector-flow/index.html</code>（54 KB）。三张表：行业板块 55 行、主题策略净买入前 15、后 15。列含 10 日涨跌、10 日成交额、量比（后 5 日均额 ÷ 前 5 日均额）、融资余额、10 日融资净买入、余额变化、相对全市场（pp）、资金流评分 10/65/250 日</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>可读性</b>：点表头切排序（每格带 <code>data-v</code> 数值属性，不解析文本）；名称框实时筛选；四张 KPI 卡给全市场余额、正增长板块数、加仓最多、减仓最多；表后一段规则化解读（余额方向、两端切换、缩量判主动去杠杆还是被动套住、相对全市场最抗跌与去杠杆最快）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>接入</b>：<code>daily_update.py</code> 第 42 步（41 大盘总结之后，约 1 秒，幂等覆盖）；导航「指标扫描 → 板块资金」。实测 <code>http://localhost:8772/sector-flow/</code> HTTP 200</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>当日读数（2026-11-13）</b>：全市场融资余额 21,396 亿，10 日 −3.87%（净买入 −1,071 亿）；55 个行业板块只有 1 个融资余额正增长（300能源 +5.8%，+2.9 亿），减仓最多 全指信息 −283 亿（−6.4%）；缩量最深 证券公司 0.46 倍，全板块都在缩量；指数 40 个上涨而杠杆资金几乎全在流出 → 杠杆与价格不同步</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 215</b>：派生页面按「末个交易日必须有 K 线」过滤。缺当日行时 10 日窗口会悄悄变成更长区间，涨跌与量比全错。本次因此剔除 39 个板块并列进「覆盖缺口」</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 216</b>：按成分股加总两融时，港股/海外指数成分没有 A 股融资数据，加出来是 0 而不是缺数。0 要当缺失处理（显示「—」），否则会混进净买入排序的两端</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 217</b>：页面文案里的 <code>&lt;日期&gt;</code> 会被浏览器当成标签吞掉，占位符必须写 <code>&amp;lt;日期&amp;gt;</code></td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-13 · 大盘总结改由 LLM 现写叙事（模板只做兜底）</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：用户指出「当天各卡片的数字可以靠 Python 条件拼接，但把指汇盈文章提炼成观点、再结合卡片数据写总结，只能靠 LLM」—— 模板只能从预写句子里挑，遇到新情况写不出真正的新判断</td></tr>

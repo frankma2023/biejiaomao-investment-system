@@ -95,6 +95,7 @@
     { href: '../index-scan/',         label: '指数全景',   page: 'index-scan' },
     { href: '../index-scan/microcap.html', label: '微盘指数', page: 'microcap' },
     { href: '../index-valuation/',    label: '指数估值',   page: 'index-valuation' },
+    { href: '../sector-flow/',        label: '板块资金',   page: 'sector-flow' },
     { href: '../market-scan/red-dividend/', label: '指数投资', page: 'red-dividend' },
     { href: '../index-scan/grid-lab.html',  label: '网格模拟器', page: 'grid-lab' },
   ];
