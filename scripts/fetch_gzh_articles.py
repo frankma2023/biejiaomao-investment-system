@@ -16,8 +16,8 @@
 - 来源是作者在搜狐号的同步发布，不是公众号原页。正文可能有排版差异/删改，
   付费或仅图片的内容拿不到。搜狐号 id 见 config/gzh_accounts.yaml。
 - publicTime 是 UTC，入库转成东八区本地时间。
-- 少量文章是视频稿（页面上只有标题和作者，没有段落），这类 body 留空。
-  2026-11-12 实测 60 篇里 3 篇属此类，约占 5%。
+- 搜狐号 type=4 是视频稿（页面只有播放器和标题，没有正文段落）。本号只做图文分析，
+  这类条目不抓取、不入库（2026-11-13 用户确认）。只统计在日志的「跳过视频稿 N 篇」里。
 """
 import argparse
 import datetime as dt
@@ -200,7 +200,14 @@ def main():
                 print('  p%d 空，停止' % page)
                 break
             fresh = [a for a in arts if str(a['id']) not in known]
-            print('  p%d %d 篇，其中新 %d 篇' % (page, len(arts), len(fresh)))
+            # 搜狐号 type=4 是视频稿，页面只有播放器、没有正文段落。
+            # 本号只做图文分析，视频稿直接跳过，不入库（2026-11-13 用户确认）。
+            n_video = sum(1 for a in fresh if a.get('type') == 4)
+            if n_video:
+                fresh = [a for a in fresh if a.get('type') != 4]
+            print('  p%d %d 篇，其中新 %d 篇%s'
+                  % (page, len(arts), len(fresh),
+                     ('（跳过视频稿 %d 篇）' % n_video) if n_video else ''))
             if args.list:
                 for a in fresh:
                     print('    %s  %s' % (to_local(a.get('publicTime')), a['title']))

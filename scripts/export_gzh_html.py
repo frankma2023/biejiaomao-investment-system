@@ -97,16 +97,18 @@ def main():
     rows = list(db.execute(sql))
     if args.limit:
         rows = rows[:args.limit]
-    if not rows:
-        print('没有待导出的文章')
-        return
-    print('待导出 %d 篇' % len(rows))
+    if rows:
+        print('待导出 %d 篇' % len(rows))
+    else:
+        print('没有待导出的文章（只重建目录页）')
 
     done = 0
     failures = []
     with sync_playwright() as p:
         b = p.chromium.launch()
-        pg = b.new_page(viewport={'width': 1280, 'height': 900})
+        pg = None
+        if rows:
+            pg = b.new_page(viewport={'width': 1280, 'height': 900})
         for i, (aid, acc, pub, title, url, body) in enumerate(rows, 1):
             try:
                 pg.goto(url, wait_until='domcontentloaded', timeout=45000)
