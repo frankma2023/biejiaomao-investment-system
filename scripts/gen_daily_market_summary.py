@@ -540,7 +540,7 @@ def render(d):
 <div class="n">样本 {num(n)} 只</div></div>
 </div>
 <h3>卖出评分信号明细</h3>
-<div class="tw"><table class="wide"><tr><th>信号</th><th>状态</th><th>得分</th></tr>{sell_rows}</table></div>
+<div class="tw"><table class="wide"><tr><th style="width:42%">信号</th><th>状态</th><th style="width:14%">得分</th></tr>{sell_rows}</table></div>
 
 <h2>二、主要指数表现</h2>
 <div class="tw"><table><tr><th>指数</th><th>代码</th><th>涨跌</th></tr>{broad_rows}</table></div>
