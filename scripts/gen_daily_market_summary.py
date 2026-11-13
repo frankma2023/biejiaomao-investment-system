@@ -35,6 +35,19 @@ STYLE_YAML = os.path.join(PROJECT, 'config', 'index_style.yaml')
 CSS = open(os.path.join(PROJECT, '.agents', 'skills', '_shared',
                         'report-style.css'), encoding='utf-8').read()
 
+# 本页附加样式：表格统一居中（列头与内容同轴，避免错位）；解读块用左侧强调线。
+CSS_EXTRA = """
+.tw table th,.tw table td{text-align:center}
+.tw table th{white-space:nowrap}
+.read{margin:12px 0 20px;padding:14px 18px;border-left:3px solid var(--accent);
+ background:rgba(127,127,127,.075);border-radius:0 8px 8px 0;
+ font-size:14px;line-height:1.9;color:var(--tx)}
+.read p{margin:0 0 8px}
+.read p:last-child{margin-bottom:0}
+.read .lb{color:var(--accent);font-weight:600}
+.pts{font-size:12.5px;color:var(--mut);margin:-6px 0 14px}
+"""
+
 JS = """
 (function(){var K='ml-theme';
 try{var s=localStorage.getItem(K);if(s)document.documentElement.dataset.theme=s;}catch(e){}
@@ -110,24 +123,31 @@ def rating_label(score, rating):
     return '很弱' if rating == 'E' else '—'
 
 
-def sparkline(vals, w=430, h=96, color='var(--blue)'):
-    """极简折线：只用 .chart 的样式类，不引外部库。"""
-    vals = [v for v in vals if v is not None]
+def sparkline(vals, w=430, h=96, color='var(--blue)', first_label='', last_label=''):
+    """极简折线：只用 .chart 的样式类，不引外部库。
+
+    上下界不画在图内（会压在曲线上），改为图下方的区间说明行；
+    图内只标首尾两个点，帮助读方向。
+    """
+    raw = list(vals)
+    vals = [v for v in raw if v is not None]
     if len(vals) < 2:
         return '<p style="font-size:12px;color:var(--mut)">序列不足，无法作图</p>'
     lo, hi = min(vals), max(vals)
     rng = (hi - lo) or 1.0
-    pad = 6
+    pad = 8
     pts = []
     for i, v in enumerate(vals):
         x = pad + i * (w - 2 * pad) / (len(vals) - 1)
         y = h - pad - (v - lo) / rng * (h - 2 * pad)
         pts.append(f'{x:.1f},{y:.1f}')
+    cap = f'区间 {lo:,.0f} ~ {hi:,.0f}'
+    if first_label and last_label:
+        cap = f'{first_label} {vals[0]:,.0f} → {last_label} {vals[-1]:,.0f} ｜ ' + cap
     return (f'<svg class="chart" viewBox="0 0 {w} {h}" preserveAspectRatio="none">'
             f'<polyline class="ln" style="stroke:{color}" points="{" ".join(pts)}"/>'
-            f'<text class="ax" x="{pad}" y="{pad + 8}">{hi:,.0f}</text>'
-            f'<text class="ax" x="{pad}" y="{h - 1}">{lo:,.0f}</text>'
-            f'</svg>')
+            f'</svg>'
+            f'<div class="pts" style="text-align:center;margin:6px 0 0">{cap}</div>')
 
 
 def strip_tags(s):
@@ -148,13 +168,14 @@ def strip_tags(s):
 def load_style():
     cfg = yaml.safe_load(open(STYLE_YAML, encoding='utf-8'))
     cats = cfg['categories']
-    names, etf_codes = {}, set()
+    names, etf_codes, cat_of = {}, set(), {}
     for key in ('market', 'sector_l1', 'sector_l2', 'thematic', 'strategy', 'etf'):
         for it in cats.get(key, []) or []:
             names.setdefault(it['code'], it['name'])
+            cat_of.setdefault(it['code'], key)
             if key == 'etf':
                 etf_codes.add(it['code'])
-    return names, cats.get('sector_l1', []) or [], etf_codes
+    return names, cats.get('sector_l1', []) or [], etf_codes, cat_of
 
 
 def q1(con, sql, args=()):
@@ -163,7 +184,7 @@ def q1(con, sql, args=()):
 
 
 def gather(con, date):
-    names, sector_l1, etf_codes = load_style()
+    names, sector_l1, etf_codes, cat_of = load_style()
     d = {'date': date}
 
     # 1) 宽度：涨跌家数 / 成交额 / 平均涨幅
@@ -172,6 +193,19 @@ def gather(con, date):
                SUM(CASE WHEN change_pct<0 THEN 1 ELSE 0 END),
                COUNT(*), AVG(change_pct)*100, SUM(amount)/1e8
           FROM daily_kline_adj WHERE date=?""", (date,)) or (None,) * 5
+
+    # 1b) 成交额近 5 / 20 日均值（判断当日是放量还是缩量）
+    amt_rows = con.execute(
+        "SELECT date, SUM(amount)/1e8 FROM daily_kline_adj WHERE date<=? "
+        "GROUP BY date ORDER BY date DESC LIMIT 20", (date,)).fetchall()
+    amts = [r[1] for r in amt_rows if r[1]]
+    d['amt_ma5'] = (sum(amts[:5]) / 5) if len(amts) >= 5 else None
+    d['amt_ma20'] = (sum(amts[:20]) / 20) if len(amts) >= 20 else None
+    # 近 20 日里上涨家数占比的均值，用来判断当日是普跌还是结构分化
+    d['ad_hist'] = con.execute(
+        "SELECT date, SUM(CASE WHEN change_pct>0 THEN 1 ELSE 0 END), COUNT(*) "
+        "FROM daily_kline_adj WHERE date<=? GROUP BY date ORDER BY date DESC LIMIT 20",
+        (date,)).fetchall()
 
     # 2) 指数涨跌：库里的 change 字段只保留两位小数（0.02 / -0.01），
     #    低于 0.5% 的变动会被抹成 0.00%，故一律用收盘价对比前一交易日重算。
@@ -236,7 +270,25 @@ def gather(con, date):
         top = sorted(flows, key=lambda r: r[sk] or 0, reverse=True)[:10]
         d['flow'][key] = [{'code': r['stock_code'],
                            'name': names.get(r['stock_code'], r['stock_code']),
-                           'score': r[sk], 'label': r['flow_label'] or '000'} for r in top]
+                           'score': r[sk], 'label': r['flow_label'] or '000',
+                           'cat': cat_of.get(r['stock_code'], '')} for r in top]
+
+    # 7b) 三个窗口的结构差异：短线与长线榜单的重叠、类别分布
+    def _names(k):
+        return [x['name'] for x in d['flow'][k]]
+    sh, md, lg = _names('10d'), _names('65d'), _names('250d')
+    d['flow_stats'] = {
+        'short_long_overlap': len(set(sh) & set(lg)),
+        'short_mid_overlap': len(set(sh) & set(md)),
+        'short_only': [x for x in sh if x not in set(lg)],
+        'long_only': [x for x in lg if x not in set(sh)],
+        'cat_short': {},
+        'cat_long': {},
+    }
+    for k, dst in (('10d', 'cat_short'), ('250d', 'cat_long')):
+        bucket = d['flow_stats'][dst]
+        for x in d['flow'][k]:
+            bucket[x['cat']] = bucket.get(x['cat'], 0) + 1
 
     # 8) 两融聚合趋势（daily_review_margin 与龙虎榜同源，日期一致）
     tr = con.execute("""
@@ -252,6 +304,24 @@ def gather(con, date):
         d['margin']['sb_5d'] = (tr[-1][2] / tr[-6][2] - 1) * 100 if tr[-6][2] else None
     if len(tr) >= 21:
         d['margin']['fb_20d'] = (tr[-1][1] / tr[-21][1] - 1) * 100 if tr[-21][1] else None
+    if len(tr) >= 61:
+        d['margin']['fb_60d'] = (tr[-1][1] / tr[0][1] - 1) * 100 if tr[0][1] else None
+        pk = max(tr, key=lambda r: r[1] or 0)
+        d['margin']['peak'] = pk[1]
+        d['margin']['peak_date'] = pk[0]
+        d['margin']['peak_dd'] = ((tr[-1][1] / pk[1] - 1) * 100) if pk[1] else None
+        d['margin']['peak_days'] = sum(1 for r in tr if r[0] > pk[0])
+    fb = [r[1] for r in tr if r[1]]
+    # 连续走平：5 日累计变动小于 0.5% 记为走平；另算「多少天没出现单日 0.5% 以上的变动」
+    flat = 0
+    for i in range(len(fb) - 1, 0, -1):
+        if fb[i - 1] and abs(fb[i] / fb[i - 1] - 1) * 100 < 0.5:
+            flat += 1
+        else:
+            break
+    d['margin']['flat_days'] = flat
+    # 近 10 日融资净买入方向
+    d['margin']['net10'] = sum((r[3] or 0) for r in tr[-10:])
 
     # 9) 个股融资净买入 TOP / BOTTOM
     def flow_top(asc):
@@ -263,36 +333,62 @@ def gather(con, date):
     d['net_in'] = flow_top(False)
     d['net_out'] = flow_top(True)
 
-    # 10) L1 行业融资余额分解
+    # 10) L1 行业融资余额分解（含 10 / 30 / 60 日变化）
+    # 做法：先把各行业成分股映射成 code→行业，再按需要的交易日一次性取全市场融资余额，
+    # 在内存里分行业汇总。比逐行业 IN(...) 查询少两个数量级的参数绑定。
+    mem2sec, sec_members = {}, {}
+    for sec in sector_l1:
+        code = sec['code']
+        snap = q1(con, "SELECT MAX(date) FROM index_constituents WHERE index_code=?", (code,))
+        if not snap or not snap[0]:
+            continue
+        ms = [r[0] for r in con.execute(
+            "SELECT stock_code FROM index_constituents WHERE index_code=? AND date=?",
+            (code, snap[0]))]
+        if not ms:
+            continue
+        sec_members[code] = ms
+        for m in ms:
+            mem2sec.setdefault(m, code)
+
+    mdates = [r[0] for r in con.execute(
+        "SELECT DISTINCT date FROM daily_review_margin WHERE date<=? "
+        "ORDER BY date DESC LIMIT 61", (date,))]
+    mdates = list(reversed(mdates))
+    lag = {'t': 0, '10': 10, '30': 30, '60': 60}
+    bal_by_date, net_by_date = {}, {}
+    for tag, step in lag.items():
+        if len(mdates) <= step:
+            continue
+        dt = mdates[-1 - step]
+        fb_sum, nb_sum = {}, {}
+        for code, fb, nb in con.execute(
+                "SELECT stock_code, fb_balance, net_buy_d1 FROM daily_review_margin "
+                "WHERE date=?", (dt,)):
+            sc = mem2sec.get(code)
+            if not sc:
+                continue
+            fb_sum[sc] = fb_sum.get(sc, 0) + (fb or 0)
+            nb_sum[sc] = nb_sum.get(sc, 0) + (nb or 0)
+        bal_by_date[tag] = {k: v / 1e8 for k, v in fb_sum.items()}
+        net_by_date[tag] = {k: v / 1e8 for k, v in nb_sum.items()}
+
     s1 = []
     for sec in sector_l1:
         code = sec['code']
-        nm = sec['name'].replace('全指', '')
-        snap = q1(con, "SELECT MAX(date) FROM index_constituents WHERE index_code=?", (code,))
-        members = []
-        if snap and snap[0]:
-            members = [r[0] for r in con.execute(
-                "SELECT stock_code FROM index_constituents WHERE index_code=? AND date=?",
-                (code, snap[0]))]
-        if not members:
+        if code not in sec_members:
             continue
-        ph = ','.join('?' * len(members))
-        r = q1(con, f"""SELECT SUM(fb_balance)/1e8, SUM(net_buy_d1)/1e8
-                          FROM daily_review_margin WHERE date=? AND stock_code IN ({ph})""",
-               (date, *members))
-        prev = q1(con, "SELECT DISTINCT date FROM daily_review_margin WHERE date<? "
-                       "ORDER BY date DESC LIMIT 1 OFFSET 4", (date,))
-        r5 = None
-        if prev:
-            r5 = q1(con, f"""SELECT SUM(fb_balance)/1e8 FROM daily_review_margin
-                              WHERE date=? AND stock_code IN ({ph})""", (prev[0], *members))
-        bal = r[0] if r and r[0] else None
-        chg5 = ((bal / r5[0] - 1) * 100) if (r5 and r5[0] and bal) else None
-        s1.append({'name': nm, 'code': code, 'balance': bal,
-                   'net': (r[1] if r and r[1] else None), 'chg5': chg5,
-                   'n': len(members)})
-    d['sector_margin'] = [x for x in sorted(
-        s1, key=lambda x: -(x['balance'] or 0)) if x['balance']][:8]
+        bal = bal_by_date.get('t', {}).get(code)
+        if not bal:
+            continue
+        row = {'name': sec['name'].replace('全指', ''), 'code': code,
+               'balance': bal, 'net': net_by_date.get('t', {}).get(code),
+               'n': len(sec_members[code])}
+        for tag in ('10', '30', '60'):
+            prev = bal_by_date.get(tag, {}).get(code)
+            row['chg' + tag] = ((bal / prev - 1) * 100) if prev else None
+        s1.append(row)
+    d['sector_margin'] = sorted(s1, key=lambda x: -(x['balance'] or 0))[:8]
 
     # 11) 龙虎榜
     lhb = con.execute("""
@@ -303,12 +399,31 @@ def gather(con, date):
         'net': sum(r[3] or 0 for r in lhb) / 1e8 if lhb else None,
         'inst': sum(r[4] or 0 for r in lhb) / 1e8 if lhb else None,
         'top': [(r[1], r[2], (r[3] or 0) / 1e8, (r[4] or 0) / 1e8) for r in lhb[:8]],
+        'up': sum(1 for r in lhb if (r[3] or 0) > 0),
+        'down': sum(1 for r in lhb if (r[3] or 0) < 0),
+        'inst_positive': sum(1 for r in lhb if (r[4] or 0) > 0),
     }
+
+    # 11b) 科技类指数（用于与指汇盈文章里的科技主题对照）
+    TECH_KEYS = ('科创', '半导', '芯片', 'TMT', '科技', '电子', '通信', '软件',
+                 '算力', '人工智能', '机器人', '云')
+    d['tech'] = [(nm, v) for nm, v in ranked if any(k in nm for k in TECH_KEYS)][:12]
+
+    # 11c) 融资净买入的行业归属（用 10) 的 成分→行业 映射）
+    sec_name = {s['code']: s['name'].replace('全指', '') for s in sector_l1}
+    d['net_in_sum'] = sum((r[2] or 0) for r in d['net_in'])
+    d['net_out_sum'] = sum((r[2] or 0) for r in d['net_out'])
+    cnt = {}
+    for r in d['net_in']:
+        s = sec_name.get(mem2sec.get(r[0]), '其他')
+        cnt[s] = cnt.get(s, 0) + 1
+    d['net_in_sec'] = sorted(cnt.items(), key=lambda x: -x[1])
 
     # 12) 指汇盈当日文章
     d['cons_date'] = (q1(con, "SELECT MAX(date) FROM index_constituents") or [None])[0]
     d['articles'] = gzh_articles(date)
     d['kw'] = keyword_check(d['articles'], ranked)
+    d['us'] = parse_us(d['articles'])
     return d
 
 
@@ -332,6 +447,25 @@ def gzh_articles(date):
         paras = [p.strip() for p in text.split('\n') if len(p.strip()) >= 30]
         out.append({'title': title, 'url': url, 'pub': pub, 'brief': brief or '',
                     'paras': paras[:4], 'text': text})
+    return out
+
+
+def parse_us(articles):
+    """从文中抓美股隔夜涨跌数字，用于判断 A 股与美股的联动。"""
+    if not articles:
+        return []
+    text = '\n'.join(a['text'] for a in articles)
+    pats = [(r'(?:费城半导体|费半)', '费城半导体'),
+            (r'(?:纳斯达克(?:100)?|纳指)', '纳斯达克'),
+            (r'(?:道琼斯|道指)', '道琼斯'),
+            (r'(?:标普500|标普)', '标普500')]
+    out, seen = [], set()
+    for pat, label in pats:
+        m = re.search(pat + r'[^。；;\n]{0,24}?([+\-−]?\d+(?:\.\d+)?)\s*%', text)
+        if m and label not in seen:
+            v = float(m.group(1).replace('−', '-'))
+            out.append((label, v))
+            seen.add(label)
     return out
 
 
@@ -399,6 +533,7 @@ def render(d):
 
     # 参与健康评分
     sub_rows = ''
+    sub_list = []
     if hz:
         for key, label, unit, note in SUB_METRICS:
             val = hz[key + '_value'] if key + '_value' in hz.keys() else None
@@ -406,6 +541,7 @@ def render(d):
             if val is None:
                 continue
             uv = f'{val:,.2f}{unit}' if unit in ('倍', '分') else f'{val:,.1f}{unit}'
+            sub_list.append((label, val, sc, uv))
             sub_rows += (f'<tr><td>{label}</td><td class="num">{uv}</td>'
                          f'<td class="num">{num(sc) if sc is not None else "—"}</td>'
                          f'<td style="color:var(--mut)">{note}</td></tr>')
@@ -413,6 +549,7 @@ def render(d):
     # 卖出评分明细
     sell_rows = ''
     trig = 0
+    trig_list = []
     if sx:
         for col, scol, label in SELL_SIGNALS:
             try:
@@ -425,6 +562,7 @@ def render(d):
             else:
                 state, c = '触发', 'var(--up)'
                 trig += 1
+                trig_list.append((label, score))
             detail = ''
             if col == 'dist_days_25d' and flag:
                 detail = f'{flag} 个'
@@ -437,7 +575,7 @@ def render(d):
     # 行业组
     sec_rows = ''.join(
         f'<tr><td>{esc(r[1])}</td><td class="num">{r[2]}</td>'
-        f'<td class="num">{esc(r[3] or "—")}</td><td class="num">{num(r[4])}</td>'
+        f'<td class="num">{esc(r[3] or "—")}</td><td class="num">{num(r[4])}%</td>'
         f'<td class="num" style="color:var(--mut)">{num(r[5])}</td></tr>'
         for r in d['sectors'])
 
@@ -458,6 +596,8 @@ def render(d):
     # 两融
     fb_series = [r[1] for r in d['margin_trend']]
     sb_series = [r[2] for r in d['margin_trend']]
+    mtrend_d0 = d['margin_trend'][0][0] if d['margin_trend'] else ''
+    mtrend_d1 = d['margin_trend'][-1][0] if d['margin_trend'] else ''
     margin_kpi = ''
     if d['margin']:
         m = d['margin']
@@ -480,8 +620,10 @@ def render(d):
 
     sec_m_rows = ''.join(
         f'<tr><td>{esc(x["name"])}</td><td class="num">{num(x["balance"])}</td>'
-        f'<td class="num">{pct(x["chg5"], 1)}</td>'
-        f'<td class="num" style="color:{cls(x["net"])}">{num(x["net"], 2)}</td>'
+        f'<td class="num {cls(x.get("chg60"))}">{pct(x.get("chg60"), 1)}</td>'
+        f'<td class="num {cls(x.get("chg30"))}">{pct(x.get("chg30"), 1)}</td>'
+        f'<td class="num {cls(x.get("chg10"))}">{pct(x.get("chg10"), 1)}</td>'
+        f'<td class="num {cls(x["net"])}">{num(x["net"], 2)}</td>'
         f'<td class="num" style="color:var(--mut)">{x["n"]}</td></tr>'
         for x in d['sector_margin'])
 
@@ -492,15 +634,21 @@ def render(d):
         f'<td class="num" style="color:{cls(inst)}">{inst:+.2f}</td></tr>'
         for nm, rs, net, inst in lhb['top'])
 
-    # 指汇盈
+    # 指汇盈：只列标题与要点，不贴全文（分析在 7.3 的解读块里）
     art_html = ''
     if d['articles']:
+        rows = ''
         for a in d['articles']:
-            paras = ''.join(f'<p>{esc(p)}</p>' for p in a['paras'])
-            art_html += (f'<h3>{esc(a["title"])}</h3>'
-                         f'<p style="font-size:12px;color:var(--mut)">{esc(a["pub"])} ｜ '
-                         f'<a href="{esc(a["url"])}" target="_blank" rel="noopener">原文</a></p>'
-                         f'{paras}')
+            brief = (a['brief'] or (a['paras'][0] if a['paras'] else '')).strip()
+            if len(brief) > 62:
+                brief = brief[:62] + '…'
+            rows += (f'<tr><td style="white-space:nowrap">{esc(a["pub"])}</td>'
+                     f'<td>{esc(a["title"])}</td>'
+                     f'<td style="color:var(--mut);text-align:left">{esc(brief)}</td>'
+                     f'<td style="white-space:nowrap"><a href="{esc(a["url"])}" '
+                     f'target="_blank" rel="noopener">原文</a></td></tr>')
+        art_html = ('<div class="tw"><table class="wide"><tr><th>发布时间</th><th>标题</th>'
+                    f'<th>开篇要点</th><th>链接</th></tr>{rows}</table></div>')
     else:
         art_html = ('<p style="color:var(--mut)">当日未抓到指汇盈文章（或该日为视频稿，'
                     '正文只有标题）。抓取器在 daily_update.py 倒数第二步执行。</p>')
@@ -510,6 +658,301 @@ def render(d):
         f'<td class="num {cls(ch)}">{pct(ch) if ch is not None else "—"}</td>'
         f'<td><span class="done {"ok" if v == "一致" else ("no" if v == "相反" else "lag")}">{esc(v)}</span></td></tr>'
         for kw, tone, nm, ch, v in d['kw'])
+
+    # ── 各块解读（数据来自上面的表，不重复罗列数字，只给判断） ──
+    def rbox(*paras):
+        body = ''.join(f'<p>{p}</p>' for p in paras if p)
+        return f'<div class="read">{body}</div>' if body else ''
+
+    bmap = {nm: v for nm, code, v in d['broad']}
+    big = bmap.get('沪深300')
+    small = bmap.get('中证2000')
+    cyb = bmap.get('创业板指')
+    dvd = bmap.get('中证红利')
+
+    # 一、健康分与卖出评分
+    h_paras = []
+    if hz:
+        sc_h = hz['total_score']
+        if sc_h < 30:
+            tone = '属于「很弱」区间，历史上对应的是下跌中继而不是底部，做多需要等右侧信号'
+        elif sc_h < 45:
+            tone = ('属于「偏弱」区间。这一档既不是崩盘也没有修复迹象，'
+                    '最典型的特征是反弹一日游、跟随买进容易被套')
+        elif sc_h < 60:
+            tone = '属于「中性」区间，可以选股但不适合加杠杆或重仓'
+        else:
+            tone = '属于健康区间，量价配合正常'
+        h_paras.append(f'健康分 <b>{sc_h:.0f}</b> 分{tone}。')
+    if sx:
+        h_paras.append(
+            f'卖出评分 <b>{sx["total_score"]}</b> 分，动作是「{esc(sx["position_advice"] or "—")}」，'
+            f'12 条信号触发 <b>{trig}</b> 条。')
+    if trig_list:
+        items = '、'.join(f'{lb}（{num(sc)} 分）' for lb, sc in trig_list)
+        h_paras.append(
+            f'触发的是 {items}。其中跌破 50 日线与跌破 200 日线两条是趋势性质，'
+            f'说明指数已经回到中期均线下方，而不是单日情绪波动。')
+        h_paras.append(
+            '这组信号的共同含义是：抛压来自已持仓者的减仓，不是新增资金撤离。'
+            '在没有放量收复 50 日线之前，评分不会快速回落，仓位也就不用急着加回来。')
+    read_health = rbox(*h_paras)
+
+    # 二、主要指数
+    b_paras = []
+    if big is not None and small is not None:
+        spread = small - big
+        if spread < -0.5:
+            b_paras.append(
+                f'小盘跑输大盘 <b>{abs(spread):.2f}</b> 个百分点（中证2000 {pct(small)} vs '
+                f'沪深300 {pct(big)}），说明当日是资金撤出小市值、往权重里躲的结构。')
+        elif spread > 0.5:
+            b_paras.append(
+                f'小盘跑赢大盘 <b>{spread:.2f}</b> 个百分点（中证2000 {pct(small)} vs '
+                f'沪深300 {pct(big)}），说明调整里资金还在做小票，风险偏好没有明显下台阶。')
+        else:
+            b_paras.append(f'大小盘基本同步（差值 {spread:+.2f} 个百分点），没有明显的风格切换。')
+    if cyb is not None and dvd is not None:
+        b_paras.append(
+            f'成长与价值的分化：创业板指 {pct(cyb)}、中证红利 {pct(dvd)}，'
+            f'差值 <b>{cyb - dvd:+.2f}</b> 个百分点'
+            + ('——跌的时候红利抗跌，说明卖出的是弹性品种。' if cyb < dvd else
+               '——红利没起到避风港作用，这轮下跌不分风格。'))
+    if n and up is not None:
+        ratio = up / n * 100
+        if d.get('amt_ma5') and amt:
+            vol_note = ('放量' if amt > d['amt_ma5'] * 1.1 else
+                        ('缩量' if amt < d['amt_ma5'] * 0.9 else '量能持平'))
+            b_paras.append(
+                f'上涨家数占比 <b>{ratio:.1f}%</b>（{num(up)} / {num(n)}），成交 {num(amt)} 亿元，'
+                f'相对近 5 日均值 {num(d["amt_ma5"])} 亿元属{vol_note}。'
+                + ('放量下跌是资金主动减仓，比缩量阴跌更需要防守。' if vol_note == '放量'
+                   else '缩量下跌说明抛压没有扩大，但也没有承接。'))
+    read_broad = rbox(*b_paras)
+
+    # 三、辅助指标
+    s_paras = []
+    graded = [(lb, val, sc, uv) for lb, val, sc, uv in sub_list if sc is not None]
+    if graded:
+        weak = sorted(graded, key=lambda x: x[2])[:3]
+        strong = sorted(graded, key=lambda x: -x[2])[:2]
+        s_paras.append('得分最低的三项是 ' + '、'.join(
+            f'{lb}（{uv}，{num(sc)} 分）' for lb, val, sc, uv in weak)
+            + '，这是当日盘面最直接的短板。')
+        s_paras.append('相对占优的是 ' + '、'.join(
+            f'{lb}（{num(sc)} 分）' for lb, val, sc, uv in strong)
+            + '，说明并非所有维度都在恶化。')
+        mrow = next(((lb, val, sc, uv) for lb, val, sc, uv in graded if '融资' in lb), None)
+        if mrow:
+            s_paras.append(
+                f'融资余额 5 日变化 {mrow[1]:+.2f}%，'
+                + ('杠杆资金在减仓；这一项通常领先指数 3~5 个交易日。' if mrow[1] < 0 else
+                   '杠杆资金基本按兵不动，没有跟着指数一起撤，说明被动持仓多、主动降杠杆少。'))
+    read_subs = rbox(*s_paras)
+
+    # 四、行业分组
+    g_paras = []
+    if d['sectors']:
+        rows = d['sectors']
+        best, worst = rows[0], rows[-1]
+        low = [r for r in rows if r[4] and ('低' in str(r[4]) or '空' in str(r[4]))]
+        g_paras.append(
+            f'最强 {esc(best[1])}（{best[2]} 分）与最弱 {esc(worst[1])}（{worst[2]} 分）'
+            f'相差 <b>{best[2] - worst[2]}</b> 分。'
+            + (f'{len(low)} 个分组给的是低仓或空仓建议，说明分化不是个别现象，'
+               '而是多数行业同时转弱。' if low else
+               '没有分组给出低仓建议，弱势集中在少数板块。'))
+        g_paras.append(
+            '分组分的用法是「找相对强」而不是「找绝对安全」：'
+            '整体环境偏弱时，最强组的作用是回撤更小，不是逆势上涨。')
+    read_sector = rbox(*g_paras)
+
+    # 五、资金活跃度
+    f_paras = []
+    fs = d['flow_stats']
+    if d['flow']['10d']:
+        f_paras.append(
+            f'短线前十与长线前十只有 <b>{fs["short_long_overlap"]}</b> 只重叠'
+            + ('，说明资金是在换方向，不是在原来的主线上加仓；这种换方向的行情通常持续性差。'
+               if fs['short_long_overlap'] <= 3 else
+               '，说明短线热点仍是中长线资金的主线，行情的延续性相对好。'))
+        if fs['short_only']:
+            f_paras.append('只在短线榜、不在长线榜的是 ' + '、'.join(
+                esc(x) for x in fs['short_only'][:6]) + '，属于短期博弈品种。')
+        if fs['long_only']:
+            f_paras.append('只在长线榜、不在短线榜的是 ' + '、'.join(
+                esc(x) for x in fs['long_only'][:6]) + '，资金在撤但底子还在。')
+        f_paras.append(
+            '评分只反映资金活跃度，不区分流入流出方向；方向看三字符标签。'
+            '当日三张表的评分普遍不高，说明是存量资金在少数板块里来回做，不是增量入场。')
+    read_flow = rbox(*f_paras)
+
+    # 六、两融
+    m_paras = []
+    if d['margin']:
+        m = d['margin']
+        flat = m.get('flat_days') or 0
+        m_paras.append(
+            f'融资余额 {num(m["fb"])} 亿元，5 日 {pct(m.get("fb_5d"), 2)}、'
+            f'20 日 {pct(m.get("fb_20d"), 2)}、60 日 {pct(m.get("fb_60d"), 2)}。'
+            + (f'最近 <b>{flat}</b> 个交易日没有出现单日 0.5% 以上的变动，'
+               '说明连续大额减仓的阶段已经结束，余额进入平台期。' if flat >= 3 else
+               '单日波动仍在 0.5% 以上，杠杆资金还在调整仓位，没有进入平台期。'))
+        if m.get('peak') and m.get('peak_dd') is not None:
+            m_paras.append(
+                f'余额距 60 日高点 {num(m["peak"])} 亿元（{esc(m["peak_date"])}）'
+                f'回落 <b>{abs(m["peak_dd"]):.2f}%</b>，已连续 {m.get("peak_days", 0)} 个交易日'
+                '没回到那个水平。'
+                + ('回撤幅度在 1% 以内，属于正常换手。' if abs(m['peak_dd']) < 1 else
+                   '回撤超过 1%，说明这一轮减仓是有规模的，不是零星调仓。'))
+        m_paras.append(
+            f'近 10 个交易日融资累计净买入 <b>{num(m.get("net10"), 1)}</b> 亿元，'
+            f'当日 <b>{num(m["net"])}</b> 亿元。'
+            + ('累计为正，杠杆资金整体还在净流入，只是速度慢了。'
+               if (m.get('net10') or 0) > 0 else
+               '累计为负，杠杆资金在这两周是净流出状态，反弹缺乏融资盘配合。'))
+        m_paras.append(
+            '两融数据的用法是看斜率不看绝对水平：余额走平意味着卖压释放接近尾声，'
+            '但走平本身不构成买入信号，需要指数同步止跌。')
+    read_margin = rbox(*m_paras)
+
+    # 6.2 个股净买入
+    ni_paras = []
+    if d['net_in']:
+        total_in = d['net_in_sum']
+        pool_net = d['margin']['net'] if d['margin'] else None
+        share = (total_in / pool_net * 100) if pool_net else None
+        ni_paras.append(
+            '净买入前十合计 <b>' + f'{total_in:.1f}' + '</b> 亿元'
+            + (f'，相当于全市场融资净买入的 <b>{share:.0f}%</b>。'
+               if share and share > 0 else '。'))
+        if share and share > 100:
+            ni_paras.append('前十只的净买入已经超过全市场合计，说明其余个股是净卖出，'
+                            '资金高度集中在少数标的。')
+        if d['net_in_sec']:
+            secs = '、'.join(f'{esc(s)} {c} 只' for s, c in d['net_in_sec'][:4])
+            top_sec, top_n = d['net_in_sec'][0]
+            ni_paras.append(f'行业归属：{secs}。'
+                            + (f'前十有 {top_n} 只集中在{esc(top_sec)}，'
+                               '是围绕单一主题的买入，不具备板块扩散性。'
+                               if top_n >= 6 else
+                               f'占比最高的是{esc(top_sec)}（{top_n} 只），'
+                               '其余分散在多个行业，属于分散式仓位回补，'
+                               '没有形成集中主线。'))
+        ni_paras.append(
+            f'净卖出前十合计 {abs(d["net_out_sum"]):.1f} 亿元，'
+            '看买卖两侧的行业是否对称：如果卖的是前期强势股、买的是低位品种，就是高低切换。')
+    read_netin = rbox(*ni_paras)
+
+    # 6.3 行业融资
+    sm_paras = []
+    if d['sector_margin']:
+        with60 = [x for x in d['sector_margin'] if x.get('chg60') is not None]
+        if with60:
+            worst60 = min(with60, key=lambda x: x['chg60'])
+            sm_paras.append(
+                f'60 日降幅最大的是 {esc(worst60["name"])}（{pct(worst60["chg60"], 1)}），'
+                f'30 日 {pct(worst60.get("chg30"), 1)}、10 日 {pct(worst60.get("chg10"), 1)}。')
+            easing = [x for x in with60
+                      if x.get('chg30') is not None and x.get('chg10') is not None
+                      and x['chg10'] > x['chg30']]
+            sm_paras.append(
+                f'{len(easing)} / {len(with60)} 个行业的 10 日变化好于 30 日变化，'
+                + ('即流出速度在放缓，这是止跌的前置条件之一。' if len(easing) * 2 >= len(with60)
+                   else '即流出仍在加速，融资盘还没有稳下来。'))
+            up60 = [x for x in with60 if x['chg60'] > 0]
+            if up60:
+                sm_paras.append('60 日仍为正增长的是 ' + '、'.join(
+                    f'{esc(x["name"])}（{pct(x["chg60"], 1)}）' for x in up60[:4])
+                    + '，属于这轮调整里融资盘还在加的行业。')
+            sm_paras.append(
+                '口径：按各行业指数最新成分股（季度快照）汇总个股融资余额，'
+                '与交易所按行业分类统计略有差异，看趋势不看绝对值。')
+    read_sector_margin = rbox(*sm_paras)
+
+    # 6.4 龙虎榜
+    l_paras = []
+    if lhb['count']:
+        l_paras.append(
+            f'上榜 {lhb["count"]} 只，净买入为正 {lhb["up"]} 只、为负 {lhb["down"]} 只，'
+            f'合计净额 {num(lhb["net"], 2)} 亿元，机构席位 {num(lhb["inst"], 2)} 亿元'
+            f'（{lhb["inst_positive"]} 只机构净买）。')
+        l_paras.append(
+            '龙虎榜的样本只覆盖异动股，作用是看游资与机构的方向是否一致：'
+            + ('两侧都是净卖出，说明连短线资金也在撤。' if (lhb['net'] or 0) < 0 and (lhb['inst'] or 0) < 0
+               else '机构与游资方向不一致时，以机构为准。'))
+    read_lhb = rbox(*l_paras)
+
+    # 七、文章要点与联动判断
+    a_paras = []
+    us = d['us']
+    tech = d['tech']
+    if tech:
+        tv = [v for nm, v in tech]
+        tavg = sum(tv) / len(tv)
+        pos = sum(1 for v in tv if v > 0)
+        a_paras.append(
+            f'A 股科技类指数当日 {pos} / {len(tv)} 只上涨，平均 <b>{tavg:+.2f}%</b>，'
+            f'最强 {esc(max(tech, key=lambda x: x[1])[0])}（{pct(max(tv))}）、'
+            f'最弱 {esc(min(tech, key=lambda x: x[1])[0])}（{pct(min(tv))}）。'
+            + ('在全市场平均下跌的背景下，科技是唯一逆势方向。'
+               if tavg > 0 and avg is not None and avg < -0.5 else ''))
+        if us:
+            usavg = sum(v for lb, v in us) / len(us)
+            a_paras.append('文中提到的美股隔夜：' + '、'.join(
+                f'{esc(lb)} {v:+.2f}%' for lb, v in us) + f'，均值 {usavg:+.2f}%。')
+            if usavg > 0.5 and tavg < -0.5:
+                a_paras.append(
+                    f'<b>联动判定：背离。</b>美股科技隔夜平均涨 {usavg:.2f}%，'
+                    f'A 股科技当日平均跌 {abs(tavg):.2f}%，外围的利好没有传导进来。'
+                    '两种解释：一是 A 股在跌自己的流动性问题，二是外资没有参与这轮反弹。'
+                    '前者要等指数止跌，后者要等成交额回升，两者都不支持当天追。')
+            elif usavg > 0.5 and tavg > 0.5:
+                ratio = tavg / usavg * 100
+                a_paras.append(
+                    f'<b>联动判定：同向但幅度衰减。</b>美股科技隔夜均值 {usavg:+.2f}%，'
+                    f'A 股科技均值 {tavg:+.2f}%，只兑现了 <b>{ratio:.0f}%</b>。'
+                    + ('外围涨幅打了对折以上，说明买盘是脉冲式的：'
+                       '开盘高开、盘中靠本地资金接力，接力不够就回落。'
+                       if ratio < 60 else '传导基本充分。'))
+            elif usavg < -0.5 and tavg > 0.5:
+                a_paras.append(
+                    f'<b>联动判定：A 股独立走强。</b>美股科技隔夜 {usavg:+.2f}%，'
+                    f'A 股科技反而 {tavg:+.2f}%，说明当日买盘来自本地逻辑，'
+                    '要看有没有对应的政策或产业消息，否则这种独立性很难持续。')
+            elif usavg < -0.5 and tavg < -0.5:
+                a_paras.append(
+                    f'<b>联动判定：同步下跌。</b>美股科技 {usavg:+.2f}%、'
+                    f'A 股科技 {tavg:+.2f}%，风险偏好在两个市场同时收缩，'
+                    '这类同步下跌通常要等美股先稳住。')
+            else:
+                a_paras.append(
+                    f'<b>联动判定：都不强。</b>美股科技均值 {usavg:+.2f}%、'
+                    f'A 股科技 {tavg:+.2f}%，两个市场都在等方向，A 股走自己的资金面逻辑。')
+    # 用融资数据交叉验证科技这波上涨有没有杠杆资金参与
+    sec_bal = {x['name']: x for x in d['sector_margin']}
+    if tech and tavg > 0:
+        hot = [sec_bal[n] for n in ('信息', '电信') if n in sec_bal]
+        if hot:
+            a_paras.append(
+                '交叉验证：' + '、'.join(
+                    f'{esc(x["name"])}行业融资余额 10 日 {pct(x.get("chg10"), 1)}、'
+                    f'当日净买入 {num(x["net"], 1)} 亿元' for x in hot)
+                + ('。科技上涨的同时融资盘仍在净流出，说明这波是存量资金在题材内轮动，'
+                   '不是杠杆资金新开仓——这种上涨通常一根阴线就会还回去。'
+                   if all((x.get('chg10') or 0) < 0 for x in hot) else
+                   '。融资盘与股价同向，说明有杠杆资金参与，延续性相对好一些。'))
+    if d['kw']:
+        hit = [k for k in d['kw'] if k[4] == '一致']
+        miss = [k for k in d['kw'] if k[4] == '相反']
+        if hit or miss:
+            a_paras.append(
+                '文中主题与当日盘面：'
+                + (f'{len(hit)} 个方向一致' if hit else '没有方向一致的')
+                + (f'、{len(miss)} 个方向相反（' + '、'.join(esc(k[0]) for k in miss[:4]) + '）'
+                   if miss else '')
+                + '。方向相反的主题，说明文章讲的是逻辑、盘面走的是资金，两者还没合上。')
+    read_article = rbox(*a_paras)
 
     hist = history_items()
     hist_rows = ''.join(
@@ -521,7 +964,7 @@ def render(d):
 <html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>{date} 大盘交易总结</title><style>{CSS}</style></head><body><div class="wrap">
+<title>{date} 大盘交易总结</title><style>{CSS}{CSS_EXTRA}</style></head><body><div class="wrap">
 <div class="top"><span class="thm" onclick="toggleTheme()">◐</span>
 <b>大盘交易总结 · {date}</b> ｜ 口径：EOD 收盘 ｜ 两融数据日 {esc((d['margin'] or {}).get('date', '—'))} ｜
 <a href="../market-scan/index.html">大盘扫描</a></div>
@@ -541,15 +984,19 @@ def render(d):
 </div>
 <h3>卖出评分信号明细</h3>
 <div class="tw"><table class="wide"><tr><th style="width:42%">信号</th><th>状态</th><th style="width:14%">得分</th></tr>{sell_rows}</table></div>
+{read_health}
 
 <h2>二、主要指数表现</h2>
 <div class="tw"><table><tr><th>指数</th><th>代码</th><th>涨跌</th></tr>{broad_rows}</table></div>
+{read_broad}
 
 <h2>三、辅助指标 · 参与健康评分</h2>
 <div class="tw"><table class="wide"><tr><th>指标</th><th>读数</th><th>得分</th><th>含义</th></tr>{sub_rows}</table></div>
+{read_subs}
 
 <h2>四、行业分组健康分</h2>
 <div class="tw"><table><tr><th>分组</th><th>健康分</th><th>评级</th><th>仓位建议</th><th>成分数</th></tr>{sec_rows}</table></div>
+{read_sector}
 
 <h2>五、资金活跃度 TOP 10</h2>
 <p style="font-size:13px;color:var(--mut)">评分 0–100；三字符依次是短线(10日)/中线(65日)/长线(250日)方向，
@@ -560,31 +1007,37 @@ def render(d):
 <div class="tw"><table><tr><th>#</th><th>指数</th><th>评分</th><th>方向</th></tr>{flow_tbl('65d')}</table></div>
 <h3>长线（250 日）</h3>
 <div class="tw"><table><tr><th>#</th><th>指数</th><th>评分</th><th>方向</th></tr>{flow_tbl('250d')}</table></div>
+{read_flow}
 
 <h2>六、资金情绪</h2>
 <h3>6.1 两融余额趋势（近 60 个交易日）</h3>
 {margin_kpi}
-<div class="tw"><table><tr><th>融资余额走势</th></tr><tr><td>{sparkline(fb_series, color='var(--up)')}</td></tr></table></div>
-<div class="tw"><table><tr><th>融券余额走势</th></tr><tr><td>{sparkline(sb_series, color='var(--accent)')}</td></tr></table></div>
+<div class="tw"><table><tr><th>融资余额走势</th></tr><tr><td>{sparkline(fb_series, color='var(--up)', first_label=mtrend_d0, last_label=mtrend_d1)}</td></tr></table></div>
+<div class="tw"><table><tr><th>融券余额走势</th></tr><tr><td>{sparkline(sb_series, color='var(--accent)', first_label=mtrend_d0, last_label=mtrend_d1)}</td></tr></table></div>
+{read_margin}
 
 <h3>6.2 个股融资净买入（当日流向，亿元）</h3>
 <div class="tw"><table><tr><th>净买入前十</th><th>代码</th><th>净买入</th></tr>{net_in_rows}</table></div>
 <div class="tw"><table><tr><th>净卖出前十</th><th>代码</th><th>净买入</th></tr>{net_out_rows}</table></div>
+{read_netin}
 
 <h3>6.3 L1 行业融资余额分解（亿元）</h3>
-<div class="tw"><table><tr><th>行业</th><th>融资余额</th><th>5 日变化</th><th>当日净买入</th><th>成分股</th></tr>{sec_m_rows}</table></div>
+<div class="tw"><table class="wide"><tr><th>行业</th><th>融资余额</th><th>60 日</th><th>30 日</th><th>10 日</th><th>当日净买入</th><th>成分股</th></tr>{sec_m_rows}</table></div>
+{read_sector_margin}
 
 <h3>6.4 龙虎榜</h3>
-<p style="font-size:13px">上榜 <b>{lhb['count']}</b> 只，合计净额 <b>{num(lhb['net'], 2)}</b> 亿元，
-机构席位净额 <b>{num(lhb['inst'], 2)}</b> 亿元。</p>
 <div class="tw"><table><tr><th>个股</th><th>上榜原因</th><th>净额</th><th>机构净额</th></tr>{lhb_rows}</table></div>
+{read_lhb}
 
-<h2>七、指汇盈当日观点</h2>
+<h2>七、指汇盈当日观点与联动判断</h2>
+<h3>7.1 当日文章</h3>
 {art_html}
-<h3>7.1 文中板块与当日指数方向核对</h3>
+<h3>7.2 文中板块与当日指数方向核对</h3>
 <div class="tw"><table><tr><th>关键词</th><th>文中语气</th><th>对应指数</th><th>当日涨跌</th><th>判定</th></tr>{kw_rows}</table></div>
-<p style="font-size:12px;color:var(--mut)">判定规则：取关键词前后 60 字，数「涨/反弹/新高」与「跌/回落/走弱」出现次数定语气；
+<p class="pts">判定规则：取关键词前后 60 字，数「涨/反弹/新高」与「跌/回落/走弱」出现次数定语气；
 语气与对应指数当日涨跌同向记「一致」，反向记「相反」。这是粗筛，不替代人工阅读。</p>
+<h3>7.3 我们怎么看</h3>
+{read_article}
 
 <h2>八、口径与数据缺口</h2>
 <ul style="font-size:13.5px;color:var(--tx)">

@@ -964,6 +964,22 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 </div>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-13 · 大盘总结改版：表格居中 + 每块加解读 + 文章联动判断</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因（用户三条意见）</b>：① 表格列头与内容错位，建议统一居中；② 不要用卡片把大盘扫描页再复述一遍，要在数据下面给分析；③ 拉文章不是让贴原文，要结合本页数据讲 A 股与美股的联动</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>表格对齐（教训 209）</b>：不再靠 <code>table.wide td:last-child</code> 这类特例打补丁，直接在页面级 CSS 写 <code>.tw table th,.tw table td{text-align:center}</code> 并把 <code>th</code> 设为 <code>nowrap</code>。列头与内容同轴后，所有表都不再错位；代价是长文本列要单独给 <code>text-align:left</code>（开篇要点列）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>每块加解读</b>：新增 <code>.read</code> 解读块（左侧强调线 + 浅底），一至七章每块数据后各一段。解读只写判断，不重复表里的数字；句式按条件分支生成，例如健康分落在哪个区间、哪些信号是趋势性质、大小盘价差 0.5pp 以上怎么读</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新增分析维度</b>：① 两融补 60 日变化、距 60 日高点回撤与天数、「连续 N 日无单日 0.5% 以上变动」的平台期判定、近 10 日累计净买入；② L1 行业融资从「5 日」扩到 <b>10 / 30 / 60 日三列</b>，并统计「10 日变化好于 30 日的行业数」判断流出是否放缓；③ 个股净买入算出前十合计占全市场融资净买入的比例与行业归属；④ 资金活跃度算出短线榜与长线榜的重叠只数与只在单侧出现的名单</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>第七章改版</b>：原文不再贴出，改三小节 —— 7.1 当日文章（时间/标题/开篇要点/原文链接表格）、7.2 文中板块与指数方向核对（沿用）、7.3 我们怎么看（科技类指数当日表现 + 美股隔夜 + 联动判定 + 融资交叉验证）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>联动判定（教训 210）</b>：不只说「同步 / 背离」，同向时给出<b>兑现比例</b>。2026-11-12 案例：费城半导体 +5.70%、纳斯达克 +2.30%（均值 +4.00%），A 股科技 12/12 上涨、均值 +0.80%，<b>只兑现 20%</b> → 判为「同向但幅度衰减」，结论是脉冲式高开、靠盘中接力</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>融资交叉验证（教训 211）</b>：科技上涨是否由杠杆资金推动，用 L1 行业融资余额回答。当日信息 10 日 −8.3%、电信 −10.5%，融资仍在净流出 → 判为存量资金在题材内轮动，一根阴线就会还回去</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>修掉的措辞矛盾</b>：辅助指标里融资余额 5 日变化是 +0.22%，原文却写「是杠杆资金在减仓」；改为按符号分支 —— 为正写「按兵不动，被动持仓多」，为负才写「减仓，领先指数 3~5 个交易日」。同理行业归属原来看「最大行业 ≥4 只」就说「集中在单一行业」，4/10 不够集中，改为 ≥6 只才这么写</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>sparkline 刻度移出图内</b>：原先把上下界文字画在曲线左侧，直接压在线上。改成图内只画折线，区间与首尾值作为图下一行说明</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>核验</b>：页面 33.7 KB、16 表、2 张 sparkline、9 章、0 pageerror；<code>None</code>/<code>nan</code>/<code>undefined</code>/「。；」残留计数均为 0。逐段截图核过 §一/§三/§四/§五/§六/§七 与全部解读块</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-13 · 公众号文章转自包含 HTML（配图本地化）</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：第一版只导出 Markdown 正文。用户指出文章里常有图表，图片本身就是信息 → 必须导 HTML 并把图存到本地</td></tr>
