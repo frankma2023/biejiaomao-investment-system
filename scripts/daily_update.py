@@ -440,11 +440,15 @@ TASKS.append(("40a.指汇盈文章拉取", [PYTHON_EXE, "scripts/fetch_gzh_artic
 TASKS.append(("40b.指汇盈文章导出", [PYTHON_EXE, "scripts/export_gzh_html.py", "--limit", "20"],
               {"timeout": 1800}))
 
-# 步骤 41：当日大盘交易总结（2026-11-13）
+# 步骤 41：当日大盘交易总结（2026-11-13；2026-11-14 起带 LLM 叙事）
 # 依赖 40 的文章入库（第七章引用当日文章）、37/38 的指数建议与 CPA、24/25 的健康分与卖出评分、
 # 两融与龙虎榜的日更。产出 web/market-logic/index.html（当日）+ 同日归档 + index.json。
-# 幂等：同日重跑覆盖。耗时 ~30s。
-TASKS.append(("41.大盘交易总结", [PYTHON_EXE, "scripts/gen_daily_market_summary.py"]))
+# --llm：把当日全部事实压成 JSON 交给模型写判断（模板只能选句子，写不出联动判断）。
+#        调用失败或超时只降级成模板段落，不影响页面生成，退出码仍为 0。
+#        叙事缓存 web/market-logic/data/<date>.llm.json，同日重跑直接复用（省一次调用）；
+#        要重写加 --refresh-llm。耗时 ~10-20s（模板起 30s + LLM 10-20s）。
+TASKS.append(("41.大盘交易总结", [PYTHON_EXE, "scripts/gen_daily_market_summary.py", "--llm"],
+              {"timeout": 900}))
 
 # TRADE_GUARD：非交易日早退。
 # 2026-11-03 清理了 2026-05-30/06-06/06-21 等 7 条非交易日残留

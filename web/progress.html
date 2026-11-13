@@ -949,6 +949,22 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-13 · 大盘总结改由 LLM 现写叙事（模板只做兜底）</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：用户指出「当天各卡片的数字可以靠 Python 条件拼接，但把指汇盈文章提炼成观点、再结合卡片数据写总结，只能靠 LLM」—— 模板只能从预写句子里挑，遇到新情况写不出真正的新判断</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新增 <code>scripts/llm_client.py</code></b>：OpenAI 兼容 /chat/completions 的最小客户端。密钥三级回退 —— 环境变量 → <code>config/secrets.local.env</code> → 本机 <code>~/.dsh/.credentials.yaml</code> 的 refs 段；提供商 deepseek（默认，约 10~13 秒）与 zhipu glm-5.3（兜底），失败自动换下一家</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b><code>facts()</code> 事实层</b>：把 <code>gather()</code> 的结果压成纯 JSON（市场宽度、健康分与 7 项子指标、卖出 12 信号、主要指数、9 个行业组、10/65/250 日活跃度与重叠统计、两融 60 日与平台期、个股净买入双向 TOP10 与行业归属、L1 行业 10/30/60 日融资、龙虎榜 8 条明细、科技指数、美股隔夜、文章全文 2,600 字），落 <code>web/market-logic/data/&lt;date&gt;.facts.json</code></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>叙事约定</b>：系统提示里写死 8 条硬约束 —— 只能用 JSON 里的事实、不复述表格数字、每块 1~3 段每段 50~130 字、一句话一个意思、不给买卖指令、第七章必须先概括文章主线再对照 A 股同类板块再判联动并给可验证观察点、只输出 JSON</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>接入与降级</b>：<code>gen_daily_market_summary.py --llm</code>；日更第 41 步带 <code>--llm</code>（timeout 900）。LLM 只在有输出时覆盖解读段落与 lead，表格与数字始终来自本地库；调用失败写 <code>[LLM][WARN]</code> 后回退模板，退出码仍为 0。叙事缓存 <code>data/&lt;date&gt;.llm.json</code>，同日重跑直接复用，<code>--refresh-llm</code> 强制重写</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>补的两处逻辑</b>：① 回填旧日期时不再覆盖首页（只写归档页，避免重跑 11-12 把首页顶成 11-12）；② 公众号晚上 22 点后才发，收盘后跑日更拿不到当日文章 —— <code>gzh_articles()</code> 改为回退最近一篇并带回实际日期，第七章标题标出「（2026-11-12；11-13 的文章尚未发布）」</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>核验</b>：11-12 调用 13.2s 出 31 段、11-13 调用 10.6s 出 32 段；<code>.scratch/check_llm_nums.py</code> 把叙事里的小数与 facts 逐个比对，11-13 的 43 个独立小数<b>全部命中</b>，无编造；页面 9 章 16 表 2 图，0 pageerror</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 212</b>：模板叙事的天花板是「预写句子的排列组合」。数据可以拼，观点不能拼 —— 文章提炼 + 跨市场联动必须交给模型，模板留作降级路径</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 213</b>：给 LLM 的事实必须自带全部明细（龙虎榜个股净额、行业 10/30/60 日变化），否则它会用「合理」的数字填空。校验方式是反向的 —— 把叙事里的每个小数回查 facts，命中率不是 100% 就不能发</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 214</b>：派生页面回填历史日期时，只在「该日期是最新交易日」时覆盖首页入口，否则一次补数会把线上首页顶回旧日期</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-13 · 当日大盘交易总结（接入日更，末两步）</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>新增脚本</b>：<code>scripts/gen_daily_market_summary.py</code>（约 650 行）—— 无人值守版，事实全部从本地库现算，叙事按规则拼装，不需要人工写注解。区别于 <code>scripts/gen_market_logic_report.py</code>（要求手写 <code>web/market-logic/data/&lt;DATE&gt;.json</code>，只能人工跑）</td></tr>

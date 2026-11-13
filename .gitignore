@@ -146,3 +146,8 @@ fund-reports/
 
 # hanako-report 鎶�鑳戒互鐩綍鑱旀帴褰㈠紡瀛樺湪锛屽彧淇濈暀 D:\hanako\.agents 涓嬬殑瑙勮寖鍓湰
 .agents/skills/hanako-report/
+
+# 大盘总结的 LLM 事实与叙事缓存（可现算，且含第三方文章原文，不入库）
+web/market-logic/data/*.facts.json
+web/market-logic/data/*.llm.json
+

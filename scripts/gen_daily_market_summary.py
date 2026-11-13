@@ -421,15 +421,20 @@ def gather(con, date):
 
     # 12) 指汇盈当日文章
     d['cons_date'] = (q1(con, "SELECT MAX(date) FROM index_constituents") or [None])[0]
-    d['articles'] = gzh_articles(date)
+    d['articles'], d['article_date'] = gzh_articles(date)
     d['kw'] = keyword_check(d['articles'], ranked)
     d['us'] = parse_us(d['articles'])
     return d
 
 
 def gzh_articles(date):
+    """取当日的指汇盈文章。当日还没发布时，回退到最近一篇，并带回实际日期。
+
+    返回 (articles, article_date)。article_date 可能早于 date —— 公众号一般
+    晚上 22 点后才发，而日更在收盘后跑，所以早跑时拿到的是昨天那篇。
+    """
     if not os.path.exists(GZH_DB):
-        return []
+        return [], None
     try:
         c = sqlite3.connect(f'file:{GZH_DB}?mode=ro', uri=True)
         cols = [r[1] for r in c.execute('PRAGMA table_info(gzh_articles)')]
@@ -438,16 +443,25 @@ def gzh_articles(date):
         rows = c.execute(
             f"SELECT {sel} FROM gzh_articles WHERE substr(publish_at,1,10)=? "
             f"ORDER BY publish_at DESC", (date,)).fetchall()
+        used = date
+        if not rows:
+            used = c.execute(
+                "SELECT MAX(substr(publish_at,1,10)) FROM gzh_articles "
+                "WHERE substr(publish_at,1,10)<=?", (date,)).fetchone()[0]
+            if used:
+                rows = c.execute(
+                    f"SELECT {sel} FROM gzh_articles WHERE substr(publish_at,1,10)=? "
+                    f"ORDER BY publish_at DESC", (used,)).fetchall()
         c.close()
     except Exception:
-        return []
+        return [], None
     out = []
     for title, url, pub, brief, body in rows:
         text = strip_tags(body or '')
         paras = [p.strip() for p in text.split('\n') if len(p.strip()) >= 30]
         out.append({'title': title, 'url': url, 'pub': pub, 'brief': brief or '',
                     'paras': paras[:4], 'text': text})
-    return out
+    return out, (used if out else None)
 
 
 def parse_us(articles):
@@ -497,8 +511,164 @@ def keyword_check(articles, ranked):
     return out[:10]
 
 
+# ── LLM 叙事层：把当日全部事实压成 JSON，交给模型写判断 ──
+SECTION_KEYS = ['health', 'broad', 'subs', 'sector', 'flow', 'margin',
+                'netin', 'sector_margin', 'lhb', 'article']
+
+PROMPT_SYS = """你是一名 A 股盘面复盘分析师，服务对象是做红利与指数研究的个人投资者。
+每天早上你要写一份「当日大盘交易总结」，读者已经能看到全部数据表格，所以你不要复述数字。
+
+硬性要求：
+1. 只能使用用户提供的 JSON 里的事实。不得引入 JSON 之外的数据、新闻、传闻或你自己的记忆。
+2. 允许对 JSON 里的数字做简单比较（加减、算差值、占比），但不得虚构新数字。
+3. 每个区块写 1~3 段，每段 50~130 字。先给结论，再给依据。
+4. 不写「表格显示」「如上表」这类指代，直接讲判断。
+5. 一句话一个意思。不用分号把两句话连起来。不堆「可能 / 也许 / 或许」。
+6. 不给买入卖出指令，只描述仓位状态、条件与观察点。
+7. 第七章（article）必须建立在当日文章的具体观点上：先概括文章讲了什么主线，
+   再对照 A 股同类板块当日表现，再判断 A 股与美股/外围是否联动（同向、背离、还是只兑现一部分），
+   最后给一个可验证的观察点。不要逐段摘抄文章。
+8. 只输出 JSON 对象，不要 markdown 代码块，不要解释。
+
+输出 JSON 结构（所有键都必须有，值为字符串数组）：
+{"lead": "一句话结论，60~90 字，含当日最关键的一组数字与判断",
+ "health": [], "broad": [], "subs": [], "sector": [], "flow": [],
+ "margin": [], "netin": [], "sector_margin": [], "lhb": [], "article": []}
+"""
+
+
+def facts(d):
+    """把 gather() 的结果压成纯 JSON（喂给 LLM，不发原始 sqlite Row）。"""
+    up, dn, n, avg, amt = list(d['breadth'])
+    hz, sx = d['health'], d['sell']
+    out = {
+        'date': d['date'],
+        'market': {
+            'up': up, 'down': dn, 'total': n,
+            'avg_chg_pct': round(avg, 2),
+            'amount_yi': round(amt, 1),
+            'amount_ma5_yi': round(d['amt_ma5'], 1) if d.get('amt_ma5') else None,
+            'amount_ma20_yi': round(d['amt_ma20'], 1) if d.get('amt_ma20') else None,
+        },
+        'breadth_20d': [{'date': r['date'],
+                         'up': list(r)[1], 'total': list(r)[2]} for r in d['ad_hist']],
+        'health': None,
+        'sell': None,
+        'broad': [{'name': nm, 'code': code,
+                   'chg_pct': round(v, 2) if v is not None else None}
+                  for nm, code, v in d['broad']],
+        'sub_metrics': [],
+        'sectors': [{'group': r['group_label'], 'score': r['total_score'],
+                     'rating': r['rating'], 'position': r['position'],
+                     'stocks': r['stocks_count']} for r in d['sectors']],
+        'flow': {k: [{'name': x['name'], 'score': x['score'], 'label': x['label']}
+                     for x in v] for k, v in d['flow'].items()},
+        'flow_stats': d['flow_stats'],
+        'margin': None,
+        'margin_trend_10d': [
+            {'date': r['date'], 'balance_yi': round(list(r)[1], 1),
+             'short_balance_yi': round(list(r)[2], 1),
+             'net_yi': round(list(r)[3], 1)} for r in d['margin_trend'][-10:]],
+        'net_in_top10': [{'name': r['name'],
+                          'net_yi': round(list(r)[2], 2)} for r in d['net_in']],
+        'net_out_top10': [{'name': r['name'],
+                           'net_yi': round(list(r)[2], 2)} for r in d['net_out']],
+        'net_in_sum_yi': round(d['net_in_sum'], 2),
+        'net_out_sum_yi': round(d['net_out_sum'], 2),
+        'net_in_by_sector': d['net_in_sec'],
+        'sector_margin': [{'sector': r['name'], 'balance_yi': round(r['balance'], 1),
+                           'net_yi': round(r['net'], 1), 'stocks': r['n'],
+                           'chg10_pct': round(r['chg10'], 1) if r.get('chg10') is not None else None,
+                           'chg30_pct': round(r['chg30'], 1) if r.get('chg30') is not None else None,
+                           'chg60_pct': round(r['chg60'], 1) if r.get('chg60') is not None else None}
+                          for r in d['sector_margin']],
+        'lhb': {'count': d['lhb'].get('count'), 'net_yi': round(d['lhb'].get('net') or 0, 2),
+                'inst_net_yi': round(d['lhb'].get('inst') or 0, 2),
+                'up': d['lhb'].get('up'), 'down': d['lhb'].get('down'),
+                'inst_positive': d['lhb'].get('inst_positive'),
+                'examples': [list(x) for x in (d['lhb'].get('top') or [])[:5]]},
+        'tech_today': [{'name': nm, 'chg_pct': round(ch, 2)} for nm, ch in d['tech']],
+        'article_keyword_check': [
+            {'keyword': k[0], 'tone': k[1], 'index': k[2],
+             'index_chg_pct': round(k[3], 2) if k[3] is not None else None,
+             'verdict': k[4]} for k in d['kw']],
+        'us_overnight': [{'name': nm, 'chg_pct': ch} for nm, ch in d['us']],
+        'articles': [],
+        'data_notes': {
+            'margin_date': (d['margin'] or {}).get('date'),
+            'constituent_snapshot': d.get('cons_date'),
+            'amount_unit': '亿元',
+        },
+    }
+    if hz:
+        out['health'] = {'score': hz['total_score'], 'rating': hz['rating']}
+        for key, label, unit, note in SUB_METRICS:
+            if key + '_value' in hz.keys():
+                out['sub_metrics'].append({
+                    'metric': label, 'value': hz[key + '_value'],
+                    'score': hz[key + '_score'], 'unit': unit, 'meaning': note})
+    if sx:
+        trig = [{'signal': lb, 'score': sx[sc] if sc in sx.keys() else None}
+                for col, sc, lb in SELL_SIGNALS if sx[col] not in (None, 0, False)]
+        out['sell'] = {'score': sx['total_score'],
+                       'action': sx['position_advice'],
+                       'triggered': trig, 'triggered_count': len(trig),
+                       'total_signals': len(SELL_SIGNALS)}
+    if d['margin']:
+        m = d['margin']
+        out['margin'] = {k: (round(v, 2) if isinstance(v, float) else v)
+                         for k, v in dict(m).items() if k != 'date'}
+    for a in d['articles']:
+        out['articles'].append({
+            'title': a['title'], 'publish': a['pub'], 'url': a['url'],
+            'brief': (a.get('brief') or '')[:200],
+            'text': (a.get('text') or '')[:2600],
+        })
+    return out
+
+
+def ask_llm(f, provider=None):
+    """把 facts 交给模型，返回清洗后的叙事 dict；失败返回 (None, 错误信息)。"""
+    try:
+        import llm_client
+    except ImportError:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import llm_client
+    user = ('以下是 %s 的当日盘面事实（JSON）：\n```json\n%s\n```\n\n'
+            '请按系统提示的结构输出 JSON。记住：数字只能来自上面的 JSON，'
+            '文章部分要提炼观点并与 A 股同类板块、美股隔夜表现做联动判断。'
+            % (f['date'], json.dumps(f, ensure_ascii=False)))
+    try:
+        txt = llm_client.chat(
+            [{'role': 'system', 'content': PROMPT_SYS},
+             {'role': 'user', 'content': user}],
+            provider=provider, json_mode=True, temperature=0.4, timeout=300)
+        raw = llm_client.parse_json(txt)
+    except Exception as e:  # noqa: BLE001
+        return None, f'{type(e).__name__}: {str(e)[:300]}'
+
+    if not isinstance(raw, dict):
+        return None, '模型未返回 JSON 对象'
+    out = {}
+    lead = str(raw.get('lead') or '').strip()
+    if len(lead) >= 20:
+        out['lead'] = lead
+    for k in SECTION_KEYS:
+        vals = raw.get(k) or []
+        if isinstance(vals, str):
+            vals = [vals]
+        vals = [str(x).strip() for x in vals if isinstance(x, (str, int, float))]
+        vals = [x for x in vals if len(x) >= 10][:4]
+        if vals:
+            out[k] = vals
+    if not out:
+        return None, '模型输出为空'
+    return out, ''
+
+
 # ── 呈现层 ────────────────────────────────────────────
 def render(d):
+
     date = d['date']
     up, dn, n, avg, amt = d['breadth']
     hz, sx = d['health'], d['sell']
@@ -954,6 +1124,37 @@ def render(d):
                 + '。方向相反的主题，说明文章讲的是逻辑、盘面走的是资金，两者还没合上。')
     read_article = rbox(*a_paras)
 
+    # 文章日期提示：公众号晚上才发，收盘后跑日更时拿到的是最近一篇
+    art_date_note = ''
+    ad = d.get('article_date')
+    if ad and ad != date:
+        art_date_note = (f'（{esc(ad)}；{date} 的文章尚未发布，'
+                         f'以下判断基于最近一篇）')
+    elif not d['articles']:
+        art_date_note = '（本周尚无文章）'
+
+    # ── LLM 生成的叙事（有则覆盖模板段落，只覆盖文字，不动表格与数字） ──
+    llm = d.get('llm') or {}
+    if llm:
+        def llm_box(key, default):
+            paras = [str(x).strip() for x in (llm.get(key) or [])
+                     if isinstance(x, str) and len(str(x).strip()) >= 10]
+            return rbox(*paras[:4]) if paras else default
+
+        read_health = llm_box('health', read_health)
+        read_broad = llm_box('broad', read_broad)
+        read_subs = llm_box('subs', read_subs)
+        read_sector = llm_box('sector', read_sector)
+        read_flow = llm_box('flow', read_flow)
+        read_margin = llm_box('margin', read_margin)
+        read_netin = llm_box('netin', read_netin)
+        read_sector_margin = llm_box('sector_margin', read_sector_margin)
+        read_lhb = llm_box('lhb', read_lhb)
+        read_article = llm_box('article', read_article)
+        lead_llm = (llm.get('lead') or '').strip()
+        if len(lead_llm) >= 20:
+            lead_txt = lead_llm if lead_llm.endswith(('。', '！', '？')) else lead_llm + '。'
+
     hist = history_items()
     hist_rows = ''.join(
         f'<tr><td style="white-space:nowrap"><a href="{esc(it["date"])}/index.html">'
@@ -1029,8 +1230,8 @@ def render(d):
 <div class="tw"><table><tr><th>个股</th><th>上榜原因</th><th>净额</th><th>机构净额</th></tr>{lhb_rows}</table></div>
 {read_lhb}
 
-<h2>七、指汇盈当日观点与联动判断</h2>
-<h3>7.1 当日文章</h3>
+<h2>七、指汇盈观点与联动判断</h2>
+<h3>7.1 当日文章{art_date_note}</h3>
 {art_html}
 <h3>7.2 文中板块与当日指数方向核对</h3>
 <div class="tw"><table><tr><th>关键词</th><th>文中语气</th><th>对应指数</th><th>当日涨跌</th><th>判定</th></tr>{kw_rows}</table></div>
@@ -1080,6 +1281,12 @@ def history_items():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--date', default=None)
+    ap.add_argument('--llm', action='store_true',
+                    help='调用 LLM 生成叙事并覆盖模板段落（失败则回退模板）')
+    ap.add_argument('--refresh-llm', action='store_true',
+                    help='忽略当日已缓存的 LLM 结果，重新调用')
+    ap.add_argument('--provider', default=None,
+                    help='LLM 提供商：deepseek / zhipu，默认 deepseek')
     a = ap.parse_args()
 
     con = sqlite3.connect(f'file:{DB}?mode=ro', uri=True)
@@ -1096,12 +1303,57 @@ def main():
     d = gather(con, date)
     con.close()
 
+    # ── LLM 叙事（可选，失败只降级，不中断日更） ──
+    if a.llm:
+        cache = os.path.join(ROOT, 'data', f'{date}.llm.json')
+        cached = None
+        if not a.refresh_llm and os.path.exists(cache):
+            try:
+                with open(cache, encoding='utf-8') as fh:
+                    cached = json.load(fh)
+                cached['_source'] = 'cache'
+            except (OSError, ValueError):
+                cached = None
+        if cached:
+            d['llm'] = cached.get('sections') or {}
+            if cached.get('lead'):
+                d['llm']['lead'] = cached['lead']
+            print(f'[LLM] 复用缓存 {os.path.basename(cache)}')
+        else:
+            f = facts(d)
+            os.makedirs(os.path.join(ROOT, 'data'), exist_ok=True)
+            with open(os.path.join(ROOT, 'data', f'{date}.facts.json'), 'w',
+                      encoding='utf-8', newline='\n') as fh:
+                json.dump(f, fh, ensure_ascii=False, indent=1)
+            t0 = datetime.now()
+            narration, err = ask_llm(f, provider=a.provider)
+            cost = (datetime.now() - t0).total_seconds()
+            if narration:
+                d['llm'] = narration
+                with open(cache, 'w', encoding='utf-8', newline='\n') as fh:
+                    json.dump({'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                               'provider': a.provider or 'deepseek',
+                               'seconds': round(cost, 1),
+                               'lead': narration.get('lead', ''),
+                               'sections': {k: v for k, v in narration.items()
+                                            if k != 'lead'}},
+                              fh, ensure_ascii=False, indent=1)
+                print(f'[LLM] 已生成叙事（{cost:.1f}s，{sum(len(v) for v in narration.values() if isinstance(v, list))} 段）')
+            else:
+                print(f'[LLM][WARN] 调用失败，回退模板段落：{err}')
+
     html = render(d)
     os.makedirs(os.path.join(ROOT, date), exist_ok=True)
     with open(os.path.join(ROOT, date, 'index.html'), 'w', encoding='utf-8', newline='\n') as fh:
         fh.write(html)
-    with open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8', newline='\n') as fh:
-        fh.write(html)
+    con2 = sqlite3.connect(f'file:{DB}?mode=ro', uri=True)
+    latest = con2.execute("SELECT MAX(date) FROM daily_kline_adj").fetchone()[0]
+    con2.close()
+    if date == latest:
+        with open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write(html)
+    else:
+        print(f'[SKIP] {date} 不是最新交易日（{latest}），只写归档页，不动首页')
 
     items = history_items()
     with open(os.path.join(ROOT, 'index.json'), 'w', encoding='utf-8', newline='\n') as fh:
@@ -1118,7 +1370,8 @@ def main():
                       fh, ensure_ascii=False, indent=1)
 
     print(f'已生成 {date} 大盘交易总结（{len(html)/1024:.1f} KB）'
-          f'｜历史 {len(items)} 期｜文章 {len(d["articles"])} 篇')
+          f'｜历史 {len(items)} 期｜文章 {len(d["articles"])} 篇'
+          f'{("（" + d["article_date"] + "）") if d.get("article_date") not in (None, date) else ""}')
     return 0
 
 
