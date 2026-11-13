@@ -128,13 +128,54 @@ def fetch_body(sess, url):
     return (body or None), None
 
 
+def export_markdown(db, out_dir):
+    """把库里的文章导出成 Markdown，一篇一个文件，另生成 index.md。"""
+    rows = list(db.execute(
+        'SELECT account,publish_at,title,url,brief,body FROM gzh_articles '
+        'ORDER BY publish_at DESC'))
+    if not rows:
+        print('库里没有文章，无法导出')
+        return 0
+    os.makedirs(out_dir, exist_ok=True)
+    index = ['# 公众号文章导出', '',
+             '共 %d 篇，按发布时间倒序。' % len(rows), '']
+    for acc, pub, title, url, brief, body in rows:
+        safe = re.sub(r'[\\/:*?"<>|\r\n\t]', ' ', title or 'untitled').strip()[:80]
+        stamp = (pub or '')[:16].replace(':', '').replace(' ', '_')
+        name = '%s_%s.md' % (stamp or 'nodate', safe)
+        path = os.path.join(out_dir, name)
+        lines = ['# %s' % (title or ''), '',
+                 '- 公众号：%s' % acc,
+                 '- 发布：%s' % (pub or ''),
+                 '- 原文：%s' % (url or ''),
+                 '']
+        if brief:
+            lines += ['> %s' % brief, '']
+        lines += [body or '_（本文无正文，原页为视频稿）_', '']
+        io.open(path, 'w', encoding='utf-8', newline='\n').write('\n'.join(lines))
+        index.append('- %s  [%s](%s)  →  `%s`' % (pub or '', title or '', url or '', name))
+    io.open(os.path.join(out_dir, 'index.md'), 'w',
+            encoding='utf-8', newline='\n').write('\n'.join(index) + '\n')
+    return len(rows)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--pages', type=int, default=None, help='最多翻几页（每页 20 篇）')
     ap.add_argument('--backfill', action='store_true', help='不因命中已入库而提前停止')
     ap.add_argument('--body', action='store_true', help='同时抓正文')
     ap.add_argument('--list', action='store_true', help='只打印新文章，不写库')
+    ap.add_argument('--export', nargs='?', const='docs/gzh', default=None,
+                    help='导出 Markdown 到目录（默认 docs/gzh），不抓取')
     args = ap.parse_args()
+
+    if args.export:
+        db = conn()
+        out = args.export if os.path.isabs(args.export) else os.path.join(PROJECT, args.export)
+        n = export_markdown(db, out)
+        print('已导出 %d 篇到 %s' % (n, out))
+        db.close()
+        return
 
     accounts = load_accounts()
     if not accounts:

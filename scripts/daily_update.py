@@ -432,6 +432,20 @@ TASKS.append(("38.指数CPA扫描", [PYTHON_EXE, "scripts/scan_index_cpa_daily.p
 TASKS.append(("39.自选股入条件评估",
               [PYTHON_EXE, "scripts/eval_entry_conditions.py"]))
 
+# 步骤 40：指汇盈公众号文章（2026-11-13）
+# 40a 拉取：走搜狐号镜像免登录接口，增量写 data/gzh.db（与主库分开，避免锁库）；
+# 40b 导出：Playwright 渲染原页取图片真实地址，下载后存自包含 HTML 到 docs/gzh/html/
+# （公众号原页 <img src> 是加密串，必须渲染后才拿到 https 地址，见 progress 教训 202 203）。
+TASKS.append(("40a.指汇盈文章拉取", [PYTHON_EXE, "scripts/fetch_gzh_articles.py"]))
+TASKS.append(("40b.指汇盈文章导出", [PYTHON_EXE, "scripts/export_gzh_html.py", "--limit", "20"],
+              {"timeout": 1800}))
+
+# 步骤 41：当日大盘交易总结（2026-11-13）
+# 依赖 40 的文章入库（第七章引用当日文章）、37/38 的指数建议与 CPA、24/25 的健康分与卖出评分、
+# 两融与龙虎榜的日更。产出 web/market-logic/index.html（当日）+ 同日归档 + index.json。
+# 幂等：同日重跑覆盖。耗时 ~30s。
+TASKS.append(("41.大盘交易总结", [PYTHON_EXE, "scripts/gen_daily_market_summary.py"]))
+
 # TRADE_GUARD：非交易日早退。
 # 2026-11-03 清理了 2026-05-30/06-06/06-21 等 7 条非交易日残留
 # （周末或节假日被误算，因为入口未校验今天是否交易日）。

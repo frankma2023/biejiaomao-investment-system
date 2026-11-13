@@ -119,6 +119,10 @@ def main():
                 if not data or data['len'] < 20:
                     failures.append((title, 'no content'))
                     print('  [%d/%d] %s -> 无正文' % (i, len(rows), title[:26]))
+                    # 视频稿没有正文段落，每次重试都要重新加载页面。标记成空串，下次跳过。
+                    db.execute("UPDATE gzh_articles SET body_html='', images='[]' "
+                               'WHERE id=?', (aid,))
+                    db.commit()
                     continue
 
                 body_html = data['html']
@@ -171,8 +175,14 @@ def main():
                 print('  [%d/%d] %s -> %s（图 %d）'
                       % (i, len(rows), title[:26], fname[:34], len(local)))
             except Exception as e:
-                failures.append((title, str(e)[:80]))
-                print('  [%d/%d] %s -> 失败 %s' % (i, len(rows), title[:26], str(e)[:60]))
+                msg = str(e)[:80]
+                failures.append((title, msg))
+                print('  [%d/%d] %s -> 失败 %s' % (i, len(rows), title[:26], msg[:60]))
+                # 视频稿没有正文段落，每次重试都要重新加载页面。标记成空串，下次跳过。
+                if 'no content' in msg:
+                    db.execute("UPDATE gzh_articles SET body_html='', images='[]' "
+                               'WHERE id=?', (aid,))
+                    db.commit()
         b.close()
 
     # 索引页

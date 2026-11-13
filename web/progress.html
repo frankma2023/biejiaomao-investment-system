@@ -949,6 +949,20 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-13 · 当日大盘交易总结（接入日更，末两步）</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新增脚本</b>：<code>scripts/gen_daily_market_summary.py</code>（约 650 行）—— 无人值守版，事实全部从本地库现算，叙事按规则拼装，不需要人工写注解。区别于 <code>scripts/gen_market_logic_report.py</code>（要求手写 <code>web/market-logic/data/&lt;DATE&gt;.json</code>，只能人工跑）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>页面九章</b>：健康分与卖出评分（含 12 条信号明细）→ 主要指数 → 辅助指标 → 行业组健康分 → 资金活跃度 10/65/250 日 TOP10 → 资金情绪（两融趋势 sparkline、个股净买入双向 TOP10、L1 行业分解、龙虎榜）→ 指汇盈当日观点 + 文中板块方向和当日指数核对 → 口径与缺口 → 历史</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>接入日更</b>：<code>scripts/daily_update.py</code> 末尾加 <code>40a.指汇盈文章拉取</code> → <code>40b.指汇盈文章导出</code> → <code>41.大盘交易总结</code>，顺序固定（第 41 步要引用当日文章）。入口 <code>http://localhost:8772/market-logic/index.html</code>，同日归档 <code>market-logic/&lt;DATE&gt;/index.html</code></td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>坑 1（教训 204）</b>：<code>index_daily_kline.change</code> <b>只存两位小数</b>（0.02 / −0.01 / 0.00），<b>0.5% 以下的涨跌会被抹成 0.00%</b>——科技50 实际 −0.006% 显示成 +0.00%，沪深300 −0.78% 显示成 −1.00%。涨跌一律用收盘价对比前一交易日重算，不读该字段</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>坑 2（教训 205）</b>：关键词对照的匹配池原来取全表指数名，ETF 行也进来了 —— 「半导体」匹配到「半导体设备ETF万家 +35.00%」、「芯片」匹配到「芯片ETF国泰 +58.00%」（ETF 的 change 是脏数据）。改为只用 <code>config/index_style.yaml</code> 的 market/sector_l1/sector_l2/thematic/strategy 五类，排除 etf，并过滤 <code>|涨跌|&gt;12%</code></td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>坑 3（教训 206）</b>：共享样式 <code>.tw table td:last-child</code> 把最后一列居中并加左内边距 → 「一句话结论」「含义」「状态」这些文字列被挤到右缘。给这类表加 <code>class="wide"</code>（CSS 已有 <code>table.wide td:last-child{text-align:left!important}</code>），并去掉状态列的 <code>num</code> 类</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>坑 4（教训 207）</b>：3 篇视频稿没有正文段落，导出脚本每天重试都要重新加载页面 → 失败时把 <code>body_html</code> 写成空串做标记，下次 <code>WHERE body_html IS NULL</code> 自动跳过。改后第二次运行直接输出「没有待导出的文章」</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>核验（2026-11-12 数据）</b>：883 涨 / 4,694 跌，成交 19,459 亿，平均 −1.49%；健康分 39（D 偏弱）；卖出评分 110（减仓至 25%），12 条信号触发 5 条；行业组最强 策略强势组 57、最弱 L2弱势组 36；两融余额 21,344 亿（5 日 −0.1%）、当日融资净买入 45 亿。页面 30.5 KB、15 表、2 张 sparkline、9 个章节、0 pageerror</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-13 · 公众号文章转自包含 HTML（配图本地化）</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：第一版只导出 Markdown 正文。用户指出文章里常有图表，图片本身就是信息 → 必须导 HTML 并把图存到本地</td></tr>
