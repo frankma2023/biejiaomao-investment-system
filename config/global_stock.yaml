@@ -1,0 +1,20 @@
+# 外部数据源配置（global-stock-data 封装层）
+# 说明：A 股仍以 data/lixinger.db 为唯一来源，本文件只管海外事件与宏观读数。
+
+# SEC EDGAR 要求带上真实的联系方式（姓名 + 邮箱），否则可能限流或拒绝。
+# 这是 SEC 的合规要求，不是登录凭据。
+sec_contact: "hanako research hanako@example.com"
+
+# 已在本机实测可用的源
+sources:
+  sec_edgar: true      # 8-K / 10-Q / Form 4 / 13F / 每日申报流 / 原文抓取
+  treasury: true       # 美国国债收益率曲线
+  cboe_vix: true       # VIX 期限结构
+  tencent_us: true     # 美股行情兜底
+
+# 已实测不可用，代码里保留但不要依赖（health() 会标 fail）
+broken:
+  finra_short: "cdn.finra.org 重定向 30 次后失败"
+  yahoo_options: "getcrumb 403"
+  bls_macro: "BLS 拒绝请求 HTTP 403"
+  hk_quote_tencent: "返回空对象"

@@ -949,6 +949,21 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-16 · 外部事件数据层（global-stock-data 抽取为正式模块）</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：核对英伟达 CEO 辞职时，两篇自媒体对「为什么辞职」给了完全相反的叙事。判断真伪要看 8-K 原文，但本地库只有 A 股，没有任何美股披露通道。用户要求装 <code>global-stock-data</code> 技能</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>先评估再动手</b>：跑了 11 个端点，7 通 4 不通。通的有 SEC EDGAR（CIK 查询、公司申报、每日全市场申报流、8-K 原文抓取、Form 4 内部人）、美国财政部国债曲线（<b>2026-11-13 10Y = 5.15%</b>）、CBOE VIX 期限结构（VIX 19.3、contango）、腾讯美股行情兜底。不通的是 FINRA 做空数据（CDN 重定向 30 次）、Yahoo 期权链（403）、BLS 宏观（403）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新增 <code>scripts/extract_gsd.py</code></b>：上游仓库没有 .py 文件，133 个函数的实现全写在 <code>SKILL.md</code> 的 43 个代码块里，还有演示语句调用后定义的函数，直接拼会 <code>NameError</code>。改用 AST 过滤 —— 保留 import/def/class，赋值语句只丢掉「调用了本文件内函数」的演示，产出可 import 的 <code>src/data/gsd_vendor.py</code>（124 KB / 111 函数），上游升级后重跑即可</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新增 <code>src/data/global_stock.py</code></b>（封装层，不直接散调上游）：<code>health()</code> 十个探针判可用性；<code>filings()</code> / <code>filing_text()</code> / <code>insider()</code> / <code>treasury_curve()</code> / <code>vix_structure()</code> / <code>quote_us()</code>；<code>events_brief()</code> 把申报 + 内部人 + 美债 + 情绪压成一段纯文本，直接可喂给分析。全部函数失败返回 <code>{'error':…}</code> 不抛异常，日更可吞错误继续跑</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>配套</b>：<code>config/global_stock.yaml</code>（SEC 要求的真实联系邮箱、可用源清单、四个已知不通的源与原因）；<code>scripts/global_stock.py</code> 命令行（<code>health</code> / <code>brief</code> / <code>filings</code> / <code>filing</code> / <code>insider</code> / <code>rates</code> / <code>vix</code> / <code>quote</code>）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>当日用它核到的事实</b>：英伟达 8-K（2026-11-12 提交）Item 5.02 原文写「董事会<b>接受</b>黄仁勋辞去总裁、CEO 与董事，立即生效」，CFO Colette M. Kress 任临时 CEO 并继续兼任 CFO，Harvey C. Jones 任董事长，附 Exhibit 99.1 新闻稿。<b>全文没有一句辞职原因、没有过渡协议或顾问安排</b> —— 「被迫」在两篇文章里都只是推断</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 218</b>：把实现写在文档里的仓库（SKILL.md 塞了几十个代码块），不能靠正则拼块。演示语句会调用后面才定义的函数，必须走 AST：只留 import/def/class，赋值语句里丢掉调用本地函数的那些，<code>compile()</code> 通过才算抽取成功</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 219</b>：数据源要先用探针判可用性，再决定接哪几个。同一技能里 SEC 与财政部能用、FINRA 与 BLS 在本机全废 —— 按源降级，把不通的写进配置的 <code>broken</code> 段，而不是让调用方自己撞 403</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 220</b>：Form 4 里的「赠与（code G）」不是减持。上游把它并进卖出统计，NVDA 近 30 日会被报成「卖 25 笔」；按交易代码分成 P / S / G 分别计数，赠与单列</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-14 · 板块资金与两融固定页面（行业 55 + 主题策略 30）</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：查光伏 10 日资金时是临时写脚本跑一次。用户要求做成固定页面，「一目了然看到各板块 10 日资金与两融情况」</td></tr>
