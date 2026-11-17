@@ -263,16 +263,16 @@
     }
 
     // ── 市场底部判断（PRD: docs/product/市场底部判断_PRD.md）──
-    // 只读接口结果，不在前端算分。分档颜色：满分绿 / 半分琥珀 / 零分红。
-    function btColor(s){ return s>=1?'#2E7D32':(s>=0.5?'#F9A825':'#E53935'); }
-    function btTag(s){ return s>=1?'满足':(s>=0.5?'部分':'不满足'); }
+    // 只读接口结果，不在前端算分。分档颜色：满分绿 / 半分琥珀 / 零分红 / 无数据灰。
+    function btColor(s){ return (s==null)?'#6B7280':(s>=1?'#2E7D32':(s>=0.5?'#F9A825':'#E53935')); }
+    function btTag(s){ return (s==null)?'无数据':(s>=1?'满足':(s>=0.5?'部分':'不满足')); }
     function btCard(title, value, unit, score, detail, threshold, sub){
-      var c=btColor(score), pct=Math.max(3, score*100);
+      var c=btColor(score), pct=Math.max(3, (score||0)*100);
       return '<div class="bt-card">'
         + '<div class="bt-t"><span>'+title+'</span>'
         + '<span class="bt-tag" style="background:'+c+'1f;color:'+c+'">'+btTag(score)+'</span></div>'
         + '<div class="bt-v" style="color:'+c+'">'+(value==null?'—':value)
-        + (unit?'<small>'+unit+'</small>':'')+'</div>'
+        + ((value==null||!unit)?'':'<small>'+unit+'</small>')+'</div>'
         + '<div class="bt-bar"><i style="width:'+pct+'%;background:'+c+'"></i></div>'
         + '<div class="bt-d">'+(detail||'')+'</div>'
         + '<div class="bt-th">判据：'+threshold+'</div>'
@@ -307,8 +307,8 @@
       });
       h+='</div><div class="bt-sub">全市场判据</div><div class="bt-grid">';
       d.market.forEach(function(m){
-        h+=btCard(m.label, nf(m.value, m.key==='right'?0:1), m.unit, m.score||0,
-                  m.detail, m.threshold);
+        h+=btCard(m.label, m.value==null?null:nf(m.value, m.key==='right'?0:1), m.unit,
+                  (m.score==null?null:m.score), m.detail, m.threshold);
       });
       h+='</div>';
       box.innerHTML=h;
