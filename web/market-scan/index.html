@@ -138,6 +138,24 @@
     @media (max-width:700px) { .core-grid,.rot-grid,.pano-row { grid-template-columns:1fr; } .pano-grid { grid-template-columns:1fr 1fr; } }
     .nav-dropdown:hover .nav-dropdown-menu { display:block; }
     .no-data { text-align:center; padding:48px; color:var(--muted); font-size:0.8rem; }
+    /* 市场底部判断（v1.0）*/
+    .bt-wrap{margin-bottom:14px}
+    .bt-head{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:14px;border:1px solid var(--border);background:var(--card);box-shadow:var(--shadow-card);flex-wrap:wrap}
+    .bt-verdict{font-family:var(--font-display);font-size:1.15rem;font-weight:800;letter-spacing:.02em}
+    .bt-score{font-size:1.9rem;font-weight:800;font-family:var(--font-display);line-height:1}
+    .bt-score small{font-size:0.6rem;font-weight:600;color:var(--muted);margin-left:3px}
+    .bt-sum{flex:1;min-width:260px;font-size:0.68rem;color:var(--text-secondary);line-height:1.55}
+    .bt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:10px}
+    .bt-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow-card)}
+    .bt-card .bt-t{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:0.72rem;font-weight:800;font-family:var(--font-display);color:var(--text-primary)}
+    .bt-tag{font-size:0.56rem;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap}
+    .bt-v{font-size:1.35rem;font-weight:800;font-family:var(--font-display);margin:6px 0 2px;line-height:1.1}
+    .bt-v small{font-size:0.58rem;font-weight:600;color:var(--muted);margin-left:3px}
+    .bt-d{font-size:0.58rem;color:var(--muted);line-height:1.5}
+    .bt-bar{height:4px;border-radius:3px;background:var(--divider);margin:8px 0 6px;overflow:hidden}
+    .bt-bar i{display:block;height:100%;border-radius:3px}
+    .bt-th{font-size:0.54rem;color:var(--muted);line-height:1.45;margin-top:4px}
+    .bt-sub{font-size:0.6rem;color:var(--muted);margin:10px 0 0;font-weight:700;font-family:var(--font-display)}
 </style>
 </head>
 <body>
@@ -154,6 +172,7 @@
         <span id="date-label" style="font-size:0.6rem;color:var(--muted)"></span>
         <button onclick="computeSnapshot()" style="margin-left:auto;font-size:10px;padding:4px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer;font-family:var(--font-body)">🔄 刷新计算</button>
       </div>
+      <div id="bottom-block" class="bt-wrap"></div>
       <div id="content"></div>
       <div id="market-logic-bar" style="display:flex;gap:14px;align-items:center;margin:2px 0 10px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-left:3px solid #2563eb;border-radius:14px;flex-wrap:wrap;cursor:pointer" onclick="window.open('../market-logic/index.html')" title="点击查看每日「市场总结」历史">
         <span style="font-family:var(--font-display);font-size:0.78rem;font-weight:800;color:var(--text-primary)">📝 市场总结</span>
@@ -227,10 +246,12 @@
           fetch(API_BASE+'/api/market-panorama').then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))),
           fetch(API_BASE+'/api/market-sell-score?date='+dateParam).then(r=>r.json()).catch(()=>({status:'no_data'})),
           fetch(API_BASE+'/api/market-scan/dividend-advice?date='+(dateParam==='latest'?'':dateParam)).then(r=>r.json()).catch(()=>({indices:[]})),
-          fetch(API_BASE+'/api/market-scan/fcf-advice?date='+(dateParam==='latest'?'':dateParam)).then(r=>r.json()).catch(()=>({}))
+          fetch(API_BASE+'/api/market-scan/fcf-advice?date='+(dateParam==='latest'?'':dateParam)).then(r=>r.json()).catch(()=>({})),
+          fetch(API_BASE+'/api/market-bottom?date='+dateParam).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))).catch(()=>({status:'no_data'}))
         ]);
         const pick=(i,dflt)=>(settled[i].status==='fulfilled'&&settled[i].value)?settled[i].value:dflt;
-        const hr=pick(0,null), pr=pick(1,{}), sr=pick(2,{status:'no_data'}), da=pick(3,{indices:[]}), fcfa=pick(4,{});
+        const hr=pick(0,null), pr=pick(1,{}), sr=pick(2,{status:'no_data'}), da=pick(3,{indices:[]}), fcfa=pick(4,{}), bt=pick(5,{status:'no_data'});
+        renderBottom(bt);
         if(!hr){div.innerHTML='<div class="no-data">📡 行情健康度接口加载失败，请稍后重试 (date='+dateParam+')</div>';return;}
         if(hr.status==='no_data'){div.innerHTML='<div class="no-data">📡 暂无健康度数据 (date='+dateParam+')</div>';return;}
         hr.dividend_advice=da;
@@ -239,6 +260,58 @@
         loadMajorIndices();
         loadMicrocapBar();
       }catch(e){div.innerHTML='<div class="no-data">📡 数据加载失败</div>';}
+    }
+
+    // ── 市场底部判断（PRD: docs/product/市场底部判断_PRD.md）──
+    // 只读接口结果，不在前端算分。分档颜色：满分绿 / 半分琥珀 / 零分红。
+    function btColor(s){ return s>=1?'#2E7D32':(s>=0.5?'#F9A825':'#E53935'); }
+    function btTag(s){ return s>=1?'满足':(s>=0.5?'部分':'不满足'); }
+    function btCard(title, value, unit, score, detail, threshold, sub){
+      var c=btColor(score), pct=Math.max(3, score*100);
+      return '<div class="bt-card">'
+        + '<div class="bt-t"><span>'+title+'</span>'
+        + '<span class="bt-tag" style="background:'+c+'1f;color:'+c+'">'+btTag(score)+'</span></div>'
+        + '<div class="bt-v" style="color:'+c+'">'+(value==null?'—':value)
+        + (unit?'<small>'+unit+'</small>':'')+'</div>'
+        + '<div class="bt-bar"><i style="width:'+pct+'%;background:'+c+'"></i></div>'
+        + '<div class="bt-d">'+(detail||'')+'</div>'
+        + '<div class="bt-th">判据：'+threshold+'</div>'
+        + (sub?'<div class="bt-th">'+sub+'</div>':'')
+        + '</div>';
+    }
+    function renderBottom(d){
+      var box=document.getElementById('bottom-block');
+      if(!box) return;
+      if(!d||d.status==='no_data'||!d.indices){
+        box.innerHTML='<div class="no-data" style="padding:18px">📐 暂无底部判断数据（先在日更里跑 compute_market_bottom.py）</div>';
+        return;
+      }
+      var vc={'底部区域':'#2E7D32','接近底部':'#F9A825','未到底部':'#E53935'}[d.verdict]||'#6B7280';
+      var h='<div class="bt-head">'
+        + '<div><div class="bt-verdict" style="color:'+vc+'">'+d.verdict+'</div>'
+        + '<div class="bt-score" style="color:'+vc+'">'+(d.score==null?'—':d.score.toFixed(0))
+        + '<small>/100 综合分</small></div></div>'
+        + '<div class="bt-sum">'+d.summary+'</div>'
+        + '</div><div class="bt-grid">';
+      d.indices.forEach(function(ix){
+        var sub='PE '+nf(ix.pe,2)+'（'+nf(ix.pe_pct,1)+'% 分位） · PB '+nf(ix.pb,2)+'（'+nf(ix.pb_pct,1)+'% 分位）';
+        // 三项小分明细直接取接口给的 items，不在前端重算，也不写死阈值
+        var lb={'dd':'回撤','days':'历时','value':'估值'};
+        var chips=(ix.items||[]).map(function(it){
+          var s=it.score>=1?'满分':(it.score>=0.5?'半分':'未达');
+          return (lb[it.key]||it.label)+' '+s+'（'+(it.value==null?'—':nf(it.value,1))+(it.unit||'')+'）';
+        }).join(' · ');
+        h+=btCard(ix.name+' · 得分 '+nf(ix.score,0), nf(ix.dd,1), '% 回撤 · '+ix.days+' 日',
+                  (ix.score||0)/100, '收盘 '+nf(ix.close,2)+' · 高点 '+nf(ix.peak,2)+'（'+ix.peak_date+'）',
+                  chips||'—', sub);
+      });
+      h+='</div><div class="bt-sub">全市场判据</div><div class="bt-grid">';
+      d.market.forEach(function(m){
+        h+=btCard(m.label, nf(m.value, m.key==='right'?0:1), m.unit, m.score||0,
+                  m.detail, m.threshold);
+      });
+      h+='</div>';
+      box.innerHTML=h;
     }
 
     function onDateChange(newDate){

@@ -949,6 +949,27 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-17 · 市场底部判断（七条判据 · 大盘扫描页顶部）</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：用户问「现在是不是底部区域」。只用沪深300 回答会被单一指数误导 —— 同一天沪深300 回撤 21.4%、创业板指 47.6%、科创50 44.7%，位置完全不同。用户要求做成量化功能放进大盘扫描页，先写 PRD 再开发，完成后独立复核</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>PRD</b>：<code>docs/product/市场底部判断_PRD.md</code> —— 七条判据（指数层 I1 回撤 / I2 历时 / I3 估值分位；全市场层 M1 缩量 / M2 破净 / M3 杠杆 / M4 右侧）、阈值、权重、判定档、口径、表结构、API、验收标准、附录 A 与 B</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>实现</b>：<code>src/scanners/market_bottom.py</code>（<code>compute</code> / <code>save</code>）+ <code>scripts/compute_market_bottom.py</code>（<code>--date</code> / <code>--dry-run</code>）+ <code>/api/market-bottom</code> + 大盘扫描页顶部区块（三张指数卡 + 四张市场卡）+ 日更第 43 步</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>复核揪出四条阻断</b>：① M3「5 日止跌」写成 <code>last5[-1] &gt;= min(全部5日)</code>，恒真，杠杆项白送半分；② 破净率缓存写 0/0 哨兵，缺数据被永久固化；③ 缺数据的判据记 0 分，2019-01-03 只得 66.7 分、2024-02-02 只得 54.2 分，验收第 5 条不可达；④ 脚本用位置参数，<code>--date 2024-02-02</code> 把 <code>'--date'</code> 当日期，查空后返回 0 的假成功</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 221</b>：「近 5 日不再新低」不能写成「今天 ≥ 近 5 日最小值」—— 今天必然 ≥ 自己的最小值，式子恒真。要写成 <code>last5[-1] &gt; min(last5[:-1])</code>，把今天排除在比较之外。这类恒真式不会报错，只会让某一项永远白送分</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 222</b>：缓存表不能写 0/0 哨兵。缺数据时聚合出 <code>(0, 0)</code> 若照样入库，下次「有缓存就早退」会把缺数据永久固化，该判据从此失效。要么写 NULL，要么删行</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 223</b>：缺数据的判据记 0 分等于给历史底部罚分。两融、健康分、卖出分都只有 2026 年之后的数据，历史日期一律 0 分会让「2019 年该判底部」的验收永远过不了。缺料就不进分母，并记录缺口</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 224</b>：阈值窗口要用历史底部反向标定，不能凭感觉写。250 日窗把 2022 / 2024-02 / 2024-09 三次底部的回撤算成 31% / 24% / 17%（实际 40% / 45% / 46%），等于悄悄收紧了阈值。用七个底部扫窗后选 750 日</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>修法</b>：M3 改 <code>last5[-1] &gt; min(last5[:-1])</code>；缓存只在 <code>n_total&gt;0</code> 时早退、聚合为空则删行；新增 <code>_avg()</code> 只对非空判据求均值并把缺口写进 <code>meta.missing</code>；脚本改 argparse</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>窗口标定</b>：PRD 原写「近 250 日高点」，但附录 A 用的是分腿口径。用七个历史底部反标定 —— 250 日窗把 2022/2024-02/2024-09 三次底部回撤低估到 31% / 24% / 17%，750 日窗五个完全命中、两处偏差 ≤8pp。改 <code>LOOKBACK=750</code></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>权重改版</b>：等权 0.5/0.5 下 2022-10-31 这种「指数层 83 分、全市场层 25 分」的真实底部只有 54 分。改为指数层 0.7 / 全市场层 0.3，判定档 65 / 45</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>自检</b>：2019-01-03 → 100 分「底部区域」；2024-02-02 → 85 分；2024-09-13 → 100 分；2016-01-28 → 85 分；2022-10-31 → 58 分「接近底部」（当日缩量比 0.91、破净率 9.7% 都不达标，偏差可解释）；2026-11-17 → <b>42.2 分「未到底部」</b></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>性能</b>：<code>fundamental_indicator</code> 1,090 万行、<code>date</code> 无索引，单日查询全表扫 190 秒。建 <code>idx_fund_date_metric(date, metric_code, value)</code>（1,103 s）；<code>mv_break_net</code> 回填 2,639 个交易日（378 s）。此后单日秒级</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>页面</b>：三张指数卡的「判据」行改成直接取接口的 items 显示三项小分（回撤 / 历时 / 估值），不在前端重算、不写死阈值；缺数据的卡片显示「—」而不是 0 分</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>已知缺陷</b>：两融、健康分、卖出分自 2026-01 起才有数，2016 年前的底部只能验证价格与缩量；破净率与缩量比是全市场口径，不能按指数拆分；PE 分位会被盈利周期扭曲（科创50 PE 88.5 仍在 63% 分位）</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-16 · 外部事件数据层（global-stock-data 抽取为正式模块）</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：核对英伟达 CEO 辞职时，两篇自媒体对「为什么辞职」给了完全相反的叙事。判断真伪要看 8-K 原文，但本地库只有 A 股，没有任何美股披露通道。用户要求装 <code>global-stock-data</code> 技能</td></tr>

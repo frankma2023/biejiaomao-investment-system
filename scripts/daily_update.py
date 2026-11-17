@@ -457,6 +457,11 @@ TASKS.append(("41.大盘交易总结", [PYTHON_EXE, "scripts/gen_daily_market_su
 # 纯读本地库现算，约 1 秒；幂等，同一天重跑覆盖。
 TASKS.append(("42.板块资金与两融", [PYTHON_EXE, "scripts/gen_sector_flow.py"]))
 
+# 步骤 43：市场底部判断（2026-11-17）
+# 依赖：指数 K 线、指数估值、个股 PB、两融、健康分、卖出分 —— 必须排在它们之后。
+# 产出 market_bottom_daily，供大盘扫描页顶部区块读取。
+TASKS.append(("43.市场底部判断", [PYTHON_EXE, "scripts/compute_market_bottom.py"]))
+
 # TRADE_GUARD：非交易日早退。
 # 2026-11-03 清理了 2026-05-30/06-06/06-21 等 7 条非交易日残留
 # （周末或节假日被误算，因为入口未校验今天是否交易日）。

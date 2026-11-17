@@ -871,6 +871,38 @@ def api_market_health():
     })
 
 # ═══════════════════════════════════════════════
+# API: GET /api/market-bottom
+# 市场底部判断（PRD: docs/product/市场底部判断_PRD.md）
+# ═══════════════════════════════════════════════
+
+@app.route('/api/market-bottom')
+def api_market_bottom():
+    target_date = request.args.get('date') or datetime.now().strftime('%Y-%m-%d')
+    if target_date == 'latest':
+        target_date = datetime.now().strftime('%Y-%m-%d')
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM market_bottom_daily WHERE date <= ? ORDER BY date DESC LIMIT 1",
+            (target_date,)).fetchone()
+    except sqlite3.OperationalError:
+        return jsonify({'status': 'no_data', 'date': target_date})
+    if not row:
+        return jsonify({'status': 'no_data', 'date': target_date})
+    payload = json.loads(row['payload']) if row['payload'] else {}
+    return jsonify({
+        'status': 'ok',
+        'date': row['date'],
+        'verdict': row['verdict'],
+        'score': row['score'],
+        'summary': row['summary'],
+        'indices': payload.get('indices', []),
+        'market': payload.get('market', []),
+        'meta': payload.get('meta', {}),
+    })
+
+
+# ═══════════════════════════════════════════════
 # API: GET /api/market-sell-score
 # ═══════════════════════════════════════════════
 
