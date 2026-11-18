@@ -451,7 +451,7 @@ TASKS.append(("41.大盘交易总结", [PYTHON_EXE, "scripts/gen_daily_market_su
               {"timeout": 900}))
 
 # 步骤 42：板块资金与两融固定页面（2026-11-14）
-# 依赖两融日更（daily_review_margin）+ K线 + 资金流评分（index_capital_flow_daily）。
+# 依赖两融日更（daily_margin_history，唯一来源）+ K线 + 资金流评分（index_capital_flow_daily）。
 # 产出 web/sector-flow/index.html：行业（一级 11 + 二级 45）主表 + 主题/策略融资两端榜，
 # 每行含 10 日涨跌、成交额、量比、融资余额、10 日净买入、余额变化、相对全市场、资金流评分。
 # 纯读本地库现算，约 1 秒；幂等，同一天重跑覆盖。

@@ -949,6 +949,20 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-18 · 废弃第二张两融表：全库统一读 daily_margin_history</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：上一轮只改了三处读取方，旧表 <code>daily_review_margin</code> 还在库里、还被 <code>daily_review.py</code> 写着，下次谁先看到它谁就取错。用户要求「直接废弃这张表的两融部分，让所有读者统一读取 <code>daily_margin_history</code>」</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>删表</b>：<code>DROP TABLE daily_review_margin</code>，删除时 <b>798,096 行</b>。删前先跑一遍全仓库非注释引用扫描（排除 <code>.git</code> / <code>node_modules</code> / <code>docs</code> / <code>.scratch</code> / <code>data</code>），确认除注释与进度页外无读取方</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>改写入方</b>：<code>scripts/daily_review.py</code> 的 <code>fetch_margin()</code> 重写为只读 <code>daily_margin_history</code>（<code>MAX(date) WHERE date&lt;=?</code> 实现 T+1 自动回退，返回 <code>(rows, 数据日)</code>），建表 DDL 一并删掉，避免旧表被重新建出来；报告里两融章节改为显示实际数据日</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>一致性验证</b>：<code>fetch_margin('2026-11-18')</code> 回退到 2026-11-17、3,894 只，两融余额 21,110 亿、融资净买入 −196 亿，与直接汇总 <code>daily_margin_history</code> 完全一致（阈值 0.5 亿内）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>连带</b>：<code>gen_sector_flow.py</code> 的口径注从「<code>daily_review_margin.fb_balance</code>…口径可能存在差异」改为「<code>daily_margin_history.financing_balance</code>，两融 T+1 披露所以数据日晚一天，旧表已废弃」，页面重新生成（409 个板块、54,332 字节）；<code>gen_daily_market_summary.py</code> 重跑通过（34.3 KB）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>文档</b>：<code>docs/DATABASE_SCHEMA.md</code> §15 加「口径铁律」（全库唯一两融来源、不要再引入第二张表、自检方法 = 逐日余额变动与净买入相关应 ≥0.999、T+1 锚点写法），§16 与 §74 改为废弃说明并保留失败证据表（抓取日错位、冻结段、自洽性 0.9039、峰值低 3,143 亿）</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 230</b>：同一个指标只允许存在一张表。两个名字都叫「融资余额」时，正确做法不是把所有读者都改一遍（改漏一个就复发），而是删掉错的那张 —— 表不存在，就没人能取错</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 231</b>：删表/删列前先做「非注释引用扫描」，只跳过行首是 <code>#</code>／<code>//</code>／<code>*</code> 的注释，其余命中逐条人工确认；<code>grep</code> 命中注释里的旧表名是正常的，别被它误导成「还有人在读」</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-18 · 底部打分改 100 分制并补两项判据（股债差、量能转向）</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：用户反馈「分数计算规则好复杂」，并给了替代方案 —— 每个小项 5 分，沪深300 回撤 2.5 + 历时 2.5 + 估值 2.5 = 7.5 分。原规则要先把 0/0.5/1 乘 100 变成 50 分，再对三个指数求均值，再按 0.7/0.3 加权，任何人无法口算核对</td></tr>

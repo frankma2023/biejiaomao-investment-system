@@ -477,8 +477,9 @@ def render(rows, mkt_fb, mkt_chg, mkt_net, dates, stale):
         table(bot, cols, 't-theme2'),
         '<h2>四、指标口径与数据缺口</h2>',
         '<div class="note">'
-        '<b>融资余额</b>：`daily_review_margin.fb_balance` 按成分股加总，单位为亿元；'
-        '与交易所公布的两融口径可能存在成分股调整带来的差异。<br>'
+        '<b>融资余额</b>：`daily_margin_history.financing_balance` 按成分股加总，单位为亿元。'
+        '两融由交易所 T+1 披露，所以数据日比行情晚一个交易日；旧表 `daily_review_margin` 已废弃'
+        '（它的 date 是抓取日，装的却是前一交易日余额，且有冻结段）。<br>'
         '<b>10 日融资净买入</b>：窗口内每个交易日 `net_buy_d1` 之和。<br>'
         '<b>余额变化</b>：窗口末融资余额 ÷ 窗口首融资余额 − 1；'
         '「相对全市场」为本值减全市场同口径值。<br>'

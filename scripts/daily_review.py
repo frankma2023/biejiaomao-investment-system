@@ -24,11 +24,6 @@ def init_tables(db):
             trading_volume REAL, trading_amount REAL,
             discount_rate REAL, buy_branch TEXT, sell_branch TEXT,
             PRIMARY KEY(date, stock_code, buy_branch));
-        CREATE TABLE IF NOT EXISTS daily_review_margin (
-            date TEXT, stock_code TEXT, margin_balance REAL,
-            margin_fb REAL, margin_sb REAL, net_buy_d1 REAL,
-            fb_balance REAL, sb_balance REAL,
-            PRIMARY KEY(date, stock_code));
         CREATE TABLE IF NOT EXISTS daily_review_summary (
             date TEXT PRIMARY KEY, up_count INT, down_count INT,
             total_amount REAL, sh_idx_close REAL, sh_idx_chg REAL,
@@ -145,52 +140,29 @@ def fetch_block_trades(db, date):
         return [], None
 
 def fetch_margin(db, date):
-    rows = db.execute('SELECT * FROM daily_review_margin WHERE date=?', (date,)).fetchall()
-    if rows: return rows
+    """两融余额（融资 + 融券）与当日融资净买入。
 
-    # 优先从 daily_margin_history 取（旧API回填，最完整）
-    rows = db.execute('SELECT * FROM daily_margin_history WHERE date=?', (date,)).fetchall()
-    if rows:
-        for row in rows:
-            fb = row['financing_balance'] or 0
-            sb = row['securities_balance'] or 0
-            db.execute('INSERT OR REPLACE INTO daily_review_margin VALUES (?,?,?,?,?,?,?,?)',
-                (date, row['stock_code'], fb + sb, fb, sb,
-                 row['net_purchase'] or 0, fb, sb))
-        db.commit()
-        return db.execute('SELECT * FROM daily_review_margin WHERE date=?', (date,)).fetchall()
+    唯一数据源是 daily_margin_history（交易所 T+1 公布的余额，与 net_purchase 自洽）。
+    旧表 daily_review_margin 已废弃：它的 date 是抓取日，装的却是前一交易日的余额，
+    且 2026-05~07 有过未刷新的冻结段，会让年内峰值算低 3,000 亿以上。
+    返回 (rows, 数据日)；rows 沿用旧的列名，避免上游改动。
+    """
+    d = db.execute('SELECT MAX(date) FROM daily_margin_history WHERE date<=?',
+                   (date,)).fetchone()[0]
+    if not d:
+        return [], None
+    rows = db.execute("""
+        SELECT stock_code,
+               financing_balance + COALESCE(securities_balance, 0) AS margin_balance,
+               financing_balance AS margin_fb,
+               COALESCE(securities_balance, 0) AS margin_sb,
+               COALESCE(net_purchase, 0) AS net_buy_d1,
+               financing_balance AS fb_balance,
+               COALESCE(securities_balance, 0) AS sb_balance,
+               date
+          FROM daily_margin_history WHERE date=?""", (d,)).fetchall()
+    return rows, d
 
-    # 其次从 daily_margin_history 取（由 daily_update.py 步骤7 fetch_margin_daily.py 写入）
-    rows = db.execute('SELECT * FROM daily_margin_history WHERE date=?', (date,)).fetchall()
-    if rows:
-        for row in rows:
-            fb = row['financing_balance'] or 0
-            sb = row['securities_balance'] or 0
-            bal = fb + sb
-            db.execute('INSERT OR REPLACE INTO daily_review_margin VALUES (?,?,?,?,?,?,?,?)',
-                (date, row['stock_code'], bal, fb, sb,
-                 row['net_purchase'] or 0, fb, sb))
-        db.commit()
-        return db.execute('SELECT * FROM daily_review_margin WHERE date=?', (date,)).fetchall()
-
-    # 最后兜底：直接调新API
-    codes = [r[0] for r in db.execute('SELECT stock_code FROM daily_kline WHERE date=?', (date,)).fetchall()]
-    data = []
-    for i in range(0, len(codes), 100):
-        batch = codes[i:i+100]
-        try:
-            r = requests.post('https://open.lixinger.com/api/cn/company/hot/mtasl',
-                json={'token': TOKEN, 'stockCodes': batch}, timeout=30).json()
-            if r.get('code') == 1: data.extend(r.get('data', []))
-        except: pass
-        time.sleep(0.3)
-    for item in data:
-        db.execute('INSERT OR REPLACE INTO daily_review_margin VALUES (?,?,?,?,?,?,?,?)',
-            (date, item.get('stockCode',''), item.get('mtaslb',0),
-             item.get('mtaslb_fb',0), item.get('mtaslb_sb',0),
-             item.get('npa_o_f_d1',0), item.get('mtaslb_fb',0), item.get('mtaslb_sb',0)))
-    db.commit()
-    return db.execute('SELECT * FROM daily_review_margin WHERE date=?', (date,)).fetchall()
 
 def lookup_name(db, code):
     r = db.execute('SELECT name FROM stock_basic WHERE stock_code=?', (code,)).fetchone()
@@ -236,11 +208,9 @@ def generate_report(date=None):
         row2 = db.execute("SELECT value FROM fundamental_indicator WHERE stock_code=? AND metric_code='cmc' AND date<=? ORDER BY date DESC LIMIT 1", (r['stock_code'], bt_date)).fetchone()
         if row2: bt_cmc[r['stock_code']] = row2[0]
 
-    # 5. 两融（T+1：本地两融表存在则直接用，否则拉当日）
+    # 5. 两融（唯一源 daily_margin_history，T+1 披露）
     print('  两融...')
-    margin = db.execute('SELECT * FROM daily_review_margin WHERE date=?', (date,)).fetchall()
-    if not margin:
-        margin = fetch_margin(db, date)
+    margin, margin_date = fetch_margin(db, date)
     total_margin = sum(r['margin_balance'] or 0 for r in margin)
     total_net_buy = sum(r['net_buy_d1'] or 0 for r in margin)
 
@@ -322,7 +292,7 @@ td:first-child{text-align:left;color:#8b8b90}
     cls = 'up' if total_net_buy > 0 else 'dn'
     html += f'<tr><td>两融余额</td><td>{total_margin/1e8:.0f}亿</td></tr>'
     html += f'<tr><td>融资净买入</td><td class="{cls}">{total_net_buy/1e8:+.0f}亿</td></tr></tbody></table>'
-    html += '<div style="font-size:10px;color:#8b8b90;margin:2px 0 12px">数据日: 两融 T+1 披露，取最新可用交易日</div>'
+    html += '<div style="font-size:10px;color:#8b8b90;margin:2px 0 12px">数据日: %s（两融 T+1 披露，取最新可用交易日）</div>' % (margin_date or '—')
 
     # 龙虎榜: 分净买入/净卖出
     html += f'<h2>4. 龙虎榜 ({len(lhb)}条)</h2>'
