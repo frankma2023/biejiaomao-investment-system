@@ -293,7 +293,7 @@
       var h='<div class="bt-head">'
         + '<div><div class="bt-verdict" style="color:'+vc+'">'+d.verdict+'</div>'
         + '<div class="bt-score" style="color:'+vc+'">'+btNum(d.earned)
-        + '<small>/'+btNum(d.avail)+' 分（'+(d.score==null?'—':d.score.toFixed(0))+'%）</small></div></div>'
+        + '<small>/'+btNum(d.avail)+' 分（'+(d.score==null?'—':btNum(d.score))+'%）</small></div></div>'
         + '<div class="bt-sum">'+d.summary+'</div>'
         + '</div><div class="bt-grid">';
       d.indices.forEach(function(ix){
@@ -301,8 +301,8 @@
         // 三项小分明细直接取接口给的 items，不在前端重算，也不写死阈值
         var lb={'dd':'回撤','days':'历时','value':'估值'};
         var chips=(ix.items||[]).map(function(it){
-          return (lb[it.key]||it.label)+' '+(it.score==null?'—':nf(it.score,1))+'/8 分'
-            +'（'+(it.value==null?'—':nf(it.value,1))+(it.unit||'')+'）';
+          return (lb[it.key]||it.label)+' '+(it.score==null?'—':btNum(it.score))+'/'+btNum(it.max)+' 分'
+            +'（'+(it.value==null?'—':btNum(it.value))+(it.unit||'')+'）';
         }).join(' · ');
         var ipts=(ix.items||[]).reduce(function(a,it){ return a + (it.score||0); }, 0);
         h+=btCard(ix.name+' · '+btNum(ipts)+'/'+btNum(ix.max), nf(ix.dd,1), '% 回撤 · '+ix.days+' 日',
@@ -311,8 +311,8 @@
       });
       h+='</div><div class="bt-sub">全市场判据</div><div class="bt-grid">';
       d.market.forEach(function(m){
-        h+=btCard(m.label, m.value==null?null:nf(m.value, m.key==='right'?0:1), m.unit,
-                  (m.score==null?null:m.score), 7, m.detail, m.threshold);
+        h+=btCard(m.label, m.value==null?null:btNum(m.value), m.unit,
+                  (m.score==null?null:m.score), (m.max||7), m.detail, m.threshold);
       });
       h+='</div>';
       box.innerHTML=h;

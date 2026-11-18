@@ -32,12 +32,18 @@ INDICES = [
 ]
 
 LOOKBACK = 750          # 周期高点回看交易日（约 3 年，覆盖一轮牛熊）
-ITEM_FULL = 8.0         # 指数层单个判据满分
-ITEM_HALF = 4.0         # 指数层单个判据半分
-IDX_MAX = 24.0          # 单个指数满分（三个判据 × 8 分）
-MKT_FULL = 7.0          # 全市场层单个判据满分
-MKT_HALF = 3.5          # 全市场层单个判据半分
-MKT_MAX = 28.0          # 全市场满分（四个判据 × 7 分）
+ITEM_FULL = 8.0         # 指数层主判据满分（回撤、历时）
+ITEM_HALF = 4.0         # 指数层主判据半分
+SUB_FULL = 4.0          # 指数层细分判据满分（估值分位、股债差）
+SUB_HALF = 2.0
+IDX_MAX = 24.0          # 单个指数满分（8 + 8 + 4 + 4）
+MKT_FULL = 7.0          # 全市场层单项满分（破净、杠杆、右侧）
+MKT_HALF = 3.5
+VOL_FULL = 4.0          # 全市场层量能子项满分（缩量）
+VOL_HALF = 2.0
+TURN_FULL = 3.0         # 全市场层量能子项满分（温和放量）
+TURN_HALF = 1.5
+MKT_MAX = 28.0          # 全市场满分（缩量 4 + 放量 3 + 破净 7 + 杠杆 7 + 右侧 7）
 TOTAL_MAX = IDX_MAX * 3 + MKT_MAX   # 100
 VERDICT_FULL = 65.0     # 得分率 >= 该值判「底部区域」
 VERDICT_NEAR = 45.0     # 得分率 >= 该值判「接近底部」
@@ -131,22 +137,42 @@ def _index_block(conn, code, name, dd_full, dd_half, date):
     val_date = _one(conn, "SELECT MAX(date) FROM index_fundamental_daily "
                           "WHERE stock_code=? AND date<=? AND pe_ttm IS NOT NULL", (code, date))
 
+    # 股债差（ERP）= 100/PE − 10 年国债，按指数自身历史取分位。
+    # 绝对水平跨指数不可比（创业板 E/P 天然高），所以打分用分位不用绝对值；
+    # 页面上同时显示绝对值，读者能看到「沪深300 5.8%」这个常被引用的数。
+    bonds = dict(_rows(conn, "SELECT date, y10 FROM bond_yield_daily WHERE date<=? AND y10 IS NOT NULL",
+                       (date,)))
+    erp_hist = []
+    for d, v in _rows(conn, "SELECT date, pe_ttm FROM index_fundamental_daily "
+                            "WHERE stock_code=? AND date<=? AND pe_ttm>0 ORDER BY date", (code, date)):
+        y = bonds.get(d)
+        if y is not None:
+            erp_hist.append(100.0 / v - y)
+    erp = erp_hist[-1] if erp_hist else None
+    erp_p = _pctile(erp_hist, erp)
+
     items = [
-        {'key': 'dd', 'label': '回撤深度',
+        {'key': 'dd', 'label': '回撤深度', 'max': ITEM_FULL,
          'value': round(dd, 1) if dd is not None else None,
          'unit': '%', 'threshold': '≥%.0f%% 满分，≥%.0f%% 半分' % (dd_full * 100, dd_half * 100),
          'score': _score(dd, dd_full * 100, dd_half * 100, higher_better=True),
          'detail': '高点 %s %.2f' % (peak_date, peak)},
-        {'key': 'days', 'label': '下跌历时',
+        {'key': 'days', 'label': '下跌历时', 'max': ITEM_FULL,
          'value': days, 'unit': '交易日', 'threshold': '≥150 满分，≥100 半分',
          'score': _score(days, 150, 100, higher_better=True),
          'detail': '自高点起算'},
-        {'key': 'value', 'label': '估值分位',
+        {'key': 'value', 'label': '估值分位', 'max': SUB_FULL,
          'value': best_val_pct, 'unit': '%',
          'threshold': 'PE 或 PB 分位 ≤10% 满分，≤20% 半分',
-         'score': _score(best_val_pct, 10, 20),
+         'score': _score(best_val_pct, 10, 20, pf=SUB_FULL, ph=SUB_HALF),
          'detail': 'PE %.2f（%s%% 分位） / PB %.2f（%s%% 分位），估值日 %s' % (
              pe or 0, pe_p, pb or 0, pb_p, val_date or '—')},
+        {'key': 'erp', 'label': '股债差', 'max': SUB_FULL,
+         'value': round(erp, 2) if erp is not None else None, 'unit': 'pp',
+         'threshold': 'ERP 历史分位 ≥90% 满分，≥80% 半分',
+         'score': _score(erp_p, 90, 80, higher_better=True, pf=SUB_FULL, ph=SUB_HALF),
+         'detail': 'ERP = 100/PE − 10Y = %.2fpp（%s%% 分位，样本 %d 日）' % (
+             erp if erp is not None else 0, erp_p, len(erp_hist))},
     ]
     sc = sum(i['score'] for i in items if i['score'] is not None)
     return {
@@ -156,6 +182,7 @@ def _index_block(conn, code, name, dd_full, dd_half, date):
         'pe': round(pe, 2) if pe else None, 'pe_pct': pe_p,
         'pb': round(pb, 2) if pb else None, 'pb_pct': pb_p,
         'dyr': round(dyr, 2) if dyr else None, 'dyr_pct': dyr_p,
+        'erp': round(erp, 2) if erp is not None else None, 'erp_pct': erp_p,
         'val_date': val_date,
         'score': round(sc, 1), 'max': IDX_MAX, 'items': items,
     }
@@ -202,7 +229,7 @@ def _market_block(conn, date):
     _ensure_amount(conn, date)
     _ensure_break_net(conn, date)
 
-    # M1 缩量比
+    # M1 量能：拆两段 —— 先缩量（抛压衰竭），再温和放量（资金承接）
     amt_dates = [r[0] for r in _rows(conn, "SELECT date FROM mv_market_amount WHERE date<=? "
                                            "ORDER BY date", (date,))]
     amt_map = dict(_rows(conn, "SELECT date, amt FROM mv_market_amount WHERE date<=?", (date,)))
@@ -215,11 +242,46 @@ def _market_block(conn, date):
             ratio = amt_map[d0] / base
     meta['amount_ratio'] = round(ratio, 2) if ratio is not None else None
     items.append({
-        'key': 'vol', 'label': '缩量比',
+        'key': 'vol', 'label': '缩量比', 'max': VOL_FULL,
         'value': round(ratio, 2) if ratio is not None else None, 'unit': '倍',
         'threshold': '≤0.70 满分，≤0.90 半分',
-        'score': _score(ratio, 0.70, 0.90, pf=MKT_FULL, ph=MKT_HALF),
+        'score': _score(ratio, 0.70, 0.90, pf=VOL_FULL, ph=VOL_HALF),
         'detail': '全市场成交额 ÷ 前 250 日均值（截至 %s）' % (amt_dates[-1] if amt_dates else '—'),
+    })
+
+    # M1b 温和放量：5 日均额高于 20 日均额 5% 以上，且最近 3 日逐日站在各自 20 日均额之上
+    amt_vals = [amt_map[d] for d in amt_dates]
+    ma20_now = sum(amt_vals[-20:]) / 20 if len(amt_vals) >= 20 else None
+    ma5_now = sum(amt_vals[-5:]) / 5 if len(amt_vals) >= 5 else None
+    expand = bool(ma20_now and ma5_now and ma5_now >= ma20_now * 1.05)
+    up3 = False
+    if len(amt_vals) >= 23:
+        up3 = True
+        for k in (1, 2, 3):
+            seg = amt_vals[-k - 19:len(amt_vals) - k + 1]
+            if not seg or sum(seg) / len(seg) >= amt_vals[-k]:
+                up3 = False
+                break
+    if ma20_now is None or ma5_now is None:
+        turn = None        # 上市初期样本不足，不进分母
+    elif expand and up3:
+        turn = TURN_FULL
+    elif expand or up3:
+        turn = TURN_HALF
+    else:
+        turn = 0.0
+    meta.update({'amount_ma5': round(ma5_now / 1e8, 0) if ma5_now else None,
+                 'amount_ma20': round(ma20_now / 1e8, 0) if ma20_now else None,
+                 'amount_expand': expand, 'amount_up3': up3})
+    items.append({
+        'key': 'turn', 'label': '量能转向', 'max': TURN_FULL,
+        'value': round(ma5_now / ma20_now, 2) if (ma5_now and ma20_now) else None, 'unit': '倍',
+        'threshold': '5 日均 ≥20 日均 ×1.05 且连续 3 日放量 = 满分',
+        'score': turn,
+        'detail': '5 日均 %.0f 亿 / 20 日均 %.0f 亿%s%s' % (
+            (ma5_now or 0) / 1e8, (ma20_now or 0) / 1e8,
+            '，已放量' if expand else '，未放量',
+            '，连续 3 日放量' if up3 else ''),
     })
 
     # M2 破净率（个股基本面数据比指数晚一天，缺则回退到最近有 PB 的交易日）
@@ -233,7 +295,7 @@ def _market_block(conn, date):
     meta['break_net_n'] = r[1] if r else 0
     meta['break_net_date'] = pb_date
     items.append({
-        'key': 'break_net', 'label': '破净率',
+        'key': 'break_net', 'label': '破净率', 'max': MKT_FULL,
         'value': round(net, 1) if net is not None else None, 'unit': '%',
         'threshold': '≥12% 满分，≥10% 半分',
         'score': _score(net, 12, 10, higher_better=True, pf=MKT_FULL, ph=MKT_HALF),
@@ -267,7 +329,7 @@ def _market_block(conn, date):
     else:
         m3 = 0.0
     items.append({
-        'key': 'margin', 'label': '杠杆出清',
+        'key': 'margin', 'label': '杠杆出清', 'max': MKT_FULL,
         'value': round(margin_dd, 1) if margin_dd is not None else None, 'unit': '%',
         'threshold': '较 %d 日高点回落 ≥15%%，且近 5 日不再新低 = 满分' % LOOKBACK,
         'score': m3,
@@ -297,7 +359,7 @@ def _market_block(conn, date):
                  'ma60': round(ma60, 2) if ma60 else None,
                  'above_ma60': above})
     items.append({
-        'key': 'right', 'label': '右侧确认',
+        'key': 'right', 'label': '右侧确认', 'max': MKT_FULL,
         'value': sum(conds) if m4 is not None else None, 'unit': '/3 项',
         'threshold': '健康分≥50 且 卖出分≤60 且 站上 MA60',
         'score': m4,
@@ -336,15 +398,15 @@ def _summary(verdict, earned, avail, rate, idx, mkt):
         return '%s 回撤 %.1f%%、PE 分位 %.0f%%' % (name, dd, pe_p)
 
     parts = [x for x in (_one_txt('沪深300'), _one_txt('创业板指'), _one_txt('科创50')) if x]
-    got = [i['label'] for i in mkt if i['score'] is not None and i['score'] >= MKT_FULL]
-    miss = [i['label'] for i in mkt if i['score'] is not None and i['score'] < MKT_FULL]
+    got = [i['label'] for i in mkt if i['score'] is not None and i['score'] >= i['max']]
+    miss = [i['label'] for i in mkt if i['score'] is not None and i['score'] < i['max']]
     tail = ''
     if got:
         tail += '；已满足 ' + '、'.join(got)
     if miss:
         tail += '；未满足 ' + '、'.join(miss)
-    return '%s · %s/%s 分（%.0f%%）。%s%s' % (
-        verdict, _fmt_pts(earned), _fmt_pts(avail), rate, '，'.join(parts), tail)
+    return '%s · %s/%s 分（%s%%）。%s%s' % (
+        verdict, _fmt_pts(earned), _fmt_pts(avail), _fmt_pts(rate), '，'.join(parts), tail)
 
 
 def _fmt_pts(v):
@@ -369,7 +431,8 @@ def compute(conn, date=None):
     idx_pts = sum(i['score'] for i in idx)
     mkt_pts = sum(m['score'] for m in mkt if m['score'] is not None)
     earned = round(idx_pts + mkt_pts, 1)
-    avail = round(IDX_MAX * len(idx) + MKT_FULL * len([m for m in mkt if m['score'] is not None]), 1)
+    avail = round(IDX_MAX * len(idx)
+                  + sum(m['max'] for m in mkt if m['score'] is not None), 1)
     rate = round(earned / avail * 100, 1) if avail else 0.0
     verdict = _verdict(rate)
     meta['data_date'] = date
@@ -418,11 +481,15 @@ def main():
         d['date'], d['verdict'], d['earned'], d['avail'], d['score']))
     print('  ' + d['summary'])
     for i in d['indices']:
-        print('  %-8s 回撤 %5.1f%%  历时 %3d  PE %6.2f (%s%%)  PB %5.2f (%s%%)  得分 %g/%g' % (
+        print('  %-8s 回撤 %5.1f%%  历时 %3d  PE %6.2f (%s%%)  PB %5.2f (%s%%)  ERP %.2fpp (%s%%)  得分 %g/%g' % (
             i['name'], i['dd'], i['days'], i['pe'] or 0, i['pe_pct'],
-            i['pb'] or 0, i['pb_pct'], i['score'], i['max']))
+            i['pb'] or 0, i['pb_pct'], i['erp'] or 0, i['erp_pct'], i['score'], i['max']))
+        for it in i['items']:
+            print('      %-8s %s%s  得分 %s/%g' % (
+                it['label'], it['value'], it['unit'] or '',
+                '—' if it['score'] is None else ('%g' % round(it['score'], 1)), it['max']))
     for m in d['market']:
-        sc = '—' if m['score'] is None else '%g/%g' % (m['score'], MKT_FULL)
+        sc = '—' if m['score'] is None else '%g/%g' % (round(m['score'], 1), m['max'])
         print('  %-8s %-8s %s  得分 %s' % (m['label'], m['value'], m['detail'], sc))
     return 0
 

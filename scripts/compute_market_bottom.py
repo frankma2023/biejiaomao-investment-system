@@ -37,22 +37,22 @@ def main():
         return 1
     if not a.dry_run:
         save(conn, d)
-    print('[bottom] %s  %s  %g/%g 分（%.0f%%）' % (
+    print('[bottom] %s  %s  %g/%g 分（%g%%）' % (
         d['date'], d['verdict'], d['earned'], d['avail'], d['score']))
     print('  ' + d['summary'])
     for i in d['indices']:
-        print('  %-8s 回撤 %5.1f%%  历时 %3d  PE分位 %5.1f%%  PB分位 %5.1f%%  得分 %g/%g' % (
+        print('  %-8s 回撤 %5.1f%%  历时 %3d  PE分位 %5.1f%%  PB分位 %5.1f%%  ERP %.2fpp（%s%% 分位）  得分 %g/%g' % (
             i['name'], i['dd'] or 0, i['days'], i['pe_pct'] or 0, i['pb_pct'] or 0,
-            i['score'], i['max']))
+            i['erp'] or 0, i['erp_pct'], i['score'], i['max']))
         for it in i['items']:
             print('      %-6s %s%s  得分 %s' % (
                 it['label'], '—' if it['value'] is None else it['value'],
                 '' if it['value'] is None else it['unit'],
-                '—（无数据）' if it['score'] is None else '%g/8' % it['score']))
+                '—（无数据）' if it['score'] is None else '%g/%g' % (it['score'], it['max'])))
     for m in d['market']:
         print('  %-8s %s  得分 %s' % (
             m['label'], '—' if m['value'] is None else '%s%s' % (m['value'], m['unit']),
-            '—（无数据，不计入）' if m['score'] is None else '%g/7' % m['score']))
+            '—（无数据，不计入）' if m['score'] is None else '%g/%g' % (m['score'], m['max'])))
     miss = d['meta'].get('missing') or []
     if miss:
         print('  [缺口] %s 无数据，未计入分母' % '、'.join(miss))

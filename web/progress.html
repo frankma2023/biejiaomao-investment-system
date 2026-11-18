@@ -949,16 +949,17 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
-<div class="section-title">📌 2026-11-18 · 底部打分改 100 分制（每项指数 8 分、全市场 7 分，直接相加）</div>
+<div class="section-title">📌 2026-11-18 · 底部打分改 100 分制并补两项判据（股债差、量能转向）</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：用户反馈「分数计算规则好复杂」，并给了替代方案 —— 每个小项 5 分，沪深300 回撤 2.5 + 历时 2.5 + 估值 2.5 = 7.5 分。原规则要先把 0/0.5/1 乘 100 变成 50 分，再对三个指数求均值，再按 0.7/0.3 加权，任何人无法口算核对</td></tr>
-<tr><td><span class="pg-dot dot-done"></span></td><td><b>新规则</b>：指数层每个判据满分 <b>8 分</b>（半分 4），单个指数 = 三项相加（满分 24），三只合计 72；全市场层每个判据满分 <b>7 分</b>（半分 3.5），四项合计 28；<b>总满分 100</b>，各判据直接相加，不做二次加权</td></tr>
-<tr><td><span class="pg-dot dot-done"></span></td><td><b>为什么是这个比例</b>：72 : 28 与原 0.7 / 0.3 权重的差别不到 2pp，判定线仍按得分率 65% / 45%，所以判定结果不变。当日 42/100 = 42%，与 65 分制的 42% 完全一致</td></tr>
-<tr><td><span class="pg-dot dot-done"></span></td><td><b>改动</b>：<code>market_bottom.py</code> 常量改 <code>ITEM_FULL=8</code> / <code>ITEM_HALF=4</code> / <code>IDX_MAX=24</code> / <code>MKT_FULL=7</code> / <code>MKT_HALF=3.5</code> / <code>MKT_MAX=28</code> / <code>TOTAL_MAX=100</code>，<code>_score()</code> 增加 <code>pf</code>/<code>ph</code> 参数让全市场层用 7 / 3.5；<code>compute()</code> 输出 <code>earned</code>/<code>avail</code>/<code>rate</code>；接口透出原始分；页面卡题「沪深300 · 12/24」、头部「42/100 分（42%）」、小项 chips 显示 <code>x/8 分</code>；CLI 打印 <code>x/24</code> / <code>x/8</code> / <code>x/7</code></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新规则</b>：指数层回撤 8、历时 8、估值分位 4、股债差 4 → 单指数 24、三只 72；全市场缩量 4、量能转向 3、破净 7、杠杆 7、右侧 7 → 28；<b>总满分 100</b>，各判据直接相加，不做二次加权</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>为什么补两项</b>：用户拿两篇讲「底部五个信号」的文章来对照。股债差（ERP）是它们共有的核心项，我们用分位而不是绝对值（创业板 E/P 天生高，ERP 2.23pp 已 100% 分位；沪深300 5.84pp 才 69% 分位）。量能转向补上「缩完要放量」这半段 —— 只测缩量会在反弹初期把信号撤掉</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>口径冲突（重要）</b>：两篇文章的「股债差」不是同一个数。文章一说「>6% 是历史大底」，那是 E/P − 10Y；文章二说「130bp、95% 分位」，那是股息率 − 10Y。同日两个口径差 4.5pp，都叫股债差</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>改动</b>：<code>market_bottom.py</code> 增 <code>SUB_FULL/SUB_HALF</code>（4/2）、<code>VOL_FULL/VOL_HALF</code>（4/2）、<code>TURN_FULL/TURN_HALF</code>（3/1.5），每个 items 项带自己的 <code>max</code>；<code>avail</code> 改为按项求和；<code>_index_block</code> 增 ERP 序列（PE 与 10Y 按日对齐后算 100/PE−10Y，取自身历史分位）；<code>_market_block</code> 增「量能转向」（5 日均 ≥20 日均 ×1.05 且连续 3 日放量）；页面小项与卡片改用 <code>it.max</code> / <code>m.max</code></td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 225</b>：归一化和加权只能留一层。先 0/1 归一、再乘 100、再求均值、再加权，同一条判据被换算了三次，谁都算不回来。要用「小项直接给分、总分是求和」的结构，权重体现在各项分值的比例里（8 : 7 ≈ 53% : 47% 每项，乘上条数后变成 72 : 28）</td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 226</b>：<code>0.0</code> 与 <code>None</code> 在 Python 里都是 falsy，显示层写 <code>if x else None</code> 会把合法的 0 值（例如破净率 0%、缩量比 0）误显示成「无数据」。判断缺值一律用 <code>is None</code></td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 227</b>：分层满分不同时，「是否满分」不能用全局常量判断。全市场项满分 7 而指数项满分 8，<code>score &gt;= ITEM_FULL</code> 会把所有市场项都判成「未满足」；判据要带自己的满分，或按层传参</td></tr>
-<tr><td><span class="pg-dot dot-done"></span></td><td><b>自检（100 分制重算）</b>：2019-01-03 62/62（100%，底部区域）、2024-09-13 86/86（100%）、2024-02-02 79/86（92%）、2016-01-28 55/62（89%）、2022-10-31 60/86（70%）五个历史底部全部判「底部区域」；2026-11-17 → <b>42/100（42%）「未到底部」</b>（沪深300 12/24、创业板指 12/24、科创50 4/24、全市场 14/28）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>自检（100 分制 + 新两项）</b>：2024-09-13 83/86（96%）、2019-01-03 59/62（95%）、2024-02-02 79/86（92%）、2022-10-31 63/86（73%）、2016-01-28 44/62（71%），五个历史底部全部判「底部区域」；2026-11-18 → <b>40.5/100（40.5%）「未到底部」</b>（沪深300 10/24、创业板指 12/24、科创50 4/24、全市场 14.5/28）</td></tr>
 </table>
 </div>
 
