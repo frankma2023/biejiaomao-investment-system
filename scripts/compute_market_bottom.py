@@ -48,11 +48,11 @@ def main():
             print('      %-6s %s%s  得分 %s' % (
                 it['label'], '—' if it['value'] is None else it['value'],
                 '' if it['value'] is None else it['unit'],
-                '—（无数据）' if it['score'] is None else '%g/5' % it['score']))
+                '—（无数据）' if it['score'] is None else '%g/8' % it['score']))
     for m in d['market']:
         print('  %-8s %s  得分 %s' % (
             m['label'], '—' if m['value'] is None else '%s%s' % (m['value'], m['unit']),
-            '—（无数据，不计入）' if m['score'] is None else '%g/5' % m['score']))
+            '—（无数据，不计入）' if m['score'] is None else '%g/7' % m['score']))
     miss = d['meta'].get('missing') or []
     if miss:
         print('  [缺口] %s 无数据，未计入分母' % '、'.join(miss))
