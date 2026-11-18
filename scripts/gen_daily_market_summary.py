@@ -290,11 +290,18 @@ def gather(con, date):
         for x in d['flow'][k]:
             bucket[x['cat']] = bucket.get(x['cat'], 0) + 1
 
-    # 8) 两融聚合趋势（daily_review_margin 与龙虎榜同源，日期一致）
+    # 8) 两融聚合趋势
+    # 用 daily_margin_history：daily_review_margin 的 date 装的是前一交易日数据
+    # （理杏仁 mtasl 接口当日抓取，交易所 T+1 才公布余额），且有过冻结段。
+    # history 可能比 K 线晚一天，故取 <= date 的最新一天，并把实际日期写进页面。
+    mrow = con.execute("SELECT MAX(date) FROM daily_margin_history WHERE date<=?",
+                       (date,)).fetchone()
+    mdate = mrow[0] if mrow and mrow[0] else date
     tr = con.execute("""
-        SELECT date, SUM(fb_balance)/1e8, SUM(sb_balance)/1e8, SUM(net_buy_d1)/1e8
-          FROM daily_review_margin WHERE date<=? GROUP BY date ORDER BY date DESC
-         LIMIT 61""", (date,)).fetchall()
+        SELECT date, SUM(financing_balance)/1e8, SUM(securities_balance)/1e8,
+               SUM(net_purchase)/1e8
+          FROM daily_margin_history WHERE date<=? GROUP BY date ORDER BY date DESC
+         LIMIT 61""", (mdate,)).fetchall()
     tr = list(reversed(tr))
     d['margin_trend'] = tr
     d['margin'] = ({'date': tr[-1][0], 'fb': tr[-1][1], 'sb': tr[-1][2], 'net': tr[-1][3]}
@@ -326,10 +333,10 @@ def gather(con, date):
     # 9) 个股融资净买入 TOP / BOTTOM
     def flow_top(asc):
         return con.execute(f"""
-            SELECT m.stock_code, b.name, m.net_buy_d1/1e8
-              FROM daily_review_margin m LEFT JOIN stock_basic b ON m.stock_code=b.stock_code
-             WHERE m.date=? AND m.net_buy_d1 IS NOT NULL
-             ORDER BY m.net_buy_d1 {'ASC' if asc else 'DESC'} LIMIT 10""", (date,)).fetchall()
+            SELECT m.stock_code, b.name, m.net_purchase/1e8
+              FROM daily_margin_history m LEFT JOIN stock_basic b ON m.stock_code=b.stock_code
+             WHERE m.date=? AND m.net_purchase IS NOT NULL
+             ORDER BY m.net_purchase {'ASC' if asc else 'DESC'} LIMIT 10""", (mdate,)).fetchall()
     d['net_in'] = flow_top(False)
     d['net_out'] = flow_top(True)
 
@@ -352,8 +359,8 @@ def gather(con, date):
             mem2sec.setdefault(m, code)
 
     mdates = [r[0] for r in con.execute(
-        "SELECT DISTINCT date FROM daily_review_margin WHERE date<=? "
-        "ORDER BY date DESC LIMIT 61", (date,))]
+        "SELECT DISTINCT date FROM daily_margin_history WHERE date<=? "
+        "ORDER BY date DESC LIMIT 61", (mdate,))]
     mdates = list(reversed(mdates))
     lag = {'t': 0, '10': 10, '30': 30, '60': 60}
     bal_by_date, net_by_date = {}, {}
@@ -363,7 +370,7 @@ def gather(con, date):
         dt = mdates[-1 - step]
         fb_sum, nb_sum = {}, {}
         for code, fb, nb in con.execute(
-                "SELECT stock_code, fb_balance, net_buy_d1 FROM daily_review_margin "
+                "SELECT stock_code, financing_balance, net_purchase FROM daily_margin_history "
                 "WHERE date=?", (dt,)):
             sc = mem2sec.get(code)
             if not sc:

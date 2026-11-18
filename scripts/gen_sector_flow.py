@@ -70,20 +70,31 @@ def load_categories():
     return out
 
 
-def trade_dates(con, n):
-    rows = q(con, "SELECT DISTINCT date FROM daily_kline_adj "
-                  "ORDER BY date DESC LIMIT ?", (n,))
+def trade_dates(con, n, end=None):
+    """最近 n 个交易日（截至 end，None 表示最新）。"""
+    if end:
+        rows = q(con, "SELECT DISTINCT date FROM daily_kline_adj WHERE date<=? "
+                      "ORDER BY date DESC LIMIT ?", (end, n))
+    else:
+        rows = q(con, "SELECT DISTINCT date FROM daily_kline_adj "
+                      "ORDER BY date DESC LIMIT ?", (n,))
     return sorted(r[0] for r in rows)
 
 
 def margin_maps(con, dates):
-    """逐日 {code: (融资余额, 当日融资净买入, 融券余额)}（亿元）。"""
+    """逐日 {code: (融资余额, 当日融资净买入, 融券余额)}（亿元）。
+
+    用 daily_margin_history 而非 daily_review_margin：后者是对理杏仁
+    `cn/company/hot/mtasl` 的当日抓取快照，交易所按 T+1 才公布两融余额，
+    所以它的 date 实际装的是前一交易日的数据（个股逐日核对 review[D] == history[D-1]），
+    且 2026-05~07 有一段未更新的冻结值。history 的余额与净买入自洽（日变动 = 净买入）。
+    """
     maps, total = {}, {}
     for d in dates:
         m = {}
         tf = tn = ts = 0.0
-        for r in q(con, "SELECT stock_code, fb_balance, net_buy_d1, sb_balance "
-                        "FROM daily_review_margin WHERE date=?", (d,)):
+        for r in q(con, "SELECT stock_code, financing_balance, net_purchase, securities_balance "
+                        "FROM daily_margin_history WHERE date=?", (d,)):
             fb = (r[1] or 0) / 1e8
             nb = (r[2] or 0) / 1e8
             sb = (r[3] or 0) / 1e8
@@ -488,7 +499,10 @@ def render(rows, mkt_fb, mkt_chg, mkt_net, dates, stale):
 def main():
     con = sqlite3.connect('file:%s?mode=ro' % DB.replace('\\', '/'), uri=True)
     con.row_factory = sqlite3.Row
-    dates = trade_dates(con, WIN + 1)
+    # 两融数据（daily_margin_history）比行情晚一天，窗口锚到两融的最新日，
+    # 否则最后一天没有融资余额，板块行会全部为空。
+    mend = q(con, "SELECT MAX(date) FROM daily_margin_history")[0][0]
+    dates = trade_dates(con, WIN + 1, mend)
     rows, mkt_fb, mkt_chg, mkt_net, ds, stale = build(con, dates)
     body = render(rows, mkt_fb, mkt_chg, mkt_net, ds, stale)
     stamp = datetime.now().strftime('%Y-%m-%d %H:%M')

@@ -959,6 +959,9 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 225</b>：归一化和加权只能留一层。先 0/1 归一、再乘 100、再求均值、再加权，同一条判据被换算了三次，谁都算不回来。要用「小项直接给分、总分是求和」的结构，权重体现在各项分值的比例里（8 : 7 ≈ 53% : 47% 每项，乘上条数后变成 72 : 28）</td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 226</b>：<code>0.0</code> 与 <code>None</code> 在 Python 里都是 falsy，显示层写 <code>if x else None</code> 会把合法的 0 值（例如破净率 0%、缩量比 0）误显示成「无数据」。判断缺值一律用 <code>is None</code></td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 227</b>：分层满分不同时，「是否满分」不能用全局常量判断。全市场项满分 7 而指数项满分 8，<code>score &gt;= ITEM_FULL</code> 会把所有市场项都判成「未满足」；判据要带自己的满分，或按层传参</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 228</b>：同名字段不等于同口径。<code>daily_review_margin.fb_balance</code> 与 <code>daily_margin_history.financing_balance</code> 都叫「融资余额」，但前者是对理杏仁 <code>mtasl</code> 的当日抓取快照 —— 交易所 T+1 才公布余额，所以它的 <code>date</code> 装的是前一交易日数据（个股逐日核对 <code>review[D] == history[D-1]</code>，全样本 207 天平均绝对差 713 亿元），2026-05~07 还有一段未刷新的冻结值。用它算峰值把年内高点算低 3,143 亿（25,719 vs 28,862）、把回撤算浅 8.8pp（18.8% vs 27.6%）。判据一律用 <code>daily_margin_history</code>，并把实际数据日写进页面</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>连带修正</b>：<code>gen_sector_flow.py</code>（板块资金）与 <code>gen_daily_market_summary.py</code>（大盘总结）的两融读取同步改到 <code>daily_margin_history</code>；两融比行情晚一天，窗口锚到两融最新日，页面头部写「两融数据日」</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 229</b>：派生页面换数据源后，窗口也要跟着换锚点。板块资金页原来按行情最后一天取 10 日窗，换源后最后一天没有融资余额，整张表变空（<code>max() iterable argument is empty</code>）。窗口起点应锚在「所有数据源都有值」的那一天</td></tr>
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>自检（100 分制 + 新两项）</b>：2024-09-13 83/86（96%）、2019-01-03 59/62（95%）、2024-02-02 79/86（92%）、2022-10-31 63/86（73%）、2016-01-28 44/62（71%），五个历史底部全部判「底部区域」；2026-11-18 → <b>40.5/100（40.5%）「未到底部」</b>（沪深300 10/24、创业板指 12/24、科创50 4/24、全市场 14.5/28）</td></tr>
 </table>
 </div>

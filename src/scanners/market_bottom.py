@@ -303,7 +303,10 @@ def _market_block(conn, date):
     })
 
     # M3 杠杆出清
-    mg = _rows(conn, "SELECT date, SUM(fb_balance)/1e8 AS v FROM daily_review_margin "
+    # 用 daily_margin_history，不用 daily_review_margin：后者的 date 实际存的是前一交易日的
+    # 余额（个股逐日核对 review[D] == history[D-1]，全样本 207 天平均绝对差 713 亿），
+    # 且 2026-05~07 有未刷新的冻结段，会把年内峰值算低 3,000 亿、回撤算浅 9 个百分点。
+    mg = _rows(conn, "SELECT date, SUM(financing_balance)/1e8 AS v FROM daily_margin_history "
                      "WHERE date<=? GROUP BY date ORDER BY date", (date,))
     margin_dd = None
     stop_falling = False
@@ -333,9 +336,9 @@ def _market_block(conn, date):
         'value': round(margin_dd, 1) if margin_dd is not None else None, 'unit': '%',
         'threshold': '较 %d 日高点回落 ≥15%%，且近 5 日不再新低 = 满分' % LOOKBACK,
         'score': m3,
-        'detail': '两融 %s 亿，高点 %s 亿（%s）%s' % (
-            meta.get('margin', '—'), meta.get('margin_peak', '—'),
-            meta.get('margin_peak_date', '—'),
+        'detail': '两融 %s 亿（%s），%d 日高点 %s 亿（%s）%s' % (
+            meta.get('margin', '—'), meta.get('margin_date', '—'), LOOKBACK,
+            meta.get('margin_peak', '—'), meta.get('margin_peak_date', '—'),
             '，近 5 日仍在新低' if (m3 is not None and not stop_falling) else
             ('，近 5 日止跌' if m3 is not None else '，无两融数据')),
     })
