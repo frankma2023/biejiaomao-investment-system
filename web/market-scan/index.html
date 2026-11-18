@@ -263,11 +263,12 @@
     }
 
     // ── 市场底部判断（PRD: docs/product/市场底部判断_PRD.md）──
-    // 只读接口结果，不在前端算分。分档颜色：满分绿 / 半分琥珀 / 零分红 / 无数据灰。
-    function btColor(s){ return (s==null)?'#6B7280':(s>=1?'#2E7D32':(s>=0.5?'#F9A825':'#E53935')); }
-    function btTag(s){ return (s==null)?'无数据':(s>=1?'满足':(s>=0.5?'部分':'不满足')); }
+    // 只读接口结果，不在前端算分。每个判据满分 5 分、半分 2.5 分、零分 0。
+    // 分档颜色：满分绿 / 半分琥珀 / 零分红 / 无数据灰。
+    function btColor(s){ return (s==null)?'#6B7280':(s>=5?'#2E7D32':(s>=2.5?'#F9A825':'#E53935')); }
+    function btTag(s){ return (s==null)?'无数据':(s>=5?'满足':(s>=2.5?'部分':'不满足')); }
     function btCard(title, value, unit, score, detail, threshold, sub){
-      var c=btColor(score), pct=Math.max(3, (score||0)*100);
+      var c=btColor(score), pct=Math.max(3, (score||0)/5*100);
       return '<div class="bt-card">'
         + '<div class="bt-t"><span>'+title+'</span>'
         + '<span class="bt-tag" style="background:'+c+'1f;color:'+c+'">'+btTag(score)+'</span></div>'
@@ -289,8 +290,8 @@
       var vc={'底部区域':'#2E7D32','接近底部':'#F9A825','未到底部':'#E53935'}[d.verdict]||'#6B7280';
       var h='<div class="bt-head">'
         + '<div><div class="bt-verdict" style="color:'+vc+'">'+d.verdict+'</div>'
-        + '<div class="bt-score" style="color:'+vc+'">'+(d.score==null?'—':d.score.toFixed(0))
-        + '<small>/100 综合分</small></div></div>'
+        + '<div class="bt-score" style="color:'+vc+'">'+nf(d.earned,1)
+        + '<small>/'+nf(d.avail,0)+' 分（'+(d.score==null?'—':d.score.toFixed(0))+'%）</small></div></div>'
         + '<div class="bt-sum">'+d.summary+'</div>'
         + '</div><div class="bt-grid">';
       d.indices.forEach(function(ix){
@@ -298,11 +299,12 @@
         // 三项小分明细直接取接口给的 items，不在前端重算，也不写死阈值
         var lb={'dd':'回撤','days':'历时','value':'估值'};
         var chips=(ix.items||[]).map(function(it){
-          var s=it.score>=1?'满分':(it.score>=0.5?'半分':'未达');
-          return (lb[it.key]||it.label)+' '+s+'（'+(it.value==null?'—':nf(it.value,1))+(it.unit||'')+'）';
+          return (lb[it.key]||it.label)+' '+(it.score==null?'—':nf(it.score,1))+' 分'
+            +'（'+(it.value==null?'—':nf(it.value,1))+(it.unit||'')+'）';
         }).join(' · ');
-        h+=btCard(ix.name+' · 得分 '+nf(ix.score,0), nf(ix.dd,1), '% 回撤 · '+ix.days+' 日',
-                  (ix.score||0)/100, '收盘 '+nf(ix.close,2)+' · 高点 '+nf(ix.peak,2)+'（'+ix.peak_date+'）',
+        var ipts=(ix.items||[]).reduce(function(a,it){ return a + (it.score||0); }, 0);
+        h+=btCard(ix.name+' · '+nf(ipts,1)+'/'+nf(ix.max,0), nf(ix.dd,1), '% 回撤 · '+ix.days+' 日',
+                  (ipts/3), '收盘 '+nf(ix.close,2)+' · 高点 '+nf(ix.peak,2)+'（'+ix.peak_date+'）',
                   chips||'—', sub);
       });
       h+='</div><div class="bt-sub">全市场判据</div><div class="bt-grid">';

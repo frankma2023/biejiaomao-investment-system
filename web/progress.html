@@ -949,6 +949,19 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-18 · 底部打分改 5 分制（每项 5 分，满分 65，不再乘权重）</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：用户反馈「分数计算规则好复杂」，并给了替代方案 —— 每个小项 5 分，沪深300 回撤 2.5 + 历时 2.5 + 估值 2.5 = 7.5 分。原规则要先把 0/0.5/1 乘 100 变成 50 分，再对三个指数求均值，再按 0.7/0.3 加权，任何人无法口算核对</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新规则</b>：每个判据满分 5 分、半分 2.5 分、未达 0。单个指数 = 三项相加（满分 15），三只合计 45；全市场四项各 5 分、合计 20；<b>总满分 65</b>，各判据直接相加</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>为什么不破坏原判定</b>：45 : 20 = 69% : 31%，与原 0.7 / 0.3 几乎一致，所以判定线仍按得分率 65% / 45%。当日 27.5/65 = 42%，与原 42.2 一致</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>改动</b>：<code>market_bottom.py</code> 常量改 <code>ITEM_FULL=5</code> / <code>ITEM_HALF=2.5</code> / <code>IDX_MAX=15</code> / <code>MKT_MAX=20</code> / <code>TOTAL_MAX=65</code>，删掉 <code>IDX_W</code>/<code>MKT_W</code>；<code>compute()</code> 输出 <code>earned</code>/<code>avail</code>/<code>rate</code>；接口透出原始分；页面卡题改「沪深300 · 7.5/15」、头部改「27.5 / 65 分（42%）」；CLI 打印每项 <code>x/5</code></td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 225</b>：归一化和加权只能留一层。先 0/1 归一、再乘 100、再求均值、再加权，同一条判据被换算了三次，谁都算不回来。要用「小项直接给分、总分是求和」的结构，权重体现在各项分值的比例里</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 226</b>：<code>0.0</code> 与 <code>None</code> 在 Python 里都是 falsy，显示层写 <code>if x else None</code> 会把合法的 0 值（例如破净率 0%、缩量比 0）误显示成「无数据」。判断缺值一律用 <code>is None</code></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>自检（5 分制重算）</b>：2019-01-03 40/40（100%，底部区域）、2024-09-13 55/55（100%）、2024-02-02 50/55（91%）、2016-01-28 35/40（88%）、2022-10-31 37.5/55（68%）五个历史底部全部判「底部区域」；2026-11-17 → <b>27.5/65（42%）「未到底部」</b></td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-17 · 市场底部判断（七条判据 · 大盘扫描页顶部）</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：用户问「现在是不是底部区域」。只用沪深300 回答会被单一指数误导 —— 同一天沪深300 回撤 21.4%、创业板指 47.6%、科创50 44.7%，位置完全不同。用户要求做成量化功能放进大盘扫描页，先写 PRD 再开发，完成后独立复核</td></tr>
@@ -961,8 +974,8 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 224</b>：阈值窗口要用历史底部反向标定，不能凭感觉写。250 日窗把 2022 / 2024-02 / 2024-09 三次底部的回撤算成 31% / 24% / 17%（实际 40% / 45% / 46%），等于悄悄收紧了阈值。用七个底部扫窗后选 750 日</td></tr>
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>修法</b>：M3 改 <code>last5[-1] &gt; min(last5[:-1])</code>；缓存只在 <code>n_total&gt;0</code> 时早退、聚合为空则删行；新增 <code>_avg()</code> 只对非空判据求均值并把缺口写进 <code>meta.missing</code>；脚本改 argparse</td></tr>
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>窗口标定</b>：PRD 原写「近 250 日高点」，但附录 A 用的是分腿口径。用七个历史底部反标定 —— 250 日窗把 2022/2024-02/2024-09 三次底部回撤低估到 31% / 24% / 17%，750 日窗五个完全命中、两处偏差 ≤8pp。改 <code>LOOKBACK=750</code></td></tr>
-<tr><td><span class="pg-dot dot-done"></span></td><td><b>权重改版</b>：等权 0.5/0.5 下 2022-10-31 这种「指数层 83 分、全市场层 25 分」的真实底部只有 54 分。改为指数层 0.7 / 全市场层 0.3，判定档 65 / 45</td></tr>
-<tr><td><span class="pg-dot dot-done"></span></td><td><b>自检</b>：2019-01-03 → 100 分「底部区域」；2024-02-02 → 85 分；2024-09-13 → 100 分；2016-01-28 → 85 分；2022-10-31 → 58 分「接近底部」（当日缩量比 0.91、破净率 9.7% 都不达标，偏差可解释）；2026-11-17 → <b>42.2 分「未到底部」</b></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>权重改版（已被 11-18 的 5 分制取代）</b>：等权 0.5/0.5 下 2022-10-31 这种「指数层 83 分、全市场层 25 分」的真实底部只有 54 分。先改为指数层 0.7 / 全市场层 0.3，判定档 65 / 45；次日按用户要求改为「每项 5 分、合计 65 分、直接相加」</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>自检（旧口径，5 分制见上方 11-18 卡片）</b>：2019-01-03 → 100 分「底部区域」；2024-02-02 → 85 分；2024-09-13 → 100 分；2016-01-28 → 85 分；2022-10-31 → 58 分「接近底部」；2026-11-17 → <b>42.2 分「未到底部」</b></td></tr>
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>性能</b>：<code>fundamental_indicator</code> 1,090 万行、<code>date</code> 无索引，单日查询全表扫 190 秒。建 <code>idx_fund_date_metric(date, metric_code, value)</code>（1,103 s）；<code>mv_break_net</code> 回填 2,639 个交易日（378 s）。此后单日秒级</td></tr>
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>页面</b>：三张指数卡的「判据」行改成直接取接口的 items 显示三项小分（回撤 / 历时 / 估值），不在前端重算、不写死阈值；缺数据的卡片显示「—」而不是 0 分</td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>已知缺陷</b>：两融、健康分、卖出分自 2026-01 起才有数，2016 年前的底部只能验证价格与缩量；破净率与缩量比是全市场口径，不能按指数拆分；PE 分位会被盈利周期扭曲（科创50 PE 88.5 仍在 63% 分位）</td></tr>

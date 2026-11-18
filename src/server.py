@@ -890,15 +890,18 @@ def api_market_bottom():
     if not row:
         return jsonify({'status': 'no_data', 'date': target_date})
     payload = json.loads(row['payload']) if row['payload'] else {}
+    meta = payload.get('meta', {})
     return jsonify({
         'status': 'ok',
         'date': row['date'],
         'verdict': row['verdict'],
         'score': row['score'],
+        'earned': meta.get('earned'),
+        'avail': meta.get('avail'),
         'summary': row['summary'],
         'indices': payload.get('indices', []),
         'market': payload.get('market', []),
-        'meta': payload.get('meta', {}),
+        'meta': meta,
     })
 
 
