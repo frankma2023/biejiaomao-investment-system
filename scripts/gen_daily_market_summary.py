@@ -696,7 +696,7 @@ def render(d):
                     f'最弱 {w["group_label"]}（{w["total_score"]} 分）')
     if d['margin']:
         m = d['margin']
-        lead.append(f'两融余额 {num(m["fb"])} 亿元（5 日 {pct(m.get("fb_5d"), 1)}），'
+        lead.append(f'融资余额 {num(m["fb"])} 亿元（5 日 {pct(m.get("fb_5d"), 1)}），'
                     f'当日融资净买入 {num(m["net"])} 亿元')
     if d['flow']['10d']:
         tops = '、'.join(x['name'] for x in d['flow']['10d'][:3])
@@ -989,7 +989,7 @@ def render(d):
                if (m.get('net10') or 0) > 0 else
                '累计为负，杠杆资金在这两周是净流出状态，反弹缺乏融资盘配合。'))
         m_paras.append(
-            '两融数据的用法是看斜率不看绝对水平：余额走平意味着卖压释放接近尾声，'
+            '融资余额的用法是看斜率不看绝对水平：余额走平意味着卖压释放接近尾声，'
             '但走平本身不构成买入信号，需要指数同步止跌。')
     read_margin = rbox(*m_paras)
 
@@ -1218,7 +1218,7 @@ def render(d):
 {read_flow}
 
 <h2>六、资金情绪</h2>
-<h3>6.1 两融余额趋势（近 60 个交易日）</h3>
+<h3>6.1 融资与融券余额趋势（近 60 个交易日）</h3>
 {margin_kpi}
 <div class="tw"><table><tr><th>融资余额走势</th></tr><tr><td>{sparkline(fb_series, color='var(--up)', first_label=mtrend_d0, last_label=mtrend_d1)}</td></tr></table></div>
 <div class="tw"><table><tr><th>融券余额走势</th></tr><tr><td>{sparkline(sb_series, color='var(--accent)', first_label=mtrend_d0, last_label=mtrend_d1)}</td></tr></table></div>

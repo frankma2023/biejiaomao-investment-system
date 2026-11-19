@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""各板块 10 日资金与两融（固定页面）。
+"""各板块 10 日资金与融资余额（固定页面）。
 
 输出 web/sector-flow/index.html：行业板块（一级 + 二级）主表 + 主题/策略榜，
 每行含 10 日涨跌、成交额、量比、融资余额、10 日融资净买入、余额变化、
@@ -354,7 +354,7 @@ HEAD = """<!DOCTYPE html>
 <meta name="color-scheme" content="dark">
 <link rel="icon" href="../images/favicon.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>板块资金与两融</title>
+<title>板块资金与融资余额</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500&family=Inter:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../shared/css/hanako-glass.css">
@@ -450,13 +450,13 @@ def render(rows, mkt_fb, mkt_chg, mkt_net, dates, stale):
     stale_txt = '、'.join(stale[:12]) + ('等 %d 个' % len(stale) if len(stale) > 12 else '') if stale else '无'
 
     return ''.join([
-        '<h1>板块资金与两融</h1>',
+        '<h1>板块资金与融资余额</h1>',
         '<div class="sub">数据截至 %s 收盘。窗口为最近 %d 个交易日（%s ~ %s）。'
-        '融资与融券按各指数最新成分股（快照 2026-05-01）汇总。'
+        '融资余额按各指数最新成分股（快照 2026-05-01）汇总。'
         '红涨绿跌：涨跌、资金流入为红，下跌、流出为绿。</div>'
         % (dates[-1], WIN, dates[0], dates[-1]),
         kpi,
-        '<h2>一、行业板块：10 日资金与两融</h2>',
+        '<h2>一、行业板块：10 日资金与融资余额</h2>',
         '<div class="note">一级行业 11 个、二级行业 45 个，按 10 日涨跌排序。'
         '点表头可切换排序。量比 = 后 5 个交易日日均成交额 ÷ 前 5 个交易日日均成交额，'
         '小于 1 为缩量。「相对全市场」= 本板块融资余额变化 − 全市场变化。</div>',
@@ -478,7 +478,7 @@ def render(rows, mkt_fb, mkt_chg, mkt_net, dates, stale):
         '<h2>四、指标口径与数据缺口</h2>',
         '<div class="note">'
         '<b>融资余额</b>：`daily_margin_history.financing_balance` 按成分股加总，单位为亿元。'
-        '两融由交易所 T+1 披露，所以数据日比行情晚一个交易日；旧表 `daily_review_margin` 已废弃'
+        '融资余额由交易所 T+1 披露，所以数据日比行情晚一个交易日；旧表 `daily_review_margin` 已废弃'
         '（它的 date 是抓取日，装的却是前一交易日余额，且有冻结段）。<br>'
         '<b>10 日融资净买入</b>：窗口内每个交易日 `net_buy_d1` 之和。<br>'
         '<b>余额变化</b>：窗口末融资余额 ÷ 窗口首融资余额 − 1；'
@@ -493,7 +493,7 @@ def render(rows, mkt_fb, mkt_chg, mkt_net, dates, stale):
         '</div>' % stale_txt,
         '<h2>五、历史</h2>',
         '<div class="note">本页每日随 `scripts/daily_update.py` 重算覆盖，只保留最新一期。'
-        '历史日期可查 `web/market-logic/&lt;日期&gt;/index.html` 的行业与两融章节。</div>',
+        '历史日期可查 `web/market-logic/&lt;日期&gt;/index.html` 的行业与融资余额章节。</div>',
     ])
 
 

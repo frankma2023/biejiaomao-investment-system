@@ -336,11 +336,11 @@ def _market_block(conn, date):
         'value': round(margin_dd, 1) if margin_dd is not None else None, 'unit': '%',
         'threshold': '较 %d 日高点回落 ≥15%%，且近 5 日不再新低 = 满分' % LOOKBACK,
         'score': m3,
-        'detail': '两融 %s 亿（%s），%d 日高点 %s 亿（%s）%s' % (
+        'detail': '融资余额 %s 亿（%s），%d 日高点 %s 亿（%s）%s' % (
             meta.get('margin', '—'), meta.get('margin_date', '—'), LOOKBACK,
             meta.get('margin_peak', '—'), meta.get('margin_peak_date', '—'),
             '，近 5 日仍在新低' if (m3 is not None and not stop_falling) else
-            ('，近 5 日止跌' if m3 is not None else '，无两融数据')),
+            ('，近 5 日止跌' if m3 is not None else '，无融资数据')),
     })
 
     # M4 右侧确认

@@ -508,6 +508,14 @@
 >
 > **T+1 处理**：本表数据日通常比行情日晚一个交易日。做窗口统计时锚到
 > `SELECT MAX(date) FROM daily_margin_history`，不要用行情最后一天，否则最后一天取空值。
+>
+> **命名铁律（2026-11-19）**：`financing_balance` 只是**融资余额**，不含融券。任何展示或文案
+> 若只汇总 `financing_balance`，标题必须写「融资余额」，不能写「两融」。
+> 只有同时汇总 `financing_balance + securities_balance` 时才能叫「两融余额」
+> （例：`scripts/daily_review.py` 的 `margin_balance` 就是两者之和，可称两融）。
+> 2026-11-19 修复了底部判据、大盘总结 lead、板块资金页三处把融资余额写成「两融」的错误。
+> 补充事实：融券余额约 224 亿元，仅为两融合计的 1.1%，且融券以机构对冲为主，
+> 散户基本不参与，因此分析杠杆力度时单看融资余额（`financing_balance`）已经足够。
 
 > ⚠️ 2026-07-25 清理：已删除冗余表 `stock_margin`（同源数据，字段多但停在 07-22）和 `daily_margin_total`（汇总表，已弃用）。融资融券以本表为准。
 

@@ -957,6 +957,7 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>一致性验证</b>：<code>fetch_margin('2026-11-18')</code> 回退到 2026-11-17、3,894 只，两融余额 21,110 亿、融资净买入 −196 亿，与直接汇总 <code>daily_margin_history</code> 完全一致（阈值 0.5 亿内）</td></tr>
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>连带</b>：<code>gen_sector_flow.py</code> 的口径注从「<code>daily_review_margin.fb_balance</code>…口径可能存在差异」改为「<code>daily_margin_history.financing_balance</code>，两融 T+1 披露所以数据日晚一天，旧表已废弃」，页面重新生成（409 个板块、54,332 字节）；<code>gen_daily_market_summary.py</code> 重跑通过（34.3 KB）</td></tr>
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>文档</b>：<code>docs/DATABASE_SCHEMA.md</code> §15 加「口径铁律」（全库唯一两融来源、不要再引入第二张表、自检方法 = 逐日余额变动与净买入相关应 ≥0.999、T+1 锚点写法），§16 与 §74 改为废弃说明并保留失败证据表（抓取日错位、冻结段、自洽性 0.9039、峰值低 3,143 亿）</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>补订正（2026-11-19）</b>：底部卡片把只汇总 <code>financing_balance</code> 的数字写成「两融」，实际不含融券。改为「融资余额」，并同步大盘总结 lead、6.1 小节标题、板块资金页标题与口径注、PRD §5 与 <code>DATABASE_SCHEMA.md</code> §15 的命名铁律（只汇总融资时不得称两融）。融券余额 224 亿、占两融合计 1.1%，散户基本不参与，判杠杆单看融资足够</td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 230</b>：同一个指标只允许存在一张表。两个名字都叫「融资余额」时，正确做法不是把所有读者都改一遍（改漏一个就复发），而是删掉错的那张 —— 表不存在，就没人能取错</td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 231</b>：删表/删列前先做「非注释引用扫描」，只跳过行首是 <code>#</code>／<code>//</code>／<code>*</code> 的注释，其余命中逐条人工确认；<code>grep</code> 命中注释里的旧表名是正常的，别被它误导成「还有人在读」</td></tr>
 </table>
