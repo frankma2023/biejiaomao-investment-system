@@ -949,6 +949,22 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-20 · 试装 Vibe-Trading（第三方多智能体投研框架）</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>装法</b>：独立 venv <code>.venv-tools</code>（Python 3.12.9，596 MB），<code>vibe-trading-ai</code> 0.1.19。<b>本机 pip 走网络静默挂死</b>（换清华源、纯 http、<code>--timeout 5 --retries 0</code> 均无效），改用 uv 0.11.6 + <code>--default-index 清华源</code> 一次成功</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>运行时根</b>：DSH 沙箱禁止写 <code>%USERPROFILE%</code> 与 <code>%TEMP%</code>，工具默认写 <code>~/.vibe-trading</code> 必 <code>PermissionError</code> → 用 <code>VIBE_TRADING_HOME</code> 指到仓库内 <code>.vibe/</code>；<code>.gitignore</code> 加 <code>.venv-tools/</code>、<code>.vibe/</code></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>数据链路实测</b>：<code>run -p "600519.SH…"</code> 15 秒取到 8 个交易日 OHLCV，源 <code>tencent</code>、<code>split_dividend_additive</code>、成交量 <code>lots</code>；<b>与本地 <code>daily_kline.lxr_fc_close</code> 逐日 diff 全 0.00%</b></td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>踩坑</b>：口语化 prompt（不带交易所后缀）触发身份护栏 <code>identity_required</code>，随后 <code>search_symbol</code> 走 Yahoo 被 403，最后降级为确定性兜底 —— <b>A 股代码必须写 <code>600519.SH</code></b></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>多智能体投委会实测</b>：<code>--swarm-run investment_committee</code>，4 agent（多/空/风控/PM）串行 16 分钟，产出 4 份 12~18 KB 论证 + PM 裁决 + 一个自带回测（metrics/trades/equity/risk_xray）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>质量核对</b>：风险官给年化波动 27.14%、最大回撤 47.5%（峰 2021-02-10 谷 2026-06-26），本地独立复算 27.14% / −47.57%（同峰谷）→ 算法可信</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>阻塞</b>：<code>alpha bench</code> 的 <code>csi300</code> universe 需要 <code>TUSHARE_TOKEN</code>（未注册 → 478 个因子只能看不能跑）；<code>yfinance</code> 因 cache 目录不可写报 <code>unable to open database file</code></td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>成本</b>：一轮投委会输入 3,238,305 token（缓存读 3,054,848）+ 输出 116,718 token，模型 <code>deepseek-v4-pro</code>。单轮成本≈一份深度报告，不适合日更</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 232</b>：本机 pip 装不了任何东西，别在 pip 上排障超 5 分钟，直接 uv + 镜像</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 233</b>：第三方工具一律先查它把运行时文件写在哪。沙箱只放行工作区，写 home 的工具必须能被环境变量重定向，否则装好了也跑不起来</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-18 · 废弃第二张两融表：全库统一读 daily_margin_history</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：上一轮只改了三处读取方，旧表 <code>daily_review_margin</code> 还在库里、还被 <code>daily_review.py</code> 写着，下次谁先看到它谁就取错。用户要求「直接废弃这张表的两融部分，让所有读者统一读取 <code>daily_margin_history</code>」</td></tr>

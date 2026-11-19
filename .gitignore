@@ -151,3 +151,7 @@ fund-reports/
 web/market-logic/data/*.facts.json
 web/market-logic/data/*.llm.json
 
+
+# 第三方工具隔离环境与运行目录（体积大、可重建）
+.venv-tools/
+.vibe/
