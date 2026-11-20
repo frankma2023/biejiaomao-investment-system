@@ -172,6 +172,7 @@
         <span id="date-label" style="font-size:0.6rem;color:var(--muted)"></span>
         <button onclick="computeSnapshot()" style="margin-left:auto;font-size:10px;padding:4px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer;font-family:var(--font-body)">🔄 刷新计算</button>
       </div>
+      <div id="stale-banner" style="display:none;margin:0 0 10px;padding:9px 14px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:12px;font-size:0.66rem;color:#f59e0b;line-height:1.6"></div>
       <div id="bottom-block" class="bt-wrap"></div>
       <div id="breadth-block" class="bt-wrap"></div>
       <div id="content"></div>
@@ -236,6 +237,23 @@
       }catch(e){ var el2=document.getElementById('mc-load'); if(el2) el2.textContent='数据不可用'; }
     }
 
+    // 数据滞后提示：页面按「最新可用数据日」渲染，所以下班后跑到一半、或数据源
+    // 晚间才发布时，页面会静黙停在昨天。这里显式对比「今天」与「数据日」，
+    // 让读者一眼看到自己看的是哪一天，而不是以为看的是今天。
+    function staleBanner(dataDate){
+      var el=document.getElementById('stale-banner');
+      if(!el) return;
+      if(!dataDate){ el.style.display='none'; return; }
+      var now=new Date();
+      var today=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+      var wd=now.getDay();
+      if(dataDate>=today || wd===0 || wd===6){ el.style.display='none'; return; }
+      el.style.display='block';
+      el.innerHTML='⚠️ 数据最新为 <b>'+dataDate+'</b>，今天（'+today+'）的数据尚未入库。'
+        + '若今天已收盘，多为数据源（理杏仁）晚间才发布；可稍后重跑 '
+        + '<code>python scripts/daily_update.py --date '+today+'</code>。';
+    }
+
     async function load(specificDate) {
       const div=document.getElementById('content');
       try{
@@ -256,6 +274,7 @@
         renderBottom(bt);
         renderBreadth(bd);
         if(!hr){div.innerHTML='<div class="no-data">📡 行情健康度接口加载失败，请稍后重试 (date='+dateParam+')</div>';return;}
+        if(dateParam==='latest') staleBanner(hr.date); else staleBanner(null);
         if(hr.status==='no_data'){div.innerHTML='<div class="no-data">📡 暂无健康度数据 (date='+dateParam+')</div>';return;}
         hr.dividend_advice=da;
         hr.fcf_advice=fcfa;

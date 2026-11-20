@@ -949,6 +949,20 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-20 · 页面停在 11-19 的排查：收盘后跑日更会拿到「半套数据」</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>现象</b>：19:42 大盘扫描页与 <code>market-logic</code> 首页仍是 11-19；指汇盈文章最新 11-16（用户看到微信 11-19 21:00 有文）</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>根因一（数据）</b>：18:48 那次 <code>daily_update</code> 43 步全跑完，但 <code>index_daily_kline</code> 的 11-20 只有 <b>9 行</b>且全是 159xxx ETF，真实指数一只都没有；<code>fundamental_indicator</code> 11-20 也是 0 行。于是健康分 / 卖出分 / 快照 / 指数资金流 / 龙虎榜全部停在 11-19。<b>个股 K 线有 5,649 行</b>（东财源早发布），造成「看起来跑完了」的假象。19:43 复测理杏仁已发布（<code>--category market</code> 拉到 90 条）</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>根因二（静默）</b>：<code>scripts/gen_daily_market_summary.py:1304</code> 查不到当日健康分就打印 <code>[SKIP]</code> 并 <code>return 0</code>，<code>daily_update</code> 记成 <code>[OK] 41.大盘交易总结 (0s)</code> —— 首页不覆盖、退出码 0、日志里看不出来</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>处置</b>：补跑 13 步（2 指数 K 线全量 / 3 指数估值 / 18 个股基本面 / 9 健康度 / 12 行业分组 / 13 资金流 / 14 卖出评分 / 15 快照 / 43 底部 / 41 大盘总结含 LLM / 42 板块资金），11-20 全链到位：健康分 <b>13 F</b>、卖出分 <b>245 强制清仓</b>、底部 <b>41.0 未到底部</b>、盘面信号 <b>10.9 偏防守</b>，<code>market-logic</code> 首页与归档页均更新到 11-20</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新增可见性</b>：<code>web/market-scan/index.html</code> 顶部加「数据滞后」横幅 —— 只在 <code>latest</code> 且工作日、且数据日落后于今天时显示，附重跑命令</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>未解</b>：① <code>scripts/fetch_margin_daily.py</code> 全量 <b>5000/5000 失败</b>（两融接口不通，11-20 的两融本应 T+1 才发布，但全失败说明接口本身有问题，需单独排查）；② <code>fundamental_indicator</code> 11-20 仍无数据，底部判据的破净率用的是 11-19（页面上会标估值日）；③ 指汇盈搜狐号 11-17 之后只有 <b>type=4 视频稿</b>（11-18「债券什么时候会连续大跌？」、11-19「买债券最大的风险是什么?」、11-20「R2理财定位模糊…」），图文停在 11-16 —— 搜狐镜像不等于微信全量</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 235</b>：静默跳过比报错危险。凡是「查不到当日数据就 return」的分支，必须让调用方看得见（退出码或显式 WARN），否则日报会安静地停在昨天</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 236</b>：判日更是否真的完成，不能看「步数跑完」，要看 <code>index_daily_kline</code> 当日行数是否接近 400。收盘后立刻跑，容易拿到「个股有、指数无」的半套数据</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-20 · 大盘扫描补「盘面信号」：涨跌家数 / 涨跌停 / 题材榜 + 三条依据</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>起因</b>：试跑 <code>daily_stock_analysis</code>（ZhuLinsen）做 11-18 复盘，它给盘面信号 <b>40/100 震荡</b>，我们同一天健康分 <b>11 (F)</b>、卖出分 <b>130（减仓至 25%）</b> —— 它只看当日三个维度，被科创50 +2.19% 拉高了指数分，而全市场 4,163 只下跌</td></tr>
