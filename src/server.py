@@ -906,6 +906,130 @@ def api_market_bottom():
 
 
 # ═══════════════════════════════════════════════
+# API: GET /api/market-breadth
+# 当日盘面信号：涨跌家数、涨跌停、题材涨跌榜、三条依据
+# 口径来源：daily_stock_analysis 的 market light（宽度 45% / 指数 35% / 涨跌停 20%）
+# ═══════════════════════════════════════════════
+
+BREADTH_INDEX_CODES = ['000001', '399001', '399006', '000688',
+                       '000300', '000905', '000852', '000985']
+LIMIT_UP_TH = 0.098    # 涨停近似阈值，未区分 ST（5%）与创业板/科创板（20%）
+LIMIT_DN_TH = -0.098
+
+
+def _pctile_rank(vals, v):
+    if not vals or v is None:
+        return None
+    n = sum(1 for x in vals if x <= v)
+    return n * 100.0 / len(vals)
+
+
+@app.route('/api/market-breadth')
+def api_market_breadth():
+    """当日盘面信号。返回宽度分、指数分、涨跌停分与题材榜。"""
+    target = request.args.get('date') or 'latest'
+    db = get_db()
+    if target in ('', 'latest'):
+        row = db.execute("SELECT MAX(date) d FROM daily_kline").fetchone()
+    else:
+        row = db.execute("SELECT MAX(date) d FROM daily_kline WHERE date<=?", (target,)).fetchone()
+    day = row['d'] if row else None
+    if not day:
+        return jsonify({'status': 'no_data'})
+
+    # 1) 涨跌家数、涨跌停、成交额
+    agg = db.execute(
+        "SELECT SUM(CASE WHEN change_pct>0 THEN 1 ELSE 0 END) up,"
+        " SUM(CASE WHEN change_pct<0 THEN 1 ELSE 0 END) down,"
+        " SUM(CASE WHEN change_pct=0 THEN 1 ELSE 0 END) flat,"
+        " SUM(CASE WHEN change_pct>=? THEN 1 ELSE 0 END) lu,"
+        " SUM(CASE WHEN change_pct<=? THEN 1 ELSE 0 END) ld,"
+        " SUM(amount)/1e8 amt, COUNT(*) n"
+        " FROM daily_kline WHERE date=?", (LIMIT_UP_TH, LIMIT_DN_TH, day)).fetchone()
+    up = agg['up'] or 0
+    down = agg['down'] or 0
+    flat = agg['flat'] or 0
+    lu = agg['lu'] or 0
+    ld = agg['ld'] or 0
+    amt = agg['amt'] or 0
+
+    # 2) 指数与题材的当日涨跌（用收盘价重算，不用 change 列：只存两位小数）
+    pools = load_index_pools() or {}
+    names = load_index_names() or {}
+    thematic = list(pools.get('thematic') or [])   # 题材池，已排除 ETF 与宽基
+    need = list(dict.fromkeys(list(BREADTH_INDEX_CODES) + thematic))
+    cutoff = (datetime.strptime(day, '%Y-%m-%d') - timedelta(days=20)).strftime('%Y-%m-%d')
+    hist = {}
+    qmarks = ','.join('?' * len(need))
+    for r in db.execute(
+            "SELECT stock_code, date, close FROM index_daily_kline"
+            " WHERE kline_type='normal' AND date>=? AND date<=? AND stock_code IN (" + qmarks + ")"
+            " ORDER BY stock_code, date", (cutoff, day, *need)):
+        hist.setdefault(r['stock_code'], []).append((r['date'], r['close']))
+
+    def chg_of(code):
+        arr = hist.get(code) or []
+        if len(arr) < 2 or arr[-1][0] != day:
+            return None
+        prev, cur = arr[-2][1], arr[-1][1]
+        if not prev:
+            return None
+        return (cur / prev - 1) * 100
+
+    idx_chgs = [(c, chg_of(c)) for c in BREADTH_INDEX_CODES]
+    idx_chgs = [(c, v) for c, v in idx_chgs if v is not None]
+    idx_avg = sum(v for _, v in idx_chgs) / len(idx_chgs) if idx_chgs else None
+
+    # 3) 三个分项与总分（照 daily_stock_analysis 的 market light）
+    breadth_score = (up / (up + down) * 100) if (up + down) else 50.0
+    index_score = max(0.0, min(100.0, 50 + (idx_avg or 0) * 12))
+    limit_score = (lu / (lu + ld) * 100) if (lu + ld) else 50.0
+    total = round(breadth_score * 0.45 + index_score * 0.35 + limit_score * 0.20, 1)
+    if total >= 70:
+        label, state = '强势', '可进攻'
+    elif total >= 55:
+        label, state = '偏暖', '可进攻'
+    elif total >= 40:
+        label, state = '震荡', '需观察'
+    else:
+        label, state = '偏弱', '偏防守'
+
+    items = [
+        {'key': 'breadth', 'name': '上涨占比', 'weight': 45,
+         'value': round(up * 100.0 / (up + down), 1) if (up + down) else None, 'unit': '%',
+         'score': round(breadth_score, 1),
+         'detail': f'{up} 涨 / {down} 跌 / {flat} 平'},
+        {'key': 'index', 'name': '主要指数均值', 'weight': 35,
+         'value': round(idx_avg, 2) if idx_avg is not None else None, 'unit': '%',
+         'score': round(index_score, 1),
+         'detail': '、'.join(f'{names.get(c, c)} {v:+.2f}%' for c, v in idx_chgs[:6])},
+        {'key': 'limit', 'name': '涨跌停差', 'weight': 20,
+         'value': lu - ld, 'unit': ' 家',
+         'score': round(limit_score, 1),
+         'detail': f'涨停 {lu} 家 / 跌停 {ld} 家（阈值 ±9.8%，含 ST 与新股）'},
+    ]
+
+    # 4) 题材涨跌榜
+    themes = []
+    for c in thematic:
+        v = chg_of(c)
+        if v is None or abs(v) > 15:
+            continue
+        themes.append({'code': c, 'name': names.get(c, c), 'chg': round(v, 2)})
+    themes.sort(key=lambda x: -x['chg'])
+
+    return jsonify({
+        'status': 'ok',
+        'date': day,
+        'breadth': {'up': up, 'down': down, 'flat': flat, 'total': agg['n'] or 0,
+                    'amount_yi': round(amt, 0)},
+        'limit': {'up': lu, 'down': ld, 'diff': lu - ld},
+        'signal': {'score': total, 'label': label, 'state': state, 'items': items},
+        'concepts': {'top': themes[:8], 'bottom': themes[-8:][::-1], 'n': len(themes)},
+    })
+
+
+# ═══════════════════════════════════════════════
 # API: GET /api/market-sell-score
 # ═══════════════════════════════════════════════
 

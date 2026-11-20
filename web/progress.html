@@ -949,6 +949,18 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-20 · 大盘扫描补「盘面信号」：涨跌家数 / 涨跌停 / 题材榜 + 三条依据</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>起因</b>：试跑 <code>daily_stock_analysis</code>（ZhuLinsen）做 11-18 复盘，它给盘面信号 <b>40/100 震荡</b>，我们同一天健康分 <b>11 (F)</b>、卖出分 <b>130（减仓至 25%）</b> —— 它只看当日三个维度，被科创50 +2.19% 拉高了指数分，而全市场 4,163 只下跌</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新增接口</b> <code>/api/market-breadth</code>（<code>src/server.py</code>）：涨跌家数与成交额（<code>daily_kline</code> 聚合）、涨跌停家数（阈值 ±9.8%）、8 个宽基的指数均值（用 <code>index_daily_kline.close</code> 重算，不用只存两位小数的 <code>change</code> 列）、题材池 227~228 只的当日涨跌榜（<code>config/index_style.yaml</code> 的 thematic）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>页面</b> <code>web/market-scan/index.html</code>：底部判据块下方新增 <code>#breadth-block</code>，头部写三条依据（上涨占比权重 45%、主要指数均值 35%、涨跌停差 20%），下面四张卡：涨跌家数、涨停/跌停、题材领涨 8、题材领跌 8</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>口径核对</b>：用同一套权重复算 11-18 得 <b>39.9/100</b>，与 DSA 的 40 分一致 → 公式复现正确；11-19 为 <b>25.7/100（偏弱·偏防守）</b>：658 涨 / 4,938 跌、涨停 34 / 跌停 115、题材领涨 科创半导体材料设备 +2.49%、领跌 中证数据 −4.31%</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>设计取舍</b>：百分比卡不套「满足/部分/不满足」标签（那是判据卡的语义），改「涨多/跌多」；涨跌停阈值 ±9.8% 是近似（未区分 ST 5% 与创业板科创板 20%），文案里写明；新闻搜索与「明日仓位区间」两项不补（前者我们有公众号 + LLM，后者与不写仓位建议的合规底线冲突）</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 234</b>：当日快照分（宽度/指数/涨跌停）与多日状态分（健康分、卖出分）不是一个东西，同页并列时必须各自标明口径，否则读者会拿 40 分去解释 11 分的结论</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-20 · 试装 Vibe-Trading（第三方多智能体投研框架）</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>装法</b>：独立 venv <code>.venv-tools</code>（Python 3.12.9，596 MB），<code>vibe-trading-ai</code> 0.1.19。<b>本机 pip 走网络静默挂死</b>（换清华源、纯 http、<code>--timeout 5 --retries 0</code> 均无效），改用 uv 0.11.6 + <code>--default-index 清华源</code> 一次成功</td></tr>

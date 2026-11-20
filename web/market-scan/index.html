@@ -173,6 +173,7 @@
         <button onclick="computeSnapshot()" style="margin-left:auto;font-size:10px;padding:4px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer;font-family:var(--font-body)">🔄 刷新计算</button>
       </div>
       <div id="bottom-block" class="bt-wrap"></div>
+      <div id="breadth-block" class="bt-wrap"></div>
       <div id="content"></div>
       <div id="market-logic-bar" style="display:flex;gap:14px;align-items:center;margin:2px 0 10px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-left:3px solid #2563eb;border-radius:14px;flex-wrap:wrap;cursor:pointer" onclick="window.open('../market-logic/index.html')" title="点击查看每日「市场总结」历史">
         <span style="font-family:var(--font-display);font-size:0.78rem;font-weight:800;color:var(--text-primary)">📝 市场总结</span>
@@ -247,11 +248,13 @@
           fetch(API_BASE+'/api/market-sell-score?date='+dateParam).then(r=>r.json()).catch(()=>({status:'no_data'})),
           fetch(API_BASE+'/api/market-scan/dividend-advice?date='+(dateParam==='latest'?'':dateParam)).then(r=>r.json()).catch(()=>({indices:[]})),
           fetch(API_BASE+'/api/market-scan/fcf-advice?date='+(dateParam==='latest'?'':dateParam)).then(r=>r.json()).catch(()=>({})),
-          fetch(API_BASE+'/api/market-bottom?date='+dateParam).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))).catch(()=>({status:'no_data'}))
+          fetch(API_BASE+'/api/market-bottom?date='+dateParam).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))).catch(()=>({status:'no_data'})),
+          fetch(API_BASE+'/api/market-breadth?date='+dateParam).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))).catch(()=>({status:'no_data'}))
         ]);
         const pick=(i,dflt)=>(settled[i].status==='fulfilled'&&settled[i].value)?settled[i].value:dflt;
-        const hr=pick(0,null), pr=pick(1,{}), sr=pick(2,{status:'no_data'}), da=pick(3,{indices:[]}), fcfa=pick(4,{}), bt=pick(5,{status:'no_data'});
+        const hr=pick(0,null), pr=pick(1,{}), sr=pick(2,{status:'no_data'}), da=pick(3,{indices:[]}), fcfa=pick(4,{}), bt=pick(5,{status:'no_data'}), bd=pick(6,{status:'no_data'});
         renderBottom(bt);
+        renderBreadth(bd);
         if(!hr){div.innerHTML='<div class="no-data">📡 行情健康度接口加载失败，请稍后重试 (date='+dateParam+')</div>';return;}
         if(hr.status==='no_data'){div.innerHTML='<div class="no-data">📡 暂无健康度数据 (date='+dateParam+')</div>';return;}
         hr.dividend_advice=da;
@@ -314,6 +317,69 @@
         h+=btCard(m.label, m.value==null?null:btNum(m.value), m.unit,
                   (m.score==null?null:m.score), (m.max||7), m.detail, m.threshold);
       });
+      h+='</div>';
+      box.innerHTML=h;
+    }
+
+    // ── 当日盘面信号（口径同 daily_stock_analysis 的 market light）──
+    // 宽度 45% / 主要指数 35% / 涨跌停 20%。这是「当日快照分」，
+    // 与底部判据（位置）和健康分（多日状态机）不是一个东西，不要混读。
+    function bdColor(s){ return (s==null)?'#6B7280':(s>=70?'#2E7D32':(s>=55?'#7CB342':(s>=40?'#F9A825':'#E53935'))); }
+    // 百分比型卡片：不套「满足/部分/不满足」语义（那是判据卡的标签），
+    // 改用「涨多 / 跌多」这类方向标签，颜色按红涨绿跌。
+    function statCard(title, value, unit, ratio, tagText, color, detail, note){
+      var w=Math.max(3, Math.min(100, ratio||0));
+      return '<div class="bt-card">'
+        + '<div class="bt-t"><span>'+title+'</span>'
+        + '<span class="bt-tag" style="background:'+color+'1f;color:'+color+'">'+tagText+'</span></div>'
+        + '<div class="bt-v" style="color:'+color+'">'+value+(unit?'<small>'+unit+'</small>':'')+'</div>'
+        + '<div class="bt-bar"><i style="width:'+w+'%;background:'+color+'"></i></div>'
+        + '<div class="bt-d">'+detail+'</div>'
+        + (note?'<div class="bt-th">'+note+'</div>':'')
+        + '</div>';
+    }
+    function conceptCard(title, arr, color){
+      var rows=(arr||[]).map(function(t){
+        return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:0.6rem;line-height:1.75">'
+          + '<span style="color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+t.name+'</span>'
+          + '<span style="color:'+color+';font-weight:700;flex-shrink:0">'+(t.chg>0?'+':'')+t.chg.toFixed(2)+'%</span></div>';
+      }).join('');
+      return '<div class="bt-card"><div class="bt-t"><span>'+title+'</span>'
+        + '<span class="bt-tag" style="background:'+color+'1f;color:'+color+'">'+(arr||[]).length+' 只</span></div>'
+        + '<div style="margin-top:6px">'+(rows||'<div class="bt-d">—</div>')+'</div></div>';
+    }
+    function renderBreadth(d){
+      var box=document.getElementById('breadth-block');
+      if(!box) return;
+      if(!d||d.status!=='ok'||!d.signal){
+        box.innerHTML='<div class="no-data" style="padding:14px">🎯 暂无盘面信号数据</div>';
+        return;
+      }
+      var sg=d.signal, b=d.breadth, lm=d.limit, c=bdColor(sg.score);
+      var h='<div class="bt-head">'
+        + '<div><div class="bt-verdict" style="color:'+c+'">盘面信号 · '+sg.label+'</div>'
+        + '<div class="bt-score" style="color:'+c+'">'+btNum(sg.score)
+        + '<small>/100 · '+sg.state+'</small></div></div>'
+        + '<div class="bt-sum"><div style="font-weight:700;margin-bottom:3px">三条依据</div>'
+        + sg.items.map(function(it){
+            return '<div>· '+it.name+' '+(it.value==null?'—':btNum(it.value)+(it.unit||''))
+              +' → '+btNum(it.score)+' 分（权重 '+it.weight+'%）'
+              +'　<span style="color:var(--muted)">'+it.detail+'</span></div>';
+          }).join('')
+        + '<div style="margin-top:5px;color:var(--muted)">当日快照分。与上方的底部判据（位置）、下方的健康分（多日状态）是三个不同口径，不互相替代。</div>'
+        + '</div></div><div class="bt-grid">';
+      h+=statCard('涨跌家数', b.up+' / '+b.down, '涨 / 跌', b.up/(b.up+b.down)*100,
+                  b.up>b.down?'涨多':'跌多', b.up>b.down?'#ef4444':'#10b981',
+                  '平 '+b.flat+' 家 · 成交 '+btNum(b.amount_yi/10000)+' 万亿',
+                  '上涨占比 '+btNum(b.up/(b.up+b.down)*100)+'%（权重 45%）');
+      var luRatio=(lm.up+lm.down)?lm.up/(lm.up+lm.down)*100:null;
+      h+=statCard('涨停 / 跌停', lm.up+' / '+lm.down, '家', luRatio,
+                  lm.diff>0?'涨停多':(lm.diff<0?'跌停多':'持平'),
+                  lm.diff>0?'#ef4444':(lm.diff<0?'#10b981':'#6B7280'),
+                  '差 '+(lm.diff>0?'+':'')+lm.diff+' 家',
+                  '涨停占比 '+(luRatio==null?'—':btNum(luRatio)+'%')+'（权重 20%，阈值 ±9.8%）');
+      h+=conceptCard('题材领涨', d.concepts&&d.concepts.top, '#ef4444');
+      h+=conceptCard('题材领跌', d.concepts&&d.concepts.bottom, '#10b981');
       h+='</div>';
       box.innerHTML=h;
     }
