@@ -72,11 +72,19 @@ def extract(pg):
     """返回 (innerHTML, [真实图片URL], 纯文本长度)。"""
     return pg.evaluate("""() => {
         const cont = document.querySelector('article.article')
+                  || document.querySelector('#js_content')
                   || document.querySelector('#mp-editor')
                   || document.querySelector('.article-text')
                   || document.querySelector('article');
         if (!cont) return null;
         cont.querySelectorAll('script,style').forEach(e => e.remove());
+        // 微信正文用 data-src 懒加载，渲染后 src 可能为空，先把真实地址写回 src，
+        // 否则 innerHTML 里只有 data-src，导出页图片全是空的。
+        cont.querySelectorAll('img').forEach(i => {
+            const s = i.currentSrc || i.getAttribute('data-src') || i.src;
+            if (s && s.startsWith('http')) i.setAttribute('src', s);
+            i.removeAttribute('data-src');
+        });
         const imgs = [...cont.querySelectorAll('img')]
             .map(i => i.currentSrc || i.src).filter(u => u && u.startsWith('http'));
         return {html: cont.innerHTML, imgs: imgs, len: cont.innerText.length};
@@ -146,13 +154,12 @@ def main():
                     except Exception:
                         continue
                 for u, rel in local.items():
-                    body_html = body_html.replace('"%s"' % u, '"%s"' % rel)
-                    body_html = body_html.replace("'%s'" % u, "'%s'" % rel)
-                    # 容器里常留协议相对写法 //q8.itc.cn/...，currentSrc 却是绝对地址
-                    body_html = body_html.replace('"%s"' % u.replace('https:', ''),
-                                                  '"%s"' % rel)
-                    body_html = body_html.replace("'%s'" % u.replace('https:', ''),
-                                                  "'%s'" % rel)
+                    # HTML 属性里的 & 会被序列化成 &amp;，两种写法都要替换
+                    for cand in (u, u.replace('https:', ''),
+                                 u.replace('&', '&amp;'),
+                                 u.replace('https:', '').replace('&', '&amp;')):
+                        body_html = body_html.replace('"%s"' % cand, '"%s"' % rel)
+                        body_html = body_html.replace("'%s'" % cand, "'%s'" % rel)
                 body_html = re.sub(r'\s(width|height|max-width)="\d+"', '', body_html)
 
                 stamp = (pub or '')[:16].replace(':', '').replace(' ', '_')

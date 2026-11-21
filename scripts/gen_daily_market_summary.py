@@ -472,7 +472,13 @@ def gzh_articles(date):
 
 
 def parse_us(articles):
-    """从文中抓美股隔夜涨跌数字，用于判断 A 股与美股的联动。"""
+    """从文中抓美股隔夜涨跌数字，用于判断 A 股与美股的联动。
+
+    只认「指数名 + 涨跌动词 + 数字%」这种紧邻结构，且数值必须在 ±12% 以内 ——
+    指数单日涨跌超过 12% 几乎不会发生，超出的一律视为文中其它数字（例如
+    个股跌幅、板块回撤、历史极值）被误抓。这一步防的是把「费半成分股跌 39%」
+    当成「费城半导体指数跌 39%」，进而得出错误的联动判定。
+    """
     if not articles:
         return []
     text = '\n'.join(a['text'] for a in articles)
@@ -482,9 +488,15 @@ def parse_us(articles):
             (r'(?:标普500|标普)', '标普500')]
     out, seen = [], set()
     for pat, label in pats:
-        m = re.search(pat + r'[^。；;\n]{0,24}?([+\-−]?\d+(?:\.\d+)?)\s*%', text)
-        if m and label not in seen:
-            v = float(m.group(1).replace('−', '-'))
+        # 紧邻结构：指数名 → 12 字内出现涨跌动词（可选「幅」）→ 数字%
+        m = re.search(pat + r'[^。；;\n]{0,12}?(?:涨|跌|收涨|收跌|上涨|下跌|大涨|大跌|下挫|走高|走低)'
+                              r'(?:幅)?[^0-9%]{0,6}?([+\-−]?\d+(?:\.\d+)?)\s*%', text)
+        if not m:
+            continue
+        v = float(m.group(1).replace('−', '-'))
+        if abs(v) > 12:
+            continue
+        if label not in seen:
             out.append((label, v))
             seen.add(label)
     return out
@@ -1253,7 +1265,7 @@ def render(d):
 {esc((d['margin'] or {}).get('date', '—'))} 数据（两个源发布时间不同，页面分别标明）。</li>
 <li>健康分、卖出评分、行业分组分、资金活跃度均来自本地日更库；资金活跃度评分口径见
 <code>src/scanners/index_capital_flow.py</code>。</li>
-<li>指汇盈文章经搜狐号镜像抓取（公众号原页需订阅号后台，见 progress 教训 202）；视频稿无正文段落。</li>
+<li>指汇盈文章以搜狐号镜像为主（公众号原页需订阅号后台，见 progress 教训 202）；镜像不覆盖的图文，用微信原文链接单篇导入（scripts/import_gzh_url.py，source=wechat）。视频稿无正文段落，不入库。</li>
 <li>行业组成分快照日 {esc(d.get('cons_date') or '—')}，季度更新，非当日实时成分。</li>
 </ul>
 

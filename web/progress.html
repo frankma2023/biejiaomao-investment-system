@@ -949,6 +949,19 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-20 · 补进 11-20 微信原文：搜狐镜像缺失的图文走单篇导入</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>问题</b>：指汇盈图文停在 11-16。搜狐号 11-18/19/20 只有 type=4 视频稿（微信 11-19 21:00《港股跌回到牛市起点了》在镜像里没有对应图文）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新增 <code>scripts/import_gzh_url.py</code></b>：用微信原文链接单篇入库（标题 / 公众号名 / 发布时间 / 正文），写 <code>data/gzh.db</code>（<code>source='wechat'</code>），正文 HTML 与配图仍交给 <code>export_gzh_html.py</code>。发布时间依次读 <code>#publish_time</code> → <code>var createTime</code> → <code>var ct</code>（unix 秒 +8h）→ 页面「2026年11月20日 21:00」文本</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>本次导入</b>：<code>https://mp.weixin.qq.com/s/cP4AyPxlNLdrfHCwtUojoQ</code> → 《流动性危机蔓延》，2026-11-20 21:00，2,038 字，导出 <code>docs/gzh/html/2026-11-20_2100_流动性危机蔓延.html</code>（29,986 字节，4 张图全部本地化，实测 4/4 加载、页高 4,510 px）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>导出脚本两处修</b>：<code>extract()</code> 的选择器链补 <code>#js_content</code>（微信正文容器）；导出前把 <code>data-src</code> 写回 <code>src</code> 再序列化，替换时同时处理 <code>u</code> / <code>u.replace('https:','')</code> / <code>u.replace('&','&amp;')</code> 四种写法 —— 否则微信文章导出后 <code>local 0 / remote 8</code>，页面一片空白</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>11-20 总结已重建</b>：第七章改为引用本篇；7.2 关键词核对 4 个方向一致（科技 / 半导体 / 芯片 / 黄金），算力、美股、债无对应指数标「无法判定」</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 237</b>：微信正文的图片是 <code>data-src</code> 懒加载，<code>currentSrc</code> 能取到地址但 <code>innerHTML</code> 里仍是空 <code>src</code>。本地化必须「先写回 src、再序列化、再替换」，且替换要覆盖 <code>&amp;</code> 转义写法</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 238</b>：从文章正文抓宏观数字必须校验量级。原来的正则把「费城半导体 <b>成分股</b>跌 39%」抓成「费城半导体跌 39%」，首轮算出的隔夜均值 −13.75%、联动判定「同步下跌」全错。加了「指数名 + 涨跌动词 + 数字」紧邻结构 + 单日 |涨跌| ≤12% 的闸门后，正确结果为纳斯达克 +2.00%、判定「背离」</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-20 · 页面停在 11-19 的排查：收盘后跑日更会拿到「半套数据」</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>现象</b>：19:42 大盘扫描页与 <code>market-logic</code> 首页仍是 11-19；指汇盈文章最新 11-16（用户看到微信 11-19 21:00 有文）</td></tr>
