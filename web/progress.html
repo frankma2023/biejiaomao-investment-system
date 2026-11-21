@@ -949,6 +949,20 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-21 · 大盘扫描加「黄金与 A 股对照」卡片：伦敦金 + 159934 + 两条 A 股指数</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>缺口</b>：本库原来没有任何黄金序列 —— 159934（黄金ETF易方达）只有价格，没有参照物；复盘「流动性收紧时卖黄金补保证金」这类判断没有数据可用</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新增 <code>scripts/fetch_gold_daily.py</code></b>：新浪外盘 JSONP 一次返回伦敦金全部历史（<code>GlobalFuturesService.getGlobalFuturesDailyKLine?symbol=XAU</code>），落表 <code>gold_daily(source,date,open,high,low,close,updated_at)</code>，PK(source,date)。首次全量 <b>5,186 行（2006-11-21 ~ 2026-11-20）</b>，增量只写库内最大日期之后</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新接口 <code>/api/gold-trend?n=250</code></b>：伦敦金 / 159934 / 沪深300 / 创业板指四条序列，<b>按日期交集对齐</b>（248 个共同交易日），起点归一为 100；返回窗口涨跌、5/20/60/120 日涨跌、距窗口高点、以及金价与各指数的日收益相关系数</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>页面卡片</b>：<code>web/market-scan/index.html</code> 在盘面信号之后新增「黄金与 A 股对照」（ECharts 四线 + 5 张指标卡），标题写明固定 250 日、不随上方日期切换</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>接入日更第 40c 步</b>（<code>scripts/daily_update.py</code>，timeout 180s），在指汇盈导出之后、大盘总结之前</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>当前读数（2025-11-11 ~ 2026-11-20）</b>：伦敦金 3,534.64（窗口 −14.35%、20 日 −11.59%、60 日 −21.79%、距 2026-01-28 高点 −34.72%）；159934 76.01（−19.71%、距高点 −38.93%）；沪深300 −15.00%（距高点 −21.84%）；创业板指 −29.42%（距高点 −49.40%）。日收益相关：金价 vs 沪深300 <b>0.27</b>、vs 创业板 0.19、vs 159934 0.52 —— <b>黄金与 A 股这轮是同向下跌，不是避险关系</b></td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 239</b>：伦敦金与 A 股交易日不等（国际金周末休市、国内有调休），跨市场对照必须<b>按日期交集对齐</b>，否则归一化起点与长度都会错位</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 240</b>：价格类指标不能共用「保留一位小数」的格式化函数 —— 76.01 会被 <code>btNum</code> 显示成 76。ETF 与金价单独 <code>toFixed(2)</code></td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-20 · 补进 11-20 微信原文：搜狐镜像缺失的图文走单篇导入</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>问题</b>：指汇盈图文停在 11-16。搜狐号 11-18/19/20 只有 type=4 视频稿（微信 11-19 21:00《港股跌回到牛市起点了》在镜像里没有对应图文）</td></tr>

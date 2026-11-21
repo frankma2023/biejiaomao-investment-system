@@ -1030,6 +1030,126 @@ def api_market_breadth():
 
 
 # ═══════════════════════════════════════════════
+# API: GET /api/gold-trend  —— 黄金与 A 股对照
+# ═══════════════════════════════════════════════
+
+GOLD_SERIES = [
+    ('xau', '伦敦金', 'gold_daily'),        # 美元/盎司，新浪外盘
+    ('159934', '黄金ETF易方达', 'index_daily_kline'),
+    ('000300', '沪深300', 'index_daily_kline'),
+    ('399006', '创业板指', 'index_daily_kline'),
+]
+
+
+@app.route('/api/gold-trend')
+def api_gold_trend():
+    """伦敦金 / 黄金ETF 与 A 股主要指数对照（统一窗口、起点归一为 100）。
+
+    伦敦金与 A 股的交易日不同（国际金周末休市、国内有调休），所以按「日期交集」
+    对齐，再接归一化。返回窗口内每个交易日的归一化点位，以及各序列的多周期涨跌。
+    """
+    try:
+        n = int(request.args.get('n') or 250)
+    except ValueError:
+        n = 250
+    n = max(30, min(1000, n))
+    db = get_db()
+
+    # 伦敦金
+    gold = [(r['date'], r['close']) for r in db.execute(
+        "SELECT date, close FROM gold_daily WHERE source='xau' AND close IS NOT NULL"
+        " ORDER BY date")]
+    if not gold:
+        return jsonify({'status': 'no_data', 'hint': '先跑 python scripts/fetch_gold_daily.py'})
+
+    # 三条 A 股序列
+    codes = ['159934', '000300', '399006']
+    hist = {}
+    for r in db.execute(
+            "SELECT stock_code, date, close FROM index_daily_kline"
+            " WHERE kline_type='normal' AND stock_code IN ('159934','000300','399006')"
+            " ORDER BY stock_code, date"):
+        hist.setdefault(r['stock_code'], []).append((r['date'], r['close']))
+    missing = [c for c in codes if not hist.get(c)]
+
+    # 用「日期交集」对齐：以最近 n 个 A 股交易日为骨架，取同日金价
+    spine = [d for d, _ in (hist.get('000300') or [])][-n:]
+    if not spine:
+        return jsonify({'status': 'no_data'})
+    gmap = dict(gold)
+    spine = [d for d in spine if d in gmap]        # 只在两者都有数据的日期上比
+    if len(spine) < 20:
+        return jsonify({'status': 'no_data', 'hint': f'交集只有 {len(spine)} 天'})
+
+    series = {}
+    for code in codes:
+        m = dict(hist.get(code) or [])
+        series[code] = [m.get(d) for d in spine]
+    series['xau'] = [gmap.get(d) for d in spine]
+
+    def norm(arr):
+        base = next((v for v in arr if v), None)
+        return [round(v / base * 100, 2) if (v and base) else None for v in arr]
+
+    def ret(arr, k):
+        vals = [v for v in arr if v]
+        if len(vals) <= k:
+            return None
+        return round((vals[-1] / vals[-1 - k] - 1) * 100, 2)
+
+    out = []
+    for key, label, _src in GOLD_SERIES:
+        arr = series.get(key) or []
+        vals = [v for v in arr if v]
+        if not vals:
+            continue
+        peak = max(vals)
+        out.append({
+            'key': key, 'name': label,
+            'last': round(vals[-1], 2),
+            'ret5': ret(arr, 5), 'ret20': ret(arr, 20),
+            'ret60': ret(arr, 60), 'ret120': ret(arr, 120),
+            'ret_win': round((vals[-1] / vals[0] - 1) * 100, 2),
+            'dd': round((vals[-1] / peak - 1) * 100, 2),
+            'peak_date': spine[arr.index(peak)] if peak in arr else None,
+            'norm': norm(arr),
+        })
+
+    # 黄金 vs A 股的窗口相关性（日收益）
+    def rets(arr):
+        rr = []
+        for i in range(1, len(arr)):
+            a, b = arr[i - 1], arr[i]
+            rr.append((b / a - 1) if (a and b) else None)
+        return rr
+    rx = rets(series['xau'])
+    corr = {}
+    for code in codes:
+        ry = rets(series[code])
+        pairs = [(a, b) for a, b in zip(rx, ry) if a is not None and b is not None]
+        if len(pairs) < 20:
+            continue
+        n2 = len(pairs)
+        mx = sum(p[0] for p in pairs) / n2
+        my = sum(p[1] for p in pairs) / n2
+        cov = sum((p[0] - mx) * (p[1] - my) for p in pairs)
+        vx = sum((p[0] - mx) ** 2 for p in pairs) ** 0.5
+        vy = sum((p[1] - my) ** 2 for p in pairs) ** 0.5
+        corr[code] = round(cov / (vx * vy), 3) if vx and vy else None
+
+    return jsonify({
+        'status': 'ok',
+        'dates': spine,
+        'n': len(spine),
+        'start': spine[0], 'end': spine[-1],
+        'series': out,
+        'corr': corr,
+        'missing': missing,
+        'gold_updated': max(gmap) if gmap else None,
+    })
+
+
+# ═══════════════════════════════════════════════
 # API: GET /api/market-sell-score
 # ═══════════════════════════════════════════════
 

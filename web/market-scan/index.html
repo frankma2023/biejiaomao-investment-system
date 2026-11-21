@@ -156,6 +156,17 @@
     .bt-bar i{display:block;height:100%;border-radius:3px}
     .bt-th{font-size:0.54rem;color:var(--muted);line-height:1.45;margin-top:4px}
     .bt-sub{font-size:0.6rem;color:var(--muted);margin:10px 0 0;font-weight:700;font-family:var(--font-display)}
+    /* 黄金对照（伦敦金 / 黄金ETF / A 股指数）*/
+    .gd-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:14px 16px 6px;border-radius:14px 14px 0 0;border:1px solid var(--border);border-bottom:0;background:var(--card)}
+    .gd-title{font-family:var(--font-display);font-size:0.95rem;font-weight:800;color:var(--text-primary)}
+    .gd-note{font-size:0.6rem;color:var(--muted)}
+    .gd-body{border:1px solid var(--border);border-radius:0 0 14px 14px;background:var(--card);padding:6px 16px 14px;box-shadow:var(--shadow-card)}
+    .gd-chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:8px;margin:6px 0 10px}
+    .gd-chip{border:1px solid var(--border);border-radius:10px;padding:7px 9px;background:var(--bg-elevated,rgba(127,127,127,.05))}
+    .gd-chip .n{font-size:0.58rem;color:var(--muted);display:block;margin-bottom:2px}
+    .gd-chip .v{display:block;font-size:0.95rem;font-weight:800;font-family:var(--font-display);line-height:1.2}
+    .gd-chip .r{display:block;font-size:0.56rem;color:var(--muted);line-height:1.4;margin-top:1px}
+    #gd-chart{width:100%;height:300px}
 </style>
 </head>
 <body>
@@ -175,6 +186,7 @@
       <div id="stale-banner" style="display:none;margin:0 0 10px;padding:9px 14px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:12px;font-size:0.66rem;color:#f59e0b;line-height:1.6"></div>
       <div id="bottom-block" class="bt-wrap"></div>
       <div id="breadth-block" class="bt-wrap"></div>
+<div id="gold-block" class="bt-wrap"></div>
       <div id="content"></div>
       <div id="market-logic-bar" style="display:flex;gap:14px;align-items:center;margin:2px 0 10px;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-left:3px solid #2563eb;border-radius:14px;flex-wrap:wrap;cursor:pointer" onclick="window.open('../market-logic/index.html')" title="点击查看每日「市场总结」历史">
         <span style="font-family:var(--font-display);font-size:0.78rem;font-weight:800;color:var(--text-primary)">📝 市场总结</span>
@@ -267,12 +279,14 @@
           fetch(API_BASE+'/api/market-scan/dividend-advice?date='+(dateParam==='latest'?'':dateParam)).then(r=>r.json()).catch(()=>({indices:[]})),
           fetch(API_BASE+'/api/market-scan/fcf-advice?date='+(dateParam==='latest'?'':dateParam)).then(r=>r.json()).catch(()=>({})),
           fetch(API_BASE+'/api/market-bottom?date='+dateParam).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))).catch(()=>({status:'no_data'})),
-          fetch(API_BASE+'/api/market-breadth?date='+dateParam).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))).catch(()=>({status:'no_data'}))
+          fetch(API_BASE+'/api/market-breadth?date='+dateParam).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))).catch(()=>({status:'no_data'})),
+          fetch(API_BASE+'/api/gold-trend?n=250').then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))).catch(()=>({status:'no_data'}))
         ]);
         const pick=(i,dflt)=>(settled[i].status==='fulfilled'&&settled[i].value)?settled[i].value:dflt;
-        const hr=pick(0,null), pr=pick(1,{}), sr=pick(2,{status:'no_data'}), da=pick(3,{indices:[]}), fcfa=pick(4,{}), bt=pick(5,{status:'no_data'}), bd=pick(6,{status:'no_data'});
+        const hr=pick(0,null), pr=pick(1,{}), sr=pick(2,{status:'no_data'}), da=pick(3,{indices:[]}), fcfa=pick(4,{}), bt=pick(5,{status:'no_data'}), bd=pick(6,{status:'no_data'}), gd=pick(7,{status:'no_data'});
         renderBottom(bt);
         renderBreadth(bd);
+        renderGold(gd);
         if(!hr){div.innerHTML='<div class="no-data">📡 行情健康度接口加载失败，请稍后重试 (date='+dateParam+')</div>';return;}
         if(dateParam==='latest') staleBanner(hr.date); else staleBanner(null);
         if(hr.status==='no_data'){div.innerHTML='<div class="no-data">📡 暂无健康度数据 (date='+dateParam+')</div>';return;}
@@ -401,6 +415,68 @@
       h+=conceptCard('题材领跌', d.concepts&&d.concepts.bottom, '#10b981');
       h+='</div>';
       box.innerHTML=h;
+    }
+
+    // ── 黄金对照（伦敦金 / 黄金ETF / A 股指数）──
+    // 只在两个市场都有数据的日期上比，起点归一为 100，避免单位与量级干扰。
+    var GD_COLORS={xau:'#D4AF37','159934':'#2DD4BF','000300':'#539BF5','399006':'#A78BFA'};
+    function gdPct(v){ return (v==null)?'—':((v>0?'+':'')+btNum(v)+'%'); }
+    function gdColor(v){ return (v==null)?'var(--muted)':(v>0?'#ef4444':(v<0?'#10b981':'var(--text-secondary)')); }
+    function renderGold(d){
+      var box=document.getElementById('gold-block');
+      if(!box) return;
+      if(!d||d.status!=='ok'||!d.series||!d.series.length){
+        box.innerHTML='<div class="no-data" style="padding:14px">🥇 暂无黄金数据（先跑 scripts/fetch_gold_daily.py）</div>';
+        return;
+      }
+      var h='<div class="gd-head"><div class="gd-title">黄金与 A 股对照</div>'
+        + '<div class="gd-note">'+d.start+' ~ '+d.end+'，共 '+d.n+' 个共同交易日，起点统一为 100'
+        + '；伦敦金最新 '+d.gold_updated+'（美元/盎司，新浪外盘）；'
+        + '<b>固定显示最近 250 个交易日，不随上方日期切换</b></div></div>'
+        + '<div class="gd-body"><div class="gd-chips">';
+      d.series.forEach(function(s){
+        h+='<div class="gd-chip"><span class="n">'+s.name+'</span>'
+          +'<span class="v" style="color:'+gdColor(s.ret_win)+'">'+Number(s.last).toFixed(2)+'</span>'
+          +'<span class="r">窗口 '+gdPct(s.ret_win)+' · 20日 '+gdPct(s.ret20)
+          +' · 距高点 '+gdPct(s.dd)+'</span></div>';
+      });
+      if(d.corr&&d.corr['000300']!=null){
+        var c3=d.corr['000300'], c6=d.corr['399006'];
+        h+='<div class="gd-chip"><span class="n">与沪深300 日收益相关</span>'
+          +'<span class="v" style="color:'+(c3<0?'#10b981':'#ef4444')+'">'+c3.toFixed(2)+'</span>'
+          +'<span class="r">与创业板指 '+(c6==null?'—':c6.toFixed(2))+'（窗口内）</span></div>';
+      }
+      h+='</div><div id="gd-chart"></div>'
+        +'<div class="bt-th">读法：金价与 A 股同时下跌 = 流动性收紧（卖黄金补保证金）；'
+        +'金价涨、A 股跌 = 避险；同向上涨 = 美元走弱或降息预期。'
+        +'159934 是场内 ETF，有跟踪误差与折溢价，不能当金价本身。</div></div>';
+      box.innerHTML=h;
+
+      var el=document.getElementById('gd-chart');
+      if(!el||typeof echarts==='undefined') return;
+      var ch=echarts.init(el);
+      el._echart=ch;
+      var series=d.series.map(function(s){
+        return {name:s.name, type:'line', smooth:true, symbol:'none',
+                lineStyle:{width: s.key==='xau'?2.4:1.7, color:GD_COLORS[s.key]},
+                itemStyle:{color:GD_COLORS[s.key]},
+                emphasis:{focus:'series'}, data:s.norm};
+      });
+      ch.setOption({
+        backgroundColor:'transparent',
+        grid:{left:44,right:26,top:34,bottom:26},
+        tooltip:{trigger:'axis', valueFormatter:function(v){return v==null?'—':(Math.round(v*10)/10);}},
+        legend:{top:2, right:4, itemWidth:14, itemHeight:8,
+                textStyle:{color:'#9aa0a6',fontSize:10}},
+        xAxis:{type:'category', data:d.dates, boundaryGap:false,
+               axisLine:{lineStyle:{color:'#3a3f47'}},
+               axisLabel:{color:'#9aa0a6',fontSize:9,
+                          formatter:function(v){return v.slice(2,10);}}},
+        yAxis:{type:'value', scale:true,
+               axisLine:{show:false}, splitLine:{lineStyle:{color:'rgba(127,127,127,.16)'}},
+               axisLabel:{color:'#9aa0a6',fontSize:9}},
+        series:series
+      });
     }
 
     function onDateChange(newDate){
