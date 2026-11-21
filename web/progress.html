@@ -957,7 +957,7 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>导出脚本两处修</b>：<code>extract()</code> 的选择器链补 <code>#js_content</code>（微信正文容器）；导出前把 <code>data-src</code> 写回 <code>src</code> 再序列化，替换时同时处理 <code>u</code> / <code>u.replace('https:','')</code> / <code>u.replace('&','&amp;')</code> 四种写法 —— 否则微信文章导出后 <code>local 0 / remote 8</code>，页面一片空白</td></tr>
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>11-20 总结已重建</b>：第七章改为引用本篇；7.2 关键词核对 4 个方向一致（科技 / 半导体 / 芯片 / 黄金），算力、美股、债无对应指数标「无法判定」</td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 237</b>：微信正文的图片是 <code>data-src</code> 懒加载，<code>currentSrc</code> 能取到地址但 <code>innerHTML</code> 里仍是空 <code>src</code>。本地化必须「先写回 src、再序列化、再替换」，且替换要覆盖 <code>&amp;</code> 转义写法</td></tr>
-<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 238</b>：从文章正文抓宏观数字必须校验量级。原来的正则把「费城半导体 <b>成分股</b>跌 39%」抓成「费城半导体跌 39%」，首轮算出的隔夜均值 −13.75%、联动判定「同步下跌」全错。加了「指数名 + 涨跌动词 + 数字」紧邻结构 + 单日 |涨跌| ≤12% 的闸门后，正确结果为纳斯达克 +2.00%、判定「背离」</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 238</b>：从文章正文抓宏观数字必须校验量级。原来的正则把「费城半导体 <b>成分股</b>跌 39%」抓成「费城半导体跌 39%」，首轮算出的隔夜均值 −13.75%、联动判定「同步下跌」全错。修正三道闸门：① 只认「指数名 + 涨跌动词 + 数字」紧邻结构；② 单日 |涨跌| ≤12%；③ 优先收盘口径 —— 文中「三大指数…均跌 2%」这类合计表述盖过「盘中一度飙涨 +2%」的盘中值。修正后为三大指数 −2.00%，联动判定与文章一致</td></tr>
 </table>
 </div>
 

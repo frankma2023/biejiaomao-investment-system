@@ -487,18 +487,41 @@ def parse_us(articles):
             (r'(?:道琼斯|道指)', '道琼斯'),
             (r'(?:标普500|标普)', '标普500')]
     out, seen = [], set()
+    origin = {}
+    BEAR = ('跌', '下挫', '走低', '收跌', '下跌', '大跌')
+    BULL = ('涨', '走高', '收涨', '上涨', '大涨', '飙')
     for pat, label in pats:
         # 紧邻结构：指数名 → 12 字内出现涨跌动词（可选「幅」）→ 数字%
-        m = re.search(pat + r'[^。；;\n]{0,12}?(?:涨|跌|收涨|收跌|上涨|下跌|大涨|大跌|下挫|走高|走低)'
-                              r'(?:幅)?[^0-9%]{0,6}?([+\-−]?\d+(?:\.\d+)?)\s*%', text)
-        if not m:
+        hits = []
+        for m in re.finditer(pat + r'[^。；;\n]{0,12}?'
+                                     r'(飙涨|大涨|上涨|收涨|涨|大跌|下跌|下挫|走低|收跌|跌)'
+                                     r'(?:幅|至)?[^0-9%]{0,6}?([+\-−]?\d+(?:\.\d+)?)\s*%', text):
+            v = float(m.group(2).replace('−', '-'))
+            if abs(v) > 12:
+                continue
+            hits.append((m.group(1), v))
+        if not hits:
             continue
-        v = float(m.group(1).replace('−', '-'))
-        if abs(v) > 12:
-            continue
+        # 隔夜总结常同时写「盘中一度涨 X%」和「收盘跌 Y%」，收盘值才是隔夜结果，
+        # 因此优先取跌方向的命中，没有跌方向才用涨方向。
+        bear = [h for h in hits if any(w in h[0] for w in BEAR)]
+        pick = bear[0] if bear else hits[0]
         if label not in seen:
-            out.append((label, v))
+            out.append((label, pick[1]))
+            origin[label] = 'bear' if bear else 'bull'
             seen.add(label)
+    # 兜底：文中常用「美股三大指数由涨转跌，均跌 2%」这类合计表述，
+    # 此时没有单个指数名，单独记一条，避免联动判定因为抓不到而变成背离。
+    m3 = re.search(r'(?:美股)?三大指数[^。；\n]{0,12}?(?:均|全部|悉数)?'
+                   r'(跌|涨)(?:幅)?[^0-9%]{0,4}(\d+(?:\.\d+)?)\s*%', text)
+    if m3 and '三大指数' not in seen:
+        v = float(m3.group(2))
+        if abs(v) <= 12:
+            agg = -v if m3.group(1) == '跌' else v
+            # 合计值优先：单个指数那边的「盘中一度飙涨 +2%」不是隔夜收盘，
+            # 和合计值并列会把均值拉回 0，联动判定随之失效。
+            out = [(lb, x) for lb, x in out if origin.get(lb) != 'bull']
+            out.append(('三大指数', agg))
     return out
 
 
