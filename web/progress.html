@@ -949,6 +949,20 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-21 · 黄金卡片补上海金 Au99.99：拆出「汇率」与「国内溢价」两层</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>缺口</b>：原先只有伦敦金（美元/盎司）。159934 用人民币计价，金价跌多少、其中多少是人民币升值，看不出来</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b><code>scripts/fetch_gold_daily.py</code> 支持双源</b>：<code>--sources xau,sge</code>（默认两个都抓）。上海金走 akshare <code>spot_hist_sge(symbol='Au99.99')</code>，写入同一张 <code>gold_daily</code>，<code>source='sge'</code>，共 <b>2,407 行（2016-12-19 ~ 2026-11-20）</b>。两个源分别增量、互不影响</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>反推隐含汇率</b>：<code>上海金(元/克) × 31.1035 ÷ 伦敦金(美元/盎司)</code>，不依赖任何外部汇率源。最新 <b>6.728</b>（2026-11-20），窗口 <b>−5.72%</b>（人民币升值），区间 6.500 ~ 7.449</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>ETF 跟踪差</b>：把 159934 与上海金放同一币种下比（248 个共同日），ETF −19.71% vs 金价 −19.25%，差 <b>−0.57pp</b> —— 跟踪是紧的，折溢价不是主要矛盾</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>页面</b>：五条线 + 8 张指标卡（5 个序列 + 隐含汇率 + 跟踪差 + 相关系数）。核验 <code>{lineN:5, chipN:8, chartH:300, errors:[]}</code></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>关键读数</b>：同一 250 日窗口，伦敦金 <b>−14.35%</b> 而上海金 <b>−19.25%</b>，差 <b>−4.9pp</b> 里有 <b>−5.7%</b> 来自人民币升值 —— 用美元金价看国内黄金会把跌幅看成一半。这正是加这一层的理由</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 241</b>：两条数值高度接近的序列（伦敦金/上海金差异只有汇率，约 5%）画在同一张归一化图里会完全互相遮盖。必须<b>错开画法</b>（粗线 + 虚线）并<b>把次要那条画在最后</b>，否则图上看不出是两条</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 242</b>：需要汇率时先想「能不能从已有两个价格反推」。两个同质商品的不同币种报价，比值就是隐含汇率，比再引入一个外部数据源更稳</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-21 · 大盘扫描加「黄金与 A 股对照」卡片：伦敦金 + 159934 + 两条 A 股指数</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>缺口</b>：本库原来没有任何黄金序列 —— 159934（黄金ETF易方达）只有价格，没有参照物；复盘「流动性收紧时卖黄金补保证金」这类判断没有数据可用</td></tr>

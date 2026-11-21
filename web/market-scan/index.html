@@ -419,7 +419,7 @@
 
     // ── 黄金对照（伦敦金 / 黄金ETF / A 股指数）──
     // 只在两个市场都有数据的日期上比，起点归一为 100，避免单位与量级干扰。
-    var GD_COLORS={xau:'#D4AF37','159934':'#2DD4BF','000300':'#539BF5','399006':'#A78BFA'};
+    var GD_COLORS={xau:'#D4AF37',sge:'#F472B6','159934':'#2DD4BF','000300':'#539BF5','399006':'#A78BFA'};
     function gdPct(v){ return (v==null)?'—':((v>0?'+':'')+btNum(v)+'%'); }
     function gdColor(v){ return (v==null)?'var(--muted)':(v>0?'#ef4444':(v<0?'#10b981':'var(--text-secondary)')); }
     function renderGold(d){
@@ -429,10 +429,11 @@
         box.innerHTML='<div class="no-data" style="padding:14px">🥇 暂无黄金数据（先跑 scripts/fetch_gold_daily.py）</div>';
         return;
       }
+      var dv=d.derived||{};
       var h='<div class="gd-head"><div class="gd-title">黄金与 A 股对照</div>'
         + '<div class="gd-note">'+d.start+' ~ '+d.end+'，共 '+d.n+' 个共同交易日，起点统一为 100'
-        + '；伦敦金最新 '+d.gold_updated+'（美元/盎司，新浪外盘）；'
-        + '<b>固定显示最近 250 个交易日，不随上方日期切换</b></div></div>'
+        + '；伦敦金最新 '+d.gold_updated+'（美元/盎司，新浪外盘）；上海金 Au99.99（元/克，上金所）'
+        + '；<b>固定显示最近 250 个交易日，不随上方日期切换</b></div></div>'
         + '<div class="gd-body"><div class="gd-chips">';
       d.series.forEach(function(s){
         h+='<div class="gd-chip"><span class="n">'+s.name+'</span>'
@@ -440,6 +441,18 @@
           +'<span class="r">窗口 '+gdPct(s.ret_win)+' · 20日 '+gdPct(s.ret20)
           +' · 距高点 '+gdPct(s.dd)+'</span></div>';
       });
+      if(dv.fx){
+        h+='<div class="gd-chip"><span class="n">隐含人民币汇率</span>'
+          +'<span class="v">'+dv.fx.last.toFixed(3)+'</span>'
+          +'<span class="r">'+dv.fx.date+' · 窗口 '+gdPct(dv.fx.ret_win)
+          +' · 区间 '+dv.fx.min.toFixed(3)+' ~ '+dv.fx.max.toFixed(3)+'</span></div>';
+      }
+      if(dv.etf_track){
+        h+='<div class="gd-chip"><span class="n">ETF 跟踪差（对上海金）</span>'
+          +'<span class="v" style="color:'+gdColor(dv.etf_track.diff)+'">'+gdPct(dv.etf_track.diff)+'</span>'
+          +'<span class="r">ETF '+gdPct(dv.etf_track.etf_ret)+' vs 金价 '+gdPct(dv.etf_track.sge_ret)
+          +'（'+dv.etf_track.n+' 日）</span></div>';
+      }
       if(d.corr&&d.corr['000300']!=null){
         var c3=d.corr['000300'], c6=d.corr['399006'];
         h+='<div class="gd-chip"><span class="n">与沪深300 日收益相关</span>'
@@ -449,6 +462,8 @@
       h+='</div><div id="gd-chart"></div>'
         +'<div class="bt-th">读法：金价与 A 股同时下跌 = 流动性收紧（卖黄金补保证金）；'
         +'金价涨、A 股跌 = 避险；同向上涨 = 美元走弱或降息预期。'
+        +'<b>隐含汇率 = 上海金(元/克) × 31.1035 ÷ 伦敦金(美元/盎司)</b>，它涨说明人民币贬值或国内溢价走高；'
+        +'它不动而两条金价分叉，才是真的国内供需差异。'
         +'159934 是场内 ETF，有跟踪误差与折溢价，不能当金价本身。</div></div>';
       box.innerHTML=h;
 
@@ -456,9 +471,14 @@
       if(!el||typeof echarts==='undefined') return;
       var ch=echarts.init(el);
       el._echart=ch;
-      var series=d.series.map(function(s){
+      // 上海金与伦敦金走势高度接近（差异只是汇率），把它压到最后画、加粗画虚线，否则会被完全盖住
+      var ordered=d.series.filter(function(s){return s.key!=='sge';})
+                        .concat(d.series.filter(function(s){return s.key==='sge';}));
+      var series=ordered.map(function(s){
         return {name:s.name, type:'line', smooth:true, symbol:'none',
-                lineStyle:{width: s.key==='xau'?2.4:1.7, color:GD_COLORS[s.key]},
+                lineStyle:{width: s.key==='xau'?2.4:(s.key==='sge'?2.2:1.7),
+                           type: s.key==='sge'?'dashed':'solid',
+                           color:GD_COLORS[s.key]},
                 itemStyle:{color:GD_COLORS[s.key]},
                 emphasis:{focus:'series'}, data:s.norm};
       });

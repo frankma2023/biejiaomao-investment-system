@@ -1035,10 +1035,12 @@ def api_market_breadth():
 
 GOLD_SERIES = [
     ('xau', '伦敦金', 'gold_daily'),        # 美元/盎司，新浪外盘
+    ('sge', '上海金Au99.99', 'gold_daily'),  # 元/克，上金所
     ('159934', '黄金ETF易方达', 'index_daily_kline'),
     ('000300', '沪深300', 'index_daily_kline'),
     ('399006', '创业板指', 'index_daily_kline'),
 ]
+OZ_TO_GRAM = 31.1035          # 1 金衡盎司 = 31.1035 克
 
 
 @app.route('/api/gold-trend')
@@ -1061,6 +1063,11 @@ def api_gold_trend():
         " ORDER BY date")]
     if not gold:
         return jsonify({'status': 'no_data', 'hint': '先跑 python scripts/fetch_gold_daily.py'})
+
+    # 上海金（元/克）
+    sge = [(r['date'], r['close']) for r in db.execute(
+        "SELECT date, close FROM gold_daily WHERE source='sge' AND close IS NOT NULL"
+        " ORDER BY date")]
 
     # 三条 A 股序列
     codes = ['159934', '000300', '399006']
@@ -1086,6 +1093,8 @@ def api_gold_trend():
         m = dict(hist.get(code) or [])
         series[code] = [m.get(d) for d in spine]
     series['xau'] = [gmap.get(d) for d in spine]
+    smap = dict(sge)
+    series['sge'] = [smap.get(d) for d in spine]
 
     def norm(arr):
         base = next((v for v in arr if v), None)
@@ -1137,12 +1146,41 @@ def api_gold_trend():
         vy = sum((p[1] - my) ** 2 for p in pairs) ** 0.5
         corr[code] = round(cov / (vx * vy), 3) if vx and vy else None
 
+    # 由两个金价反推隐含人民币汇率：上海金(元/克) × 31.1035 ÷ 伦敦金(美元/盎司)
+    fx = [(spine[i], series['sge'][i] * OZ_TO_GRAM / series['xau'][i])
+          for i in range(len(spine))
+          if series['sge'][i] and series['xau'][i]]
+    derived = {}
+    if len(fx) >= 2:
+        vals = [v for _, v in fx]
+        derived['fx'] = {
+            'last': round(vals[-1], 4), 'date': fx[-1][0],
+            'ret_win': round((vals[-1] / vals[0] - 1) * 100, 2),
+            'min': round(min(vals), 4), 'max': round(max(vals), 4),
+            'n': len(vals),
+        }
+
+    # 黄金ETF 相对上海金的跟踪差（都是人民币计价，可直接比）
+    pa = [(spine[i], series['159934'][i], series['sge'][i])
+          for i in range(len(spine))
+          if series['159934'][i] and series['sge'][i]]
+    if len(pa) >= 2:
+        e0, s0 = pa[0][1], pa[0][2]
+        e1, s1 = pa[-1][1], pa[-1][2]
+        derived['etf_track'] = {
+            'etf_ret': round((e1 / e0 - 1) * 100, 2),
+            'sge_ret': round((s1 / s0 - 1) * 100, 2),
+            'diff': round(((e1 / e0) / (s1 / s0) - 1) * 100, 2),
+            'start': pa[0][0], 'end': pa[-1][0], 'n': len(pa),
+        }
+
     return jsonify({
         'status': 'ok',
         'dates': spine,
         'n': len(spine),
         'start': spine[0], 'end': spine[-1],
         'series': out,
+        'derived': derived,
         'corr': corr,
         'missing': missing,
         'gold_updated': max(gmap) if gmap else None,
