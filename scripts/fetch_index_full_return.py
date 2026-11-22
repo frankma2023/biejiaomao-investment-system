@@ -8,7 +8,15 @@ scripts/fetch_index_full_return.py — 红利指数全收益（total_return）�
 
 用法：
   python scripts/fetch_index_full_return.py            # 增量（各指数表内 MAX(date) 起）
+  python scripts/fetch_index_full_return.py --lookback 5   # 增量 + 重拉最近 5 个交易日
   python scripts/fetch_index_full_return.py --full     # 全量（2012-12-31 起）
+
+为什么需要 --lookback
+--------------------
+type=total_return 的发布晚于价格序列（2026-11 实测：11-20 夜里价格已有 380 个标的，
+全收益 0 个；11-13 的行直到 11-17 才进库）。日更收盘后就跑，当天这根常常拿不到。
+只从 MAX(date) 起拉，缺的那天要等下一次运行才补上，节假日前后会被拖很久。
+--lookback N 把起点前移到「最近第 N 个交易日」，幂等重拉，代价很小（17 个标的）。
 """
 import sys, os, io, sqlite3, argparse
 from datetime import datetime
@@ -50,6 +58,8 @@ FULL_START = '2012-12-31'
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--full', action='store_true', help='全量（2016 起），默认增量')
+    ap.add_argument('--lookback', type=int, default=0, metavar='N',
+                    help='增量时把起点前移到最近第 N 个交易日（幂等重拉，补供应侧延迟）。默认 0')
     args = ap.parse_args()
 
     conn = sqlite3.connect(DB_PATH)
@@ -59,12 +69,26 @@ def main():
         updated_at TEXT DEFAULT (datetime('now','localtime')),
         PRIMARY KEY (stock_code, date))""")
 
+    # 最近第 N 个交易日（用 000922 的价格序列当交易日历；缺行时回退到日历日估算）
+    lookback_date = None
+    if args.lookback > 0:
+        r = conn.execute("""
+            SELECT MIN(date) d FROM (
+                SELECT DISTINCT date FROM index_daily_kline
+                WHERE stock_code='000922' AND kline_type='normal' AND date<=?
+                ORDER BY date DESC LIMIT ?)
+        """, (datetime.now().strftime('%Y-%m-%d'), args.lookback)).fetchone()
+        lookback_date = r[0] if r and r[0] else None
+        print(f'[INFO] --lookback {args.lookback} → 起点不晚于 {lookback_date}')
+
     for code, name in INDICES:
         if args.full:
             start = FULL_START
         else:
             r = conn.execute("SELECT MAX(date) FROM index_full_return_daily WHERE stock_code=?", (code,)).fetchone()
             start = r[0] if r and r[0] else FULL_START
+            if lookback_date and lookback_date < start:
+                start = lookback_date
         try:
             # 分 9 年窗口（理杏仁约束 ≤10 年；实测容忍但防御性分窗，与 fetch_shareholders_num 同款）
             from datetime import date as _d, timedelta as _td

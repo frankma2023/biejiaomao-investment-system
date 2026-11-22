@@ -257,7 +257,10 @@ TASKS = [
      {"timeout": 3600, "stream": True}),
     # 5c.【已取消 2026-09-15】ex_rights/fc_rights/bc_rights 不再拉取，lxr_fc 已满足全站复权需求
     # 5.5 指数全收益（理杏仁 total_return，8 指数 2016 起，回撤买点基准；替代旧 H00922 单指数脚本）
-    ("5.5全收益指数",     [PYTHON_EXE, "scripts/fetch_index_full_return.py"]),
+    #     --lookback 5：total_return 发布晚于价格序列（2026-11 实测：11-20 夜里价格有 380 个标的、
+    #     全收益 0 个；11-13 的行到 11-17 才进库）。只从 MAX(date) 起拉，缺的那天要等下次运行才补，
+    #     节假日前后会被拖很久；重拉最近 5 个交易日是幂等的，17 个标的代价很小。
+    ("5.5全收益指数",     [PYTHON_EXE, "scripts/fetch_index_full_return.py", "--lookback", "5"]),
     # 5.6 国债收益率（红利温度计股债息差用）
     ("5.6国债收益率",     [PYTHON_EXE, "scripts/fetch_bond_yield.py"]),
     # 5.7 港股红利ETF（每日行情，akshare 新浪源）

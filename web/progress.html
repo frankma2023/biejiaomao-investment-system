@@ -949,6 +949,17 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-22 · 全收益增量加 --lookback 5：补供应侧 T+1 延迟</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>问题</b>：<code>total_return</code> 的发布晚于价格序列。2026-11-20 夜里日更跑完时，价格表已有 <b>380 个标的</b>、全收益表 <b>0 个</b>；11-13 的行直到 <b>11-17</b> 才进库、11-16 的行到 11-18。只从 <code>MAX(date)</code> 起拉，缺的那天要等下一次运行才补，节假日前后会被拖到一周</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b><code>scripts/fetch_index_full_return.py</code> 加 <code>--lookback N</code></b>：增量时把起点前移到「最近第 N 个交易日」（交易日历取 <code>index_daily_kline</code> 的 000922），幂等重拉。实测 <code>--lookback 5</code> → 起点 2026-11-16，17 只各 +5 条，退出码 0</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>日更接入</b>：<code>scripts/daily_update.py</code> 第 5.5 步改为 <code>fetch_index_full_return.py --lookback 5</code></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>当天数据已补齐</b>：17 只指数各补 11-19、11-20 两条（000922 全收益 11-20 = 12,059.91），图上全收益那条线接上最后一天</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 247</b>：同一家数据商的不同 <code>type</code> 发布节奏不一样（价格 T+0、全收益 T+1~T+2）。跨口径指标必须假设「口径 A 有、口径 B 没有」，增量拉取要么带重拉窗口，要么在消费端做口径降级 —— 只靠 <code>MAX(date)</code> 的增量会把缺口一直带在身上</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-22 · 修 RSI 图上的假暴跌：全收益与价格不能按元素回退</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>现象</b>：<code>dividend-advice-detail.html?code=000922&amp;date=2026-11-20</code> 的 RSI 买卖点图，RSI20 末值显示 <b>9.05</b>（RSI6 是 2.18、RSI14 是 6.22），还标了一个「极强买点」。而中证红利 11-20 只是小跌 −0.33%，不可能极度超卖</td></tr>
