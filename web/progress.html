@@ -949,6 +949,19 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-22 · 红利「六只亮红灯」小红书图文：六张卡片 + 一篇长文</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>数据层</b>：<code>docs/article/make_div_note01.py</code> 直连 <code>data/lixinger.db</code> 现算九只红利指数的 PE / PB / 股息率、滚动 750 日分位、全史分位、股债息差（对 10 年国债 1.5755%）、750 日锚定回撤，并<b>复算</b>页面 v2.0 判据（风险分取三项最大、广度 ≥2 才成立）。结果与线上 <code>/api/market-scan/dividend-advice</code> 一致：<b>减仓 6 / 谨慎 1 / 观望 2</b></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>六张 3:4 卡片</b>（2592×3456、240 dpi、PNG+SVG 双份）→ <code>docs/article/红利减仓笔记01_六只亮红灯/images/p1..p6</code>：封面 / PE·PB 分位轨道 / 股债息差三条 750 日走势 / 距 3 年高点回撤 / 九只一览表 / 口径与四个后续信号</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>长文</b> <code>index.html</code>：7 章 + 10 行名单表 + 5 张图（封面不入页），Playwright 核验 <code>{bg:rgb(14,14,18), wrapW:680, figures:5, broken:[], tables:1, errors:[]}</code>，整页 1520×15604 px</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 243</b>：同一份内容既做卡片又做长文时，卡片上的编号必须和长文章节号<b>脱钩</b>。卡片的 kicker 原来写「01 贵在哪…05 怎么用」，而长文有 7 章，图文第一张就对不上。改成不带数字的「贵在哪 / 性价比 / 位置 / 一览 / 怎么用」</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 244</b>：<code>(x or -99) > -1</code> 这种「None 兜底」写法会把 <code>0.0</code> 一并当缺值吞掉（<code>-0.0</code> 是 falsy）。当时「距高点不到 1%」数出 2 只，实际 4 只。判空只能写 <code>x is not None</code></td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 245</b>：<code>head()</code> 的副标纵向位置是按标题行数算出来的，改标题换行数会连带撞上后面的图例与首行轨道。卡片布局要按「头部 / 图例 / 主图 / 读数卡 / 脚注」五段固定预算，不要靠单点微调</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>排版迭代七处</b>：图例与两行副标重叠（0.777 撞 0.775）→ 图例下移；轨道行距 0.052×9 压到读数卡 → 0.038；<code>ylim</code> 5.4 把港股通 2024 年的 6~7pp 削平 → 改 8.0；两条末值标注（2.26/2.30）互压 → 删标注由读数卡承担；一览表头上移后撞副标、页脚单行溢出 → 页脚拆两行；<code>figcaption</code>「2024 年普遍 4~6pp」与卡内「5~7pp」矛盾 → 统一为「港股通 6~7pp、A 股红利 3~5pp」；股息率分位 <code>:.0f</code> 把 0.1% 显示成 0% → <code>:.1f</code></td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-21 · 黄金卡片补上海金 Au99.99：拆出「汇率」与「国内溢价」两层</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>缺口</b>：原先只有伦敦金（美元/盎司）。159934 用人民币计价，金价跌多少、其中多少是人民币升值，看不出来</td></tr>
