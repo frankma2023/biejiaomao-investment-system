@@ -2721,12 +2721,26 @@ def api_market_dividend_detail():
     # RSI 基于全收益序列（含分红再投资）计算。红利指数股息率 4%~6%，
     # 用价格序列会把除息计为下跌；缺失全收益数据的日期回退价格指数。
     if dates_long and tri_long and any(v is not None for v in tri_long):
-        rsi_closes = [tv if tv is not None else cv
-                      for tv, cv in zip(tri_long, closes_long)]
+        # 全收益序列与价格序列的末日不齐（全收益一般晚一天更新）。原先按元素回退
+        # 「tv if tv is not None else cv」会把两种量级混进同一条序列：2026-11-19 全收益
+        # 是 12,096.72，2026-11-20 回退到价格 5,529.78，最后一天被算成 −54%，
+        # RSI20 掉到 9.05、并误标一个「极强买点」。
+        # 改为按「日收益率」链式拼接：两天都有全收益就用全收益收益，缺的那天用价格
+        # 收益接到前一个水平上。序列连续、不跳档，也天然含分红再投资。
+        rsi_closes = [1.0]
+        for _i in range(1, len(dates_long)):
+            _tv0, _tv1 = tri_long[_i - 1], tri_long[_i]
+            _cv0, _cv1 = closes_long[_i - 1], closes_long[_i]
+            _r = None
+            if _tv0 and _tv1:
+                _r = _tv1 / _tv0
+            elif _cv0 and _cv1:
+                _r = _cv1 / _cv0
+            rsi_closes.append(rsi_closes[-1] * (_r if _r else 1.0))
     else:
         rsi_closes = closes_long if dates_long else closes
-    # 后续收益用全收益口径（红利指数分红不可忽略），没有全收益就退回价格
-    rsi_fwd_base = tri_long if (tri_long and len(tri_long) == len(rsi_closes)) else rsi_closes
+    # 后续收益同样用这条连续序列（含分红），口径与 RSI 一致
+    rsi_fwd_base = rsi_closes
 
     def _rsi_fwd_raw(i, n):
         """未取整的后续收益（%）。判胜负必须用它 —— 先 round 到 1 位再比 >0，

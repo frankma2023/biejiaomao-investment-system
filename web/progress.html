@@ -949,6 +949,18 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-22 · 修 RSI 图上的假暴跌：全收益与价格不能按元素回退</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>现象</b>：<code>dividend-advice-detail.html?code=000922&amp;date=2026-11-20</code> 的 RSI 买卖点图，RSI20 末值显示 <b>9.05</b>（RSI6 是 2.18、RSI14 是 6.22），还标了一个「极强买点」。而中证红利 11-20 只是小跌 −0.33%，不可能极度超卖</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>根因</b>：<code>src/server.py</code> 构造 RSI 输入序列时写的是 <code>[tv if tv is not None else cv for tv, cv in zip(tri_long, closes_long)]</code> —— <b>按元素</b>在「全收益」和「价格」之间回退。全收益序列 11-20 还没更新（末日是 11-19 的 <b>12,096.72</b>），价格序列有 11-20 的 <b>5,529.78</b>，于是最后一天被算成 <b>−54%</b>，接缝处造出一根假暴跌</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>修法</b>：改成按<b>日收益率链式拼接</b> —— 两天都有全收益就用全收益收益，缺的那天用价格收益接到前一个水平上。序列连续、不跳档，且天然含分红再投资；<code>rsi_fwd_base</code> 同步改用这条链，RSI 与后续收益口径一致</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>复核（同一份库数据独立重算）</b>：RSI20 <b>9.05 → 49.75</b>、RSI14 6.22 → 48.90、RSI6 2.18 → 44.02，前一日分别是 51.15 / 51.04 / 49.85；11-20 的「极强买点」标记消失；重启 <code>src/server.py</code> 后接口 <code>rsi_series[period=20].values</code> 末值为 49.75，与手算一致</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 246</b>：同一标的的两套价格序列（全收益 / 不复权）量级可以差一倍以上，<b>按元素回退一定会造出假跳空</b>。跨口径补数据只有两种正确做法：整段统一口径，或按<b>收益率</b>链式拼接。判据是「接缝前后单日收益是否落在 ±12% 以内」</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>附带发现</b>：<code>_rsi20()</code>（打分用）只读 <code>index_full_return_daily</code>，末日取到 11-19，所以那只给 50.9 是<b>对的</b> —— 这个 bug 只影响图上那条曲线与买卖点标记，没有污染减仓/买入评分</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-22 · 红利「六只亮红灯」小红书图文：六张卡片 + 一篇长文</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-done"></span></td><td><b>数据层</b>：<code>docs/article/make_div_note01.py</code> 直连 <code>data/lixinger.db</code> 现算九只红利指数的 PE / PB / 股息率、滚动 750 日分位、全史分位、股债息差（对 10 年国债 1.5755%）、750 日锚定回撤，并<b>复算</b>页面 v2.0 判据（风险分取三项最大、广度 ≥2 才成立）。结果与线上 <code>/api/market-scan/dividend-advice</code> 一致：<b>减仓 6 / 谨慎 1 / 观望 2</b></td></tr>
