@@ -949,6 +949,25 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-23 · 缠论扫描全失败：czsc 编译模块丢失 + 静默降级</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>现象</b>：日更报 <code>[WARN] 失败任务: 27c.缠论批量扫描</code>。查 <code>logs/chanlun_weekly_failed_codes.txt</code> 发现 <b>3,957 只全部失败</b>，错误一律是 <code>cannot import name 'CzscSignals' from 'czsc._native' (unknown location)</code></td></tr>
+<tr><td><span class="pg-dot dot-risk"></span></td><td><b>根因</b>：<code>site-packages/czsc/_native.pyd</code>（<b>68.9 MB</b> 编译模块）在 <b>2026-11-14 19:27</b> 消失，只剩 <code>_native/__init__.pyi</code> 类型存根 → <code>czsc._native</code> 被当成空命名空间包。<code>chanlun_scan_daily</code> 最新日期停在 <b>2026-11-13</b>，11-16 ~ 11-20 五个交易日全缺（11-14 是周六）</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>为什么五天才发现</b>：<code>from czsc import ...</code> 写在 <code>scan_stock_all()</code> 里逐只 import，异常被逐只 <code>except</code> 吞掉 → 脚本照常跑完 3,957 只、每只都失败、退出码却是 0；只有 <code>generate_html</code> 因空数据抛异常才让退出码非 0，日更因此只留一行 WARN</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>修复依赖</b>：<code>pip install --force-reinstall --no-deps --no-cache-dir czsc==1.0.1</code>。第一次漏了 <code>--no-deps</code>，pip 正准备把 <b>numpy 2.4.2→2.5.5、pandas 2.3.3→3.1.1、polars 2.1.0</b> 一起升，在解包阶段叫停；改 <code>--no-deps</code> 后 68,946,944 字节的 <code>_native.pyd</code> 归位，<code>import czsc</code> 通过</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>护栏 1（<code>src/scanners/chanlun_scan.py</code>）</b>：<code>run_scan()</code> 开头预检 <code>from czsc import CZSC, RawBar, Freq</code>，失败直接打印 <code>[FATAL] czsc 不可用</code> + 修复命令 + <code>sys.exit(2)</code>，不再逐只失败</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>护栏 2（同文件）</b>：<code>scanned == 0</code> 时跳过 <code>generate_html</code>（空看板会覆盖上一份）并 <code>sys.exit(3)</code>，让日更明确报 FAIL</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>新脚本 <code>scripts/catchup_chanlun.py</code></b>：单趟多日回补。原 <code>chanlun_scan.py</code> 一次只扫一个日期、每只股票重放全历史，缺 5 天就要重放 5 遍（约 2.5 小时）；复用 <code>scan_stock_all(code, dates)</code> 把 5 天合成一趟，实测 <b>3,937 只 × 5 天 = 19,659 行，20 分钟</b>。支持 <code>--days N</code> / <code>--dry-run</code></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>数据已补齐</b>：11-16 ~ 11-20 各 3,931/3,932 只，<code>chanlun_bi_json</code> 同步（每只都有）；11-13 是 4,064 只（当日过滤池更大）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>下游已重跑</b>（它们昨晚都吃到了空 bi）：27d 杯柄形态 V2 → 新写入 SIGNAL 0 / CANDIDATE 2；29 MW 信号扫描 → <b>1,718 条</b>（B1=0、B2=0，跳过 1,483 只无 bi）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>日更接入</b>：新增第 27c2 步 <code>catchup_chanlun.py --days 5</code>，紧跟 27c 之后。无缺口时只查一次库，几毫秒</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 248</b>：编译扩展（<code>.pyd</code>/<code>.so</code>）缺失不会在 import 包时暴露，只在用到子模块时报 <code>unknown location</code>。第三方依赖的 import 必须放在「每只股票都走一次」的循环之外做预检</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 249</b>：<code>pip install --force-reinstall</code> 会连带升级全部依赖。只想修一个包时永远加 <code>--no-deps</code>，否则一次修包能把 numpy/pandas 大版本换掉</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 250</b>：全失败必须 != 成功。逐只 try/except + 退出码 0 的组合会让「100% 失败」看起来像「跑完了」。任何批量任务都要有「成功数 == 0 → 非零退出」这条兜底</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-22 · 全收益增量加 --lookback 5：补供应侧 T+1 延迟</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>问题</b>：<code>total_return</code> 的发布晚于价格序列。2026-11-20 夜里日更跑完时，价格表已有 <b>380 个标的</b>、全收益表 <b>0 个</b>；11-13 的行直到 <b>11-17</b> 才进库、11-16 的行到 11-18。只从 <code>MAX(date)</code> 起拉，缺的那天要等下一次运行才补，节假日前后会被拖到一周</td></tr>

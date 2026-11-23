@@ -276,7 +276,17 @@ def run_scan(scan_date=None, all_market=False):
     """
     if scan_date is None:
         scan_date = datetime.now().strftime("%Y-%m-%d")
-    
+
+    # 预检 czsc：它被逐只 import 在 scan_stock_all 里，依赖坏了会变成「每只都失败」，
+    # 2026-11-14 ~ 11-20 就是这样静默跑了 3,957 只全失败（czsc/_native.pyd 丢失）。
+    try:
+        from czsc import CZSC, RawBar, Freq  # noqa: F401
+    except Exception as e:
+        print(f"[FATAL] czsc 不可用：{type(e).__name__}: {e}")
+        print("        修复：python -m pip install --force-reinstall --no-cache-dir czsc==1.0.1")
+        print("        检查：site-packages/czsc/_native.pyd（缺失即损坏）")
+        sys.exit(2)
+
     conn = _connect()
     _ensure_table(conn)
     
@@ -328,6 +338,11 @@ def run_scan(scan_date=None, all_market=False):
     conn.close()
     
     print(f"完成: {scanned}/{len(stocks)} 成功, {has_signal} 只有信号")
+
+    if scanned == 0:
+        # 全失败不能当成功：既不出 HTML（空看板会覆盖上一份），也要用非零退出码上报
+        print(f"[FAIL] 0/{len(stocks)} 成功，跳过 HTML 快照，退出码 3")
+        sys.exit(3)
     
     # 生成 HTML 快照
     html_path = generate_html(scan_date)

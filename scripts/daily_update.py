@@ -381,6 +381,10 @@ TASKS.append(("27b.缠论分钟数据", [PYTHON_EXE, "scripts/fetch_tdx_minute.p
 # 必须跑在 MW 信号扫描之前，否则 MW 引擎 0% 兜底下会跳过全部股票
 TASKS.append(("27c.缠论批量扫描", [PYTHON_EXE, "src/scanners/chanlun_scan.py", "--date", today_str, "--all"]))
 
+# 27c2. 缠论缺口回补（兜 27c 失败留下的空洞：2026-11-14 czsc/_native.pyd 丢失，
+# 27c 静默跑了 5 天全失败，缺口一直没人补。单趟多日，无缺口时只是一次查询）
+TASKS.append(("27c2.缠论缺口回补", [PYTHON_EXE, "scripts/catchup_chanlun.py", "--days", "5"]))
+
 # 27d. 杯柄形态 V2（依赖 27c 的当日笔；同时落 SIGNAL 与 CANDIDATE 两类记录，
 # 供驾驶舱「杯柄信号」页消费。引擎按结构去重，候选约 3 条/日，增量幂等可重复）
 TASKS.append(("27d.杯柄形态V2", [PYTHON_EXE, "scripts/scan_cup_handle_v2.py", "--date", today_str]))
