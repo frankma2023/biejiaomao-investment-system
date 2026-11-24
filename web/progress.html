@@ -961,6 +961,7 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 255</b>：增量拉的起点不能用「库内 MAX(date)+1」当成「源头最大可发布日」。数据源按 type 分批发布（股票先、指数后、全收益再后），必须带固定回看窗口</td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 256</b>：日更必须自检「关键表最新日期 = 今天」。没有这一步，「全部完成」可以是所有下游都停在三天前</td></tr>
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 257</b>：页面的日期骨架不能取单条序列（哪怕它是基准指数），要取全表并集并逐条报 asof。一条序列落后不该截断整张图</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 258</b>：<code>market_health.py --sector</code> 在目标日缺 <code>index_rs_daily</code> 时会<b>静默回退</b>到最近有 RS 数据的日期（日志只有一行 WARN），所以补跑行业健康分前必须先跑第 11 步「指数 RS 强度」，否则跑完仍停在旧日期</td></tr>
 </table>
 </div>
 
