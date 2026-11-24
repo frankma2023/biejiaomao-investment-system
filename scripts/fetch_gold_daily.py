@@ -78,7 +78,7 @@ def fetch_sge():
 FETCHERS = {'xau': fetch_xau, 'sge': fetch_sge}
 
 
-def save(con, source, rows, full):
+def save(con, source, rows, full, lookback_start=None):
     if not rows:
         print(f'[FAIL] {source} 未取到任何数据')
         return 1
@@ -86,8 +86,11 @@ def save(con, source, rows, full):
     if not full:
         r = con.execute('SELECT MAX(date) FROM gold_daily WHERE source=?', (source,)).fetchone()
         last = r[0] if r else None
-        if last:
-            rows = [t for t in rows if t[0] > last]
+        # 回看窗口：源头晚发布时，只按 MAX(date)+1 增量会把那几天永久漏掉。
+        # UPSERT 幂等，重拉无害。
+        cut = lookback_start if (lookback_start and last and lookback_start < last) else last
+        if cut:
+            rows = [t for t in rows if t[0] > cut]
         if not rows:
             print(f'[OK] {source} 无新数据（库内最新 {last}）')
             return 0
@@ -111,8 +114,14 @@ def main():
     ap.add_argument('--full', action='store_true')
     ap.add_argument('--sources', default='xau,sge', help='逗号分隔：xau,sge')
     ap.add_argument('--source', default=None, help='（兼容旧参数，等同 --sources）')
+    ap.add_argument('--lookback', type=int, default=0,
+                    help='回看 N 个自然日重拉（源头晚发布时用来补缺口；0=只拉最新之后）')
     a = ap.parse_args()
     socket.setdefaulttimeout(30)
+
+    lookback_start = None
+    if a.lookback > 0:
+        lookback_start = (dt.date.today() - dt.timedelta(days=a.lookback)).isoformat()
 
     names = (a.source or a.sources).split(',')
     con = sqlite3.connect(a.db)
@@ -126,7 +135,7 @@ def main():
             print(f'[SKIP] 未知源 {s}')
             continue
         try:
-            bad |= save(con, s, fn(), a.full)
+            bad |= save(con, s, fn(), a.full, lookback_start)
         except Exception as e:
             bad |= 1
             print(f'[FAIL] {s} {type(e).__name__}: {str(e)[:120]}')

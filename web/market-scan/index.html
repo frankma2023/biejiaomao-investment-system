@@ -160,6 +160,8 @@
     .gd-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:14px 16px 6px;border-radius:14px 14px 0 0;border:1px solid var(--border);border-bottom:0;background:var(--card)}
     .gd-title{font-family:var(--font-display);font-size:0.95rem;font-weight:800;color:var(--text-primary)}
     .gd-note{font-size:0.6rem;color:var(--muted)}
+    .gd-stale{font-size:0.62rem;color:#f59e0b;background:rgba(245,158,11,.09);
+      border-left:3px solid #f59e0b;border-radius:6px;padding:6px 9px;margin:4px 0 6px}
     .gd-body{border:1px solid var(--border);border-radius:0 0 14px 14px;background:var(--card);padding:6px 16px 14px;box-shadow:var(--shadow-card)}
     .gd-chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:8px;margin:6px 0 10px}
     .gd-chip{border:1px solid var(--border);border-radius:10px;padding:7px 9px;background:var(--bg-elevated,rgba(127,127,127,.05))}
@@ -434,6 +436,11 @@
         + '<div class="gd-note">'+d.start+' ~ '+d.end+'，共 '+d.n+' 个共同交易日，起点统一为 100'
         + '；伦敦金最新 '+d.gold_updated+'（美元/盎司，新浪外盘）；上海金 Au99.99（元/克，上金所）'
         + '；<b>固定显示最近 250 个交易日，不随上方日期切换</b></div></div>'
+        + (d.stale&&d.stale.length
+            ? '<div class="gd-stale">⚠ 有序列落后于 '+d.end+'：'
+              + d.stale.map(function(x){return x.name+' 截至 '+x.asof;}).join('；')
+              + '（指数 K 线由日更第 2 步拉取，数据源 EOD 发布晚于收盘时会滞后一天）</div>'
+            : '')
         + '<div class="gd-body"><div class="gd-chips">';
       d.series.forEach(function(s){
         h+='<div class="gd-chip"><span class="n">'+s.name+'</span>'

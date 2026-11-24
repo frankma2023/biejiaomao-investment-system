@@ -1079,8 +1079,15 @@ def api_gold_trend():
         hist.setdefault(r['stock_code'], []).append((r['date'], r['close']))
     missing = [c for c in codes if not hist.get(c)]
 
-    # 用「日期交集」对齐：以最近 n 个 A 股交易日为骨架，取同日金价
-    spine = [d for d, _ in (hist.get('000300') or [])][-n:]
+    # 用「日期交集」对齐：骨架取全表最近的 A 股交易日，再与金价取交集。
+    # 2026-11-24 修：骨架原来固定取 000300 的日期序列，一旦该指数的 K 线比金价
+    # 落后几天（数据源指数 EOD 发布晚于股票与 ETF），整张卡片就被截到旧日期，
+    # 看上去像「金价没更新」。改为按表内所有指数的并集取日期，再逐条给出 asof。
+    start_hint = (hist.get('000300') or hist.get('159934') or [(None,)])[0][0]
+    spine = [r['date'] for r in db.execute(
+        "SELECT DISTINCT date FROM index_daily_kline WHERE kline_type='normal'"
+        " AND date >= ? ORDER BY date DESC LIMIT ?", (start_hint or '2000-01-01', n))]
+    spine.reverse()
     if not spine:
         return jsonify({'status': 'no_data'})
     gmap = dict(gold)
@@ -1113,9 +1120,12 @@ def api_gold_trend():
         if not vals:
             continue
         peak = max(vals)
+        # 该条序列自己最新有值的那一天：各源发布节奏不同，必须逐条报
+        last_i = max(i for i, v in enumerate(arr) if v)
         out.append({
             'key': key, 'name': label,
             'last': round(vals[-1], 2),
+            'asof': spine[last_i],
             'ret5': ret(arr, 5), 'ret20': ret(arr, 20),
             'ret60': ret(arr, 60), 'ret120': ret(arr, 120),
             'ret_win': round((vals[-1] / vals[0] - 1) * 100, 2),
@@ -1174,6 +1184,9 @@ def api_gold_trend():
             'start': pa[0][0], 'end': pa[-1][0], 'n': len(pa),
         }
 
+    stale = [{'key': s['key'], 'name': s['name'], 'asof': s['asof']}
+             for s in out if s['asof'] != spine[-1]]
+
     return jsonify({
         'status': 'ok',
         'dates': spine,
@@ -1183,9 +1196,9 @@ def api_gold_trend():
         'derived': derived,
         'corr': corr,
         'missing': missing,
+        'stale': stale,
         'gold_updated': max(gmap) if gmap else None,
     })
-
 
 # ═══════════════════════════════════════════════
 # API: GET /api/market-sell-score

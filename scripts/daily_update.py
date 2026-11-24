@@ -243,7 +243,8 @@ TASKS = [
     # 1. 股票基础信息
     ("1.股票状态",         [PYTHON_EXE, "scripts/fetch_stock_basic.py"]),
     # 2. 指数日K线 + 估值（理杏仁API）
-    ("2.指数日K线",       [PYTHON_EXE, "scripts/fetch_index_daily_kline.py", "--all", "--end", today_str]),
+    ("2.指数日K线",       [PYTHON_EXE, "scripts/fetch_index_daily_kline.py", "--all", "--end",
+                          today_str, "--lookback", "7"]),
     ("3.指数估值PE/PB",    [PYTHON_EXE, "scripts/fetch_index_fundamental.py", "--incremental", "--end", today_str]),
     # 4. 通达信补K线（ETF + 个股，本地文件读取）
     ("4.通达信ETF+K线",   [PYTHON_EXE, "scripts/fetch_tdx_kline.py"]),
@@ -451,7 +452,8 @@ TASKS.append(("40b.指汇盈文章导出", [PYTHON_EXE, "scripts/export_gzh_html
 # 大盘扫描页「黄金与 A 股对照」卡片的唯一数据源（表 gold_daily，source='xau'）。
 # 新浪外盘接口一次返回全部历史（2006 起约 5,180 根），增量只写库内最大日期之后的行；
 # 国际金与 A 股交易日不同，页面按日期交集对齐。耗时 ~1s。失败不影响主流程。
-TASKS.append(("40c.伦敦金日线", [PYTHON_EXE, "scripts/fetch_gold_daily.py"],
+TASKS.append(("40c.伦敦金日线", [PYTHON_EXE, "scripts/fetch_gold_daily.py",
+                                 "--lookback", "10"],
               {"timeout": 180}))
 
 # 步骤 41：当日大盘交易总结（2026-11-13；2026-11-14 起带 LLM 叙事）
@@ -523,6 +525,45 @@ for item in TASKS:
             break
 
 # ═══════════════════════════════════════════════
+# 数据新鲜度自检（2026-11-24 新增）
+# 起因：11-24 跑完日更，股票 K 线已到 11-24，但 392 个指数的 K 线最新只到 11-20
+# （数据源指数 EOD 发布晚于股票）。此后所有下游都停在 11-20，页面看上去是
+# 「今天跑了但没更新」，日志里却没有一行失败 —— 因为没有任何一处检查
+# 「关键表的最新日期是不是今天」。这里补上：跑完逐表比对，落后就报。
+# ═══════════════════════════════════════════════
+
+FRESH_TABLES = [
+    ("股票K线 daily_kline", "SELECT MAX(date) FROM daily_kline"),
+    ("指数K线 index_daily_kline", "SELECT MAX(date) FROM index_daily_kline"),
+    ("指数估值 index_fundamental_daily", "SELECT MAX(date) FROM index_fundamental_daily"),
+    ("大盘健康分 market_health_daily", "SELECT MAX(date) FROM market_health_daily"),
+    ("卖出评分 market_sell_score_daily", "SELECT MAX(date) FROM market_sell_score_daily"),
+    ("行业健康 market_health_sector_daily", "SELECT MAX(date) FROM market_health_sector_daily"),
+    ("资金活跃度 index_capital_flow_daily", "SELECT MAX(date) FROM index_capital_flow_daily"),
+]
+
+
+def fresh_check(target_date):
+    """返回 [(表名, 最新日期)]，只列落后于 target_date 的表。"""
+    conn = sqlite3.connect(os.path.join(PROJECT_DIR, "data", "lixinger.db"))
+    stale = []
+    try:
+        for label, sql in FRESH_TABLES:
+            try:
+                row = conn.execute(sql).fetchone()
+            except sqlite3.Error:
+                continue
+            latest = row[0] if row else None
+            if not latest or latest < target_date:
+                stale.append((label, latest))
+    finally:
+        conn.close()
+    return stale
+
+
+stale_tables = fresh_check(today_str)
+
+# ═══════════════════════════════════════════════
 # 汇总
 # ═══════════════════════════════════════════════
 
@@ -542,7 +583,16 @@ if failed:
 else:
     log(f"全部完成")
 
+if stale_tables:
+    log(f"[STALE] {len(stale_tables)} 张关键表落后于 {today_str}：")
+    for _lbl, _latest in stale_tables:
+        log(f"   · {_lbl}: 最新 {_latest or '(空)'}")
+    log("   常见原因：数据源当日 EOD 尚未发布。第 2 步已带 --lookback 7，"
+        "次日重跑会自动补齐；页面在此之前会停在旧日期。")
+else:
+    log(f"[FRESH] 关键表均已到 {today_str}")
+
 log(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-if failed:
+if failed or stale_tables:
     sys.exit(1)

@@ -145,11 +145,17 @@ def main():
     # ── 解析参数 ──────────────────────────────────────────
     user_start = None
     user_end = None
+    lookback = 0
     for i, arg in enumerate(sys.argv):
         if arg == "--start" and i + 1 < len(sys.argv):
             user_start = sys.argv[i + 1]
         if arg == "--end" and i + 1 < len(sys.argv):
             user_end = sys.argv[i + 1]
+        if arg == "--lookback" and i + 1 < len(sys.argv):
+            try:
+                lookback = int(sys.argv[i + 1])
+            except ValueError:
+                lookback = 0
 
     # 加载指数配置（按分类）
     cats = load_index_config_by_category()
@@ -200,6 +206,12 @@ def main():
     #   现改为：逐指数记录“应当拿到、却拿到 0 条”的落空项，大面积落空即报错并非零退出。
     expect_date = user_end or default_end
     missed = []
+    # ── 重拉窗口（2026-11-24 加固）────────────────────────────
+    # 数据源的指数 EOD 发布晚于股票（实测 11-24 18:48 跑：股票已到 11-24，
+    # 392 个指数最新只到 11-20），只按「库内最大日期+1」增量拉，晚发布的那几天
+    # 会永远补不上：次日 start 从 11-21 起，源头此时已有 11-21 但用户看到的
+    # 页面仍是 11-20 的锚点。改为每次回看 lookback 个自然日重拉，UPSERT 幂等。
+    lookback_start = (datetime.now() - timedelta(days=lookback)).strftime("%Y-%m-%d") if lookback > 0 else None
 
     for idx_code, idx_name in indices.items():
         # 查询该指数已存的最新日期
@@ -210,6 +222,8 @@ def main():
         elif latest:
             start = datetime.strptime(latest, "%Y-%m-%d") + timedelta(days=1)
             start_date = start.strftime("%Y-%m-%d")
+            if lookback_start and lookback_start < start_date:
+                start_date = lookback_start
             if start_date > default_end:
                 log.info(f"  {idx_code} {idx_name} ✅ 已最新")
                 continue
@@ -227,6 +241,10 @@ def main():
                 missed.append(idx_code)
         except Exception as e:
             log.error(f"  {idx_code} {idx_name}: ❌ {e}")
+            # 2026-11-24 加固：原实现只把「取到 0 条」计入落空，抛异常的不计。
+            # 于是接口报错（限流/超时）整批失败时 missed 为空、退出码 0，
+            # 日更看到的是 ✅ 而库里一行没进。异常同样算落空。
+            missed.append(idx_code)
 
     log.info(f"🏁 完成: 共保存 {total_saved} 条指数K线")
     if missed:

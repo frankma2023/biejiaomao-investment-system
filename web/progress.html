@@ -949,6 +949,22 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-24 · 日更「跑了但没更新」：指数 K 线落后 2 个交易日</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>现象</b>：11-24 日更跑完，市场扫描页的伦敦金/上海金/黄金ETF 仍显示 11-20；大盘交易总结的日期也停在 11-20</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>定位</b>：股票 K 线已到 11-24，但 <code>index_daily_kline</code> 里 <b>392 个指数</b>最新只到 11-20（另有 38 个到 11-19），只有 21 个 ETF 到 11-24。<b>数据源的指数 EOD 发布晚于股票</b>（同类延迟 11-20 已在全收益上踩过一次）。下游 health / sell_score / 资金流 / 总结全部以指数表为输入，于是一起停在 11-20</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>根因</b>：增量拉的起点是「库内 MAX(date)+1」。晚发布的那天，当次拉不到，下次起点已经越过它 → <b>缺口永久留着</b>。而取 0 条只进 <code>missed</code> 列表，<b>抛异常的不进</b>，所以整批失败时退出码仍是 0</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>修 1（拉取）</b>：<code>fetch_index_daily_kline.py</code> 加 <code>--lookback N</code>，日更第 2 步改为 <code>--lookback 7</code>；<code>fetch_gold_daily.py</code> 同样加 <code>--lookback</code>，第 40c 步用 10。UPSERT 幂等，重拉无害。异常也计入 <code>missed</code>，超 20% 落空即非零退出</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>修 2（卡片骨架）</b>：<code>/api/gold-trend</code> 原来拿 <b>000300 单条序列</b>的日期当骨架，该指数落后就把整张卡片截断。改为取 <code>index_daily_kline</code> 全表并集日期，并逐条返回 <code>asof</code>；有序列落后时页面顶部显示琥珀色提示条，列出「哪条序列截至哪天」</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>修 3（自检）</b>：<code>daily_update.py</code> 收尾新增数据新鲜度检查，逐表比对 7 张关键表的 <code>MAX(date)</code> 与今天；落后的打印 <code>[STALE]</code> 清单并以非零退出。以前「跑了但没更新」不会出现在任何一行日志里</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>补齐</b>：回拉 410 个指数共 <b>2,452 行</b>（11-17 ~ 11-24），重跑 11-23/11-24 的健康分、行业健康、资金活跃度、卖出评分、快照与总结。现在黄金卡片末值 —— 伦敦金 <b>3,624.16</b>、上海金 <b>777.72</b> 元/克、黄金ETF <b>77.23</b>、隐含汇率 <b>6.675</b>，五条序列 asof 全部 2026-11-24</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 255</b>：增量拉的起点不能用「库内 MAX(date)+1」当成「源头最大可发布日」。数据源按 type 分批发布（股票先、指数后、全收益再后），必须带固定回看窗口</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 256</b>：日更必须自检「关键表最新日期 = 今天」。没有这一步，「全部完成」可以是所有下游都停在三天前</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 257</b>：页面的日期骨架不能取单条序列（哪怕它是基准指数），要取全表并集并逐条报 asof。一条序列落后不该截断整张图</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-24 · 用 A 股十年数据检验市赚率（PR = PE ÷ ROE%）</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：用户读雪球「市赚率」一文（腾讯 0.4PR 买、1.0PR 卖），要求用历史数据验证</td></tr>
