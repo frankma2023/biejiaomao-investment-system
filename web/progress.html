@@ -949,6 +949,23 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-24 · 用 A 股十年数据检验市赚率（PR = PE ÷ ROE%）</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>起因</b>：用户读雪球「市赚率」一文（腾讯 0.4PR 买、1.0PR 卖），要求用历史数据验证</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>样本</b>：109 个月度截面（2016-06 ~ 2025-06），<b>268,821</b> 条记录。PR 不需要财报 —— 全库 <code>fundamental_indicator</code> 每日有 <code>pe_ttm</code> 与 <code>pb</code>，而 <code>PB = PE × ROE</code>，故 <b>ROE = PB ÷ PE</b>，<b>PR = PE² ÷ (PB × 100)</b>。过滤：PE&gt;0、隐含 ROE 2%~80%、上市满 250 日、20 日均成交额 ≥2000 万</td></tr>
+<tr><td><span class="pg-dot dot-risk"></span></td><td><b>结果 1（方向反了）</b>：PR&lt;0.3 组 250 日超额 <b>−11.10pp</b>（胜率 38.3%），0.3~0.6 三档也在 −1.7 ~ −3.3pp；反而 1.2~2.0 档为正（+0.37 / +0.56pp）。横截面 IC <b>−0.035 ~ −0.039（t≈−2.5）</b>，符号一致</td></tr>
+<tr><td><span class="pg-dot dot-risk"></span></td><td><b>结果 2（它不是二维因子）</b>：<code>log(PR)</code> 的方差 <b>82%</b> 由 <code>log(PE)</code> 单独解释，corr(logPR, logPE)=<b>+0.906</b>。因为 PE 本身已含 ROE（PE = PB ÷ ROE），PR = PE² ÷ PB 只是 PE 的单调放大，不是「估值 × 质量」两个独立维度</td></tr>
+<tr><td><span class="pg-dot dot-risk"></span></td><td><b>结果 3（控制 PE 后仍反向）</b>：每月先按 PE 切五分位、再在组内按 PR 切三份。五个 PE 档里，PR 最低的 T1 <b>全部</b>差于 T2/T3（P1 从 −3.68pp 到 +0.07pp；P4 +0.40 vs +1.41）。同一 PE 下 PR 低 = ROE 高，而这批「高 ROE 且便宜」的股票恰好多是周期顶部</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>结果 4（不是行业问题）</b>：剔除名称含银行/保险/证券/地产/信托的 80 只后，PR&lt;0.4 仍 −8.69pp、0.4~0.6 仍 −3.13pp。严格组合「ROE&gt;15% 且 PR&lt;1」250 日均值 5.96%、超额 <b>−4.69pp</b>；再收紧到 PR&lt;0.6 为 −6.34pp</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>结果 5（阈值不适用）</b>：A 股市赚率中位约 <b>2.9</b>（十分位 D5 中位 2.92），PR&lt;0.6 只覆盖 <b>5.8%</b> 样本、PR&lt;1 覆盖 13.2%。作者的 0.4/0.5/0.6 取自腾讯与可口可乐个案，与 A 股分布不在一个量级。分年看 10 年里 3 年正超额、7 年负（2019 −16.8、2024 −18.2 最差；2016 +18.6、2017 +14.2 最好）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>产物</b>：<code>scripts/backtest_pr.py</code>（数据构建）、<code>scripts/analyze_pr.py</code>（分档/十分位/阈值扫描/IC/分年）、<code>scripts/analyze_pr_extra.py</code>（方差分解、同 PE 双重排序、剔除金融地产）、<code>docs/report/pr_backtest/data/*.json</code> 与配图</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 252</b>：一个指标若由两个已公开的比率拼出，先做方差分解，别假设它带来新信息。PR 的 82% 就是 PE</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 253</b>：阈值必须落在目标市场的分布上看。把美股个案的 0.4 折搬到 A 股，等于用一个只覆盖 5.8% 样本的尺子去筛全市场</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 254</b>：「指标无效」与「用错场景」要分开。双重排序才看得出：同 PE 内 ROE 最高的那批，往往是周期顶部，这才是低 PR 组跑输的机制</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-24 · 沪深300 估值分位对照：把 0.901 当成了 0.9%</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>现象</b>：估值全景 tab 的「沪深300 估值分位对照」显示本指数 2026-11-19 PE 分位 <b>0.9%</b>、PB 分位 <b>0.6%</b>，与上方「PE 十年分位 90%」「PB 十年分位 65%」直接矛盾</td></tr>
