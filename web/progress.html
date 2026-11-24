@@ -949,6 +949,18 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-24 · 沪深300 估值分位对照：把 0.901 当成了 0.9%</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>现象</b>：估值全景 tab 的「沪深300 估值分位对照」显示本指数 2026-11-19 PE 分位 <b>0.9%</b>、PB 分位 <b>0.6%</b>，与上方「PE 十年分位 90%」「PB 十年分位 65%」直接矛盾</td></tr>
+<tr><td><span class="pg-dot dot-risk"></span></td><td><b>根因</b>：<code>/api/valuation</code> 的 <code>pe_pct</code>/<code>pb_pct</code> 是 <b>0~1 小数</b>（0.901 = 90.1%）。<code>renderHsCmp()</code> 直接画在 0~100 的轴上，tooltip 再 <code>toFixed(1)+'%'</code>，于是 0.901 显示成「0.9%」。同图另两条沪深300 线取自另一个接口的 0~100 整数序列，<b>两种量纲混在一张图</b></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>修法</b>：四条线统一取 <code>/api/valuation</code> 的同一窗口（2016-01-04 起 2,644 个交易日）、统一乘 100；删掉对 <code>dividend-advice-detail?code=000300</code> 的二次 fetch（那份只有 728 日滚动窗口）</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>校验</b>：末值 本指数 PE <b>90.1%</b> / PB <b>65.0%</b>、沪深300 PE <b>67.3%</b> / PB <b>21.4%</b>，与统计卡一致；y 轴 0~100，0 pageerror，截图核对四条线不再贴底</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>顺带修正</b>：副标原写「本指数自 2024-09-23 起、沪深300 有 2016 年起完整序列」是错的 —— 两条都是 2016 起同一窗口；标题「以沪深300 更长历史做参照」也改掉</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 251</b>：同一页面里百分比与小数混用，必须在取数处立刻归一。tooltip 里的 <code>%</code> 是最后一道关，它不校验量纲 —— 0.901 和 0.9 都长得像分位</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-23 · 缠论扫描全失败：czsc 编译模块丢失 + 静默降级</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>现象</b>：日更报 <code>[WARN] 失败任务: 27c.缠论批量扫描</code>。查 <code>logs/chanlun_weekly_failed_codes.txt</code> 发现 <b>3,957 只全部失败</b>，错误一律是 <code>cannot import name 'CzscSignals' from 'czsc._native' (unknown location)</code></td></tr>

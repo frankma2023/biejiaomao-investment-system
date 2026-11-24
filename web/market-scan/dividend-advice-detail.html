@@ -74,7 +74,7 @@ html[data-theme="light"] .tab.active{background:var(--accent-subtle);color:var(-
     <div id="val-stats" class="stat-row"></div>
     <div class="chart-card"><div class="ct">📊 PE-TTM 走势与十年分位</div><div id="val-chart-pe" style="height:480px"></div><div id="val-text-pe" class="analysis-text"></div></div>
     <div class="chart-card"><div class="ct">📊 PB 走势与十年分位</div><div id="val-chart-pb" style="height:480px"></div><div id="val-text-pb" class="analysis-text"></div></div>
-    <div class="chart-card"><div class="ct">🔍 沪深300 估值分位对照（以沪深300 更长历史做参照）</div><div id="val-chart-hs-cmp" style="height:400px"></div><div class="cs" style="font-size:0.62rem;line-height:1.9">本指数估值序列自发布日（2024-09-23）起，历史过短；沪深300 有 2016 年起的完整序列。同图可判断「本指数估值分位处在 A 股大盘的什么位置」。<br>⚠ 两条线各自相对<b>自身历史</b>计算分位，刻度可比、水平不可直接相减。</div></div>
+    <div class="chart-card"><div class="ct">🔍 沪深300 估值分位对照（同一窗口，各自历史分位）</div><div id="val-chart-hs-cmp" style="height:400px"></div><div class="cs" style="font-size:0.62rem;line-height:1.9">两条序列都取 2016-01-04 起的同一窗口（2,644 个交易日），各自相对<b>自身历史</b>算滚动分位。<br>刻度可比、水平不可直接相减：同样的 50%，对红利是贵，对沪深300 可能只是中性。</div></div>
 <div class="chart-card"><div class="ct">📊 股息率 走势与十年分位</div><div id="val-chart-dyr" style="height:420px"></div><div id="val-text-dyr" class="analysis-text"></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
       <div class="chart-card"><div class="ct">📊 ROE（%）</div><div id="val-chart-roe" style="height:360px"></div><div id="val-text-roe" class="analysis-text"></div></div>
@@ -865,7 +865,7 @@ async function loadValuation() {
       data.dyr_pct,
       hs.dyr && hs.dyr.map(v => v != null ? (v * 100).toFixed(2) : null),
       dyrColor, tx2, sp2);
-      renderHsCmp(data, tx2, sp2);
+      renderHsCmp(data, hs, tx2, sp2);
       setTimeout(applyPalette, 400);
     genValText('val-text-pe', 'PE-TTM', data.pe, data.pe_pct, hs.pe, '倍', clr(pePct));
     genValText('val-text-pb', 'PB', data.pb, data.pb_pct, hs.pb, '倍', clr(pbPct));
@@ -1001,27 +1001,23 @@ function buildValChart(id, name, dates, vals, pcts, hsVals, lineColor, tx, sp) {
   dom._echart = ch;
 }
 
-// 沪深300 估值分位对照：按日期把当前指数对齐到沪深300 的时间轴
-async function renderHsCmp(me, tx, sp) {
+// 沪深300 估值分位对照：两条分位序列都来自 /api/valuation（0~1 小数），同轴直接乘 100
+function renderHsCmp(me, hs, tx, sp) {
   const dom = document.getElementById('val-chart-hs-cmp');
-  if (!dom || dom._echart || !me) return;
-  let ref;
-  try {
-    const r = await fetch(API_BASE + '/api/market-scan/dividend-advice-detail?code=000300');
-    ref = await r.json();
-  } catch (e) { ref = null; }
-  if (!ref || !ref.dates) { dom.innerHTML = '<div class="cs">沪深300 数据暂不可用</div>'; return; }
+  if (!dom || dom._echart || !me || !me.dates) return;
+  if (!hs || !hs.dates || !hs.pe_pct) { dom.innerHTML = '<div class="cs">沪深300 数据暂不可用</div>'; return; }
 
-  const axis = (ref && ref.dates) || meDates;   // 优先用沪深300 的更长轴
+  const axis = me.dates;
   const toMap = (dates, vals) => {
     const m = {};
-    (dates || []).forEach((d, i) => { if (vals[i] != null) m[d] = vals[i]; });
+    (dates || []).forEach((d, i) => { if (vals && vals[i] != null) m[d] = vals[i] * 100; });
     return m;
   };
-  const meDates = me.dates || [];
-  const mePe = toMap(meDates, me.pe_pct || me.pe_series);
-  const mePb = toMap(meDates, me.pb_pct || me.pb_series);
   const pad = m => axis.map(d => (m[d] != null ? m[d] : null));
+  const mePe = pad(toMap(axis, me.pe_pct));
+  const mePb = pad(toMap(axis, me.pb_pct));
+  const hsPe = pad(toMap(hs.dates, hs.pe_pct));
+  const hsPb = pad(toMap(hs.dates, hs.pb_pct));
 
   const ch = echarts.init(dom);
   const mk = (nm, data, c) => ({name: nm, type: 'line', data: data, smooth: true,
@@ -1044,10 +1040,10 @@ async function renderHsCmp(me, tx, sp) {
             splitLine: {lineStyle: {color: sp}}},
     dataZoom: [{type: 'inside', start: 0, end: 100}],
     series: [
-      mk('本指数 PE分位', pad(mePe), '#f59e0b'),
-      mk('沪深300 PE分位', ref.pe_series, '#539BF5'),
-      mk('本指数 PB分位', pad(mePb), '#10b981'),
-      mk('沪深300 PB分位', ref.pb_series, '#ef4444'),
+      mk('本指数 PE分位', mePe, '#f59e0b'),
+      mk('沪深300 PE分位', hsPe, '#539BF5'),
+      mk('本指数 PB分位', mePb, '#10b981'),
+      mk('沪深300 PB分位', hsPb, '#ef4444'),
     ]
   });
   dom._echart = ch;
