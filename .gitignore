@@ -147,11 +147,16 @@ fund-reports/
 # hanako-report æŠ€èƒ½ä»¥ç›®å½•è”æ¥å½¢å¼å­˜åœ¨ï¼Œåªä¿ç•™ D:\hanako\.agents ä¸‹çš„è§„èŒƒå‰¯æœ¬
 .agents/skills/hanako-report/
 
-# ´óÅÌ×Ü½áµÄ LLM ÊÂÊµÓëĞğÊÂ»º´æ£¨¿ÉÏÖËã£¬ÇÒº¬µÚÈı·½ÎÄÕÂÔ­ÎÄ£¬²»Èë¿â£©
+# å¤§ç›˜æ€»ç»“çš„ LLM äº‹å®ä¸å™äº‹ç¼“å­˜ï¼ˆå¯ç°ç®—ï¼Œä¸”å«ç¬¬ä¸‰æ–¹æ–‡ç« åŸæ–‡ï¼Œä¸å…¥åº“ï¼‰
 web/market-logic/data/*.facts.json
 web/market-logic/data/*.llm.json
 
 
-# µÚÈı·½¹¤¾ß¸ôÀë»·¾³ÓëÔËĞĞÄ¿Â¼£¨Ìå»ı´ó¡¢¿ÉÖØ½¨£©
+# ç¬¬ä¸‰æ–¹å·¥å…·éš”ç¦»ç¯å¢ƒä¸è¿è¡Œç›®å½•ï¼ˆä½“ç§¯å¤§ã€å¯é‡å»ºï¼‰
 .venv-tools/
 .vibe/
+
+# One-off diagnostics / unpacked wheels (rebuildable, not tracked)
+acl-recovery/
+factor_out/
+pip-unpack-*/
