@@ -898,5 +898,86 @@
     "run_date": "2026-11-03",
     "market_phase": null,
     "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-11-04",
+    "pool_size": 418,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-11-04",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-11-05",
+    "pool_size": 449,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-11-05",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-11-06",
+    "pool_size": 471,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-11-06",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-11-09",
+    "pool_size": 448,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-11-09",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-11-10",
+    "pool_size": 449,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-11-10",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-11-11",
+    "pool_size": 456,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-11-11",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-11-12",
+    "pool_size": 467,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-11-12",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-11-13",
+    "pool_size": 475,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-11-13",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
+  },
+  {
+    "obs_date": "2026-11-19",
+    "pool_size": 481,
+    "chanlun_n": 0,
+    "oneil_advanced_n": 0,
+    "run_date": "2026-11-24",
+    "market_phase": null,
+    "chanlun_filtered_n": 0
   }
 ]

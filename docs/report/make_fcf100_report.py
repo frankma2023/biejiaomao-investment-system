@@ -21,6 +21,8 @@ NAME = '国证自由现金流'
 REVISION_DATE = '2024-08-15'     # 官方规则修订实施日（改造自 CN6008 海南综合指数）
 BENCH = [('000300', '沪深300'), ('000922', '中证红利'), ('000905', '中证500')]
 ASOF = '2026-11-04'
+# 快照截止日：显式截断，保证重复运行得到同一份数字（数据库会继续新增交易日）。
+CUTOFF = os.environ.get('FCF_ASOF', ASOF)
 
 con = sqlite3.connect(f'file:{DB}?mode=ro', uri=True)
 con.row_factory = sqlite3.Row
@@ -28,7 +30,8 @@ con.row_factory = sqlite3.Row
 
 def ser(tbl, code):
     return {r['date']: r['close'] for r in con.execute(
-        f"SELECT date, close FROM {tbl} WHERE stock_code=? ORDER BY date", (code,))}
+        f"SELECT date, close FROM {tbl} WHERE stock_code=? AND date<=? ORDER BY date",
+        (code, CUTOFF))}
 
 
 TR = ser('index_full_return_daily', CODE)
@@ -176,7 +179,7 @@ BASE_FWD = {h: (lambda v: v[len(v) // 2] * 100)(
 # 估值
 VAL = [(r[0], r[1], r[2], r[3] * 100) for r in con.execute(
     "SELECT date, pe_ttm, pb, dyr FROM index_fundamental_daily WHERE stock_code=? "
-    "AND pe_ttm IS NOT NULL ORDER BY date", (CODE,))]
+    "AND pe_ttm IS NOT NULL AND date<=? ORDER BY date", (CODE, CUTOFF))]
 
 CUR_DD = DD[-1]
 CUR_RSI = {n: RSI_S[n]['arr'][-1] for n in (6, 14, 20)}

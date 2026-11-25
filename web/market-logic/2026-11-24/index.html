@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>2026-11-24 大盘交易总结</title><style>/* ==========================================================================
+   投研报告统一样式 —— 唯一来源（single source of truth）
+   --------------------------------------------------------------------------
+   规则：任何生成报告的脚本都 **读取本文件并内联** 到 <style>，不得各自复制 CSS。
+        需要改配色/排版，只改这里，所有报告下次生成即生效。
+
+   用法（生成器内）：
+       SPEC = os.path.join(PROJECT, '.agents', 'skills', '_shared', 'report-style.css')
+       CSS = open(SPEC, encoding='utf-8').read()
+       # 再拼进报告的 <style> 标签里（标签写法见生成器，此处不写死）
+
+   注意（2026-11-06 踩过）：本文件会被整体内联进 style 元素，
+       注释里**绝不能出现** style 的闭合标签字面量，否则会提前闭合该元素，
+       后面的规则全部失效、页面完全裸样式（body 透明、h1 变 Times 32px）。
+       判断方法：浏览器里 body 背景色为 rgba(0,0,0,0) 即中招。
+
+   为什么必须有这个文件：
+       2026-11-05 曾因两个报告各自手抄配色，把「红涨绿跌」抄成了「绿涨红跌」。
+       复制即漂移，漂移无人发现。凡重复定义，必出此错。
+
+   红线：红涨绿跌。--up 是红，--down 是绿。
+        hanako-glass 的 --rise 是绿、--fall 是红（西式语义），与 A 股惯例相反。
+        用它的令牌必须交叉引用：.rise{color:var(--fall)}
+   ========================================================================== */
+
+:root {
+  /* 面 */
+  --bg:        #f7f7f9;
+  --card:      #ffffff;
+  --line:      #e4e4ea;
+  /* 字 */
+  --tx:        #1c1c22;
+  --mut:       #6b6b76;
+  /* 涨跌：红涨绿跌，不要反 */
+  --up:        #ef4444;
+  --down:      #10b981;
+  /* 强调 */
+  --accent:    #b45309;
+  --blue:      #2563eb;
+  --warnbg:    #fff8eb;
+  --warnbd:    #f0c36d;
+  --dangerbg:  #fdf0f0;
+  --dangerbd:  #eab5b5;
+}
+
+html[data-theme="dark"] {
+  --bg:        #0e0e12;
+  --card:      #16161d;
+  --line:      #2a2a33;
+  --tx:        #e9e9ec;
+  --mut:       #8f8f97;
+  --up:        #ef4444;
+  --down:      #10b981;
+  --accent:    #f59e0b;
+  --blue:      #539BF5;
+  --warnbg:    #241d10;
+  --warnbd:    #6b5320;
+  --dangerbg:  #241314;
+  --dangerbd:  #5c2b2b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--tx);
+  font-size: 15px;
+  line-height: 1.72;
+  font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.wrap { max-width: 1024px; margin: 0 auto; padding: 22px 20px 72px; }
+
+/* ── 标题：衬线 + 900 ───────────────────────────────── */
+h1, h2, h3, h4 {
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  font-weight: 900;
+  letter-spacing: .005em;
+}
+h1 { font-size: 27px; line-height: 1.3;  margin: 6px 0 8px; }
+h2 { font-size: 19px; margin: 32px 0 10px; padding-left: 11px;
+     border-left: 4px solid var(--accent); }
+h3 { font-size: 15px; margin: 18px 0 6px; }
+p  { margin: 9px 0; }
+
+/* ── 顶栏 / 页脚 ───────────────────────────────────── */
+.top {
+  position: sticky; top: 0; z-index: 9;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+  padding: 9px 0; font-size: 13px; color: var(--mut); margin-bottom: 4px;
+}
+.top b { color: var(--tx); }
+.thm {
+  float: right; cursor: pointer; border: 1px solid var(--line);
+  border-radius: 6px; padding: 1px 9px; font-size: 12px; color: var(--mut);
+}
+.ft {
+  margin-top: 40px; padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--mut); line-height: 1.8;
+}
+
+/* ── 结论 / 提示 ───────────────────────────────────── */
+.lead, .ess {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 0 10px 10px 0;
+  padding: 14px 18px; margin: 14px 0; font-size: 16px;
+}
+.warn {
+  background: var(--warnbg); border: 1px solid var(--warnbd);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px; padding: 11px 14px; margin: 12px 0; font-size: 14px;
+}
+.danger {
+  background: var(--dangerbg); border: 1px solid var(--dangerbd);
+  border-left: 4px solid var(--up);
+  border-radius: 8px; padding: 11px 14px; margin: 12px 0; font-size: 14px;
+}
+
+/* ── 数据卡 ───────────────────────────────────────── */
+.kpi {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px; margin: 14px 0;
+}
+.kpi > div {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 13px;
+}
+.kpi .k { font-size: 12px; color: var(--mut); }
+.kpi .v {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 18px; font-weight: 700; margin-top: 2px;
+}
+.kpi .n { font-size: 11px; color: var(--mut); margin-top: 2px; }
+
+.card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 16px 18px; margin: 14px 0;
+}
+
+/* ── 表格三件套（硬性）───────────────────────────── */
+.tw { overflow-x: auto; margin: 10px 0; }
+table {
+  width: 100%; border-collapse: collapse;
+  background: var(--card); font-size: 13.5px;
+}
+th, td {
+  padding: 8px 10px; border-bottom: 1px solid var(--line);
+  vertical-align: top; text-align: left;
+}
+th {
+  background: rgba(0, 0, 0, .03);
+  font-size: 12.5px; color: var(--mut); font-weight: 600;
+}
+html[data-theme="dark"] th { background: rgba(255, 255, 255, .04); }
+td:first-child, th:first-child { text-align: left; padding-left: 14px; }   /* ① */
+td:last-child,  th:last-child  { padding-right: 14px; padding-left: 26px;
+                                 text-align: center; }                      /* ② */
+td.num:last-child, th.num:last-child { text-align: right; }
+table.wide td:last-child, table.wide th:last-child {
+  text-align: left !important; padding-left: 10px;                          /* ③ */
+}
+.num {
+  font-family: ui-monospace, Menlo, monospace;
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+
+/* ── 涨跌语义（红涨绿跌，不得反）────────────────── */
+.rise { color: var(--up); }
+.fall { color: var(--down); }
+
+/* ── 状态徽标 ─────────────────────────────────────── */
+.done {
+  display: inline-block; font-size: 11px; padding: 0 7px;
+  border-radius: 999px; border: 1px solid var(--line); color: var(--mut);
+}
+.done.ok  { color: var(--down); border-color: var(--down); }
+.done.lag { color: var(--accent); border-color: var(--accent); }
+.done.no  { color: var(--up);   border-color: var(--up); }
+
+/* ── 图表（内联 SVG）─────────────────────────────── */
+.chart { width: 100%; height: auto; display: block; }
+.chart .gl  { stroke: var(--line); stroke-width: 1; }
+.chart .ax  { fill: var(--mut); font-size: 10px; }
+.chart .ay  { fill: var(--mut); font-size: 10px;
+              font-family: ui-monospace, monospace; }
+.chart .bv  { fill: var(--tx); font-size: 10px;
+              font-family: ui-monospace, monospace; }
+.chart .ln  { fill: none; stroke-width: 2; stroke-linejoin: round; }
+
+.lg { display: flex; flex-wrap: wrap; gap: 14px; margin: 8px 0 2px;
+      font-size: 12.5px; color: var(--mut); }
+.lg i { display: inline-block; width: 16px; height: 3px;
+        border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.ctl { display: flex; flex-wrap: wrap; gap: 16px; margin: 10px 0; font-size: 13px; }
+.ctl label { display: flex; align-items: center; gap: 6px;
+             cursor: pointer; color: var(--mut); }
+.hide { display: none !important; }
+
+code {
+  font-family: ui-monospace, Menlo, monospace; font-size: .86em;
+  background: rgba(0, 0, 0, .05); padding: 1px 5px; border-radius: 4px;
+}
+html[data-theme="dark"] code { background: rgba(255, 255, 255, .08); }
+a { color: var(--blue); }
+ul { padding-left: 20px; }
+
+.tw table th,.tw table td{text-align:center}
+.tw table th{white-space:nowrap}
+.read{margin:12px 0 20px;padding:14px 18px;border-left:3px solid var(--accent);
+ background:rgba(127,127,127,.075);border-radius:0 8px 8px 0;
+ font-size:14px;line-height:1.9;color:var(--tx)}
+.read p{margin:0 0 8px}
+.read p:last-child{margin-bottom:0}
+.read .lb{color:var(--accent);font-weight:600}
+.pts{font-size:12.5px;color:var(--mut);margin:-6px 0 14px}
+</style></head><body><div class="wrap">
+<div class="top"><span class="thm" onclick="toggleTheme()">◐</span>
+<b>大盘交易总结 · 2026-11-24</b> ｜ 口径：EOD 收盘 ｜ 两融数据日 2026-11-23 ｜
+<a href="../market-scan/index.html">大盘扫描</a></div>
+<h1>2026-11-24 大盘交易总结</h1>
+<div class="lead">上证微涨0.27%但3532家下跌、健康分23分E级、卖出信号7/12触发，指数由科创50涨1.81%与权重护盘撑住，红利却跌0.81%，盘面是缩圈而非普涨。</div>
+
+<h2>一、大盘健康分与卖出评分</h2>
+<div class="kpi">
+<div><div class="k">大盘健康分</div><div class="v">23</div>
+<div class="n">评级 E · 很弱</div></div>
+<div><div class="k">卖出评分</div><div class="v">195</div>
+<div class="n">清仓</div></div>
+<div><div class="k">触发信号</div><div class="v">7 / 12</div>
+<div class="n">信号越多环境越差</div></div>
+<div><div class="k">涨跌家数</div><div class="v"><span class="rise">1,981</span> / <span class="fall">3,532</span></div>
+<div class="n">样本 5,653 只</div></div>
+</div>
+<h3>卖出评分信号明细</h3>
+<div class="tw"><table class="wide"><tr><th style="width:42%">信号</th><th>状态</th><th style="width:14%">得分</th></tr><tr><td>抛盘日（25 日内）</td><td style="color:var(--up)">触发 5 个</td><td class="num">10</td></tr><tr><td>追盘日失效</td><td style="color:var(--up)">触发</td><td class="num">30</td></tr><tr><td>龙头见顶</td><td style="color:var(--mut)">未触发</td><td class="num">0</td></tr><tr><td>垃圾股补涨</td><td style="color:var(--up)">触发</td><td class="num">25</td></tr><tr><td>指数背离</td><td style="color:var(--mut)">未触发</td><td class="num">0</td></tr><tr><td>跌破 50 日线</td><td style="color:var(--up)">触发</td><td class="num">30</td></tr><tr><td>跌破 200 日线</td><td style="color:var(--up)">触发</td><td class="num">40</td></tr><tr><td>均线死亡交叉</td><td style="color:var(--mut)">未触发</td><td class="num">0</td></tr><tr><td>AD 低位（5 日）</td><td style="color:var(--up)">触发</td><td class="num">20</td></tr><tr><td>AD 骤降</td><td style="color:var(--mut)">未触发</td><td class="num">0</td></tr><tr><td>新高新低比走低</td><td style="color:var(--up)">触发</td><td class="num">30</td></tr><tr><td>上涨无量</td><td style="color:var(--mut)">未触发</td><td class="num">0</td></tr></table></div>
+<div class="read"><p>健康分23分、E级，是当日最硬的一条结论：盘面不具备做多基础。50日均线上方占比仅10%，新高新低比0.03倍，放量突破69只，多数个股已跌破中期均线。</p><p>卖出模型12项信号触发7项，包括跌破50日线、跌破200日线、追盘日失效、垃圾股补涨、AD低位与新高新低比走低，模型给出的动作是清仓。</p><p>唯一偏正面的读数来自恐贪34.1分与AD 1.38倍，说明情绪已在偏恐区域，涨跌家数比尚未完全失衡。这两项只能定义为超跌，不构成转强证据。</p></div>
+
+<h2>二、主要指数表现</h2>
+<div class="tw"><table><tr><th>指数</th><th>代码</th><th>涨跌</th></tr><tr><td>上证指数</td><td class="num" style="color:var(--mut)">000001</td><td class="num rise">+0.27%</td></tr><tr><td>深证成指</td><td class="num" style="color:var(--mut)">399001</td><td class="num fall">-0.29%</td></tr><tr><td>创业板指</td><td class="num" style="color:var(--mut)">399006</td><td class="num fall">-0.05%</td></tr><tr><td>科创50</td><td class="num" style="color:var(--mut)">000688</td><td class="num rise">+1.81%</td></tr><tr><td>沪深300</td><td class="num" style="color:var(--mut)">000300</td><td class="num rise">+0.14%</td></tr><tr><td>中证500</td><td class="num" style="color:var(--mut)">000905</td><td class="num fall">-0.27%</td></tr><tr><td>中证1000</td><td class="num" style="color:var(--mut)">000852</td><td class="num fall">-0.23%</td></tr><tr><td>中证全指</td><td class="num" style="color:var(--mut)">000985</td><td class="num fall">-0.01%</td></tr><tr><td>中证A500</td><td class="num" style="color:var(--mut)">000510</td><td class="num rise">+0.01%</td></tr><tr><td>中证红利</td><td class="num" style="color:var(--mut)">000922</td><td class="num fall">-0.81%</td></tr><tr><td>800红利低波</td><td class="num" style="color:var(--mut)">931848</td><td class="num fall">-0.38%</td></tr><tr><td>中证2000</td><td class="num" style="color:var(--mut)">932000</td><td class="num rise">+0.23%</td></tr></table></div>
+<div class="read"><p>指数层面是权重与科技的局部行情。上证涨0.27%、沪深300涨0.14%、中证A500涨0.01%，而深证成指跌0.29%、中证500跌0.27%、中证1000跌0.23%，市值越大越抗跌。</p><p>科创50涨1.81%明显领先，中证2000涨0.23%小幅收红，中证全指仅跌0.01%。这说明资金在两端做选择，一头是半导体权重，一头是超小市值，中间的中盘最弱。</p><p>红利方向逆势走弱。中证红利跌0.81%、800红利低波跌0.38%，均弱于上证与沪深300，红利低波当日没有起到防御作用。</p></div>
+
+<h2>三、辅助指标 · 参与健康评分</h2>
+<div class="tw"><table class="wide"><tr><th>指标</th><th>读数</th><th>得分</th><th>含义</th></tr><tr><td>50 日均线上方占比</td><td class="num">10.0%</td><td class="num">0</td><td style="color:var(--mut)">越高越健康</td></tr><tr><td>新高/新低比</td><td class="num">0.03倍</td><td class="num">0</td><td style="color:var(--mut)">>1 多头占优</td></tr><tr><td>涨跌家数比（AD）</td><td class="num">1.38倍</td><td class="num">9</td><td style="color:var(--mut)">>1 上涨家数多</td></tr><tr><td>放量突破数</td><td class="num">69.0只</td><td class="num">0</td><td style="color:var(--mut)">越多做多动能越强</td></tr><tr><td>融资余额 5 日变化</td><td class="num">-4.7%</td><td class="num">0</td><td style="color:var(--mut)">转为下降是去杠杆信号</td></tr><tr><td>恐贪读数</td><td class="num">34.10分</td><td class="num">4</td><td style="color:var(--mut)">0 极恐 / 100 极贪</td></tr></table></div>
+<div class="read"><p>市场宽度在一天内剧烈反转。前一日上涨4696家，当日只剩1981家，上涨家数减少2715家，占比从约83%回落到约35%。</p><p>把时间拉长看，11月20日上涨仅317家，11月23日反弹到4696家，11月24日又回落到1981家。这种一日普涨、次日缩圈的结构，说明反弹缺乏持续性买盘。</p><p>成交额16678.5亿元，高于5日均值14715.8亿元，低于20日均值16451.6亿元。放量发生在下跌家数占优的日子，量能更多来自换手与抛压，而非增量做多。</p></div>
+
+<h2>四、行业分组健康分</h2>
+<div class="tw"><table><tr><th>分组</th><th>健康分</th><th>评级</th><th>仓位建议</th><th>成分数</th></tr><tr><td>策略强势组</td><td class="num">59</td><td class="num">C</td><td class="num">35%</td><td class="num" style="color:var(--mut)">639</td></tr><tr><td>L2强势组</td><td class="num">47</td><td class="num">D</td><td class="num">20%</td><td class="num" style="color:var(--mut)">306</td></tr><tr><td>策略中性组</td><td class="num">44</td><td class="num">D</td><td class="num">20%</td><td class="num" style="color:var(--mut)">1,471</td></tr><tr><td>主题强势组</td><td class="num">44</td><td class="num">D</td><td class="num">20%</td><td class="num" style="color:var(--mut)">1,072</td></tr><tr><td>主题弱势组</td><td class="num">41</td><td class="num">D</td><td class="num">20%</td><td class="num" style="color:var(--mut)">1,484</td></tr><tr><td>L2弱势组</td><td class="num">38</td><td class="num">D</td><td class="num">20%</td><td class="num" style="color:var(--mut)">650</td></tr><tr><td>L2中性组</td><td class="num">35</td><td class="num">D</td><td class="num">20%</td><td class="num" style="color:var(--mut)">771</td></tr><tr><td>策略弱势组</td><td class="num">35</td><td class="num">D</td><td class="num">20%</td><td class="num" style="color:var(--mut)">1,921</td></tr><tr><td>主题中性组</td><td class="num">35</td><td class="num">D</td><td class="num">20%</td><td class="num" style="color:var(--mut)">2,979</td></tr></table></div>
+<div class="read"><p>当日强势集中在科技硬件。科创芯片涨2.35%、科创信息涨2.07%、消费电子涨2.05%、中证半导涨2.03%、芯片产业涨1.91%，半导体链条整体涨幅在1.5%以上。</p><p>这与红利形成明显分化。中证红利跌0.81%，与科创芯片的2.35%相差3.16个百分点，红利与科技当日是反向的两条线。</p><p>科技内部也有强弱差别。科创芯片设计涨1.62%、科创半导体材料设备涨1.54%，弱于科创芯片本身，资金更偏向芯片核心环节而非外围配套。</p></div>
+
+<h2>五、资金活跃度 TOP 10</h2>
+<p style="font-size:13px;color:var(--mut)">评分 0–100；三字符依次是短线(10日)/中线(65日)/长线(250日)方向，
+<span class="rise">+</span> 净流入、<span class="fall">−</span> 净流出、0 中性。</p>
+<h3>短线（10 日）</h3>
+<div class="tw"><table><tr><th>#</th><th>指数</th><th>评分</th><th>方向</th></tr><tr><td class="num">1</td><td>300公用</td><td class="num" style="font-weight:600">93</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">2</td><td>家电龙头</td><td class="num" style="font-weight:600">92</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--mut)">0</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">3</td><td>保险主题</td><td class="num" style="font-weight:600">91</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">4</td><td>家用电器</td><td class="num" style="font-weight:600">90</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--mut)">0</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">5</td><td>消费50</td><td class="num" style="font-weight:600">85</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">6</td><td>SHS消费龙头</td><td class="num" style="font-weight:600">84</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">7</td><td>上证央企</td><td class="num" style="font-weight:600">83</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">8</td><td>上红低波</td><td class="num" style="font-weight:600">82</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">9</td><td>180金融</td><td class="num" style="font-weight:600">81</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">10</td><td>中证银行</td><td class="num" style="font-weight:600">81</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr></table></div>
+<h3>中线（65 日）</h3>
+<div class="tw"><table><tr><th>#</th><th>指数</th><th>评分</th><th>方向</th></tr><tr><td class="num">1</td><td>300公用</td><td class="num" style="font-weight:600">96</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">2</td><td>180金融</td><td class="num" style="font-weight:600">86</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">3</td><td>消费50</td><td class="num" style="font-weight:600">86</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">4</td><td>上红低波</td><td class="num" style="font-weight:600">86</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">5</td><td>保险主题</td><td class="num" style="font-weight:600">84</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">6</td><td>SHS消费龙头</td><td class="num" style="font-weight:600">84</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">7</td><td>上证央企</td><td class="num" style="font-weight:600">82</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">8</td><td>800公用</td><td class="num" style="font-weight:400">78</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">9</td><td>中证银行</td><td class="num" style="font-weight:400">78</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">10</td><td>消费龙头</td><td class="num" style="font-weight:400">78</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span><span style="color:var(--up)">+</span></td></tr></table></div>
+<h3>长线（250 日）</h3>
+<div class="tw"><table><tr><th>#</th><th>指数</th><th>评分</th><th>方向</th></tr><tr><td class="num">1</td><td>300信息</td><td class="num" style="font-weight:600">80</td><td class="num"><span style="color:var(--down)">-</span><span style="color:var(--down)">-</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">2</td><td>工业4.0</td><td class="num" style="font-weight:400">78</td><td class="num"><span style="color:var(--down)">-</span><span style="color:var(--down)">-</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">3</td><td>智能制造</td><td class="num" style="font-weight:400">76</td><td class="num"><span style="color:var(--down)">-</span><span style="color:var(--down)">-</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">4</td><td>科创芯片</td><td class="num" style="font-weight:400">75</td><td class="num"><span style="color:var(--down)">-</span><span style="color:var(--down)">-</span><span style="color:var(--mut)">0</span></td></tr><tr><td class="num">5</td><td>CS智消费</td><td class="num" style="font-weight:400">74</td><td class="num"><span style="color:var(--down)">-</span><span style="color:var(--down)">-</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">6</td><td>电子50</td><td class="num" style="font-weight:400">74</td><td class="num"><span style="color:var(--down)">-</span><span style="color:var(--down)">-</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">7</td><td>家用电器</td><td class="num" style="font-weight:400">73</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--mut)">0</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">8</td><td>5G 50</td><td class="num" style="font-weight:400">73</td><td class="num"><span style="color:var(--down)">-</span><span style="color:var(--down)">-</span><span style="color:var(--mut)">0</span></td></tr><tr><td class="num">9</td><td>中证龙头</td><td class="num" style="font-weight:400">73</td><td class="num"><span style="color:var(--up)">+</span><span style="color:var(--down)">-</span><span style="color:var(--up)">+</span></td></tr><tr><td class="num">10</td><td>科创材料</td><td class="num" style="font-weight:400">72</td><td class="num"><span style="color:var(--down)">-</span><span style="color:var(--down)">-</span><span style="color:var(--up)">+</span></td></tr></table></div>
+<div class="read"><p>资金流评分呈现短中期与长期的分裂。10日与65日榜单前列集中在300公用、保险主题、消费50、上红低波、中证银行、180金融，属于防御与红利方向。</p><p>250日榜单前列换成300信息、工业4.0、智能制造、科创芯片、电子50，属于科技成长方向。长周期强势品种与短周期强势品种几乎不重叠。</p><p>短中期重叠仅1个，短期与中期重叠8个。防御方向在短中期形成共识，科技方向只在长周期榜上占优，当日科技上涨属于长周期品种的反弹，不是新趋势的确认。</p></div>
+
+<h2>六、资金情绪</h2>
+<h3>6.1 融资与融券余额趋势（近 60 个交易日）</h3>
+
+<div class="kpi">
+<div><div class="k">融资余额</div><div class="v">20,093 亿</div>
+<div class="n">5 日 -4.7% · 20 日 -11.4%</div></div>
+<div><div class="k">融券余额</div><div class="v">222.7 亿</div>
+<div class="n">5 日 +0.5%</div></div>
+<div><div class="k">当日融资净买入</div><div class="v" style="color:var(--down)">-104 亿</div>
+<div class="n">数据日 2026-11-23</div></div>
+</div>
+<div class="tw"><table><tr><th>融资余额走势</th></tr><tr><td><svg class="chart" viewBox="0 0 430 96" preserveAspectRatio="none"><polyline class="ln" style="stroke:var(--up)" points="8.0,8.5 14.9,9.5 21.8,9.7 28.7,10.1 35.6,8.4 42.5,8.9 49.4,8.5 56.3,8.0 63.2,8.9 70.1,9.6 77.0,12.4 83.9,10.5 90.8,10.4 97.7,11.0 104.6,11.7 111.5,13.9 118.4,14.6 125.3,14.4 132.2,13.4 139.1,12.9 146.0,12.7 152.9,10.5 159.8,10.0 166.7,10.4 173.6,12.8 180.5,17.3 187.4,18.4 194.3,23.5 201.2,23.3 208.1,25.5 215.0,26.4 221.9,27.9 228.8,29.6 235.7,34.8 242.6,37.0 249.5,38.2 256.4,38.5 263.3,38.7 270.2,42.7 277.1,46.5 284.0,47.2 290.9,49.8 297.8,49.6 304.7,53.8 311.6,60.3 318.5,62.0 325.4,67.0 332.3,67.0 339.2,65.8 346.1,69.1 353.0,67.1 359.9,67.3 366.8,66.3 373.7,66.3 380.6,68.6 387.5,72.4 394.4,75.5 401.3,77.0 408.2,79.8 415.1,86.4 422.0,88.0"/></svg><div class="pts" style="text-align:center;margin:6px 0 0">2026-08-21 25,119 → 2026-11-23 20,093 ｜ 区间 20,093 ~ 25,154</div></td></tr></table></div>
+<div class="tw"><table><tr><th>融券余额走势</th></tr><tr><td><svg class="chart" viewBox="0 0 430 96" preserveAspectRatio="none"><polyline class="ln" style="stroke:var(--accent)" points="8.0,88.0 14.9,81.3 21.8,76.1 28.7,67.6 35.6,59.6 42.5,56.4 49.4,49.9 56.3,46.3 63.2,47.9 70.1,52.3 77.0,59.5 83.9,55.9 90.8,51.4 97.7,45.4 104.6,44.9 111.5,47.5 118.4,43.7 125.3,43.5 132.2,42.0 139.1,41.3 146.0,37.1 152.9,32.2 159.8,30.9 166.7,33.7 173.6,37.5 180.5,41.1 187.4,35.7 194.3,34.1 201.2,28.2 208.1,25.0 215.0,21.1 221.9,22.4 228.8,21.0 235.7,26.0 242.6,23.2 249.5,19.2 256.4,20.8 263.3,26.8 270.2,27.4 277.1,22.0 284.0,19.7 290.9,21.9 297.8,17.2 304.7,33.6 311.6,36.1 318.5,31.9 325.4,29.3 332.3,24.1 339.2,24.4 346.1,28.7 353.0,23.6 359.9,21.8 366.8,20.9 373.7,21.9 380.6,17.4 387.5,15.0 394.4,10.2 401.3,9.5 408.2,8.0 415.1,16.4 422.0,12.8"/></svg><div class="pts" style="text-align:center;margin:6px 0 0">2026-08-21 184 → 2026-11-23 223 ｜ 区间 184 ~ 225</div></td></tr></table></div>
+<div class="read"><p>融资余额20092.89亿元，单日净减104.09亿元，5日减少4.69%，20日减少11.38%，60日减少20.01%。杠杆资金处于持续去化状态。</p><p>距9月1日峰值25153.69亿元已回撤20.12%，历时53天，期间没有一天持平。10日累计净减1255.77亿元，去杠杆是连续过程而非单日扰动。</p><p>融券余额222.68亿元，5日增加0.52%，与融资方向相反。多头在减仓、空头在小幅加仓，两融结构对盘面偏不利。</p></div>
+
+<h3>6.2 个股融资净买入（当日流向，亿元）</h3>
+<div class="tw"><table><tr><th>净买入前十</th><th>代码</th><th>净买入</th></tr><tr><td>贵州茅台</td><td class="num" style="color:var(--mut)">600519</td><td class="num">+3.81</td></tr><tr><td>中际旭创</td><td class="num" style="color:var(--mut)">300308</td><td class="num">+2.97</td></tr><tr><td>宇树科技</td><td class="num" style="color:var(--mut)">688836</td><td class="num">+2.09</td></tr><tr><td>风华高科</td><td class="num" style="color:var(--mut)">000636</td><td class="num">+1.70</td></tr><tr><td>江苏银行</td><td class="num" style="color:var(--mut)">600919</td><td class="num">+1.53</td></tr><tr><td>新易盛</td><td class="num" style="color:var(--mut)">300502</td><td class="num">+1.48</td></tr><tr><td>中国平安</td><td class="num" style="color:var(--mut)">601318</td><td class="num">+1.44</td></tr><tr><td>华虹宏力</td><td class="num" style="color:var(--mut)">688347</td><td class="num">+1.41</td></tr><tr><td>招商银行</td><td class="num" style="color:var(--mut)">600036</td><td class="num">+1.33</td></tr><tr><td>北方华创</td><td class="num" style="color:var(--mut)">002371</td><td class="num">+1.15</td></tr></table></div>
+<div class="tw"><table><tr><th>净卖出前十</th><th>代码</th><th>净买入</th></tr><tr><td>寒武纪</td><td class="num" style="color:var(--mut)">688256</td><td class="num">-3.79</td></tr><tr><td>澜起科技</td><td class="num" style="color:var(--mut)">688008</td><td class="num">-2.12</td></tr><tr><td>飞龙股份</td><td class="num" style="color:var(--mut)">002536</td><td class="num">-1.89</td></tr><tr><td>三安光电</td><td class="num" style="color:var(--mut)">600703</td><td class="num">-1.67</td></tr><tr><td>浪潮信息</td><td class="num" style="color:var(--mut)">000977</td><td class="num">-1.60</td></tr><tr><td>巨化股份</td><td class="num" style="color:var(--mut)">600160</td><td class="num">-1.45</td></tr><tr><td>冰山冷热</td><td class="num" style="color:var(--mut)">000530</td><td class="num">-1.41</td></tr><tr><td>紫金矿业</td><td class="num" style="color:var(--mut)">601899</td><td class="num">-1.39</td></tr><tr><td>罗博特科</td><td class="num" style="color:var(--mut)">300757</td><td class="num">-1.33</td></tr><tr><td>宁德时代</td><td class="num" style="color:var(--mut)">300750</td><td class="num">-1.12</td></tr></table></div>
+<div class="read"><p>个股净流入前十合计18.9亿元，净流出前十合计17.77亿元，两者接近对冲，主力资金整体是存量博弈。</p><p>流入端结构分散。贵州茅台3.81亿元居首，中际旭创2.97亿元、宇树科技2.09亿元、风华高科1.7亿元，另有江苏银行、中国平安、招商银行等金融股，金融行业占3席。</p><p>流出端集中在科技。寒武纪净流出3.79亿元、澜起科技2.12亿元、三安光电1.67亿元、浪潮信息1.6亿元，与当日半导体上涨形成资金与价格的背离。</p></div>
+
+<h3>6.3 L1 行业融资余额分解（亿元）</h3>
+<div class="tw"><table class="wide"><tr><th>行业</th><th>融资余额</th><th>60 日</th><th>30 日</th><th>10 日</th><th>当日净买入</th><th>成分股</th></tr><tr><td>信息</td><td class="num">3,019</td><td class="num fall">-28.4%</td><td class="num fall">-22.3%</td><td class="num fall">-7.7%</td><td class="num fall">-22.87</td><td class="num" style="color:var(--mut)">161</td></tr><tr><td>工业</td><td class="num">2,912</td><td class="num fall">-19.5%</td><td class="num fall">-16.8%</td><td class="num fall">-5.9%</td><td class="num fall">-13.20</td><td class="num" style="color:var(--mut)">355</td></tr><tr><td>金融</td><td class="num">2,458</td><td class="num fall">-11.5%</td><td class="num fall">-7.4%</td><td class="num fall">-3.1%</td><td class="num rise">5.79</td><td class="num" style="color:var(--mut)">137</td></tr><tr><td>材料</td><td class="num">1,784</td><td class="num fall">-19.0%</td><td class="num fall">-15.9%</td><td class="num fall">-6.8%</td><td class="num fall">-14.13</td><td class="num" style="color:var(--mut)">174</td></tr><tr><td>电信</td><td class="num">1,042</td><td class="num fall">-33.9%</td><td class="num fall">-29.9%</td><td class="num fall">-7.5%</td><td class="num fall">-0.70</td><td class="num" style="color:var(--mut)">65</td></tr><tr><td>可选</td><td class="num">896</td><td class="num fall">-16.9%</td><td class="num fall">-14.3%</td><td class="num fall">-5.9%</td><td class="num fall">-8.81</td><td class="num" style="color:var(--mut)">126</td></tr><tr><td>医药</td><td class="num">774</td><td class="num fall">-18.8%</td><td class="num fall">-11.8%</td><td class="num fall">-4.9%</td><td class="num fall">-6.28</td><td class="num" style="color:var(--mut)">118</td></tr><tr><td>消费</td><td class="num">476</td><td class="num fall">-17.1%</td><td class="num fall">-13.2%</td><td class="num fall">-4.8%</td><td class="num rise">2.61</td><td class="num" style="color:var(--mut)">50</td></tr></table></div>
+<div class="read"><p>融资盘行业全线承压。信息净减22.9亿元、材料净减14.1亿元、工业净减13.2亿元、可选净减8.8亿元、医药净减6.3亿元，仅金融净增5.8亿元、消费净增2.6亿元。</p><p>跌幅越深的行业杠杆越重。信息10日跌7.7%、30日跌22.3%、60日跌28.4%，电信60日跌33.9%，杠杆资金在这些方向上仍在减仓。</p><p>金融是唯一逆势加杠杆的方向。融资余额2458.4亿元，净增5.8亿元，60日跌幅11.5%为各行业最小，红利与金融的融资盘相对稳定。</p></div>
+
+<h3>6.4 龙虎榜</h3>
+<div class="tw"><table><tr><th>个股</th><th>上榜原因</th><th>净额</th><th>机构净额</th></tr></table></div>
+<div class="read"><p>龙虎榜当日无数据，上榜家数、净买入、机构净买入均为0，无法从席位角度判断资金性质。</p><p>在龙虎榜缺失的情况下，个股资金判断只能依赖净流入流出前十，机构与游资的分工无法区分。</p><p>这一项不构成方向依据，只作为当日数据完整性的说明。</p></div>
+
+<h2>七、指汇盈观点与联动判断</h2>
+<h3>7.1 当日文章（2026-11-20；2026-11-24 的文章尚未发布，以下判断基于最近一篇）</h3>
+<div class="tw"><table class="wide"><tr><th>发布时间</th><th>标题</th><th>开篇要点</th><th>链接</th></tr><tr><td style="white-space:nowrap">2026-11-20 22:06:55</td><td>海外科技大跌！市场正在担心的一些问题</td><td style="color:var(--mut);text-align:left">外围流动性也是很差，这样的利空都能跌5%，只能说现在的AI，不是半年前的AI了。大资金跟昨天一样，在沪深300，中证500，…</td><td style="white-space:nowrap"><a href="https://www.sohu.com/a/1104280077_120994993" target="_blank" rel="noopener">原文</a></td></tr><tr><td style="white-space:nowrap">2026-11-20 22:00:57</td><td>流动性危机蔓延！分享一些止跌的参考信号</td><td style="color:var(--mut);text-align:left">所幸的是，最近美股AI产业趋势也出现了明显放缓迹象，民主党横扫两院后AI数据中心审批放缓，英伟达老黄被查，美股近期也跌了不少…</td><td style="white-space:nowrap"><a href="https://www.sohu.com/a/1104280028_120994993" target="_blank" rel="noopener">原文</a></td></tr><tr><td style="white-space:nowrap">2026-11-20 21:00:00</td><td>流动性危机蔓延</td><td style="color:var(--mut);text-align:left">昨晚，全球最大的AI公司Anthropic（后续简称ANT，也是该公司的上市代码）正式IPO上市。上市之前，提振全球AI板块…</td><td style="white-space:nowrap"><a href="https://mp.weixin.qq.com/s/cP4AyPxlNLdrfHCwtUojoQ" target="_blank" rel="noopener">原文</a></td></tr></table></div>
+<h3>7.2 文中板块与当日指数方向核对</h3>
+<div class="tw"><table><tr><th>关键词</th><th>文中语气</th><th>对应指数</th><th>当日涨跌</th><th>判定</th></tr><tr><td>科技</td><td>偏空</td><td>科技传媒通信150</td><td class="num rise">+1.20%</td><td><span class="done no">相反</span></td></tr><tr><td>半导体</td><td>中性</td><td>中华半导体芯片</td><td class="num rise">+1.83%</td><td><span class="done lag">无法判定</span></td></tr><tr><td>芯片</td><td>中性</td><td>科创芯片</td><td class="num rise">+2.35%</td><td><span class="done lag">无法判定</span></td></tr><tr><td>算力</td><td>中性</td><td>中证算力</td><td class="num rise">+1.06%</td><td><span class="done lag">无法判定</span></td></tr><tr><td>AI</td><td>中性</td><td>科创AI</td><td class="num rise">+1.30%</td><td><span class="done lag">无法判定</span></td></tr><tr><td>黄金</td><td>偏空</td><td>SSH黄金股票</td><td class="num fall">-3.40%</td><td><span class="done ok">一致</span></td></tr><tr><td>美股</td><td>中性</td><td>（未找到对应指数）</td><td class="num ">—</td><td><span class="done lag">无法判定</span></td></tr><tr><td>债</td><td>中性</td><td>（未找到对应指数）</td><td class="num ">—</td><td><span class="done lag">无法判定</span></td></tr></table></div>
+<p class="pts">判定规则：取关键词前后 60 字，数「涨/反弹/新高」与「跌/回落/走弱」出现次数定语气；
+语气与对应指数当日涨跌同向记「一致」，反向记「相反」。这是粗筛，不替代人工阅读。</p>
+<h3>7.3 我们怎么看</h3>
+<div class="read"><p>当日文章的主线是外围流动性冲击。Anthropic上市抽走流动性，美股三大指数由涨转跌均跌2%，AMD被做空累计跌10%，黄金因补充保证金被抛售，作者把黄金止跌视为流动性危机结束的观察标的。</p><p>对照A股同类板块，文章对科技偏空，但当日科技传媒通信150涨1.2%、中华半导体芯片涨1.83%、科创芯片涨2.35%、中证算力涨1.06%、科创AI涨1.3%，A股科技全线收红，与文章基调相反。黄金关键词偏空，SSH黄金股票跌3.4%，与文章判断一致。</p><p>联动关系是只兑现一部分。美股隔夜三大指数跌2%，A股上证反而涨0.27%、科创50涨1.81%，指数层面背离。但融资余额5日减4.69%、60日减20.01%，与文章描述的全球去杠杆同向，A股是用杠杆去化承接了外围冲击。</p><p>可验证的观察点有两个。一是SSH黄金股票能否止跌，文章把它当作流动性冲击结束的信号。二是科创芯片上涨能否带动融资余额止住5日连降，若价格涨而杠杆继续降，说明反弹仍是存量换手。</p></div>
+
+<h2>八、口径与数据缺口</h2>
+<ul style="font-size:13.5px;color:var(--tx)">
+<li>交易日 2026-11-24；行情与指数为 EOD 收盘数据，两融与龙虎榜为
+2026-11-23 数据（两个源发布时间不同，页面分别标明）。</li>
+<li>健康分、卖出评分、行业分组分、资金活跃度均来自本地日更库；资金活跃度评分口径见
+<code>src/scanners/index_capital_flow.py</code>。</li>
+<li>指汇盈文章以搜狐号镜像为主（公众号原页需订阅号后台，见 progress 教训 202）；镜像不覆盖的图文，用微信原文链接单篇导入（scripts/import_gzh_url.py，source=wechat）。视频稿无正文段落，不入库。</li>
+<li>行业组成分快照日 2026-11-01，季度更新，非当日实时成分。</li>
+</ul>
+
+<h2>九、历史</h2>
+<div class="tw"><table class="wide"><tr><th>日期</th><th>一句话结论</th></tr><tr><td style="white-space:nowrap"><a href="2026-11-24/index.html">2026-11-24</a></td><td>海外科技大跌！市场正在担心的一些问题</td></tr><tr><td style="white-space:nowrap"><a href="2026-11-20/index.html">2026-11-20</a></td><td>流动性危机蔓延</td></tr><tr><td style="white-space:nowrap"><a href="2026-11-19/index.html">2026-11-19</a></td><td>英伟达换人发酵！AI叙事逻辑可能被打破了</td></tr><tr><td style="white-space:nowrap"><a href="2026-11-18/index.html">2026-11-18</a></td><td>英伟达换人发酵！AI叙事逻辑可能被打破了</td></tr><tr><td style="white-space:nowrap"><a href="2026-11-17/index.html">2026-11-17</a></td><td>英伟达换人发酵！AI叙事逻辑可能被打破了</td></tr><tr><td style="white-space:nowrap"><a href="2026-11-16/index.html">2026-11-16</a></td><td>行情日内大跳水！科技内部主线可能要换了</td></tr><tr><td style="white-space:nowrap"><a href="2026-11-13/index.html">2026-11-13</a></td><td>行情日内大跳水！科技内部主线可能要换了</td></tr><tr><td style="white-space:nowrap"><a href="2026-11-12/index.html">2026-11-12</a></td><td>行情日内大跳水！科技内部主线可能要换了</td></tr><tr><td style="white-space:nowrap"><a href="2026-11-05/index.html">2026-11-05</a></td><td>交易「油价崩 + 港股科技 + 绿能」，并完成从预期到兑现的切换：油头化工彻底胜出、气头转跌，能源链全天被抛售，价值（红利）继续被抛弃。</td></tr></table></div>
+
+<div class="ft">生成器 <code>scripts/gen_daily_market_summary.py</code>（daily_update.py 末两步自动执行）
+｜ 数据源：本地 <code>lixinger.db</code> + <code>gzh.db</code> ｜
+本页为盘面事实的规则化汇总，不构成买卖建议、目标价或仓位建议。</div>
+</div><script>
+(function(){var K='ml-theme';
+try{var s=localStorage.getItem(K);if(s)document.documentElement.dataset.theme=s;}catch(e){}
+window.toggleTheme=function(){var c=document.documentElement.dataset.theme==='dark'?'light':'dark';
+document.documentElement.dataset.theme=c;try{localStorage.setItem(K,c);}catch(e){}};})();
+</script></body></html>
