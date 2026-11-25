@@ -442,9 +442,14 @@ TASKS.append(("39.自选股入条件评估",
 
 # 步骤 40：指汇盈公众号文章（2026-11-13）
 # 40a 拉取：走搜狐号镜像免登录接口，增量写 data/gzh.db（与主库分开，避免锁库）；
+#     加 --body：正文供 41 步 LLM 提炼观点（只抓 brief 写不出判断，见教训 259）。
+# 40a2 正文补齐：为历史漏抓正文的行补抓（40a 只对新文章抓正文）。
 # 40b 导出：Playwright 渲染原页取图片真实地址，下载后存自包含 HTML 到 docs/gzh/html/
 # （公众号原页 <img src> 是加密串，必须渲染后才拿到 https 地址，见 progress 教训 202 203）。
-TASKS.append(("40a.指汇盈文章拉取", [PYTHON_EXE, "scripts/fetch_gzh_articles.py"]))
+TASKS.append(("40a.指汇盈文章拉取", [PYTHON_EXE, "scripts/fetch_gzh_articles.py", "--body"],
+              {"timeout": 1800}))
+TASKS.append(("40a2.指汇盈正文补齐", [PYTHON_EXE, "scripts/fetch_gzh_articles.py",
+                                  "--fill-body"], {"timeout": 1800}))
 TASKS.append(("40b.指汇盈文章导出", [PYTHON_EXE, "scripts/export_gzh_html.py", "--limit", "20"],
               {"timeout": 1800}))
 

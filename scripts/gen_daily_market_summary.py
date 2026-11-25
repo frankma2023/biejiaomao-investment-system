@@ -90,6 +90,33 @@ KEYWORDS = ['科技', '半导体', '芯片', '算力', 'AI', '军工', '新能�
             '白酒', '医药', '证券', '银行', '煤炭', '化工', '黄金', '红利',
             '港股', '美股', '债', '汇率', '地产', '汽车']
 
+# 关键词 → 指数名别名。文章说的是「科技」「AI」「债」这类口语词，
+# 指数名里往往不含这些字，直接子串匹配会大面积「未找到对应指数」。
+KW_ALIAS = {
+    '科技': ['科创50', '科创200', '科技', '科创', '创业板指'],
+    '半导体': ['半导体', '芯片'],
+    '芯片': ['半导体', '芯片'],
+    '算力': ['算力', '人工智能', '数据中心', '云计算'],
+    'AI': ['人工智能', '算力', '机器人', 'AI'],
+    '军工': ['军工', '国防'],
+    '新能源': ['新能源', '电池', '锂电'],
+    '光伏': ['光伏'],
+    '白酒': ['白酒', '食品饮料'],
+    '医药': ['医药', '生物', '医疗', '创新药'],
+    '证券': ['证券', '券商'],
+    '银行': ['银行'],
+    '煤炭': ['煤炭'],
+    '化工': ['化工', '基础化工'],
+    '黄金': ['黄金', '有色'],
+    '红利': ['中证红利', '红利低波', '红利质量', '红利'],
+    '港股': ['港股通', '恒生', 'H股'],
+    '美股': ['纳斯达克', '标普', '道琼斯'],
+    '债': ['国债', '债券', '政金债'],
+    '汇率': ['外汇', '人民币'],
+    '地产': ['地产', '房地产'],
+    '汽车': ['汽车', '乘用车', '智能车'],
+}
+
 BULL_WORDS = ['涨', '反弹', '新高', '走强', '上行', '上攻', '拉升', '回暖']
 BEAR_WORDS = ['跌', '回落', '走弱', '下调', '下跌', '跳水', '走低', '杀跌', '调整']
 
@@ -428,6 +455,15 @@ def gather(con, date):
 
     # 12) 指汇盈当日文章
     d['cons_date'] = (q1(con, "SELECT MAX(date) FROM index_constituents") or [None])[0]
+    # 指数 EOD 到位率：数据源对指数收盘价的发布晚于股票，当日可能只有部分代码齐全
+    d['idx_cov'] = (
+        (q1(con, "SELECT COUNT(DISTINCT stock_code) FROM index_daily_kline WHERE date=?", (date,)) or [0])[0],
+        (q1(con, "SELECT COUNT(DISTINCT stock_code) FROM index_daily_kline "
+                 "WHERE date=(SELECT MAX(date) FROM index_daily_kline WHERE date<?)",
+            (date,)) or [0])[0],
+    )
+    d['val_date'] = (q1(con, "SELECT MAX(date) FROM index_fundamental_daily WHERE date<=?",
+                        (date,)) or [None])[0]
     d['articles'], d['article_date'] = gzh_articles(date)
     d['kw'] = keyword_check(d['articles'], ranked)
     d['us'] = parse_us(d['articles'])
@@ -541,6 +577,11 @@ def keyword_check(articles, ranked):
         tone = '偏多' if bull > bear else ('偏空' if bear > bull else '中性')
         hit = next(((nm, ch) for nm, ch in ranked if kw in nm), None)
         if not hit:
+            for alias in KW_ALIAS.get(kw, []):
+                hit = next(((nm, ch) for nm, ch in ranked if alias in nm), None)
+                if hit:
+                    break
+        if not hit:
             out.append((kw, tone, '（未找到对应指数）', None, '无法判定'))
             continue
         nm, ch = hit
@@ -640,6 +681,9 @@ def facts(d):
             'margin_date': (d['margin'] or {}).get('date'),
             'constituent_snapshot': d.get('cons_date'),
             'amount_unit': '亿元',
+            'index_eod_codes_today': (d.get('idx_cov') or (0, 0))[0],
+            'index_eod_codes_prev': (d.get('idx_cov') or (0, 0))[1],
+            'valuation_date': d.get('val_date'),
         },
     }
     if hz:
@@ -1175,6 +1219,15 @@ def render(d):
     elif not d['articles']:
         art_date_note = '（本周尚无文章）'
 
+    # 指数 EOD 到位率说明（数据源对指数收盘价的发布晚于股票）
+    idx_today, idx_prev = (d.get('idx_cov') or (0, 0))
+    if idx_prev and idx_today < idx_prev * 0.95:
+        idx_gap_note = (f'，比上一交易日少 <b>{idx_prev - idx_today}</b> 个；'
+                        '缺少的指数在「主要指数表现」里显示为 —，'
+                        '行业分组与资金活跃度也按库内已有数据计算')
+    else:
+        idx_gap_note = ''
+
     # ── LLM 生成的叙事（有则覆盖模板段落，只覆盖文字，不动表格与数字） ──
     llm = d.get('llm') or {}
     if llm:
@@ -1290,6 +1343,8 @@ def render(d):
 <code>src/scanners/index_capital_flow.py</code>。</li>
 <li>指汇盈文章以搜狐号镜像为主（公众号原页需订阅号后台，见 progress 教训 202）；镜像不覆盖的图文，用微信原文链接单篇导入（scripts/import_gzh_url.py，source=wechat）。视频稿无正文段落，不入库。</li>
 <li>行业组成分快照日 {esc(d.get('cons_date') or '—')}，季度更新，非当日实时成分。</li>
+<li>指数 EOD 到位率：当日 <b>{idx_today}</b> / 上一交易日 {idx_prev} 个代码有收盘价{idx_gap_note}；
+指数估值（PE/PB/股息率）最新到 <b>{esc(d.get('val_date') or '—')}</b>。</li>
 </ul>
 
 <h2>九、历史</h2>

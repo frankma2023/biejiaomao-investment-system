@@ -949,6 +949,21 @@ function toggleTheme(){var h=document.documentElement,n=h.dataset.theme==='dark'
 <script>Nav.init({brandIcon:"⬤",brandText:"项目进展",currentPage:"progress"})</script>
 
 <div class="pg-section">
+<div class="section-title">📌 2026-11-25 · 单独跑 11-25 指汇盈拉取与大盘总结：补正文、补关键词别名、报指数到位率</div>
+<table class="pg-table">
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>现象</b>：11-25 两篇文章已入库但 <code>body</code> 为空（正文 0 字），第七章只能拿 <code>brief</code> 拼判断；<code>7.2</code> 关键词核对表 8 行里 5 行显示「未找到对应指数」</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>根因 1（正文）</b>：<code>fetch_gzh_articles.py</code> 只在<b>插入新文章</b>时抓正文，日更第 40a 步没带 <code>--body</code>，于是经日更入库的文章永远没有正文。新增 <code>--fill-body</code>：不翻页、只对 <code>body IS NULL</code> 的行补抓，实测补齐 6 篇（含 11-25 两篇 1,200 / 1,784 字），库内 64 篇全部有正文</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>根因 2（关键词）</b>：核对逻辑用「关键词是否为指数名子串」，文章说「科技」「AI」「债」，指数名里没有这些字，必然大面积落空。新增 <code>KW_ALIAS</code>：科技→科创50/科创200/创业板指，芯片→半导体，AI→人工智能/算力/机器人，红利→中证红利/红利低波，美股→纳斯达克/标普/道琼斯，债→国债/政金债 等 22 组</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>修 3（到位率）</b>：指数 EOD 当晚只到 107 / 428 个代码，第八章原本不体现这个缺口。新增两行：当日与上一交易日的代码数、差额说明（缺的指数在「主要指数表现」显示 —，行业分组与资金活跃度按已有数据计算）、指数估值最新日期。同一组数字也进 <code>data_notes</code>，LLM 能看到</td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>日更接入</b>：40a 改为带 <code>--body</code>；新增 40a2「指汇盈正文补齐」调 <code>--fill-body</code></td></tr>
+<tr><td><span class="pg-dot dot-done"></span></td><td><b>当日产出</b>：11-25 总结 33.5 KB、16 表、9 章、0 pageerror。健康分 <b>28（E）</b>、卖出评分 <b>255（强制清仓）</b>、12 条信号触发 <b>8 条</b>、597 涨 / 4,983 跌、成交额 1.39 万亿</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 259</b>：抓取脚本的「正文」开关只在插入路径生效时，日更跑久了会攒下一批空正文。补数据的能力要单独做成幂等子命令，不能指望重跑主流程</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 260</b>：用「名称子串」把文章口语词对到指数，命中率天然低。口语词与指数名之间需要一张显式别名表，且别名表要写进代码可被审阅</td></tr>
+<tr><td><span class="pg-dot dot-warn"></span></td><td><b>教训 261</b>：当日数据不齐（107/428）时，页面必须把这个比例写进「口径与数据缺口」，否则读的人会把半套数据算出来的行业分数当成全市场结论</td></tr>
+</table>
+</div>
+
+<div class="pg-section">
 <div class="section-title">📌 2026-11-24 · 日更「跑了但没更新」：指数 K 线落后 2 个交易日</div>
 <table class="pg-table">
 <tr><td><span class="pg-dot dot-warn"></span></td><td><b>现象</b>：11-24 日更跑完，市场扫描页的伦敦金/上海金/黄金ETF 仍显示 11-20；大盘交易总结的日期也停在 11-20</td></tr>

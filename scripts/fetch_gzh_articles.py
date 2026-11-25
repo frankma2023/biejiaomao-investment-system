@@ -164,6 +164,8 @@ def main():
     ap.add_argument('--pages', type=int, default=None, help='最多翻几页（每页 20 篇）')
     ap.add_argument('--backfill', action='store_true', help='不因命中已入库而提前停止')
     ap.add_argument('--body', action='store_true', help='同时抓正文')
+    ap.add_argument('--fill-body', action='store_true',
+                    help='为库内正文为空的文章补抓正文（不翻页、不插新文章）')
     ap.add_argument('--list', action='store_true', help='只打印新文章，不写库')
     ap.add_argument('--export', nargs='?', const='docs/gzh', default=None,
                     help='导出 Markdown 到目录（默认 docs/gzh），不抓取')
@@ -184,6 +186,31 @@ def main():
     sess = requests.Session()
     sess.headers.update({'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9'})
     db = conn()
+
+    if args.fill_body:
+        rows = db.execute("SELECT id, title, url FROM gzh_articles "
+                          "WHERE body IS NULL OR TRIM(body)='' "
+                          "ORDER BY publish_at DESC").fetchall()
+        print('待补正文 %d 篇' % len(rows))
+        filled = 0
+        for aid, title, url in rows:
+            body, err = fetch_body(sess, url or '')
+            if body:
+                db.execute("UPDATE gzh_articles SET body=?, "
+                           "fetched_at=datetime('now','localtime') WHERE id=?",
+                           (body, aid))
+                filled += 1
+                print('  ok  %s  %d 字' % ((title or '')[:30], len(body)))
+            else:
+                print('  --  %s  %s' % ((title or '')[:30], err or '无正文段落'))
+            time.sleep(0.6)
+        db.commit()
+        n, body_n = db.execute(
+            'SELECT COUNT(*), SUM(body IS NOT NULL) FROM gzh_articles').fetchone()
+        print('补齐 %d 篇；库内共 %d 篇（含正文 %d 篇）' % (filled, n, body_n or 0))
+        db.close()
+        return
+
     known = set(r[0] for r in db.execute('SELECT id FROM gzh_articles'))
 
     max_pages = args.pages or (10 if args.backfill else 3)
